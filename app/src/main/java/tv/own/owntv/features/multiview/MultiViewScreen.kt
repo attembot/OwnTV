@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -126,11 +128,11 @@ private fun AddStreamPicker(channels: List<ChannelEntity>, onPick: (ChannelEntit
             if (channels.isEmpty()) {
                 Text("No recent channels to add.", style = MaterialTheme.typography.bodyMedium, color = OwnTVTheme.colors.onSurfaceVariant)
             } else {
-                androidx.compose.foundation.lazy.LazyColumn(
+                LazyColumn(
                     Modifier.fillMaxWidth().heightIn(max = 320.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    androidx.compose.foundation.lazy.items(channels, key = { it.id }) { ch ->
+                    items(channels, key = { it.id }) { ch ->
                         tv.own.owntv.ui.components.FocusableSurface(
                             onClick = { onPick(ch) },
                             modifier = if (ch.id == channels.first().id) Modifier.fillMaxWidth().focusRequester(firstFocus) else Modifier.fillMaxWidth(),
