@@ -31,6 +31,13 @@ android {
         versionName = System.getenv("VERSION_NAME") ?: "99.99.99"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Personal fork: ship only the arm64-v8a libmpv/FFmpeg libs. Fire TV 4K Max and effectively every
+        // modern TV/box is arm64; dropping x86, x86_64, and 32-bit ARM roughly halves the APK with zero
+        // impact on those devices. Remove this to go back to a universal build that also runs on emulators.
+        ndk {
+            abiFilters += "arm64-v8a"
+        }
     }
 
     // Release signing is driven by env vars (set from GitHub secrets in CI). When they're absent
