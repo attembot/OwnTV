@@ -32,11 +32,12 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Personal fork: ship only the arm64-v8a libmpv/FFmpeg libs. Fire TV 4K Max and effectively every
-        // modern TV/box is arm64; dropping x86, x86_64, and 32-bit ARM roughly halves the APK with zero
-        // impact on those devices. Remove this to go back to a universal build that also runs on emulators.
+        // Personal fork: ship both ARM ABIs, drop the emulator-only x86 ones. Fire TV Sticks (incl. the
+        // 4K Max) run a 32-bit Android runtime and report armeabi-v7a, so an arm64-only APK fails to install
+        // on them (INSTALL_FAILED_NO_MATCHING_ABIS → "App not installed"). armeabi-v7a covers the Fire Stick;
+        // arm64-v8a covers 64-bit boxes. This still cuts ~55 MB of x86/x86_64 libs no TV ever loads.
         ndk {
-            abiFilters += "arm64-v8a"
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a")
         }
     }
 
