@@ -383,14 +383,14 @@ private fun BottomBar(
                 // Corner (true PiP) controls — present only while a second stream is in the corner.
                 if (onCornerClose != null) {
                     if (onCornerAudio != null) {
-                        CtrlButton(if (cornerAudioOn) OwnTVIcon.VOLUME_HIGH else OwnTVIcon.VOLUME_MUTE, active = cornerAudioOn) { onCornerAudio?.invoke() }
+                        CtrlButton(if (cornerAudioOn) OwnTVIcon.VOLUME_HIGH else OwnTVIcon.VOLUME_MUTE, active = cornerAudioOn, label = "Sound") { onCornerAudio?.invoke() }
                     }
-                    if (onCornerSwap != null) CtrlButton(OwnTVIcon.PIP, active = true) { onCornerSwap?.invoke() }
-                    CtrlButton(OwnTVIcon.CLOSE) { onCornerClose?.invoke() }
+                    if (onCornerSwap != null) CtrlButton(OwnTVIcon.PIP, active = true, label = "Swap") { onCornerSwap?.invoke() }
+                    CtrlButton(OwnTVIcon.CLOSE, label = "Close PiP") { onCornerClose?.invoke() }
                 }
-                if (onPip != null) CtrlButton(OwnTVIcon.PIP) { onPip() }
-                if (onMultiView != null) CtrlButton(OwnTVIcon.VIDEO) { onMultiView() } // enter the multi-stream grid
-                CtrlButton(OwnTVIcon.FULLSCREEN_EXIT) { onBack() }
+                if (onPip != null) CtrlButton(OwnTVIcon.PIP, label = "PiP") { onPip() }
+                if (onMultiView != null) CtrlButton(OwnTVIcon.VIDEO, label = "MultiView") { onMultiView() } // enter the multi-stream grid
+                CtrlButton(OwnTVIcon.FULLSCREEN_EXIT, label = "Exit") { onBack() }
             }
         }
     }
@@ -441,25 +441,36 @@ private fun SpeedButton(label: String, active: Boolean, onClick: () -> Unit) {
 private fun formatSpeed(speed: Double): String = if (speed == 1.0) "1.0x" else "${speed}x"
 
 @Composable
-private fun CtrlButton(icon: OwnTVIcon, badge: Int? = null, active: Boolean = false, onClick: () -> Unit) {
+private fun CtrlButton(icon: OwnTVIcon, badge: Int? = null, active: Boolean = false, label: String? = null, onClick: () -> Unit) {
     FocusableSurface(
         onClick = onClick,
-        modifier = Modifier.size(44.dp),
+        // Icon-only buttons stay a 44dp square; labeled ones grow into a pill so the text fits.
+        modifier = if (label == null) Modifier.size(44.dp) else Modifier.height(44.dp),
         shape = RoundedCornerShape(12.dp),
         focusedContainerColor = Color.White.copy(alpha = 0.16f),
         unfocusedContainerColor = Color.Transparent,
         selectedContainerColor = Color.Transparent,
         contentAlignment = Alignment.Center,
     ) { focused ->
-        Box(contentAlignment = Alignment.Center) {
-            OwnTVIcon(icon, tint = if (active) TEAL else if (focused) Color.White else Color.White.copy(alpha = 0.78f), filled = true, modifier = Modifier.size(22.dp))
-            if (badge != null) {
-                Box(
-                    Modifier.align(Alignment.TopEnd).size(15.dp).clip(CircleShape).background(TEAL),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("$badge", style = MaterialTheme.typography.labelSmall, color = Color(0xFF003730), fontWeight = FontWeight.Bold)
+        val tint = if (active) TEAL else if (focused) Color.White else Color.White.copy(alpha = 0.78f)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            modifier = if (label == null) Modifier else Modifier.padding(horizontal = 14.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                OwnTVIcon(icon, tint = tint, filled = true, modifier = Modifier.size(22.dp))
+                if (badge != null) {
+                    Box(
+                        Modifier.align(Alignment.TopEnd).size(15.dp).clip(CircleShape).background(TEAL),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("$badge", style = MaterialTheme.typography.labelSmall, color = Color(0xFF003730), fontWeight = FontWeight.Bold)
+                    }
                 }
+            }
+            if (label != null) {
+                Text(label, style = MaterialTheme.typography.labelLarge, color = tint, maxLines = 1)
             }
         }
     }
