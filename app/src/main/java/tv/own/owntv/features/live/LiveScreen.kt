@@ -380,7 +380,7 @@ private fun LivePreviewPane(
         Spacer(Modifier.height(16.dp))
         // True picture-in-picture: open this channel in a corner window that keeps playing while you watch
         // (or browse) something else. Audio stays with the main stream until you hand it to the corner.
-        OwnTVButton(label = "Watch in corner", onClick = onWatchInCorner, icon = OwnTVIcon.PIP)
+        OwnTVButton(label = "Picture-in-picture", onClick = onWatchInCorner, icon = OwnTVIcon.PIP)
         Spacer(Modifier.height(10.dp))
         // MultiView: open this channel as the first of up to four tiles (add more from inside the grid).
         OwnTVButton(label = "MultiView", onClick = onMultiView, icon = OwnTVIcon.PIP, style = OwnTVButtonStyle.SECONDARY)

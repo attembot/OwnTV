@@ -107,6 +107,8 @@ fun OwnTVShell(
     var audioOnCorner by remember { mutableStateOf(false) }
     // True while the channel switcher for the PiP corner is open (retune the corner without closing it).
     var cornerBrowsing by remember { mutableStateOf(false) }
+    // True while picking the SECOND stream to open in the corner from the full-screen player (true PiP entry).
+    var pipPicking by remember { mutableStateOf(false) }
     // Same activity-scoped instances the Live/Guide screens use — lets the fullscreen HUD zap channels
     // up/down (CH+/CH-) through whichever section's list opened the stream.
     val liveVm = org.koin.androidx.compose.koinViewModel<tv.own.owntv.features.live.LiveViewModel>()
@@ -408,7 +410,9 @@ fun OwnTVShell(
                 PlayerHud(
                     player = if (liveOnExo) liveVm.previewEngine else mpvEngine, // HUD drives the active engine
                     onBack = exitPlayer,
-                    onPip = dockPlayer, // PiP/dock works for live on either engine now
+                    // True PiP: pick a SECOND stream for the corner while this one stays full-screen as the
+                    // main. Hidden once a corner is already up — then the corner swap/close controls take over.
+                    onPip = if (cornerActive) null else ({ pipPicking = true }),
                     onChannelUp = zap?.let { z -> { z(-1) } },
                     onChannelDown = zap?.let { z -> { z(1) } },
                     onRewindLive = if (isLiveChannel && canRewindLive) liveVm::rewindLive else null,
@@ -472,6 +476,21 @@ fun OwnTVShell(
             search = { q -> liveVm.browseChannels(q) },
             onPick = { ch -> pip.openCorner(ch); cornerBrowsing = false },
             onDismiss = { cornerBrowsing = false },
+            modifier = Modifier.fillMaxSize(),
+        )
+      }
+
+      // True PiP entry from the full-screen player: pick a SECOND stream to open in the corner. The current
+      // full-screen stream keeps playing as the main; the corner opens muted. (Two streams = two provider
+      // connections — a provider that allows only one will 509 the corner; that's a plan limit, not a bug.)
+      if (pipPicking) {
+        val mainCh = liveVm.previewChannel.value
+        tv.own.owntv.ui.components.ChannelSwitcher(
+            title = "Add a stream to the corner",
+            recent = recentChannels.filter { it.id != mainCh?.id },
+            search = { q -> liveVm.browseChannels(q) },
+            onPick = { ch -> pip.openCorner(ch); pipPicking = false },
+            onDismiss = { pipPicking = false },
             modifier = Modifier.fillMaxSize(),
         )
       }
