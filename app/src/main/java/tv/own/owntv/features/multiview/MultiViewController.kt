@@ -86,6 +86,18 @@ class MultiViewController(
         applyAudio()
     }
 
+    /** Swap the channel shown in tile [index] for [channel], **in place** — every other tile keeps playing
+     *  untouched, and the active/audible tile is unchanged. No-op if [index] is out of range or already on
+     *  this stream. This is the cheap "retune one window" path the in-overlay channel switcher uses. */
+    fun replaceTile(index: Int, channel: ChannelEntity) {
+        val current = _tiles.value
+        if (index !in current.indices) return
+        if (current[index].streamUrl == channel.streamUrl) return
+        _tiles.value = current.toMutableList().apply { set(index, channel) }
+        startTile(index, channel) // engine url differs now, so this retunes just this slot
+        applyAudio()
+    }
+
     /** Remove tile [index], stopping its decoder. Exits MultiView if it was the last tile. */
     fun removeTile(index: Int) {
         val current = _tiles.value

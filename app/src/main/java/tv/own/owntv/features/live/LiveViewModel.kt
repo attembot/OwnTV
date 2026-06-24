@@ -236,6 +236,18 @@ class LiveViewModel(
         return epgDao.listEpgChannels(ids, query.trim().lowercase(), 300)
     }
 
+    /**
+     * One-shot channel browse for the in-overlay switcher (PiP / MultiView): the active sources' channels,
+     * filtered by [query] when it's non-blank, as a bounded list (no paging — the overlay shows a scroll of
+     * the first [limit]). Lets the user retune a corner/tile from the whole playlist without leaving playback.
+     */
+    suspend fun browseChannels(query: String, limit: Int = 100): List<ChannelEntity> = withContext(Dispatchers.IO) {
+        val ids = ctx.value.sourceIds
+        if (ids.isEmpty()) return@withContext emptyList()
+        val q = query.trim()
+        if (q.isEmpty()) channelDao.allForSources(ids, limit) else channelDao.searchList(q, ids, limit)
+    }
+
     val count: StateFlow<Int> = combine(_selected, ctx, hiddenCategoryIds) { key, c, hidden -> Triple(key, c, hidden) }
         .flatMapLatest { (key, c, hidden) -> countFlow(key, c, hidden) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, 0)

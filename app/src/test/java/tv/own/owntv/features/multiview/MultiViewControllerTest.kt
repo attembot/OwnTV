@@ -69,6 +69,34 @@ class MultiViewControllerTest {
     }
 
     @Test
+    fun replaceTile_retunesInPlaceAndLeavesOthersUntouched() {
+        val (c, engines) = controller()
+        c.enter(listOf(channel(1, "a"), channel(2, "b")))
+        c.setActive(1) // tile 1 is the audible one
+
+        c.replaceTile(0, channel(9, "z"))
+
+        assertEquals("tile 0 now shows the new channel", listOf(9L, 2L), c.tiles.value.map { it.id })
+        assertEquals("tile 0's engine retuned to the new url", "z", engines[0].currentUrl)
+        assertEquals("tile 1 was left playing untouched", "b", engines[1].currentUrl)
+        assertEquals("audio stayed put: only the active tile is audible", 1, engines.count { !it.muted })
+        assertFalse("active tile (1) is still the audible one", engines[1].muted)
+    }
+
+    @Test
+    fun replaceTile_ignoresOutOfRangeAndSameStream() {
+        val (c, engines) = controller()
+        c.enter(listOf(channel(1, "a"), channel(2, "b")))
+        val playsBefore = engines[0].currentUrl
+
+        c.replaceTile(5, channel(9, "z"))      // out of range — no-op
+        c.replaceTile(0, channel(1, "a"))      // same stream — no-op
+
+        assertEquals(listOf(1L, 2L), c.tiles.value.map { it.id })
+        assertEquals(playsBefore, engines[0].currentUrl)
+    }
+
+    @Test
     fun promoteToDominant_setsActiveAndSwitchesLayout() {
         val (c, _) = controller()
         c.enter(listOf(channel(1, "a"), channel(2, "b")))

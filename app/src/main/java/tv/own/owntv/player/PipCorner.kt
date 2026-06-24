@@ -73,6 +73,7 @@ fun PipCornerWindow(
     showControls: Boolean,
     audioOnCorner: Boolean,
     onToggleAudio: () -> Unit,
+    onBrowse: () -> Unit,
     onSwap: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
@@ -104,22 +105,22 @@ fun PipCornerWindow(
             }
         }
 
-        // Title strip (top) — channel name on a slight scrim, with a small "PiP" marker.
+        // Title strip (top) — channel name on a scrim, with the PiP marker and an audio badge (icons, not
+        // emoji, so they render consistently in the TV system font and match the rest of the app's chrome).
         Row(
             modifier = Modifier.align(Alignment.TopStart).fillMaxWidth()
-                .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.6f), Color.Transparent)))
-                .padding(horizontal = 8.dp, vertical = 5.dp),
+                .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.7f), Color.Transparent)))
+                .padding(horizontal = 9.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text(
-                if (audioOnCorner) "PiP · 🔊" else "PiP",
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.8f),
-            )
+            OwnTVIcon(OwnTVIcon.PIP, tint = Color.White.copy(alpha = 0.85f), filled = true, modifier = Modifier.size(14.dp))
+            if (audioOnCorner) {
+                OwnTVIcon(OwnTVIcon.VOLUME_HIGH, tint = tv.own.owntv.ui.theme.OwnTVTheme.colors.primary, filled = true, modifier = Modifier.size(14.dp))
+            }
             Text(
                 meta.title ?: "",
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelLarge,
                 color = Color.White,
                 maxLines = 1,
             )
@@ -135,7 +136,8 @@ fun PipCornerWindow(
             ) {
                 PipBtn(if (audioOnCorner) OwnTVIcon.VOLUME_HIGH else OwnTVIcon.VOLUME_MUTE, onClick = onToggleAudio)
                 Spacer(Modifier.weight(1f))
-                PipBtn(OwnTVIcon.FULLSCREEN, onClick = onSwap) // swap the corner stream into the main window
+                PipBtn(OwnTVIcon.PLAYLIST, onClick = onBrowse) // retune the corner stream from the playlist
+                PipBtn(OwnTVIcon.FULLSCREEN, onClick = onSwap)  // swap the corner stream into the main window
                 PipBtn(OwnTVIcon.CLOSE, onClick = onClose)
             }
         }
@@ -146,14 +148,19 @@ fun PipCornerWindow(
 private fun PipBtn(icon: OwnTVIcon, onClick: () -> Unit) {
     FocusableSurface(
         onClick = onClick,
-        modifier = Modifier.size(32.dp),
+        modifier = Modifier.size(38.dp),
         shape = CircleShape,
-        focusedScale = 1.12f,
-        focusedContainerColor = Color.White.copy(alpha = 0.28f),
-        unfocusedContainerColor = Color.White.copy(alpha = 0.12f),
-        selectedContainerColor = Color.White.copy(alpha = 0.12f),
+        focusedScale = 1.15f,
+        focusedContainerColor = tv.own.owntv.ui.theme.OwnTVTheme.colors.primary,
+        unfocusedContainerColor = Color.White.copy(alpha = 0.14f),
+        selectedContainerColor = Color.White.copy(alpha = 0.14f),
         contentAlignment = Alignment.Center,
-    ) { _ ->
-        OwnTVIcon(icon, tint = Color.White, filled = true, modifier = Modifier.size(16.dp))
+    ) { focused ->
+        OwnTVIcon(
+            icon,
+            tint = if (focused) tv.own.owntv.ui.theme.OwnTVTheme.colors.onPrimary else Color.White,
+            filled = true,
+            modifier = Modifier.size(19.dp),
+        )
     }
 }

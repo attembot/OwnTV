@@ -105,6 +105,8 @@ fun OwnTVShell(
     val cornerActive by pip.active.collectAsStateWithLifecycle()
     val cornerChannel by pip.channel.collectAsStateWithLifecycle()
     var audioOnCorner by remember { mutableStateOf(false) }
+    // True while the channel switcher for the PiP corner is open (retune the corner without closing it).
+    var cornerBrowsing by remember { mutableStateOf(false) }
     // Same activity-scoped instances the Live/Guide screens use — lets the fullscreen HUD zap channels
     // up/down (CH+/CH-) through whichever section's list opened the stream.
     val liveVm = org.koin.androidx.compose.koinViewModel<tv.own.owntv.features.live.LiveViewModel>()
@@ -218,6 +220,9 @@ fun OwnTVShell(
         plan.muteMain?.let { setMainMuted(it) }
         pip.engine.setMuted(plan.muteCorner)
     }
+
+    // If the corner closes by any path (close, swap-to-fullscreen, entering MultiView), drop its switcher too.
+    LaunchedEffect(cornerActive) { if (!cornerActive) cornerBrowsing = false }
 
     LaunchedEffect(Unit) { runCatching { sidebarFocus.requestFocus() } }
 
@@ -431,7 +436,8 @@ fun OwnTVShell(
       if (mvActive) {
         tv.own.owntv.features.multiview.MultiViewScreen(
             controller = mv,
-            addableChannels = recentChannels,
+            recentChannels = recentChannels,
+            searchChannels = { q -> liveVm.browseChannels(q) },
             onExit = exitMultiView,
             modifier = Modifier.fillMaxSize(),
         )
@@ -449,11 +455,25 @@ fun OwnTVShell(
                 showControls = playerMode != PlayerMode.FULLSCREEN,
                 audioOnCorner = audioOnCorner,
                 onToggleAudio = toggleCornerAudio,
+                onBrowse = { cornerBrowsing = true }, // retune the corner from the playlist, live
                 onSwap = expandCorner, // window's expand button promotes the corner channel to full-screen
                 onClose = closeCorner,
                 modifier = Modifier.fillMaxSize(),
             )
         }
+      }
+
+      // Channel switcher for the PiP corner — pick from the playlist (search included) and the corner retunes
+      // in place, without closing or stealing the main window's sound.
+      if (cornerActive && cornerBrowsing) {
+        tv.own.owntv.ui.components.ChannelSwitcher(
+            title = "Change the PiP stream",
+            recent = recentChannels,
+            search = { q -> liveVm.browseChannels(q) },
+            onPick = { ch -> pip.openCorner(ch); cornerBrowsing = false },
+            onDismiss = { cornerBrowsing = false },
+            modifier = Modifier.fillMaxSize(),
+        )
       }
 
         if (showExit) {
