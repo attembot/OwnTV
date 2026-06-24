@@ -69,6 +69,7 @@ fun PlayerHud(
     player: PlaybackEngine,
     onBack: () -> Unit,
     onPip: (() -> Unit)? = null,
+    onMultiView: (() -> Unit)? = null, // enter MultiView seeded with this channel (live only)
     onChannelUp: (() -> Unit)? = null,
     onChannelDown: (() -> Unit)? = null,
     // Live rewind / timeshift (catch-up channels). onRewindLive non-null = this live channel can rewind;
@@ -178,7 +179,7 @@ fun PlayerHud(
                     volume = volume, audioCount = audioCount, subCount = subCount, zoomMode = zoomMode,
                     speedLabel = formatSpeed(speed),
                     onScrubLive = onScrubLive, timeshiftOffsetSec = timeshiftOffsetSec,
-                    onOpenDialog = { dialog = it }, onPip = onPip, onBack = onBack,
+                    onOpenDialog = { dialog = it }, onPip = onPip, onMultiView = onMultiView, onBack = onBack,
                     onCornerSwap = onCornerSwap, onCornerAudio = onCornerAudio, onCornerClose = onCornerClose,
                     cornerAudioOn = cornerAudioOn,
                     modifier = Modifier.align(Alignment.BottomStart),
@@ -345,7 +346,7 @@ private fun BottomBar(
     player: PlaybackEngine, isLive: Boolean, position: Long, duration: Long,
     volume: Int, audioCount: Int, subCount: Int, zoomMode: ZoomMode, speedLabel: String,
     onScrubLive: ((Int) -> Unit)?, timeshiftOffsetSec: Int?,
-    onOpenDialog: (HudDialog) -> Unit, onPip: (() -> Unit)?, onBack: () -> Unit,
+    onOpenDialog: (HudDialog) -> Unit, onPip: (() -> Unit)?, onMultiView: (() -> Unit)? = null, onBack: () -> Unit,
     onCornerSwap: (() -> Unit)? = null, onCornerAudio: (() -> Unit)? = null, onCornerClose: (() -> Unit)? = null,
     cornerAudioOn: Boolean = false,
     modifier: Modifier = Modifier,
@@ -388,6 +389,7 @@ private fun BottomBar(
                     CtrlButton(OwnTVIcon.CLOSE) { onCornerClose?.invoke() }
                 }
                 if (onPip != null) CtrlButton(OwnTVIcon.PIP) { onPip() }
+                if (onMultiView != null) CtrlButton(OwnTVIcon.VIDEO) { onMultiView() } // enter the multi-stream grid
                 CtrlButton(OwnTVIcon.FULLSCREEN_EXIT) { onBack() }
             }
         }

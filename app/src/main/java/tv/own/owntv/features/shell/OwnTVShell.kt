@@ -413,6 +413,8 @@ fun OwnTVShell(
                     // True PiP: pick a SECOND stream for the corner while this one stays full-screen as the
                     // main. Hidden once a corner is already up — then the corner swap/close controls take over.
                     onPip = if (cornerActive) null else ({ pipPicking = true }),
+                    // MultiView: drop into the grid seeded with this channel (live only); add more from inside.
+                    onMultiView = if (isLiveChannel) ({ liveVm.previewChannel.value?.let { enterMultiView(it) } }) else null,
                     onChannelUp = zap?.let { z -> { z(-1) } },
                     onChannelDown = zap?.let { z -> { z(1) } },
                     onRewindLive = if (isLiveChannel && canRewindLive) liveVm::rewindLive else null,
