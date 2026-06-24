@@ -3,9 +3,6 @@
 package tv.own.owntv.features.multiview
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
@@ -23,7 +20,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -36,7 +32,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.MaterialTheme
@@ -49,21 +44,21 @@ import tv.own.owntv.ui.components.ChannelSwitcher
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.theme.OwnTVTheme
 
-/** Inset for on-screen chrome so it clears TV overscan (the outer ~5% a panel may crop). */
+/** Inset for the control bar so it clears TV overscan (the outer ~5% a panel may crop). */
 private val SafeArea = 28.dp
 
-/** How long the control bar lingers after the last key press before it fades back to just-video. */
-private const val ChromeIdleMs = 4000L
+/** Sentinel [switchTarget] meaning "open the switcher to add a new tile" rather than retune an existing one. */
+private const val ADD_TILE = -1
 
 /**
  * MultiView — up to four live streams on screen at once, in either an equal **grid** or a **dominant**
- * (one large + a small strip) layout. The whole surface is built for a remote:
+ * (one large + a small strip) layout. Built for a remote:
  *
  * - **D-pad** moves focus between tiles; the focused tile is the only audible one.
- * - **OK** on a tile opens the [ChannelSwitcher] to retune *that* tile from the playlist, live, while the
- *   others keep playing.
+ * - **D-pad down** off the bottom tiles reaches the control bar (which sits *below* the tiles, not over
+ *   them, so directional focus can actually traverse onto it).
+ * - **OK** on a tile opens the [ChannelSwitcher] to retune *that* tile from the playlist, live.
  * - **Hold OK** promotes a tile to the dominant (large) layout.
- * - The control bar auto-hides to an unobstructed video wall and returns on any key press.
  *
  * Each tile renders a [SecondaryVideoSurface] — the constrained second-decoder pattern from PiP.
  */
@@ -83,45 +78,36 @@ fun MultiViewScreen(
     var switchTarget by remember { mutableStateOf<Int?>(null) }
     val switcherOpen = switchTarget != null
 
-    // Auto-hiding chrome. Any key press shows it and restarts the idle timer; it only fades while focus is on
-    // a tile (not the bar), so a tile always owns focus when the bar leaves the composition — no stranded focus.
-    var chromeVisible by remember { mutableStateOf(true) }
-    var barFocused by remember { mutableStateOf(false) }
-    var interactions by remember { mutableIntStateOf(0) }
-    LaunchedEffect(interactions, barFocused, switcherOpen) {
-        if (!barFocused && !switcherOpen) {
-            delay(ChromeIdleMs)
-            chromeVisible = false
+    // The active tile carries this requester. We pull focus onto it on entry and whenever the switcher closes
+    // — retried across a few frames because on a TV the focus node isn't attached on the very first frame, so
+    // a single requestFocus() silently no-ops and the remote ends up controlling nothing. This is the fix for
+    // "MultiView opens but the D-pad does nothing".
+    val activeTileFocus = remember { FocusRequester() }
+    LaunchedEffect(switcherOpen) {
+        if (!switcherOpen && tiles.isNotEmpty()) {
+            repeat(8) { runCatching { activeTileFocus.requestFocus() }; delay(70) }
         }
     }
 
     BackHandler(enabled = !switcherOpen) { onExit() }
 
-    Box(
-        modifier
-            .fillMaxSize()
-            .background(Color.Black)
-            // Reveal chrome on any remote activity, then let the event flow on to the focused tile/button.
-            .onPreviewKeyEvent { chromeVisible = true; interactions++; false },
-    ) {
-        when {
-            tiles.isEmpty() -> Unit
-            layout == MultiLayout.DOMINANT && tiles.size > 1 ->
-                DominantLayout(tiles, activeIndex, controller, chromeVisible) { switchTarget = it }
-            else -> GridLayout(tiles, activeIndex, controller, chromeVisible) { switchTarget = it }
-        }
+    Box(modifier.fillMaxSize().background(Color.Black)) {
+        Column(Modifier.fillMaxSize()) {
+            // Tiles fill everything above the bar.
+            Box(Modifier.fillMaxWidth().weight(1f)) {
+                when {
+                    tiles.isEmpty() -> Unit
+                    layout == MultiLayout.DOMINANT && tiles.size > 1 ->
+                        DominantLayout(tiles, activeIndex, controller, activeTileFocus) { switchTarget = it }
+                    else -> GridLayout(tiles, activeIndex, controller, activeTileFocus) { switchTarget = it }
+                }
+            }
 
-        // Bottom chrome: a one-line hint for the OK gestures, then the control pill. Fades together.
-        AnimatedVisibility(
-            visible = chromeVisible,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier.align(Alignment.BottomCenter),
-        ) {
+            // Control bar — a real row beneath the tiles, so D-pad down moves onto it cleanly.
             Column(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = SafeArea),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(bottom = SafeArea),
             ) {
                 Text(
                     "OK changes the focused stream · hold OK to enlarge it",
@@ -133,8 +119,7 @@ fun MultiViewScreen(
                         .clip(RoundedCornerShape(16.dp))
                         .background(Color.Black.copy(alpha = 0.6f))
                         .padding(horizontal = 10.dp, vertical = 8.dp)
-                        .focusGroup()
-                        .onFocusChanged { barFocused = it.hasFocus },
+                        .focusGroup(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -153,7 +138,6 @@ fun MultiViewScreen(
             val adding = target == ADD_TILE
             ChannelSwitcher(
                 title = if (adding) "Add a stream" else "Change this stream",
-                // For "add", hide channels already on screen; for "change", the whole playlist is fair game.
                 recent = if (adding) recentChannels.filter { ch -> tiles.none { it.id == ch.id } } else recentChannels,
                 search = searchChannels,
                 onPick = { ch ->
@@ -165,9 +149,6 @@ fun MultiViewScreen(
         }
     }
 }
-
-/** Sentinel [switchTarget] meaning "open the switcher to add a new tile" rather than retune an existing one. */
-private const val ADD_TILE = -1
 
 /** A focusable icon+label button for the MultiView control bar. Labels (not bare icons) keep modes legible. */
 @Composable
@@ -206,20 +187,20 @@ private fun GridLayout(
     tiles: List<ChannelEntity>,
     activeIndex: Int,
     controller: MultiViewController,
-    chromeVisible: Boolean,
+    activeTileFocus: FocusRequester,
     onChange: (Int) -> Unit,
 ) {
     val gap = 4.dp
     when (tiles.size) {
-        1 -> TileRow(tiles, 0, activeIndex, controller, chromeVisible, onChange, Modifier.fillMaxSize())
-        2 -> TileRow(tiles, 0, activeIndex, controller, chromeVisible, onChange, Modifier.fillMaxSize(), count = 2)
+        1 -> TileRow(tiles, 0, activeIndex, controller, activeTileFocus, onChange, Modifier.fillMaxSize())
+        2 -> TileRow(tiles, 0, activeIndex, controller, activeTileFocus, onChange, Modifier.fillMaxSize(), count = 2)
         3 -> Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(gap)) {
-            TileRow(tiles, 0, activeIndex, controller, chromeVisible, onChange, Modifier.fillMaxWidth().weight(1f), count = 2)
-            TileRow(tiles, 2, activeIndex, controller, chromeVisible, onChange, Modifier.fillMaxWidth().weight(1f), count = 1)
+            TileRow(tiles, 0, activeIndex, controller, activeTileFocus, onChange, Modifier.fillMaxWidth().weight(1f), count = 2)
+            TileRow(tiles, 2, activeIndex, controller, activeTileFocus, onChange, Modifier.fillMaxWidth().weight(1f), count = 1)
         }
         else -> Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(gap)) {
-            TileRow(tiles, 0, activeIndex, controller, chromeVisible, onChange, Modifier.fillMaxWidth().weight(1f), count = 2)
-            TileRow(tiles, 2, activeIndex, controller, chromeVisible, onChange, Modifier.fillMaxWidth().weight(1f), count = 2)
+            TileRow(tiles, 0, activeIndex, controller, activeTileFocus, onChange, Modifier.fillMaxWidth().weight(1f), count = 2)
+            TileRow(tiles, 2, activeIndex, controller, activeTileFocus, onChange, Modifier.fillMaxWidth().weight(1f), count = 2)
         }
     }
 }
@@ -231,7 +212,7 @@ private fun TileRow(
     start: Int,
     activeIndex: Int,
     controller: MultiViewController,
-    chromeVisible: Boolean,
+    activeTileFocus: FocusRequester,
     onChange: (Int) -> Unit,
     modifier: Modifier,
     count: Int = 1,
@@ -240,7 +221,7 @@ private fun TileRow(
         for (offset in 0 until count) {
             val index = start + offset
             if (index in tiles.indices) {
-                Tile(index, tiles[index], active = index == activeIndex, controller, chromeVisible, onChange, Modifier.fillMaxHeight().weight(1f))
+                Tile(index, tiles[index], active = index == activeIndex, controller, activeTileFocus, onChange, Modifier.fillMaxHeight().weight(1f))
             }
         }
     }
@@ -252,15 +233,15 @@ private fun DominantLayout(
     tiles: List<ChannelEntity>,
     activeIndex: Int,
     controller: MultiViewController,
-    chromeVisible: Boolean,
+    activeTileFocus: FocusRequester,
     onChange: (Int) -> Unit,
 ) {
     val big = activeIndex.coerceIn(0, tiles.lastIndex) // guard against a transient tiles/active mismatch
     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        Tile(big, tiles[big], active = true, controller, chromeVisible, onChange, Modifier.fillMaxHeight().weight(3f))
+        Tile(big, tiles[big], active = true, controller, activeTileFocus, onChange, Modifier.fillMaxHeight().weight(3f))
         Column(Modifier.fillMaxHeight().weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             tiles.forEachIndexed { i, ch ->
-                if (i != big) Tile(i, ch, active = false, controller, chromeVisible, onChange, Modifier.fillMaxWidth().weight(1f))
+                if (i != big) Tile(i, ch, active = false, controller, activeTileFocus, onChange, Modifier.fillMaxWidth().weight(1f))
             }
         }
     }
@@ -273,15 +254,12 @@ private fun Tile(
     channel: ChannelEntity,
     active: Boolean,
     controller: MultiViewController,
-    chromeVisible: Boolean,
+    activeTileFocus: FocusRequester,
     onChange: (Int) -> Unit,
     modifier: Modifier,
 ) {
     val engine = remember(index) { controller.engineAt(index) }
     val state by engine.state.collectAsStateWithLifecycle()
-    val focusRequester = remember { FocusRequester() }
-    // Pull focus to the active tile when MultiView opens / the active tile changes.
-    LaunchedEffect(active) { if (active) runCatching { focusRequester.requestFocus() } }
 
     Box(
         modifier = modifier
@@ -300,7 +278,8 @@ private fun Tile(
                 color = if (active) OwnTVTheme.colors.primary else Color.White.copy(alpha = 0.25f),
                 shape = RoundedCornerShape(8.dp),
             )
-            .focusRequester(focusRequester)
+            // Only the active tile owns the shared requester (one node at a time) — that's what entry focus lands on.
+            .then(if (active) Modifier.focusRequester(activeTileFocus) else Modifier)
             .onFocusChanged { if (it.isFocused) controller.setActive(index) }
             // combinedClickable is the single focus target: OK retunes this tile, hold OK enlarges it.
             .combinedClickable(
@@ -320,25 +299,17 @@ private fun Tile(
                 tv.own.owntv.ui.components.OwnTVSpinner(sizeDp = 22)
             }
         }
-        // Title strip fades with the rest of the chrome, leaving a clean video wall when idle.
-        AnimatedVisibility(
-            visible = chromeVisible,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier.align(Alignment.TopStart),
+        Row(
+            modifier = Modifier.align(Alignment.TopStart).fillMaxWidth()
+                .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.7f), Color.Transparent)))
+                .padding(horizontal = 10.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth()
-                    .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.7f), Color.Transparent)))
-                    .padding(horizontal = 10.dp, vertical = 7.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                if (active) {
-                    OwnTVIcon(OwnTVIcon.VOLUME_HIGH, tint = OwnTVTheme.colors.primary, filled = true, modifier = Modifier.size(16.dp))
-                }
-                Text(channel.name, style = MaterialTheme.typography.titleSmall, color = Color.White, maxLines = 1)
+            if (active) {
+                OwnTVIcon(OwnTVIcon.VOLUME_HIGH, tint = OwnTVTheme.colors.primary, filled = true, modifier = Modifier.size(16.dp))
             }
+            Text(channel.name, style = MaterialTheme.typography.titleSmall, color = Color.White, maxLines = 1)
         }
     }
 }
