@@ -14,11 +14,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -27,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
@@ -35,39 +38,48 @@ import kotlinx.coroutines.delay
 import tv.own.owntv.core.database.entity.ChannelEntity
 import tv.own.owntv.ui.theme.OwnTVTheme
 
+/** A browsable category for the [ChannelSwitcher]: a label and a lazy loader for its channels. */
+class ChannelCategory(val label: String, val load: suspend () -> List<ChannelEntity>)
+
 /**
- * A full-screen modal for retuning one playing window — a PiP corner or a MultiView tile — without
- * interrupting it. Seeded with [recent] (shown while the box is empty), then type-to-[search] across the
- * whole playlist. Picking a channel calls [onPick]; Back (or the on-screen hint) dismisses.
+ * A full-screen modal for retuning a playing window — a PiP corner or a MultiView tile — without
+ * interrupting it. **Browse-first:** the left column is the playlist's [categories]; focusing one fills the
+ * right column with its channels (live, like the main guide). A [search] field on top filters across the
+ * whole playlist when you'd rather type. Picking a channel calls [onPick]; Back dismisses.
  *
- * Built for a remote: the first result auto-focuses so OK lands a pick in two presses (type, OK), and the
- * search field is the app's standard [SearchBar] pill so the D-pad can skip past it.
+ * Focus is purely D-pad/spatial (the two columns sit side by side, so left/right traverses cleanly), and
+ * the picker holds focus because the player HUD goes inert beneath it — see PlayerHud's `inert`.
  */
 @Composable
 fun ChannelSwitcher(
     title: String,
-    recent: List<ChannelEntity>,
+    categories: List<ChannelCategory>,
     search: suspend (String) -> List<ChannelEntity>,
     onPick: (ChannelEntity) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var query by remember { mutableStateOf("") }
-    var results by remember { mutableStateOf(recent) }
-    val firstFocus = remember { FocusRequester() }
+    var selected by remember { mutableIntStateOf(0) }
+    var channels by remember { mutableStateOf<List<ChannelEntity>>(emptyList()) }
+    var searchResults by remember { mutableStateOf<List<ChannelEntity>>(emptyList()) }
+    val firstCategoryFocus = remember { FocusRequester() }
+    val searching = query.isNotBlank()
 
-    // Debounced one-shot search; a blank query falls back to the recents we were seeded with.
-    LaunchedEffect(query) {
-        if (query.isBlank()) {
-            results = recent
-        } else {
-            delay(250)
-            results = runCatching { search(query) }.getOrDefault(emptyList())
-        }
+    // The focused category's channels (reloads as focus moves down the category list).
+    LaunchedEffect(selected, categories) {
+        channels = if (selected in categories.indices) {
+            runCatching { categories[selected].load() }.getOrDefault(emptyList())
+        } else emptyList()
     }
-    // Land focus on the top result once when the picker opens. Do NOT re-grab when results change while the
-    // user is typing — that was yanking focus out of the search field (closing the keyboard) mid-search.
-    LaunchedEffect(Unit) { if (results.isNotEmpty()) runCatching { firstFocus.requestFocus() } }
+    // Debounced search across the whole playlist.
+    LaunchedEffect(query) {
+        if (query.isBlank()) { searchResults = emptyList(); return@LaunchedEffect }
+        delay(250)
+        searchResults = runCatching { search(query) }.getOrDefault(emptyList())
+    }
+    // Land focus on the first category once, on open. (Don't re-grab on data changes — that fights typing.)
+    LaunchedEffect(Unit) { if (categories.isNotEmpty()) runCatching { firstCategoryFocus.requestFocus() } }
 
     BackHandler { onDismiss() }
 
@@ -76,42 +88,81 @@ fun ChannelSwitcher(
         contentAlignment = Alignment.Center,
     ) {
         Column(
-            Modifier.fillMaxWidth(0.5f).fillMaxHeight(0.92f)
+            Modifier.fillMaxWidth(0.72f).fillMaxHeight(0.92f)
                 .clip(RoundedCornerShape(18.dp))
                 .background(OwnTVTheme.colors.surfaceContainerHigh)
                 .padding(24.dp),
         ) {
             Text(title, style = MaterialTheme.typography.titleLarge, color = OwnTVTheme.colors.onSurface)
             Spacer(Modifier.height(14.dp))
-            SearchBar(query = query, onQueryChange = { query = it }, placeholder = "Search channels…")
-            Spacer(Modifier.height(14.dp))
-            if (results.isEmpty()) {
-                Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                    Text(
-                        if (query.isBlank()) "Type to search your playlist." else "No channels match “$query”.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = OwnTVTheme.colors.onSurfaceVariant,
-                    )
-                }
-            } else {
+            SearchBar(query = query, onQueryChange = { query = it }, placeholder = "Search all channels…")
+            Spacer(Modifier.height(16.dp))
+
+            Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                // Left — categories. Focusing one selects it (fills the right column).
                 LazyColumn(
-                    Modifier.fillMaxWidth().weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    Modifier.fillMaxHeight().weight(0.34f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    itemsIndexed(results, key = { _, ch -> ch.id }) { i, ch ->
+                    itemsIndexed(categories, key = { _, c -> c.label }) { i, cat ->
                         FocusableSurface(
-                            onClick = { onPick(ch) },
-                            modifier = if (i == 0) Modifier.fillMaxWidth().focusRequester(firstFocus) else Modifier.fillMaxWidth(),
+                            onClick = { selected = i },
+                            modifier = (if (i == 0) Modifier.focusRequester(firstCategoryFocus) else Modifier)
+                                .fillMaxWidth()
+                                .onFocusChanged { if (it.isFocused) selected = i },
+                            selected = i == selected && !searching,
                             shape = RoundedCornerShape(10.dp),
                             focusedScale = 1.02f,
                             focusedContainerColor = OwnTVTheme.colors.primary,
+                            selectedContainerColor = OwnTVTheme.colors.primary.copy(alpha = 0.22f),
                             contentAlignment = Alignment.CenterStart,
-                        ) { focused -> ChannelSwitcherRow(ch, focused) }
+                        ) { focused ->
+                            Text(
+                                cat.label,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = if (focused) OwnTVTheme.colors.onPrimary else OwnTVTheme.colors.onSurface,
+                                maxLines = 1,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
+                            )
+                        }
+                    }
+                }
+
+                // Right — channels for the focused category, or search results while typing.
+                val list = if (searching) searchResults else channels
+                if (list.isEmpty()) {
+                    Box(Modifier.fillMaxHeight().weight(0.66f), contentAlignment = Alignment.Center) {
+                        Text(
+                            if (searching) "No channels match “$query”." else "No channels in this category.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = OwnTVTheme.colors.onSurfaceVariant,
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        Modifier.fillMaxHeight().weight(0.66f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        items(list, key = { it.id }) { ch ->
+                            FocusableSurface(
+                                onClick = { onPick(ch) },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp),
+                                focusedScale = 1.02f,
+                                focusedContainerColor = OwnTVTheme.colors.primary,
+                                contentAlignment = Alignment.CenterStart,
+                            ) { focused -> ChannelSwitcherRow(ch, focused) }
+                        }
                     }
                 }
             }
-            Spacer(Modifier.height(14.dp))
-            Text("Press Back to cancel", style = MaterialTheme.typography.labelSmall, color = OwnTVTheme.colors.onSurfaceVariant)
+
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "Browse categories on the left, channels on the right · type above to search · Back to cancel",
+                style = MaterialTheme.typography.labelSmall,
+                color = OwnTVTheme.colors.onSurfaceVariant,
+            )
         }
     }
 }

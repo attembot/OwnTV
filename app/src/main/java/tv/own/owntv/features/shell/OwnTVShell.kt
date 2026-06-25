@@ -144,6 +144,21 @@ fun OwnTVShell(
     val mv = koinInject<tv.own.owntv.features.multiview.MultiViewController>()
     val mvActive by mv.active.collectAsStateWithLifecycle()
     val recentChannels by liveVm.recentlyWatched.collectAsStateWithLifecycle()
+    // Browse categories for the PiP/MultiView channel pickers: "Recent" + the live rail's All and folder
+    // categories (each loads its channels on demand). Favorites/History stay in the main guide.
+    val railItems by liveVm.railItems.collectAsStateWithLifecycle()
+    val browseCategories = remember(railItems, recentChannels) {
+        buildList {
+            add(tv.own.owntv.ui.components.ChannelCategory("Recent") { recentChannels })
+            railItems.forEach { item ->
+                when (item.key) {
+                    tv.own.owntv.features.live.LiveKey.All, is tv.own.owntv.features.live.LiveKey.Folder ->
+                        add(tv.own.owntv.ui.components.ChannelCategory(item.title) { liveVm.channelsFor(item.key) })
+                    else -> {}
+                }
+            }
+        }
+    }
 
     // Opening content from a browse screen goes fullscreen — UNLESS the player is already docked as a
     // mini-player, in which case it stays docked and just swaps to the newly-selected stream (the VM
@@ -463,7 +478,7 @@ fun OwnTVShell(
       if (mvActive) {
         tv.own.owntv.features.multiview.MultiViewScreen(
             controller = mv,
-            recentChannels = recentChannels,
+            categories = browseCategories,
             searchChannels = { q -> liveVm.browseChannels(q) },
             onExit = exitMultiView,
             modifier = Modifier.fillMaxSize(),
@@ -503,7 +518,7 @@ fun OwnTVShell(
       if (cornerActive && cornerBrowsing) {
         tv.own.owntv.ui.components.ChannelSwitcher(
             title = "Change the PiP stream",
-            recent = recentChannels,
+            categories = browseCategories,
             search = { q -> liveVm.browseChannels(q) },
             onPick = { ch -> pip.openCorner(ch); cornerBrowsing = false },
             onDismiss = { cornerBrowsing = false },
@@ -515,10 +530,9 @@ fun OwnTVShell(
       // full-screen stream keeps playing as the main; the corner opens muted. (Two streams = two provider
       // connections — a provider that allows only one will 509 the corner; that's a plan limit, not a bug.)
       if (pipPicking) {
-        val mainCh = liveVm.previewChannel.value
         tv.own.owntv.ui.components.ChannelSwitcher(
             title = "Add a stream to the corner",
-            recent = recentChannels.filter { it.id != mainCh?.id },
+            categories = browseCategories,
             search = { q -> liveVm.browseChannels(q) },
             onPick = { ch -> pip.openCorner(ch); pipPicking = false },
             onDismiss = { pipPicking = false },

@@ -40,6 +40,7 @@ import kotlinx.coroutines.delay
 import tv.own.owntv.core.database.entity.ChannelEntity
 import tv.own.owntv.player.CornerState
 import tv.own.owntv.player.SecondaryVideoSurface
+import tv.own.owntv.ui.components.ChannelCategory
 import tv.own.owntv.ui.components.ChannelSwitcher
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.theme.OwnTVTheme
@@ -65,7 +66,7 @@ private const val ADD_TILE = -1
 @Composable
 fun MultiViewScreen(
     controller: MultiViewController,
-    recentChannels: List<ChannelEntity>,
+    categories: List<ChannelCategory>,
     searchChannels: suspend (String) -> List<ChannelEntity>,
     onExit: () -> Unit,
     modifier: Modifier = Modifier,
@@ -138,7 +139,7 @@ fun MultiViewScreen(
             val adding = target == ADD_TILE
             ChannelSwitcher(
                 title = if (adding) "Add a stream" else "Change this stream",
-                recent = if (adding) recentChannels.filter { ch -> tiles.none { it.id == ch.id } } else recentChannels,
+                categories = categories,
                 search = searchChannels,
                 onPick = { ch ->
                     if (adding) controller.addTile(ch) else target?.let { controller.replaceTile(it, ch) }

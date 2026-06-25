@@ -75,6 +75,10 @@ interface ChannelDao {
     @Query("SELECT * FROM channels WHERE categoryId = :categoryId ORDER BY name ASC")
     fun pagingByCategoryAlpha(categoryId: Long): PagingSource<Int, ChannelEntity>
 
+    /** Bounded, one-shot list of a category's channels — for the in-overlay browse picker (PiP / MultiView). */
+    @Query("SELECT * FROM channels WHERE categoryId = :categoryId ORDER BY sortOrder ASC, name ASC LIMIT :limit")
+    suspend fun listByCategory(categoryId: Long, limit: Int): List<ChannelEntity>
+
     @Query("SELECT * FROM channels WHERE sourceId IN (:sourceIds) ORDER BY name ASC")
     fun pagingAll(sourceIds: List<Long>): PagingSource<Int, ChannelEntity>
 
