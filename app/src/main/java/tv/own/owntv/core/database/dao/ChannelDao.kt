@@ -162,4 +162,20 @@ interface ChannelDao {
             "WHERE h.profileId = :profileId ORDER BY h.watchedAt DESC LIMIT :limit",
     )
     fun recentlyWatched(profileId: Long, limit: Int): Flow<List<ChannelEntity>>
+
+    /** One-shot Favorites list for the in-overlay browse picker. */
+    @Query(
+        "SELECT c.* FROM channels c " +
+            "INNER JOIN favorites f ON f.itemId = c.id AND f.mediaType = 'LIVE' " +
+            "WHERE f.profileId = :profileId ORDER BY f.addedAt DESC LIMIT :limit",
+    )
+    suspend fun listFavorites(profileId: Long, limit: Int): List<ChannelEntity>
+
+    /** One-shot History list for the in-overlay browse picker. */
+    @Query(
+        "SELECT c.* FROM channels c " +
+            "INNER JOIN watch_history h ON h.itemId = c.id AND h.mediaType = 'LIVE' " +
+            "WHERE h.profileId = :profileId ORDER BY h.watchedAt DESC LIMIT :limit",
+    )
+    suspend fun listHistory(profileId: Long, limit: Int): List<ChannelEntity>
 }

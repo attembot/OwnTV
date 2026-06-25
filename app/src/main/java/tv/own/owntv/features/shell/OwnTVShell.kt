@@ -150,12 +150,9 @@ fun OwnTVShell(
     val browseCategories = remember(railItems, recentChannels) {
         buildList {
             add(tv.own.owntv.ui.components.ChannelCategory("Recent") { recentChannels })
+            // Every live-rail category (Favorites, History, All, and each folder) in the order the guide shows.
             railItems.forEach { item ->
-                when (item.key) {
-                    tv.own.owntv.features.live.LiveKey.All, is tv.own.owntv.features.live.LiveKey.Folder ->
-                        add(tv.own.owntv.ui.components.ChannelCategory(item.title) { liveVm.channelsFor(item.key) })
-                    else -> {}
-                }
+                add(tv.own.owntv.ui.components.ChannelCategory(item.title) { liveVm.channelsFor(item.key) })
             }
         }
     }

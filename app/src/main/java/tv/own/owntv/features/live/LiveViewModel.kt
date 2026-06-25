@@ -248,14 +248,15 @@ class LiveViewModel(
         if (q.isEmpty()) channelDao.allForSources(ids, limit) else channelDao.searchList(q, ids, limit)
     }
 
-    /** One-shot channels for a browse [key] (All or a Folder/category) — backs the in-overlay browse picker. */
+    /** One-shot channels for a browse [key] (All / Favorites / History / a Folder) — backs the browse picker. */
     suspend fun channelsFor(key: LiveKey, limit: Int = 300): List<ChannelEntity> = withContext(Dispatchers.IO) {
-        val ids = ctx.value.sourceIds
-        if (ids.isEmpty()) return@withContext emptyList()
+        val c = ctx.value
+        if (c.sourceIds.isEmpty()) return@withContext emptyList()
         when (key) {
-            LiveKey.All -> channelDao.allForSources(ids, limit)
+            LiveKey.All -> channelDao.allForSources(c.sourceIds, limit)
+            LiveKey.Favorites -> channelDao.listFavorites(c.profileId, limit)
+            LiveKey.History -> channelDao.listHistory(c.profileId, limit)
             is LiveKey.Folder -> channelDao.listByCategory(key.id, limit)
-            else -> emptyList() // Favorites/History are browsed from the main UI, not the quick picker
         }
     }
 
