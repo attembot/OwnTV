@@ -70,6 +70,9 @@ fun PlayerHud(
     onBack: () -> Unit,
     onPip: (() -> Unit)? = null,
     onMultiView: (() -> Unit)? = null, // enter MultiView seeded with this channel (live only)
+    // When an overlay (e.g. the channel picker) is open over the player, the HUD goes inert: it stops its
+    // auto-hide timer and — crucially — stops requesting focus, so it can't yank focus off that overlay.
+    inert: Boolean = false,
     onChannelUp: (() -> Unit)? = null,
     onChannelDown: (() -> Unit)? = null,
     // Live rewind / timeshift (catch-up channels). onRewindLive non-null = this live channel can rewind;
@@ -123,10 +126,12 @@ fun PlayerHud(
     val zap: (Int) -> Unit = { d -> (if (d < 0) onChannelUp else onChannelDown)?.invoke(); channelFlash++ }
 
     LaunchedEffect(forceShow) { if (forceShow) controlsVisible = true }
-    LaunchedEffect(controlsVisible, wakeTick, forceShow) {
-        if (controlsVisible && !forceShow) { delay(4500); controlsVisible = false }
+    LaunchedEffect(controlsVisible, wakeTick, forceShow, inert) {
+        // Don't auto-hide while an overlay is up — hiding is what triggers the focus grab below.
+        if (controlsVisible && !forceShow && !inert) { delay(4500); controlsVisible = false }
     }
-    LaunchedEffect(controlsVisible, error) {
+    LaunchedEffect(controlsVisible, error, inert) {
+        if (inert) return@LaunchedEffect // an overlay owns focus; the HUD must not pull it back
         if (controlsVisible) {
             if (error != null) runCatching { retryFocus.requestFocus() } else runCatching { playFocus.requestFocus() }
         } else runCatching { catchFocus.requestFocus() }
