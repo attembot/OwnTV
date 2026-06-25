@@ -4,6 +4,9 @@ package tv.own.owntv.player
 
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusGroup
@@ -18,7 +21,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,6 +36,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import kotlinx.coroutines.delay
 import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.OwnTVIcon
 
@@ -74,6 +82,7 @@ fun PipCornerWindow(
     audioOnCorner: Boolean,
     onToggleAudio: () -> Unit,
     onBrowse: () -> Unit,
+    onMove: () -> Unit,
     onSwap: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
@@ -81,6 +90,10 @@ fun PipCornerWindow(
     val state by engine.state.collectAsStateWithLifecycle()
     val meta by engine.meta.collectAsStateWithLifecycle()
     val loading = state == CornerState.LOADING
+
+    // The channel name shows briefly when the corner opens or changes channel, then fades to just video.
+    var titleVisible by remember { mutableStateOf(true) }
+    LaunchedEffect(meta.title) { titleVisible = true; delay(4000); titleVisible = false }
 
     Box(
         modifier = modifier
@@ -107,23 +120,31 @@ fun PipCornerWindow(
 
         // Title strip (top) — channel name on a scrim, with the PiP marker and an audio badge (icons, not
         // emoji, so they render consistently in the TV system font and match the rest of the app's chrome).
-        Row(
-            modifier = Modifier.align(Alignment.TopStart).fillMaxWidth()
-                .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.7f), Color.Transparent)))
-                .padding(horizontal = 9.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        // Auto-hides a few seconds after opening / changing channel so it doesn't sit over the video forever.
+        AnimatedVisibility(
+            visible = titleVisible,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.TopStart),
         ) {
-            OwnTVIcon(OwnTVIcon.PIP, tint = Color.White.copy(alpha = 0.85f), filled = true, modifier = Modifier.size(14.dp))
-            if (audioOnCorner) {
-                OwnTVIcon(OwnTVIcon.VOLUME_HIGH, tint = tv.own.owntv.ui.theme.OwnTVTheme.colors.primary, filled = true, modifier = Modifier.size(14.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.7f), Color.Transparent)))
+                    .padding(horizontal = 9.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                OwnTVIcon(OwnTVIcon.PIP, tint = Color.White.copy(alpha = 0.85f), filled = true, modifier = Modifier.size(14.dp))
+                if (audioOnCorner) {
+                    OwnTVIcon(OwnTVIcon.VOLUME_HIGH, tint = tv.own.owntv.ui.theme.OwnTVTheme.colors.primary, filled = true, modifier = Modifier.size(14.dp))
+                }
+                Text(
+                    meta.title ?: "",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.White,
+                    maxLines = 1,
+                )
             }
-            Text(
-                meta.title ?: "",
-                style = MaterialTheme.typography.labelLarge,
-                color = Color.White,
-                maxLines = 1,
-            )
         }
 
         if (showControls) {
@@ -134,9 +155,10 @@ fun PipCornerWindow(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                PipBtn(if (audioOnCorner) OwnTVIcon.VOLUME_HIGH else OwnTVIcon.VOLUME_MUTE, onClick = onToggleAudio)
+                PipBtn(OwnTVIcon.SWAP, onClick = onToggleAudio)   // move the sound between the two windows
                 Spacer(Modifier.weight(1f))
                 PipBtn(OwnTVIcon.PLAYLIST, onClick = onBrowse) // retune the corner stream from the playlist
+                PipBtn(OwnTVIcon.MOVE, onClick = onMove)       // cycle the corner through the four screen corners
                 PipBtn(OwnTVIcon.FULLSCREEN, onClick = onSwap)  // swap the corner stream into the main window
                 PipBtn(OwnTVIcon.CLOSE, onClick = onClose)
             }

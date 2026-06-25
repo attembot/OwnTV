@@ -23,7 +23,7 @@ enum class OwnTVIcon {
     PERSON, ADD, SETTINGS, PALETTE, THEME, ZOOM, PLAYLIST, EPG, VIDEO, SHARE, CHEVRON, FAVORITE,
     PAUSE, REWIND, FORWARD, AUDIO, SUBTITLE, SKIP_NEXT, SKIP_PREVIOUS,
     BACK, VOLUME_HIGH, VOLUME_LOW, VOLUME_MUTE, ASPECT, FULLSCREEN, FULLSCREEN_EXIT, PIP, CLOSE,
-    SORT,
+    SORT, SWAP, MOVE,
 }
 
 @Composable
@@ -202,6 +202,28 @@ fun OwnTVIcon(
             OwnTVIcon.FORWARD -> {
                 drawPath(triangle(p(4f, 6f), p(11f, 12f), p(4f, 18f)), tint, style = Fill)
                 drawPath(triangle(p(13f, 6f), p(20f, 12f), p(13f, 18f)), tint, style = Fill)
+            }
+            OwnTVIcon.SWAP -> {
+                // Two horizontal arrows pointing opposite ways — "move this between the two windows".
+                drawLineStroke(p(4f, 9f), p(19f, 9f), tint, stroke)
+                drawLineStroke(p(16f, 6f), p(19f, 9f), tint, stroke)
+                drawLineStroke(p(16f, 12f), p(19f, 9f), tint, stroke)
+                drawLineStroke(p(20f, 15f), p(5f, 15f), tint, stroke)
+                drawLineStroke(p(8f, 12f), p(5f, 15f), tint, stroke)
+                drawLineStroke(p(8f, 18f), p(5f, 15f), tint, stroke)
+            }
+            OwnTVIcon.MOVE -> {
+                // Four-way arrows — "reposition the window".
+                drawLineStroke(p(12f, 4f), p(12f, 20f), tint, stroke)
+                drawLineStroke(p(4f, 12f), p(20f, 12f), tint, stroke)
+                drawLineStroke(p(9f, 7f), p(12f, 4f), tint, stroke)
+                drawLineStroke(p(15f, 7f), p(12f, 4f), tint, stroke)
+                drawLineStroke(p(9f, 17f), p(12f, 20f), tint, stroke)
+                drawLineStroke(p(15f, 17f), p(12f, 20f), tint, stroke)
+                drawLineStroke(p(7f, 9f), p(4f, 12f), tint, stroke)
+                drawLineStroke(p(7f, 15f), p(4f, 12f), tint, stroke)
+                drawLineStroke(p(17f, 9f), p(20f, 12f), tint, stroke)
+                drawLineStroke(p(17f, 15f), p(20f, 12f), tint, stroke)
             }
             OwnTVIcon.SKIP_NEXT -> {
                 // play-to-bar: ▶|

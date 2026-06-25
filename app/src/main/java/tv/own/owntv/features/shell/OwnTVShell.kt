@@ -62,6 +62,19 @@ private enum class ShellLayer { SIDEBAR, RAIL, CONTENT }
 /** Player presentation: hidden, fullscreen, or docked mini-player over the browse UI. */
 private enum class PlayerMode { NONE, FULLSCREEN, MINI }
 
+/** Which screen corner the PiP window sits in. [next] cycles them: top-right → top-left → bottom-left →
+ *  bottom-right → top-right. A new PiP always (re)starts at [TOP_END]. */
+private enum class CornerPos {
+    TOP_END, TOP_START, BOTTOM_START, BOTTOM_END;
+
+    fun next(): CornerPos = when (this) {
+        TOP_END -> TOP_START
+        TOP_START -> BOTTOM_START
+        BOTTOM_START -> BOTTOM_END
+        BOTTOM_END -> TOP_END
+    }
+}
+
 /**
  * The MD3 shell: a fixed navigation panel (Layer 1) plus the active destination. Settings is a
  * single-pane sectioned screen; browse sections keep the Folder Rail → Content → Preview layout.
@@ -109,6 +122,8 @@ fun OwnTVShell(
     var cornerBrowsing by remember { mutableStateOf(false) }
     // True while picking the SECOND stream to open in the corner from the full-screen player (true PiP entry).
     var pipPicking by remember { mutableStateOf(false) }
+    // Which screen corner the PiP window sits in. Resets to TOP_END each time a corner is (re)opened.
+    var cornerPos by remember { mutableStateOf(CornerPos.TOP_END) }
     // Same activity-scoped instances the Live/Guide screens use — lets the fullscreen HUD zap channels
     // up/down (CH+/CH-) through whichever section's list opened the stream.
     val liveVm = org.koin.androidx.compose.koinViewModel<tv.own.owntv.features.live.LiveViewModel>()
@@ -224,7 +239,10 @@ fun OwnTVShell(
     }
 
     // If the corner closes by any path (close, swap-to-fullscreen, entering MultiView), drop its switcher too.
-    LaunchedEffect(cornerActive) { if (!cornerActive) cornerBrowsing = false }
+    LaunchedEffect(cornerActive) {
+        if (cornerActive) cornerPos = CornerPos.TOP_END // every new PiP starts in the top-right
+        else cornerBrowsing = false
+    }
 
     LaunchedEffect(Unit) { runCatching { sidebarFocus.requestFocus() } }
 
@@ -427,6 +445,7 @@ fun OwnTVShell(
                     // so the exchange is clean; audio/close are always available with a corner up.
                     onCornerSwap = if (cornerActive && liveOnExo) swapCorner else null,
                     onCornerAudio = if (cornerActive) toggleCornerAudio else null,
+                    onCornerMove = if (cornerActive) ({ cornerPos = cornerPos.next() }) else null,
                     onCornerClose = if (cornerActive) closeCorner else null,
                     cornerAudioOn = audioOnCorner,
                     modifier = Modifier.fillMaxSize(),
@@ -449,12 +468,19 @@ fun OwnTVShell(
         )
       }
 
-      // True picture-in-picture corner — a second, independent stream in the upper-right corner, drawn over
-      // both the browse UI and the full-screen player (its SurfaceView is z-ordered above the main surface).
-      // While full-screen the player HUD owns the corner's controls, so the window itself is video-only then.
+      // True picture-in-picture corner — a second, independent stream drawn over both the browse UI and the
+      // full-screen player (its SurfaceView is z-ordered above the main surface). The user can cycle it through
+      // the four screen corners (cornerPos); it always (re)opens top-right. While full-screen the player HUD
+      // owns the corner's controls, so the window itself is video-only then.
       if (cornerActive) {
+        val cornerAlign = when (cornerPos) {
+            CornerPos.TOP_END -> Alignment.TopEnd
+            CornerPos.TOP_START -> Alignment.TopStart
+            CornerPos.BOTTOM_START -> Alignment.BottomStart
+            CornerPos.BOTTOM_END -> Alignment.BottomEnd
+        }
         Box(
-            modifier = Modifier.align(Alignment.TopEnd).padding(24.dp).size(width = 320.dp, height = 180.dp),
+            modifier = Modifier.align(cornerAlign).padding(24.dp).size(width = 320.dp, height = 180.dp),
         ) {
             tv.own.owntv.player.PipCornerWindow(
                 engine = pip.engine,
@@ -462,6 +488,7 @@ fun OwnTVShell(
                 audioOnCorner = audioOnCorner,
                 onToggleAudio = toggleCornerAudio,
                 onBrowse = { cornerBrowsing = true }, // retune the corner from the playlist, live
+                onMove = { cornerPos = cornerPos.next() }, // cycle through the four corners
                 onSwap = expandCorner, // window's expand button promotes the corner channel to full-screen
                 onClose = closeCorner,
                 modifier = Modifier.fillMaxSize(),

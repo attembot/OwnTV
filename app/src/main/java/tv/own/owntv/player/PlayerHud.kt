@@ -83,6 +83,7 @@ fun PlayerHud(
     // onCornerClose non-null = a corner is active; cornerAudioOn = the corner currently has the sound.
     onCornerSwap: (() -> Unit)? = null,   // swap the corner stream into the main window (and vice versa)
     onCornerAudio: (() -> Unit)? = null,  // move the audio between the main and corner windows
+    onCornerMove: (() -> Unit)? = null,   // cycle the corner window through the four screen corners
     onCornerClose: (() -> Unit)? = null,  // close the corner window
     cornerAudioOn: Boolean = false,
     modifier: Modifier = Modifier,
@@ -180,7 +181,7 @@ fun PlayerHud(
                     speedLabel = formatSpeed(speed),
                     onScrubLive = onScrubLive, timeshiftOffsetSec = timeshiftOffsetSec,
                     onOpenDialog = { dialog = it }, onPip = onPip, onMultiView = onMultiView, onBack = onBack,
-                    onCornerSwap = onCornerSwap, onCornerAudio = onCornerAudio, onCornerClose = onCornerClose,
+                    onCornerSwap = onCornerSwap, onCornerAudio = onCornerAudio, onCornerMove = onCornerMove, onCornerClose = onCornerClose,
                     cornerAudioOn = cornerAudioOn,
                     modifier = Modifier.align(Alignment.BottomStart),
                 )
@@ -347,7 +348,7 @@ private fun BottomBar(
     volume: Int, audioCount: Int, subCount: Int, zoomMode: ZoomMode, speedLabel: String,
     onScrubLive: ((Int) -> Unit)?, timeshiftOffsetSec: Int?,
     onOpenDialog: (HudDialog) -> Unit, onPip: (() -> Unit)?, onMultiView: (() -> Unit)? = null, onBack: () -> Unit,
-    onCornerSwap: (() -> Unit)? = null, onCornerAudio: (() -> Unit)? = null, onCornerClose: (() -> Unit)? = null,
+    onCornerSwap: (() -> Unit)? = null, onCornerAudio: (() -> Unit)? = null, onCornerMove: (() -> Unit)? = null, onCornerClose: (() -> Unit)? = null,
     cornerAudioOn: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
@@ -383,9 +384,11 @@ private fun BottomBar(
                 // Corner (true PiP) controls — present only while a second stream is in the corner.
                 if (onCornerClose != null) {
                     if (onCornerAudio != null) {
-                        CtrlButton(if (cornerAudioOn) OwnTVIcon.VOLUME_HIGH else OwnTVIcon.VOLUME_MUTE, active = cornerAudioOn, label = "Sound") { onCornerAudio?.invoke() }
+                        // Swap icon, not a mute icon — this moves the sound between the two windows.
+                        CtrlButton(OwnTVIcon.SWAP, active = cornerAudioOn, label = "Sound") { onCornerAudio?.invoke() }
                     }
                     if (onCornerSwap != null) CtrlButton(OwnTVIcon.PIP, active = true, label = "Swap") { onCornerSwap?.invoke() }
+                    if (onCornerMove != null) CtrlButton(OwnTVIcon.MOVE, label = "Move") { onCornerMove?.invoke() }
                     CtrlButton(OwnTVIcon.CLOSE, label = "Close PiP") { onCornerClose?.invoke() }
                 }
                 if (onPip != null) CtrlButton(OwnTVIcon.PIP, label = "PiP") { onPip() }

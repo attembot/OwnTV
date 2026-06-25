@@ -65,8 +65,9 @@ fun ChannelSwitcher(
             results = runCatching { search(query) }.getOrDefault(emptyList())
         }
     }
-    // Keep focus on the top result as the list changes, so OK is always one press from a pick.
-    LaunchedEffect(results) { if (results.isNotEmpty()) runCatching { firstFocus.requestFocus() } }
+    // Land focus on the top result once when the picker opens. Do NOT re-grab when results change while the
+    // user is typing — that was yanking focus out of the search field (closing the keyboard) mid-search.
+    LaunchedEffect(Unit) { if (results.isNotEmpty()) runCatching { firstFocus.requestFocus() } }
 
     BackHandler { onDismiss() }
 
