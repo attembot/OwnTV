@@ -1,3 +1,6 @@
+// focusProperties { exit = ... } — the picker's D-pad focus trap — is still experimental in Compose UI.
+@file:OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+
 package tv.own.owntv.ui.components
 
 import androidx.activity.compose.BackHandler
