@@ -69,6 +69,10 @@ fun PlayerHud(
     player: PlaybackEngine,
     onBack: () -> Unit,
     onPip: (() -> Unit)? = null,
+    onMultiView: (() -> Unit)? = null, // enter MultiView seeded with this channel (live only)
+    // When an overlay (e.g. the channel picker) is open over the player, the HUD goes inert: it stops its
+    // auto-hide timer and — crucially — stops requesting focus, so it can't yank focus off that overlay.
+    inert: Boolean = false,
     onChannelUp: (() -> Unit)? = null,
     onChannelDown: (() -> Unit)? = null,
     // Live: open the channel-list overlay (Left while the controls are hidden). Null = not a live channel.
@@ -84,6 +88,13 @@ fun PlayerHud(
     // streams ExoPlayer can't handle). null = not a live channel; true = currently pinned to mpv.
     compatMode: Boolean? = null,
     onToggleCompatMode: (() -> Unit)? = null,
+    // True picture-in-picture corner controls — shown only while a second (corner) stream is running.
+    // onCornerClose non-null = a corner is active; cornerAudioOn = the corner currently has the sound.
+    onCornerSwap: (() -> Unit)? = null,   // swap the corner stream into the main window (and vice versa)
+    onCornerAudio: (() -> Unit)? = null,  // move the audio between the main and corner windows
+    onCornerMove: (() -> Unit)? = null,   // cycle the corner window through the four screen corners
+    onCornerClose: (() -> Unit)? = null,  // close the corner window
+    cornerAudioOn: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val isPlaying by player.isPlaying.collectAsStateWithLifecycle()
@@ -124,13 +135,14 @@ fun PlayerHud(
     val zap: (Int) -> Unit = { d -> (if (d < 0) onChannelUp else onChannelDown)?.invoke(); channelFlash++ }
 
     LaunchedEffect(forceShow) { if (forceShow) controlsVisible = true }
-    LaunchedEffect(controlsVisible, wakeTick, forceShow) {
-        if (controlsVisible && !forceShow) { delay(4500); controlsVisible = false }
+    LaunchedEffect(controlsVisible, wakeTick, forceShow, inert) {
+        // Don't auto-hide while an overlay is up — hiding is what triggers the focus grab below.
+        if (controlsVisible && !forceShow && !inert) { delay(4500); controlsVisible = false }
     }
-    LaunchedEffect(controlsVisible, error, dialog) {
-        // Never steal focus while a dialog is open (its rows own it); when the dialog closes this
-        // re-runs and hands focus back to the HUD.
-        if (dialog != HudDialog.NONE) return@LaunchedEffect
+    LaunchedEffect(controlsVisible, error, dialog, inert) {
+        // Never steal focus while a dialog is open (its rows own it) or while an overlay is inert (the PiP
+        // channel picker owns it); when either closes this re-runs and hands focus back to the HUD.
+        if (dialog != HudDialog.NONE || inert) return@LaunchedEffect
         if (controlsVisible) {
             if (error != null) runCatching { retryFocus.requestFocus() } else runCatching { playFocus.requestFocus() }
         } else runCatching { catchFocus.requestFocus() }
@@ -194,7 +206,9 @@ fun PlayerHud(
                     onScrubLive = onScrubLive, timeshiftOffsetSec = timeshiftOffsetSec,
                     compatMode = compatMode, onToggleCompatMode = onToggleCompatMode,
                     onInfo = { showInfo = !showInfo }, infoOn = showInfo,
-                    onOpenDialog = { dialog = it }, onPip = onPip, onBack = onBack,
+                    onOpenDialog = { dialog = it }, onPip = onPip, onMultiView = onMultiView, onBack = onBack,
+                    onCornerSwap = onCornerSwap, onCornerAudio = onCornerAudio, onCornerMove = onCornerMove, onCornerClose = onCornerClose,
+                    cornerAudioOn = cornerAudioOn,
                     modifier = Modifier.align(Alignment.BottomStart),
                 )
             }
@@ -380,7 +394,10 @@ private fun BottomBar(
     onScrubLive: ((Int) -> Unit)?, timeshiftOffsetSec: Int?,
     compatMode: Boolean?, onToggleCompatMode: (() -> Unit)?,
     onInfo: (() -> Unit)? = null, infoOn: Boolean = false,
-    onOpenDialog: (HudDialog) -> Unit, onPip: (() -> Unit)?, onBack: () -> Unit, modifier: Modifier = Modifier,
+    onOpenDialog: (HudDialog) -> Unit, onPip: (() -> Unit)?, onMultiView: (() -> Unit)? = null, onBack: () -> Unit,
+    onCornerSwap: (() -> Unit)? = null, onCornerAudio: (() -> Unit)? = null, onCornerMove: (() -> Unit)? = null, onCornerClose: (() -> Unit)? = null,
+    cornerAudioOn: Boolean = false,
+    modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 20.dp)) {
         when {
@@ -418,8 +435,19 @@ private fun BottomBar(
                 // Aspect/zoom works in every mode now — direct mode resizes the surface view itself
                 // (see MpvVideoSurface), GL mode scales internally.
                 CtrlButton(OwnTVIcon.ASPECT, active = zoomMode != ZoomMode.FIT) { onOpenDialog(HudDialog.ZOOM) }
-                if (onPip != null) CtrlButton(OwnTVIcon.PIP) { onPip() }
-                CtrlButton(OwnTVIcon.FULLSCREEN_EXIT) { onBack() }
+                // Corner (true PiP) controls — present only while a second stream is in the corner.
+                if (onCornerClose != null) {
+                    if (onCornerAudio != null) {
+                        // Swap icon, not a mute icon — this moves the sound between the two windows.
+                        CtrlButton(OwnTVIcon.SWAP, active = cornerAudioOn, label = "Sound") { onCornerAudio?.invoke() }
+                    }
+                    if (onCornerSwap != null) CtrlButton(OwnTVIcon.PIP, active = true, label = "Swap") { onCornerSwap?.invoke() }
+                    if (onCornerMove != null) CtrlButton(OwnTVIcon.MOVE, label = "Move") { onCornerMove?.invoke() }
+                    CtrlButton(OwnTVIcon.CLOSE, label = "Close PiP") { onCornerClose?.invoke() }
+                }
+                if (onPip != null) CtrlButton(OwnTVIcon.PIP, label = "PiP") { onPip() }
+                if (onMultiView != null) CtrlButton(OwnTVIcon.VIDEO, label = "MultiView") { onMultiView() } // enter the multi-stream grid
+                CtrlButton(OwnTVIcon.FULLSCREEN_EXIT, label = "Exit") { onBack() }
             }
         }
     }
@@ -470,25 +498,36 @@ private fun SpeedButton(label: String, active: Boolean, onClick: () -> Unit) {
 private fun formatSpeed(speed: Double): String = if (speed == 1.0) "1.0x" else "${speed}x"
 
 @Composable
-private fun CtrlButton(icon: OwnTVIcon, badge: Int? = null, active: Boolean = false, onClick: () -> Unit) {
+private fun CtrlButton(icon: OwnTVIcon, badge: Int? = null, active: Boolean = false, label: String? = null, onClick: () -> Unit) {
     FocusableSurface(
         onClick = onClick,
-        modifier = Modifier.size(44.dp),
+        // Icon-only buttons stay a 44dp square; labeled ones grow into a pill so the text fits.
+        modifier = if (label == null) Modifier.size(44.dp) else Modifier.height(44.dp),
         shape = RoundedCornerShape(12.dp),
         focusedContainerColor = Color.White.copy(alpha = 0.16f),
         unfocusedContainerColor = Color.Transparent,
         selectedContainerColor = Color.Transparent,
         contentAlignment = Alignment.Center,
     ) { focused ->
-        Box(contentAlignment = Alignment.Center) {
-            OwnTVIcon(icon, tint = if (active) TEAL else if (focused) Color.White else Color.White.copy(alpha = 0.78f), filled = true, modifier = Modifier.size(22.dp))
-            if (badge != null) {
-                Box(
-                    Modifier.align(Alignment.TopEnd).size(15.dp).clip(CircleShape).background(TEAL),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("$badge", style = MaterialTheme.typography.labelSmall, color = Color(0xFF003730), fontWeight = FontWeight.Bold)
+        val tint = if (active) TEAL else if (focused) Color.White else Color.White.copy(alpha = 0.78f)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            modifier = if (label == null) Modifier else Modifier.padding(horizontal = 14.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                OwnTVIcon(icon, tint = tint, filled = true, modifier = Modifier.size(22.dp))
+                if (badge != null) {
+                    Box(
+                        Modifier.align(Alignment.TopEnd).size(15.dp).clip(CircleShape).background(TEAL),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("$badge", style = MaterialTheme.typography.labelSmall, color = Color(0xFF003730), fontWeight = FontWeight.Bold)
+                    }
                 }
+            }
+            if (label != null) {
+                Text(label, style = MaterialTheme.typography.labelLarge, color = tint, maxLines = 1)
             }
         }
     }

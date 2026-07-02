@@ -15,6 +15,11 @@ android {
 
     defaultConfig {
         applicationId = "tv.own.owntv"
+        // Personal fork: a distinct application id so this build installs ALONGSIDE an official
+        // OwnTV (no signature-mismatch conflict). The matching versionNameSuffix makes the fork
+        // obvious in the About screen. Drop both lines to track upstream's package id exactly.
+        applicationIdSuffix = ".fork"
+        versionNameSuffix = "-fork"
         minSdk = 26
         targetSdk = 36
         // CI injects these from the git tag (see .github/workflows/android.yml) so releases never
@@ -28,6 +33,14 @@ android {
         versionName = System.getenv("VERSION_NAME") ?: "99.99.99"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Personal fork: ship both ARM ABIs, drop the emulator-only x86 ones. Fire TV Sticks (incl. the
+        // 4K Max) run a 32-bit Android runtime and report armeabi-v7a, so an arm64-only APK fails to install
+        // on them (INSTALL_FAILED_NO_MATCHING_ABIS → "App not installed"). armeabi-v7a covers the Fire Stick;
+        // arm64-v8a covers 64-bit boxes. This still cuts ~55 MB of x86/x86_64 libs no TV ever loads.
+        ndk {
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a")
+        }
     }
 
     // Release signing is driven by env vars (set from GitHub secrets in CI). When they're absent

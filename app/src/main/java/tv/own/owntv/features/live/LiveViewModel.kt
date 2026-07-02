@@ -276,6 +276,30 @@ class LiveViewModel(
         return epgDao.listEpgChannels(ids, query.trim().lowercase(), 300)
     }
 
+    /**
+     * One-shot channel browse for the in-overlay switcher (PiP / MultiView): the active sources' channels,
+     * filtered by [query] when it's non-blank, as a bounded list (no paging — the overlay shows a scroll of
+     * the first [limit]). Lets the user retune a corner/tile from the whole playlist without leaving playback.
+     */
+    suspend fun browseChannels(query: String, limit: Int = 100): List<ChannelEntity> = withContext(Dispatchers.IO) {
+        val ids = ctx.value.sourceIds
+        if (ids.isEmpty()) return@withContext emptyList()
+        val q = query.trim()
+        if (q.isEmpty()) channelDao.allForSources(ids, limit) else channelDao.searchList(q, ids, limit)
+    }
+
+    /** One-shot channels for a browse [key] (All / Favorites / History / a Folder) — backs the browse picker. */
+    suspend fun channelsFor(key: LiveKey, limit: Int = 300): List<ChannelEntity> = withContext(Dispatchers.IO) {
+        val c = ctx.value
+        if (c.sourceIds.isEmpty()) return@withContext emptyList()
+        when (key) {
+            LiveKey.All -> channelDao.allForSources(c.sourceIds, limit)
+            LiveKey.Favorites -> channelDao.listFavorites(c.profileId, limit)
+            LiveKey.History -> channelDao.listHistory(c.profileId, limit)
+            is LiveKey.Folder -> channelDao.listByCategory(key.id, limit)
+        }
+    }
+
     val count: StateFlow<Int> = combine(_selected, ctx, hiddenCategoryIds) { key, c, hidden -> Triple(key, c, hidden) }
         .flatMapLatest { (key, c, hidden) -> countFlow(key, c, hidden) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, 0)

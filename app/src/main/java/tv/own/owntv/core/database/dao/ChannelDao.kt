@@ -122,6 +122,10 @@ interface ChannelDao {
     @Query("SELECT * FROM channels WHERE categoryId = :categoryId ORDER BY name ASC")
     fun pagingByCategoryAlpha(categoryId: Long): PagingSource<Int, ChannelEntity>
 
+    /** Bounded, one-shot list of a category's channels — for the in-overlay browse picker (PiP / MultiView). */
+    @Query("SELECT * FROM channels WHERE categoryId = :categoryId ORDER BY sortOrder ASC, name ASC LIMIT :limit")
+    suspend fun listByCategory(categoryId: Long, limit: Int): List<ChannelEntity>
+
     @Query("SELECT * FROM channels WHERE sourceId IN (:sourceIds) ORDER BY name ASC")
     fun pagingAll(sourceIds: List<Long>): PagingSource<Int, ChannelEntity>
 
@@ -267,4 +271,19 @@ interface ChannelDao {
             "WHERE h.profileId = :profileId ORDER BY h.watchedAt DESC LIMIT :limit",
     )
     fun recentlyWatchedWithTimestamp(profileId: Long, limit: Int): Flow<List<ChannelWithWatchedAt>>
+    /** One-shot Favorites list for the in-overlay browse picker. */
+    @Query(
+        "SELECT c.* FROM channels c " +
+            "INNER JOIN favorites f ON f.itemId = c.id AND f.mediaType = 'LIVE' " +
+            "WHERE f.profileId = :profileId ORDER BY f.addedAt DESC LIMIT :limit",
+    )
+    suspend fun listFavorites(profileId: Long, limit: Int): List<ChannelEntity>
+
+    /** One-shot History list for the in-overlay browse picker. */
+    @Query(
+        "SELECT c.* FROM channels c " +
+            "INNER JOIN watch_history h ON h.itemId = c.id AND h.mediaType = 'LIVE' " +
+            "WHERE h.profileId = :profileId ORDER BY h.watchedAt DESC LIMIT :limit",
+    )
+    suspend fun listHistory(profileId: Long, limit: Int): List<ChannelEntity>
 }
