@@ -400,15 +400,29 @@ class LiveViewModel(
         if (previewEngine.currentUrl == channel.streamUrl &&
             previewEngine.state.value != tv.own.owntv.player.LivePreviewEngine.State.ERROR
         ) {
-            previewEngine.setMuted(!livePreviewAudio.value)
+            previewEngine.setMuted(!previewAudioOn())
             return
         }
         previewEngine.play(
-            channel.streamUrl, muted = !livePreviewAudio.value,
+            channel.streamUrl, muted = !previewAudioOn(),
             meta = tv.own.owntv.player.MediaMeta(title = channel.name, logoUrl = channel.logoUrl),
             userAgent = sourceUaMap[channel.sourceId],
         )
     }
+
+    // While a PiP corner is up, the in-pane preview must stay silent even with the "preview audio" setting
+    // on — otherwise browsing plays TWO soundtracks (the corner is the audible window in browse mode).
+    private var previewAudioSuppressed = false
+    private fun previewAudioOn(): Boolean = livePreviewAudio.value && !previewAudioSuppressed
+
+    /** Shell calls this with the PiP corner's active state; applies to the current preview immediately. */
+    fun setPreviewAudioSuppressed(suppressed: Boolean) {
+        previewAudioSuppressed = suppressed
+        if (!_liveOnExo.value && previewEngine.currentUrl != null) previewEngine.setMuted(!previewAudioOn())
+    }
+
+    /** Per-source custom user-agent — the corner/tile engines need the same UA the main engine uses. */
+    fun uaFor(sourceId: Long): String? = sourceUaMap[sourceId]
 
     // The ordered channel list of the row the user opened fullscreen from, so the player HUD can
     // zap up/down with the remote without going back to the list. Snapshot of the loaded paging

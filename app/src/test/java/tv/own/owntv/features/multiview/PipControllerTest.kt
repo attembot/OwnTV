@@ -31,7 +31,7 @@ class PipControllerTest {
         val muteCalls = mutableListOf<Boolean>()
         var stopCalls = 0
 
-        override fun play(url: String, meta: MediaMeta, muted: Boolean) {
+        override fun play(url: String, meta: MediaMeta, muted: Boolean, userAgent: String?) {
             playCalls += Triple(url, meta, muted)
             currentUrl = url
         }

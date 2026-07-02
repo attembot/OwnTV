@@ -43,13 +43,23 @@ class MultiViewController(
 
     private val pool = arrayOfNulls<CornerEngine>(MAX)
 
+    /** Per-source user-agent lookup (the shell wires this to the live VM's source map) — providers with a
+     *  custom UA otherwise 403 in every tile while playing fine full-screen. */
+    var uaResolver: (Long) -> String? = { null }
+
     private val _tiles = MutableStateFlow<List<ChannelEntity>>(emptyList())
     /** The channels currently on screen, one per tile (index = tile slot). */
     val tiles: StateFlow<List<ChannelEntity>> = _tiles.asStateFlow()
 
     private val _activeIndex = MutableStateFlow(0)
-    /** The focused tile — the only audible one, and the dominant one in [MultiLayout.DOMINANT]. */
+    /** The focused tile — the only audible one. Audio follows D-pad focus. */
     val activeIndex: StateFlow<Int> = _activeIndex.asStateFlow()
+
+    private val _dominantIndex = MutableStateFlow(0)
+    /** The LARGE tile in [MultiLayout.DOMINANT]. Deliberately separate from [activeIndex]: audio follows
+     *  focus freely, but the layout only restructures on an explicit promote (hold OK) — if the big pane
+     *  followed focus, merely D-pad-ing across the side strip would re-parent every tile and drop focus. */
+    val dominantIndex: StateFlow<Int> = _dominantIndex.asStateFlow()
 
     private val _layout = MutableStateFlow(MultiLayout.GRID)
     val layout: StateFlow<MultiLayout> = _layout.asStateFlow()
@@ -67,6 +77,7 @@ class MultiViewController(
         if (take.isEmpty()) return
         _tiles.value = take
         _activeIndex.value = 0
+        _dominantIndex.value = 0
         _active.value = true
         take.forEachIndexed { i, ch -> startTile(i, ch) }
         applyAudio()
@@ -87,14 +98,14 @@ class MultiViewController(
     }
 
     /** Swap the channel shown in tile [index] for [channel], **in place** — every other tile keeps playing
-     *  untouched, and the active/audible tile is unchanged. No-op if [index] is out of range or already on
-     *  this stream. This is the cheap "retune one window" path the in-overlay channel switcher uses. */
+     *  untouched, and the active/audible tile is unchanged. This is the cheap "retune one window" path the
+     *  in-overlay channel switcher uses. Re-picking the SAME channel is a no-op while it plays, but retries
+     *  it after an error (the engine clears its url on terminal failure, so startTile re-plays). */
     fun replaceTile(index: Int, channel: ChannelEntity) {
         val current = _tiles.value
         if (index !in current.indices) return
-        if (current[index].streamUrl == channel.streamUrl) return
         _tiles.value = current.toMutableList().apply { set(index, channel) }
-        startTile(index, channel) // engine url differs now, so this retunes just this slot
+        startTile(index, channel) // only actually retunes if the engine isn't already on this url
         applyAudio()
     }
 
@@ -110,10 +121,11 @@ class MultiViewController(
         _tiles.value = remaining
         remaining.forEachIndexed { i, ch -> startTile(i, ch) } // re-bind slots to the new order (idempotent)
         _activeIndex.value = _activeIndex.value.coerceIn(0, remaining.lastIndex)
+        _dominantIndex.value = _dominantIndex.value.coerceIn(0, remaining.lastIndex)
         applyAudio()
     }
 
-    /** Move focus to tile [index] — it becomes the only audible one (and the dominant one in DOMINANT mode). */
+    /** Move focus to tile [index] — it becomes the only audible one. The layout does NOT restructure. */
     fun setActive(index: Int) {
         if (index !in _tiles.value.indices) return
         _activeIndex.value = index
@@ -124,6 +136,7 @@ class MultiViewController(
     fun promoteToDominant(index: Int) {
         if (index !in _tiles.value.indices) return
         _activeIndex.value = index
+        _dominantIndex.value = index
         _layout.value = MultiLayout.DOMINANT
         applyAudio()
     }
@@ -139,6 +152,7 @@ class MultiViewController(
         for (i in pool.indices) { pool[i]?.release(); pool[i] = null }
         _tiles.value = emptyList()
         _activeIndex.value = 0
+        _dominantIndex.value = 0
         _layout.value = MultiLayout.GRID
         _active.value = false
     }
@@ -146,7 +160,12 @@ class MultiViewController(
     private fun startTile(index: Int, channel: ChannelEntity) {
         val engine = engineAt(index)
         if (engine.currentUrl != channel.streamUrl) {
-            engine.play(channel.streamUrl, meta = MediaMeta(title = channel.name, logoUrl = channel.logoUrl), muted = true)
+            engine.play(
+                channel.streamUrl,
+                meta = MediaMeta(title = channel.name, logoUrl = channel.logoUrl),
+                muted = true,
+                userAgent = uaResolver(channel.sourceId),
+            )
         }
     }
 

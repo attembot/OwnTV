@@ -51,21 +51,27 @@ import tv.own.owntv.ui.components.OwnTVIcon
  */
 @Composable
 fun SecondaryVideoSurface(engine: CornerEngine, modifier: Modifier = Modifier, keepAwake: Boolean = true) {
-    AndroidView(
-        modifier = modifier,
-        factory = { ctx ->
-            SurfaceView(ctx).apply {
-                // Must be set before the surface is created — lifts this surface above the main one behind it.
-                setZOrderMediaOverlay(true)
-                holder.addCallback(object : SurfaceHolder.Callback {
-                    override fun surfaceCreated(holder: SurfaceHolder) = engine.setSurface(holder.surface)
-                    override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
-                    override fun surfaceDestroyed(holder: SurfaceHolder) = engine.setSurface(null)
-                })
-            }
-        },
-        update = { it.keepScreenOn = keepAwake },
-    )
+    // key(engine): the factory captures `engine` in the holder callback ONCE. If Compose reused this
+    // AndroidView node for a different engine (e.g. MultiView's dominant pane recomposing to another tile),
+    // the surface would stay bound to the old engine and the new one would decode invisibly. Keying by
+    // engine identity discards the node instead, so a fresh SurfaceView binds the right engine.
+    androidx.compose.runtime.key(engine) {
+        AndroidView(
+            modifier = modifier,
+            factory = { ctx ->
+                SurfaceView(ctx).apply {
+                    // Must be set before the surface is created — lifts this surface above the main one behind it.
+                    setZOrderMediaOverlay(true)
+                    holder.addCallback(object : SurfaceHolder.Callback {
+                        override fun surfaceCreated(holder: SurfaceHolder) = engine.setSurface(holder.surface)
+                        override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
+                        override fun surfaceDestroyed(holder: SurfaceHolder) = engine.setSurface(null)
+                    })
+                }
+            },
+            update = { it.keepScreenOn = keepAwake },
+        )
+    }
 }
 
 /**

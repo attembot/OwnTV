@@ -60,6 +60,11 @@ class SecondaryLivePlayer(
     private var player: ExoPlayer? = null
     private var surface: Surface? = null
     private var muted: Boolean = true
+    /** UA the current [player] was built with — a different per-source UA forces a rebuild. */
+    private var builtUa: String = HttpClient.DEFAULT_USER_AGENT
+    /** Bumped on every play()/stop()/release(); a scheduled reconnect from an older epoch is stale and
+     *  must not fire (same-URL re-opens made the old `currentUrl != url` guard pass incorrectly). */
+    private var playEpoch = 0
 
     private val _state = MutableStateFlow(CornerState.IDLE)
     override val state: StateFlow<CornerState> = _state.asStateFlow()
@@ -107,8 +112,15 @@ class SecondaryLivePlayer(
         override fun onPlayerError(error: PlaybackException) {
             android.util.Log.w(TAG, "corner ExoPlayer error: ${error.errorCodeName}", error)
             if (hasPlayed) { reconnect("error ${error.errorCodeName}"); return } // mid-stream drop → reconnect
-            _state.value = CornerState.ERROR; _isPlaying.value = false; _buffering.value = false
+            enterError()
         }
+    }
+
+    /** Terminal failure: clear [currentUrl] so re-picking the SAME channel retries (the controllers skip a
+     *  play() when the engine is already "on" that url — an errored engine must never look like it is). */
+    private fun enterError() {
+        currentUrl = null
+        _state.value = CornerState.ERROR; _isPlaying.value = false; _buffering.value = false
     }
 
     /** Attach the corner SurfaceView's surface, or null when it's destroyed. */
@@ -120,17 +132,26 @@ class SecondaryLivePlayer(
     /** Start (or switch to) [url] in the corner. Starts muted by default — the main stream keeps the audio
      *  until the user explicitly hands sound to the corner. Never throws: a stream ExoPlayer can't open just
      *  shows the error state (the corner is best-effort; the main player is unaffected either way). */
-    override fun play(url: String, meta: MediaMeta, muted: Boolean) {
+    override fun play(url: String, meta: MediaMeta, muted: Boolean, userAgent: String?) {
         diagnostics.start(); diagnostics.markLoad()
         this.muted = muted
         currentUrl = url
+        playEpoch++
         hasPlayed = false; retryCount = 0; mainHandler.removeCallbacks(stallWatchdog)
         _videoHeight.value = null
         _meta.value = meta
         _state.value = CornerState.LOADING
         _buffering.value = true
         runCatching {
-            val p = player ?: build().also { player = it }
+            // Per-source UA (providers that 403 the default). The data source is baked into the player, so a
+            // UA change rebuilds it — rare (only when hopping between sources with different UAs) and cheap.
+            val ua = userAgent?.takeIf { it.isNotBlank() } ?: HttpClient.DEFAULT_USER_AGENT
+            if (player != null && ua != builtUa) {
+                player?.run { removeListener(listener); release() }
+                player = null
+            }
+            builtUa = ua
+            val p = player ?: build(ua).also { player = it }
             surface?.let { p.setVideoSurface(it) }
             p.volume = if (muted) 0f else 1f
             p.setMediaItem(MediaItem.fromUri(url))
@@ -138,7 +159,7 @@ class SecondaryLivePlayer(
             p.playWhenReady = true
         }.onFailure {
             android.util.Log.w(TAG, "corner play() failed for $url", it)
-            _state.value = CornerState.ERROR
+            enterError()
         }
     }
 
@@ -150,6 +171,7 @@ class SecondaryLivePlayer(
     /** Stop playback and free the decoder/connection, keeping the instance for the next corner channel. */
     override fun stop() {
         currentUrl = null
+        playEpoch++
         hasPlayed = false; retryCount = 0; mainHandler.removeCallbacks(stallWatchdog)
         _videoHeight.value = null
         _isPlaying.value = false
@@ -159,6 +181,7 @@ class SecondaryLivePlayer(
     }
 
     override fun release() {
+        playEpoch++
         mainHandler.removeCallbacks(stallWatchdog)
         player?.run { removeListener(listener); release() }
         player = null
@@ -172,24 +195,27 @@ class SecondaryLivePlayer(
         val p = player
         val url = currentUrl
         if (p == null || url == null || retryCount >= MAX_RECONNECTS) {
-            _state.value = CornerState.ERROR; _isPlaying.value = false; _buffering.value = false
+            enterError()
             return
         }
         retryCount++
         _state.value = CornerState.LOADING; _buffering.value = true
         android.util.Log.w(TAG, "corner reconnect ($reason) — attempt $retryCount/$MAX_RECONNECTS")
+        val epoch = playEpoch
         mainHandler.postDelayed({
-            if (currentUrl != url) return@postDelayed // superseded (channel changed / closed)
+            // Stale if ANY play/stop/release happened since scheduling — a plain url compare is not enough,
+            // because closing and re-opening the SAME channel makes the url match again.
+            if (playEpoch != epoch || currentUrl != url) return@postDelayed
             runCatching {
                 p.setMediaItem(MediaItem.fromUri(url)) // fresh fetch (live edge)
                 p.prepare()
                 p.playWhenReady = true
-            }.onFailure { _state.value = CornerState.ERROR }
+            }.onFailure { enterError() }
         }, (1500L * retryCount).coerceAtMost(4000L))
     }
 
-    private fun build(): ExoPlayer {
-        val dataSource = OkHttpDataSource.Factory(okHttpClient).setUserAgent(HttpClient.DEFAULT_USER_AGENT)
+    private fun build(ua: String): ExoPlayer {
+        val dataSource = OkHttpDataSource.Factory(okHttpClient).setUserAgent(ua)
         // Shallow buffers — the corner only needs to start quickly, not buffer deep (keeps memory down).
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(2_000, 8_000, 1_000, 2_000)

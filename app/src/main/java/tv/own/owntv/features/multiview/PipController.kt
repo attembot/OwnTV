@@ -21,6 +21,10 @@ import tv.own.owntv.player.MediaMeta
  */
 class PipController(val engine: CornerEngine) {
 
+    /** Per-source user-agent lookup (the shell wires this to the live VM's source map) — providers with a
+     *  custom UA otherwise 403 in the corner while playing fine full-screen. */
+    var uaResolver: (Long) -> String? = { null }
+
     private val _active = MutableStateFlow(false)
     /** True while a corner window is on screen (a second stream is running). */
     val active: StateFlow<Boolean> = _active.asStateFlow()
@@ -30,7 +34,8 @@ class PipController(val engine: CornerEngine) {
     val channel: StateFlow<ChannelEntity?> = _channel.asStateFlow()
 
     /** Open [channel] in the corner (or switch the corner to it). Starts muted so the main stream keeps the
-     *  sound; the user hands audio to the corner explicitly. No-op-safe to call repeatedly with the same one. */
+     *  sound; the user hands audio to the corner explicitly. No-op-safe to call repeatedly with the same one
+     *  — except after an error, where the engine clears its url so the same channel retries. */
     fun openCorner(channel: ChannelEntity, muted: Boolean = true) {
         _channel.value = channel
         _active.value = true
@@ -39,6 +44,7 @@ class PipController(val engine: CornerEngine) {
                 channel.streamUrl,
                 meta = MediaMeta(title = channel.name, logoUrl = channel.logoUrl),
                 muted = muted,
+                userAgent = uaResolver(channel.sourceId),
             )
         } else {
             engine.setMuted(muted)

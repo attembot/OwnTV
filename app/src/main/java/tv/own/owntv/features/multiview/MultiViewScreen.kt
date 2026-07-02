@@ -73,6 +73,7 @@ fun MultiViewScreen(
 ) {
     val tiles by controller.tiles.collectAsStateWithLifecycle()
     val activeIndex by controller.activeIndex.collectAsStateWithLifecycle()
+    val dominantIndex by controller.dominantIndex.collectAsStateWithLifecycle()
     val layout by controller.layout.collectAsStateWithLifecycle()
 
     // The channel switcher overlay. null = closed; ADD_TILE = "add a new tile"; >=0 = "retune that tile".
@@ -84,7 +85,9 @@ fun MultiViewScreen(
     // a single requestFocus() silently no-ops and the remote ends up controlling nothing. This is the fix for
     // "MultiView opens but the D-pad does nothing".
     val activeTileFocus = remember { FocusRequester() }
-    LaunchedEffect(switcherOpen) {
+    // Re-acquire focus on entry, when a switcher closes, AND after any layout restructure (grid<->dominant
+    // or a new dominant tile re-parents every Tile, destroying the focused node).
+    LaunchedEffect(switcherOpen, layout, dominantIndex) {
         if (!switcherOpen && tiles.isNotEmpty()) {
             repeat(8) { runCatching { activeTileFocus.requestFocus() }; delay(70) }
         }
@@ -99,7 +102,7 @@ fun MultiViewScreen(
                 when {
                     tiles.isEmpty() -> Unit
                     layout == MultiLayout.DOMINANT && tiles.size > 1 ->
-                        DominantLayout(tiles, activeIndex, controller, activeTileFocus) { switchTarget = it }
+                        DominantLayout(tiles, activeIndex, dominantIndex, controller, activeTileFocus) { switchTarget = it }
                     else -> GridLayout(tiles, activeIndex, controller, activeTileFocus) { switchTarget = it }
                 }
             }
@@ -222,27 +225,40 @@ private fun TileRow(
         for (offset in 0 until count) {
             val index = start + offset
             if (index in tiles.indices) {
-                Tile(index, tiles[index], active = index == activeIndex, controller, activeTileFocus, onChange, Modifier.fillMaxHeight().weight(1f))
+                androidx.compose.runtime.key(index) {
+                    Tile(index, tiles[index], active = index == activeIndex, controller, activeTileFocus, onChange, Modifier.fillMaxHeight().weight(1f))
+                }
             }
         }
     }
 }
 
-/** Dominant layout: the active tile fills the left ~3/4; the others stack down the right ~1/4. */
+/** Dominant layout: the DOMINANT tile fills the left ~3/4; the others stack down the right ~1/4.
+ *  The big pane follows [dominantIndex] (an explicit hold-OK promote), NOT the focused tile — if it
+ *  followed focus, D-pad-ing across the strip would re-parent every tile and drop focus. Audio still
+ *  follows focus ([activeIndex]). Tiles are keyed so Compose moves them instead of reusing mismatched
+ *  nodes when the layout restructures. */
 @Composable
 private fun DominantLayout(
     tiles: List<ChannelEntity>,
     activeIndex: Int,
+    dominantIndex: Int,
     controller: MultiViewController,
     activeTileFocus: FocusRequester,
     onChange: (Int) -> Unit,
 ) {
-    val big = activeIndex.coerceIn(0, tiles.lastIndex) // guard against a transient tiles/active mismatch
+    val big = dominantIndex.coerceIn(0, tiles.lastIndex) // guard against a transient tiles/dominant mismatch
     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        Tile(big, tiles[big], active = true, controller, activeTileFocus, onChange, Modifier.fillMaxHeight().weight(3f))
+        androidx.compose.runtime.key(big) {
+            Tile(big, tiles[big], active = big == activeIndex, controller, activeTileFocus, onChange, Modifier.fillMaxHeight().weight(3f))
+        }
         Column(Modifier.fillMaxHeight().weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             tiles.forEachIndexed { i, ch ->
-                if (i != big) Tile(i, ch, active = false, controller, activeTileFocus, onChange, Modifier.fillMaxWidth().weight(1f))
+                if (i != big) {
+                    androidx.compose.runtime.key(i) {
+                        Tile(i, ch, active = i == activeIndex, controller, activeTileFocus, onChange, Modifier.fillMaxWidth().weight(1f))
+                    }
+                }
             }
         }
     }

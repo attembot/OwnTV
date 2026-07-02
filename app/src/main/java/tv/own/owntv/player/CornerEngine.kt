@@ -20,7 +20,9 @@ interface CornerEngine {
     /** URL the corner is currently on (null when stopped) — lets the controller skip a redundant reload. */
     val currentUrl: String?
 
-    fun play(url: String, meta: MediaMeta = MediaMeta(), muted: Boolean = true)
+    /** [userAgent] is the per-source custom UA (some providers 403 the default) — same contract as the
+     *  main live engine, so a provider that needs one works in the corner/tiles too. */
+    fun play(url: String, meta: MediaMeta = MediaMeta(), muted: Boolean = true, userAgent: String? = null)
     fun setMuted(muted: Boolean)
     /** Stop playback and free the decoder/connection, keeping the instance for reuse. */
     fun stop()

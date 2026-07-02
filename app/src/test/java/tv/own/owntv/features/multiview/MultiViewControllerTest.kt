@@ -26,7 +26,7 @@ class MultiViewControllerTest {
         var muted = true
         var released = false
         var stops = 0
-        override fun play(url: String, meta: MediaMeta, muted: Boolean) { currentUrl = url; this.muted = muted }
+        override fun play(url: String, meta: MediaMeta, muted: Boolean, userAgent: String?) { currentUrl = url; this.muted = muted }
         override fun setMuted(muted: Boolean) { this.muted = muted }
         override fun stop() { stops++; currentUrl = null }
         override fun release() { released = true; currentUrl = null }
@@ -97,14 +97,42 @@ class MultiViewControllerTest {
     }
 
     @Test
-    fun promoteToDominant_setsActiveAndSwitchesLayout() {
+    fun promoteToDominant_setsActiveAndDominantAndSwitchesLayout() {
         val (c, _) = controller()
         c.enter(listOf(channel(1, "a"), channel(2, "b")))
 
         c.promoteToDominant(1)
 
         assertEquals(1, c.activeIndex.value)
+        assertEquals(1, c.dominantIndex.value)
         assertEquals(MultiLayout.DOMINANT, c.layout.value)
+    }
+
+    @Test
+    fun setActive_movesAudioButNotTheDominantTile() {
+        // Audio follows D-pad focus; the LARGE tile only changes on an explicit promote — if it followed
+        // focus, merely moving across the strip would restructure the layout and drop focus.
+        val (c, engines) = controller()
+        c.enter(listOf(channel(1, "a"), channel(2, "b"), channel(3, "c")))
+        c.promoteToDominant(0)
+
+        c.setActive(2)
+
+        assertEquals(2, c.activeIndex.value)
+        assertEquals("dominant tile unchanged by focus moves", 0, c.dominantIndex.value)
+        assertFalse("focused tile is the audible one", engines[2].muted)
+    }
+
+    @Test
+    fun removeTile_clampsDominantIndex() {
+        val (c, _) = controller()
+        c.enter(listOf(channel(1, "a"), channel(2, "b"), channel(3, "c")))
+        c.promoteToDominant(2)
+
+        c.removeTile(2)
+
+        assertEquals(2, c.tiles.value.size)
+        assertEquals("dominant clamped into the remaining range", 1, c.dominantIndex.value)
     }
 
     @Test

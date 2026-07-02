@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -28,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -84,7 +84,15 @@ fun ChannelSwitcher(
     BackHandler { onDismiss() }
 
     Box(
-        modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.85f)).padding(28.dp).focusGroup(),
+        modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.85f))
+            .padding(28.dp)
+            .focusGroup()
+            // Trap D-pad focus inside the picker. Compose's geometric focus search ignores z-order, so
+            // without this, Left/Up off the picker's edge lands on invisible HUD buttons behind the scrim
+            // (the HUD is inert and won't reclaim focus) — OK could then trigger a hidden Exit. Back dismisses.
+            .focusProperties { exit = { FocusRequester.Cancel } },
         contentAlignment = Alignment.Center,
     ) {
         Column(
@@ -104,7 +112,9 @@ fun ChannelSwitcher(
                     Modifier.fillMaxHeight().weight(0.34f),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    itemsIndexed(categories, key = { _, c -> c.label }) { i, cat ->
+                    // Keyed by INDEX, not label: IPTV playlists routinely repeat category names across
+                    // sources, and duplicate LazyColumn keys crash the composition outright.
+                    itemsIndexed(categories, key = { i, _ -> i }) { i, cat ->
                         FocusableSurface(
                             onClick = { selected = i },
                             modifier = (if (i == 0) Modifier.focusRequester(firstCategoryFocus) else Modifier)
@@ -143,7 +153,8 @@ fun ChannelSwitcher(
                         Modifier.fillMaxHeight().weight(0.66f),
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        items(list, key = { it.id }) { ch ->
+                        // Index keys here too — a recents/history join can legitimately repeat a channel.
+                        itemsIndexed(list, key = { i, _ -> i }) { _, ch ->
                             FocusableSurface(
                                 onClick = { onPick(ch) },
                                 modifier = Modifier.fillMaxWidth(),
