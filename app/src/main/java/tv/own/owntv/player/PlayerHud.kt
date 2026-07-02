@@ -94,6 +94,8 @@ fun PlayerHud(
     onCornerAudio: (() -> Unit)? = null,  // move the audio between the main and corner windows
     onCornerMove: (() -> Unit)? = null,   // cycle the corner window through the four screen corners
     onCornerClose: (() -> Unit)? = null,  // close the corner window
+    onChangeMain: (() -> Unit)? = null,   // pick a new channel for the FULL-SCREEN window (corner untouched)
+    onChangeCorner: (() -> Unit)? = null, // pick a new channel for the PiP corner (main untouched)
     cornerAudioOn: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
@@ -208,6 +210,7 @@ fun PlayerHud(
                     onInfo = { showInfo = !showInfo }, infoOn = showInfo,
                     onOpenDialog = { dialog = it }, onPip = onPip, onMultiView = onMultiView, onBack = onBack,
                     onCornerSwap = onCornerSwap, onCornerAudio = onCornerAudio, onCornerMove = onCornerMove, onCornerClose = onCornerClose,
+                    onChangeMain = onChangeMain, onChangeCorner = onChangeCorner,
                     cornerAudioOn = cornerAudioOn,
                     modifier = Modifier.align(Alignment.BottomStart),
                 )
@@ -396,10 +399,41 @@ private fun BottomBar(
     onInfo: (() -> Unit)? = null, infoOn: Boolean = false,
     onOpenDialog: (HudDialog) -> Unit, onPip: (() -> Unit)?, onMultiView: (() -> Unit)? = null, onBack: () -> Unit,
     onCornerSwap: (() -> Unit)? = null, onCornerAudio: (() -> Unit)? = null, onCornerMove: (() -> Unit)? = null, onCornerClose: (() -> Unit)? = null,
+    onChangeMain: (() -> Unit)? = null, onChangeCorner: (() -> Unit)? = null,
     cornerAudioOn: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 20.dp)) {
+        // Dedicated PiP row (only while a corner stream is up) — its own labeled strip so it's obvious
+        // which window each action touches: "Change main" retunes the full-screen stream, "Change PiP"
+        // retunes the inset. Kept separate from the media controls so neither row overflows.
+        if (onCornerClose != null) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color.Black.copy(alpha = 0.45f))
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                    .focusGroup(),
+            ) {
+                OwnTVIcon(OwnTVIcon.PIP, tint = TEAL, filled = true, modifier = Modifier.size(16.dp))
+                Text(
+                    "PiP",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = TEAL,
+                    modifier = Modifier.padding(start = 2.dp, end = 8.dp),
+                )
+                if (onChangeMain != null) CtrlButton(OwnTVIcon.LIVE_TV, label = "Change main") { onChangeMain() }
+                if (onChangeCorner != null) CtrlButton(OwnTVIcon.PLAYLIST, label = "Change PiP") { onChangeCorner() }
+                if (onCornerSwap != null) CtrlButton(OwnTVIcon.FULLSCREEN, label = "Swap windows") { onCornerSwap() }
+                // Swap-arrows icon on Sound (not a mute glyph): it MOVES the audio between the two windows.
+                if (onCornerAudio != null) CtrlButton(OwnTVIcon.SWAP, active = cornerAudioOn, label = "Sound") { onCornerAudio() }
+                if (onCornerMove != null) CtrlButton(OwnTVIcon.MOVE, label = "Move") { onCornerMove() }
+                CtrlButton(OwnTVIcon.CLOSE, label = "Close") { onCornerClose() }
+            }
+            Spacer(Modifier.height(10.dp))
+        }
         when {
             // Catch-up live channel → a scrubbable live timeline (last LIVE_WINDOW up to the live edge).
             onScrubLive != null -> {
@@ -435,16 +469,7 @@ private fun BottomBar(
                 // Aspect/zoom works in every mode now — direct mode resizes the surface view itself
                 // (see MpvVideoSurface), GL mode scales internally.
                 CtrlButton(OwnTVIcon.ASPECT, active = zoomMode != ZoomMode.FIT) { onOpenDialog(HudDialog.ZOOM) }
-                // Corner (true PiP) controls — present only while a second stream is in the corner.
-                if (onCornerClose != null) {
-                    if (onCornerAudio != null) {
-                        // Swap icon, not a mute icon — this moves the sound between the two windows.
-                        CtrlButton(OwnTVIcon.SWAP, active = cornerAudioOn, label = "Sound") { onCornerAudio?.invoke() }
-                    }
-                    if (onCornerSwap != null) CtrlButton(OwnTVIcon.PIP, active = true, label = "Swap") { onCornerSwap?.invoke() }
-                    if (onCornerMove != null) CtrlButton(OwnTVIcon.MOVE, label = "Move") { onCornerMove?.invoke() }
-                    CtrlButton(OwnTVIcon.CLOSE, label = "Close PiP") { onCornerClose?.invoke() }
-                }
+                // (The corner/PiP controls live in their own labeled row above — see the top of this Column.)
                 if (onPip != null) CtrlButton(OwnTVIcon.PIP, label = "PiP") { onPip() }
                 if (onMultiView != null) CtrlButton(OwnTVIcon.VIDEO, label = "MultiView") { onMultiView() } // enter the multi-stream grid
                 CtrlButton(OwnTVIcon.FULLSCREEN_EXIT, label = "Exit") { onBack() }

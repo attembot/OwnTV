@@ -143,6 +143,8 @@ fun OwnTVShell(
     var cornerBrowsing by remember { mutableStateOf(false) }
     // True while picking the SECOND stream to open in the corner from the full-screen player (true PiP entry).
     var pipPicking by remember { mutableStateOf(false) }
+    // True while picking a new channel for the FULL-SCREEN window from the PiP row (corner keeps playing).
+    var mainPicking by remember { mutableStateOf(false) }
     // Which screen corner the PiP window sits in. Resets to TOP_END each time a corner is (re)opened.
     var cornerPos by remember { mutableStateOf(CornerPos.TOP_END) }
     // Same activity-scoped instances the Live/Guide screens use — lets the fullscreen HUD zap channels
@@ -594,8 +596,8 @@ fun OwnTVShell(
                     onPip = if (cornerActive) null else ({ pipPicking = true }),
                     // MultiView: drop into the grid seeded with this channel (live only); add more from inside.
                     onMultiView = if (isLiveChannel) ({ liveVm.previewChannel.value?.let { enterMultiView(it) } }) else null,
-                    // Go inert while the PiP channel picker is open so the HUD can't steal focus from it.
-                    inert = pipPicking,
+                    // Go inert while ANY channel picker is open over the player so the HUD can't steal focus.
+                    inert = pipPicking || mainPicking || cornerBrowsing,
                     onChannelUp = zap?.let { z -> { z(-1) } },
                     onChannelDown = zap?.let { z -> { z(1) } },
                     onOpenChannelList = if (isLiveChannel && liveCanZap) { { showChannelList = true } } else null,
@@ -613,6 +615,11 @@ fun OwnTVShell(
                     onCornerAudio = if (cornerActive) toggleCornerAudio else null,
                     onCornerMove = if (cornerActive) ({ cornerPos = cornerPos.next() }) else null,
                     onCornerClose = if (cornerActive) closeCorner else null,
+                    // Explicit per-window channel pickers, so it's never ambiguous which window retunes:
+                    // "Change main" = the full-screen stream, "Change PiP" = the corner. Both keep the
+                    // other window playing untouched.
+                    onChangeMain = if (cornerActive && isLiveChannel) ({ mainPicking = true }) else null,
+                    onChangeCorner = if (cornerActive) ({ cornerBrowsing = true }) else null,
                     cornerAudioOn = audioOnCorner,
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -675,11 +682,28 @@ fun OwnTVShell(
       // in place, without closing or stealing the main window's sound.
       if (cornerActive && cornerBrowsing) {
         tv.own.owntv.ui.components.ChannelSwitcher(
-            title = "Change the PiP stream",
+            title = "Change the PiP channel — the small window",
             categories = browseCategories,
             search = { q -> liveVm.browseChannels(q) },
             onPick = { ch -> pip.openCorner(ch); cornerBrowsing = false },
             onDismiss = { cornerBrowsing = false },
+            modifier = Modifier.fillMaxSize(),
+        )
+      }
+
+      // Channel switcher for the MAIN window while PiP is up — retunes the full-screen stream; the corner
+      // keeps playing untouched (its engine is independent).
+      if (mainPicking) {
+        tv.own.owntv.ui.components.ChannelSwitcher(
+            title = "Change the main channel — the full screen",
+            categories = browseCategories,
+            search = { q -> liveVm.browseChannels(q) },
+            onPick = { ch ->
+                zapSource = MainSection.LIVE_TV
+                liveVm.ensurePlaying(ch)
+                mainPicking = false
+            },
+            onDismiss = { mainPicking = false },
             modifier = Modifier.fillMaxSize(),
         )
       }
