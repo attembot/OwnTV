@@ -87,18 +87,16 @@ private enum class CornerPos {
     }
 }
 
-/** PiP window size presets (16:9). The Size control cycles them; the choice is remembered for the
- *  session (unlike the position, which resets to top-right on each open). These are dp, so the window
- *  additionally scales with the global UI-zoom density like everything else. */
-private enum class CornerSize(val width: Int, val height: Int) {
-    SMALL(240, 135), MEDIUM(320, 180), LARGE(432, 243);
-
-    fun next(): CornerSize = when (this) {
-        SMALL -> MEDIUM
-        MEDIUM -> LARGE
-        LARGE -> SMALL
-    }
-}
+/** PiP window sizing: the base 320×180 dp (the original fixed size) scaled by a user-adjustable
+ *  percentage. Size +/− steps by [CORNER_SCALE_STEP]; clamped to [CORNER_SCALE_MIN]% (the base — no
+ *  smaller) … [CORNER_SCALE_MAX]% (640×360 dp, which still fits every corner position with its 24 dp
+ *  margin on a 960×540 dp TV canvas). Remembered for the session (unlike the position, which resets
+ *  to top-right on each open). dp-based, so it additionally scales with the global UI-zoom density. */
+private const val CORNER_BASE_W = 320
+private const val CORNER_BASE_H = 180
+private const val CORNER_SCALE_MIN = 100
+private const val CORNER_SCALE_MAX = 200
+private const val CORNER_SCALE_STEP = 10
 
 /**
  * The MD3 shell: a fixed navigation panel (Layer 1) plus the active destination. Settings is a
@@ -160,8 +158,10 @@ fun OwnTVShell(
     var mainPicking by remember { mutableStateOf(false) }
     // Which screen corner the PiP window sits in. Resets to TOP_END each time a corner is (re)opened.
     var cornerPos by remember { mutableStateOf(CornerPos.TOP_END) }
-    // PiP window size — cycled by the Size control, remembered for the session.
-    var cornerSize by remember { mutableStateOf(CornerSize.MEDIUM) }
+    // PiP window scale (percent of the 320×180 base) — Size +/− steps it, remembered for the session.
+    var cornerScalePct by remember { androidx.compose.runtime.mutableIntStateOf(CORNER_SCALE_MIN) }
+    val cornerGrow = { cornerScalePct = (cornerScalePct + CORNER_SCALE_STEP).coerceAtMost(CORNER_SCALE_MAX) }
+    val cornerShrink = { cornerScalePct = (cornerScalePct - CORNER_SCALE_STEP).coerceAtLeast(CORNER_SCALE_MIN) }
     // Bumped whenever either window is retuned out-of-band (zap, Change main/PiP, swap) so the audio
     // arbitration below re-applies its plan — retuning unmutes/mutes engines without changing any of the
     // arbitration's other keys, which previously left both windows audible (or both silent).
@@ -655,7 +655,8 @@ fun OwnTVShell(
                     onCornerSwap = if (cornerActive && liveOnExo) swapCorner else null,
                     onCornerAudio = if (cornerActive) toggleCornerAudio else null,
                     onCornerMove = if (cornerActive) ({ cornerPos = cornerPos.next() }) else null,
-                    onCornerResize = if (cornerActive) ({ cornerSize = cornerSize.next() }) else null,
+                    onCornerGrow = if (cornerActive) cornerGrow else null,
+                    onCornerShrink = if (cornerActive) cornerShrink else null,
                     onCornerClose = if (cornerActive) closeCorner else null,
                     // Explicit per-window channel pickers, so it's never ambiguous which window retunes:
                     // "Change main" = the full-screen stream, "Change PiP" = the corner. Both keep the
@@ -704,7 +705,8 @@ fun OwnTVShell(
             CornerPos.BOTTOM_END -> Alignment.BottomEnd
         }
         Box(
-            modifier = Modifier.align(cornerAlign).padding(24.dp).size(width = cornerSize.width.dp, height = cornerSize.height.dp),
+            modifier = Modifier.align(cornerAlign).padding(24.dp)
+                .size(width = (CORNER_BASE_W * cornerScalePct / 100).dp, height = (CORNER_BASE_H * cornerScalePct / 100).dp),
         ) {
             tv.own.owntv.player.PipCornerWindow(
                 engine = pip.engine,
@@ -713,7 +715,8 @@ fun OwnTVShell(
                 onToggleAudio = toggleCornerAudio,
                 onBrowse = { cornerBrowsing = true }, // retune the corner from the playlist, live
                 onMove = { cornerPos = cornerPos.next() }, // cycle through the four corners
-                onResize = { cornerSize = cornerSize.next() }, // cycle Small → Medium → Large
+                onGrow = cornerGrow,     // +10% (capped at 200% of the base size)
+                onShrink = cornerShrink, // −10% (never below the 320×180 base)
                 onSwap = expandCorner, // window's expand button promotes the corner channel to full-screen
                 onClose = closeCorner,
                 modifier = Modifier.fillMaxSize(),

@@ -23,7 +23,7 @@ enum class OwnTVIcon {
     PERSON, ADD, SETTINGS, PALETTE, THEME, ZOOM, PLAYLIST, EPG, VIDEO, SHARE, CHEVRON, FAVORITE,
     PAUSE, REWIND, FORWARD, AUDIO, SUBTITLE, SKIP_NEXT, SKIP_PREVIOUS,
     BACK, VOLUME_HIGH, VOLUME_LOW, VOLUME_MUTE, ASPECT, FULLSCREEN, FULLSCREEN_EXIT, PIP, CLOSE,
-    SORT, SWAP, MOVE,
+    SORT, SWAP, MOVE, MINUS,
 }
 
 @Composable
@@ -131,6 +131,9 @@ fun OwnTVIcon(
             }
             OwnTVIcon.ADD -> {
                 drawLineStroke(p(12f, 5f), p(12f, 19f), tint, stroke)
+                drawLineStroke(p(5f, 12f), p(19f, 12f), tint, stroke)
+            }
+            OwnTVIcon.MINUS -> {
                 drawLineStroke(p(5f, 12f), p(19f, 12f), tint, stroke)
             }
             OwnTVIcon.SETTINGS -> {

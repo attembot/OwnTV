@@ -71,7 +71,7 @@ fun PlayerHud(
     onPip: (() -> Unit)? = null,
     onMultiView: (() -> Unit)? = null, // enter MultiView seeded with this channel (live only)
     // When an overlay (e.g. the channel picker) is open over the player, the HUD goes inert: it stops its
-    // auto-hide timer and — crucially — stops requesting focus, so it can't yank focus off that overlay.
+    // auto-hide timer and â crucially â stops requesting focus, so it can't yank focus off that overlay.
     inert: Boolean = false,
     onChannelUp: (() -> Unit)? = null,
     onChannelDown: (() -> Unit)? = null,
@@ -82,18 +82,19 @@ fun PlayerHud(
     onRewindLive: (() -> Unit)? = null,
     onForwardLive: (() -> Unit)? = null,
     onGoToLive: (() -> Unit)? = null,
-    onScrubLive: ((Int) -> Unit)? = null, // timeline scrub: +sec = back, −sec = toward live
+    onScrubLive: ((Int) -> Unit)? = null, // timeline scrub: +sec = back, âsec = toward live
     timeshiftOffsetSec: Int? = null,
     // Live "compatibility mode": pin this channel to the mpv engine (fixes UHD artifacts / undecodable
     // streams ExoPlayer can't handle). null = not a live channel; true = currently pinned to mpv.
     compatMode: Boolean? = null,
     onToggleCompatMode: (() -> Unit)? = null,
-    // True picture-in-picture corner controls — shown only while a second (corner) stream is running.
+    // True picture-in-picture corner controls â shown only while a second (corner) stream is running.
     // onCornerClose non-null = a corner is active; cornerAudioOn = the corner currently has the sound.
     onCornerSwap: (() -> Unit)? = null,   // swap the corner stream into the main window (and vice versa)
     onCornerAudio: (() -> Unit)? = null,  // move the audio between the main and corner windows
     onCornerMove: (() -> Unit)? = null,   // cycle the corner window through the four screen corners
-    onCornerResize: (() -> Unit)? = null, // cycle the corner window size (small -> medium -> large)
+    onCornerGrow: (() -> Unit)? = null,   // grow the corner window +10% (capped)
+    onCornerShrink: (() -> Unit)? = null, // shrink the corner window -10% (never below the base size)
     onCornerClose: (() -> Unit)? = null,  // close the corner window
     onChangeMain: (() -> Unit)? = null,   // pick a new channel for the FULL-SCREEN window (corner untouched)
     onChangeCorner: (() -> Unit)? = null, // pick a new channel for the PiP corner (main untouched)
@@ -139,7 +140,7 @@ fun PlayerHud(
 
     LaunchedEffect(forceShow) { if (forceShow) controlsVisible = true }
     LaunchedEffect(controlsVisible, wakeTick, forceShow, inert) {
-        // Don't auto-hide while an overlay is up — hiding is what triggers the focus grab below.
+        // Don't auto-hide while an overlay is up â hiding is what triggers the focus grab below.
         if (controlsVisible && !forceShow && !inert) { delay(4500); controlsVisible = false }
     }
     LaunchedEffect(controlsVisible, error, dialog, inert) {
@@ -156,7 +157,7 @@ fun PlayerHud(
             if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
             when {
                 // Channel surfing: dedicated CH+/CH- and media prev/next keys always zap. D-pad Up/Down
-                // zap ONLY while the HUD is hidden (when it's visible, Up/Down navigate the controls) —
+                // zap ONLY while the HUD is hidden (when it's visible, Up/Down navigate the controls) â
                 // this is the only way to change channels on remotes without CH keys (e.g. Fire TV).
                 canZap && (e.key == Key.ChannelUp || e.key == Key.MediaPrevious) -> { zap(-1); true }
                 canZap && (e.key == Key.ChannelDown || e.key == Key.MediaNext) -> { zap(1); true }
@@ -176,13 +177,13 @@ fun PlayerHud(
             )
         }
 
-        // Stream technical info — drawn over everything (and kept up even when the controls auto-hide), so
+        // Stream technical info â drawn over everything (and kept up even when the controls auto-hide), so
         // you can read live bitrate/buffer while watching. Toggled from the bottom bar's info button.
         if (showInfo) {
             StreamInfoOverlay(player, modifier = Modifier.align(Alignment.TopEnd).padding(top = 84.dp, end = 20.dp))
         }
 
-        // Channel flash card (zapping with the HUD hidden) — shown independently of the full controls.
+        // Channel flash card (zapping with the HUD hidden) â shown independently of the full controls.
         if (isLive && showFlash && !controlsVisible) {
             ChannelCard(player, modifier = Modifier.align(Alignment.TopStart).padding(start = 28.dp, top = 28.dp))
         }
@@ -197,7 +198,7 @@ fun PlayerHud(
             TopBar(player, isLive, streamChips.ifEmpty { listOfNotNull(videoRes) }, duration, onBack, modifier = Modifier.align(Alignment.TopStart))
             if (isLive) ChannelCard(player, modifier = Modifier.align(Alignment.TopStart).padding(start = 28.dp, top = 92.dp))
 
-            // Hide the transport (play/seek/prev/next) and bottom bar while an error is up — the error
+            // Hide the transport (play/seek/prev/next) and bottom bar while an error is up â the error
             // overlay owns the screen with its own Retry, so the play/rewind/forward must not show behind it.
             if (error == null) {
                 CenterControls(player, nav, isPlaying, isLive, onRewindLive, onForwardLive, onGoToLive, timeshiftOffsetSec, playFocus, modifier = Modifier.align(Alignment.Center))
@@ -210,7 +211,7 @@ fun PlayerHud(
                     compatMode = compatMode, onToggleCompatMode = onToggleCompatMode,
                     onInfo = { showInfo = !showInfo }, infoOn = showInfo,
                     onOpenDialog = { dialog = it }, onPip = onPip, onMultiView = onMultiView, onBack = onBack,
-                    onCornerSwap = onCornerSwap, onCornerAudio = onCornerAudio, onCornerMove = onCornerMove, onCornerResize = onCornerResize, onCornerClose = onCornerClose,
+                    onCornerSwap = onCornerSwap, onCornerAudio = onCornerAudio, onCornerMove = onCornerMove, onCornerGrow = onCornerGrow, onCornerShrink = onCornerShrink, onCornerClose = onCornerClose,
                     onChangeMain = onChangeMain, onChangeCorner = onChangeCorner,
                     cornerAudioOn = cornerAudioOn,
                     modifier = Modifier.align(Alignment.BottomStart),
@@ -225,7 +226,7 @@ fun PlayerHud(
                 Spacer(Modifier.height(8.dp))
                 Text(error ?: "", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.7f), textAlign = TextAlign.Center)
                 // Structured technical detail so a user can report the real cause without adb/logcat:
-                // plain reason → media spec (codec • resolution • decoder) → raw engine/codec line.
+                // plain reason â media spec (codec â¢ resolution â¢ decoder) â raw engine/codec line.
                 errorInfo?.let { info ->
                     info.reason?.takeIf { it.isNotBlank() }?.let {
                         Spacer(Modifier.height(8.dp))
@@ -248,7 +249,7 @@ fun PlayerHud(
     }
 
     when (dialog) {
-        // Track lists are SNAPSHOT once when the dialog opens (re-polled only while still empty —
+        // Track lists are SNAPSHOT once when the dialog opens (re-polled only while still empty â
         // heavy HDR/DTS streams report their tracks late). Reading player.xxxTracks() directly in
         // composition handed the dialog a fresh list on every HUD recomposition, endlessly rebuilding
         // the rows and losing/yanking D-pad focus.
@@ -259,7 +260,7 @@ fun PlayerHud(
                 "Audio Track", audioTracks,
                 onSelect = { player.selectAudio(it.mpvId); dialog = HudDialog.NONE }, onOff = null,
                 onDismiss = { dialog = HudDialog.NONE },
-                // A/V-sync nudge only for VOD (mpv) — live A/V is the provider's; ExoPlayer has no audio-delay.
+                // A/V-sync nudge only for VOD (mpv) â live A/V is the provider's; ExoPlayer has no audio-delay.
                 audioDelayMs = if (!isLive) audioDelayMs else null,
                 onAdjustAudioDelay = if (!isLive) ({ d -> player.adjustAudioDelay(d) }) else null,
             )
@@ -299,7 +300,7 @@ private fun TopBar(
                 val parts = buildList {
                     meta.year?.takeIf { it.isNotBlank() }?.let { add(it) }
                     if (!isLive && durMin > 0) add("$durMin min")
-                    addAll(chips) // aspect · resolution · fps · audio
+                    addAll(chips) // aspect Â· resolution Â· fps Â· audio
                 }
                 parts.forEachIndexed { i, label ->
                     if (i > 0) Box(Modifier.size(3.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.3f)))
@@ -361,7 +362,7 @@ private fun CenterControls(
         if (timeshifting) {
             // Counts down as the archive catches up to the live edge; grows if you pause.
             Text(
-                if (timeshiftOffsetSec!! <= 1) "● At the live edge" else "● ${mmss(timeshiftOffsetSec)} behind live",
+                if (timeshiftOffsetSec!! <= 1) "â At the live edge" else "â ${mmss(timeshiftOffsetSec)} behind live",
                 style = MaterialTheme.typography.labelLarge,
                 color = OwnTVTheme.colors.accent,
             )
@@ -386,7 +387,7 @@ private fun CenterControls(
     }
 }
 
-/** mm:ss for a seconds offset (e.g. 150 → "2:30"). */
+/** mm:ss for a seconds offset (e.g. 150 â "2:30"). */
 private fun mmss(sec: Int): String = "${sec / 60}:${(sec % 60).toString().padStart(2, '0')}"
 
 // ---------------- Bottom bar ----------------
@@ -399,13 +400,13 @@ private fun BottomBar(
     compatMode: Boolean?, onToggleCompatMode: (() -> Unit)?,
     onInfo: (() -> Unit)? = null, infoOn: Boolean = false,
     onOpenDialog: (HudDialog) -> Unit, onPip: (() -> Unit)?, onMultiView: (() -> Unit)? = null, onBack: () -> Unit,
-    onCornerSwap: (() -> Unit)? = null, onCornerAudio: (() -> Unit)? = null, onCornerMove: (() -> Unit)? = null, onCornerResize: (() -> Unit)? = null, onCornerClose: (() -> Unit)? = null,
+    onCornerSwap: (() -> Unit)? = null, onCornerAudio: (() -> Unit)? = null, onCornerMove: (() -> Unit)? = null, onCornerGrow: (() -> Unit)? = null, onCornerShrink: (() -> Unit)? = null, onCornerClose: (() -> Unit)? = null,
     onChangeMain: (() -> Unit)? = null, onChangeCorner: (() -> Unit)? = null,
     cornerAudioOn: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 20.dp)) {
-        // Dedicated PiP row (only while a corner stream is up) — its own labeled strip so it's obvious
+        // Dedicated PiP row (only while a corner stream is up) â its own labeled strip so it's obvious
         // which window each action touches: "Change main" retunes the full-screen stream, "Change PiP"
         // retunes the inset. Kept separate from the media controls so neither row overflows.
         if (onCornerClose != null) {
@@ -431,13 +432,14 @@ private fun BottomBar(
                 // Swap-arrows icon on Sound (not a mute glyph): it MOVES the audio between the two windows.
                 if (onCornerAudio != null) CtrlButton(OwnTVIcon.SWAP, active = cornerAudioOn, label = "Sound") { onCornerAudio() }
                 if (onCornerMove != null) CtrlButton(OwnTVIcon.MOVE, label = "Move") { onCornerMove() }
-                if (onCornerResize != null) CtrlButton(OwnTVIcon.ZOOM, label = "Size") { onCornerResize() }
+                if (onCornerGrow != null) CtrlButton(OwnTVIcon.ADD, label = "Size +") { onCornerGrow() }
+                if (onCornerShrink != null) CtrlButton(OwnTVIcon.MINUS, label = "Size -") { onCornerShrink() }
                 CtrlButton(OwnTVIcon.CLOSE, label = "Close") { onCornerClose() }
             }
             Spacer(Modifier.height(10.dp))
         }
         when {
-            // Catch-up live channel → a scrubbable live timeline (last LIVE_WINDOW up to the live edge).
+            // Catch-up live channel â a scrubbable live timeline (last LIVE_WINDOW up to the live edge).
             onScrubLive != null -> {
                 LiveTimelineBar(offsetSec = timeshiftOffsetSec ?: 0, onScrub = onScrubLive)
                 Spacer(Modifier.height(10.dp))
@@ -459,7 +461,7 @@ private fun BottomBar(
                 SpeedButton(label = speedLabel, active = speedLabel != "1.0x") { onOpenDialog(HudDialog.SPEED) }
                 CtrlButton(OwnTVIcon.SUBTITLE, badge = subCount.takeIf { it > 0 }) { onOpenDialog(HudDialog.SUBS) }
                 CtrlButton(OwnTVIcon.AUDIO, badge = audioCount.takeIf { it > 1 }) { onOpenDialog(HudDialog.AUDIO) }
-                // Stream technical info (codec/res/HDR/bitrate/decoder/audio/buffer) — toggles the overlay.
+                // Stream technical info (codec/res/HDR/bitrate/decoder/audio/buffer) â toggles the overlay.
                 if (onInfo != null) CtrlButton(OwnTVIcon.VIDEO, active = infoOn) { onInfo() }
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -468,10 +470,10 @@ private fun BottomBar(
                 if (onToggleCompatMode != null) {
                     CtrlButton(OwnTVIcon.SETTINGS, active = compatMode == true) { onToggleCompatMode() }
                 }
-                // Aspect/zoom works in every mode now — direct mode resizes the surface view itself
+                // Aspect/zoom works in every mode now â direct mode resizes the surface view itself
                 // (see MpvVideoSurface), GL mode scales internally.
                 CtrlButton(OwnTVIcon.ASPECT, active = zoomMode != ZoomMode.FIT) { onOpenDialog(HudDialog.ZOOM) }
-                // (The corner/PiP controls live in their own labeled row above — see the top of this Column.)
+                // (The corner/PiP controls live in their own labeled row above â see the top of this Column.)
                 if (onPip != null) CtrlButton(OwnTVIcon.PIP, label = "PiP") { onPip() }
                 if (onMultiView != null) CtrlButton(OwnTVIcon.VIDEO, label = "MultiView") { onMultiView() } // enter the multi-stream grid
                 CtrlButton(OwnTVIcon.FULLSCREEN_EXIT, label = "Exit") { onBack() }
@@ -604,7 +606,7 @@ private const val LIVE_SCRUB_STEP_SEC = 60     // per Left/Right press (hold to 
 /** Scrubbable live timeline for a catch-up channel: spans the last [LIVE_WINDOW_SEC] up to the live edge.
  *  Left = back in time, Right = toward live; the thumb is the watched point and the gap to the red LIVE dot
  *  on the right is how far behind live you are. Holding a key scrubs freely; the archive loads when you
- *  settle (the VM debounces). Going past the window keeps working via the ⏪ button — the bar just pins left. */
+ *  settle (the VM debounces). Going past the window keeps working via the âª button â the bar just pins left. */
 @Composable
 private fun LiveTimelineBar(offsetSec: Int, onScrub: (Int) -> Unit) {
     val interaction = remember { MutableInteractionSource() }
@@ -651,7 +653,7 @@ private fun TrackDialog(
     onSelect: (TrackOption) -> Unit,
     onOff: (() -> Unit)?,
     onDismiss: () -> Unit,
-    audioDelayMs: Int? = null,                 // non-null on the Audio dialog (VOD) → show the A/V-sync nudge
+    audioDelayMs: Int? = null,                 // non-null on the Audio dialog (VOD) â show the A/V-sync nudge
     onAdjustAudioDelay: ((Int) -> Unit)? = null,
 ) {
     val colors = OwnTVTheme.colors
@@ -659,13 +661,13 @@ private fun TrackDialog(
     BackHandler { onDismiss() }
     // Open with focus on the CURRENTLY-selected track (so re-opening to change it lands on the right row),
     // else the "Off" row if nothing's selected, else the first track. The requestFocus must run from
-    // INSIDE the target row (below) — a top-level LaunchedEffect fires before the LazyColumn has composed
+    // INSIDE the target row (below) â a top-level LaunchedEffect fires before the LazyColumn has composed
     // that row, so requestFocus would throw "not initialized" and focus would fall back to the first item.
     val selectedIndex = tracks.indexOfFirst { it.selected }
     val focusOff = onOff != null && selectedIndex < 0
     // Safety net: the per-row one-shot requestFocus below can fire while the dialog window is still
     // mid-transition (seen on HDR/HDR10/DTS streams, whose surface re-layout delays window focus) or
-    // before the engine has reported the tracks at all — leaving the dialog with NO focused row and
+    // before the engine has reported the tracks at all â leaving the dialog with NO focused row and
     // the D-pad locked out. Retry over a few frames, and re-run whenever the track list (re)arrives.
     LaunchedEffect(tracks.size, focusOff) { requestFocusRetrying(focus) }
     DialogScaffold(title = title, onDismiss = onDismiss) {
@@ -683,15 +685,15 @@ private fun TrackDialog(
             val focusThis = index == selectedIndex || (selectedIndex < 0 && onOff == null && index == 0)
             if (focusThis) LaunchedEffect(Unit) { androidx.compose.runtime.withFrameNanos {}; runCatching { focus.requestFocus() } }
             OptionRow(
-                // Image-based subs (PGS/VOBSUB/DVB) play via the ExoPlayer handoff on VOD — mark them so
+                // Image-based subs (PGS/VOBSUB/DVB) play via the ExoPlayer handoff on VOD â mark them so
                 // it's clear they're a different kind of track, but they're fully selectable.
-                label = if (!track.image) track.label else "${track.label}  ·  image",
+                label = if (!track.image) track.label else "${track.label}  Â·  image",
                 selected = track.selected,
                 modifier = if (focusThis) Modifier.focusRequester(focus) else Modifier,
                 onClick = { onSelect(track) },
             )
         }
-        // A/V-sync nudge (audio dialog, VOD only) — fixes a badly-muxed file where audio leads/lags the video.
+        // A/V-sync nudge (audio dialog, VOD only) â fixes a badly-muxed file where audio leads/lags the video.
         if (onAdjustAudioDelay != null) {
             item {
                 Row(
@@ -700,7 +702,7 @@ private fun TrackDialog(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Text("A/V sync", style = MaterialTheme.typography.titleSmall, color = colors.onSurface, modifier = Modifier.weight(1f))
-                    StepButton("–", enabled = (audioDelayMs ?: 0) > -5_000) { onAdjustAudioDelay(-50) }
+                    StepButton("â", enabled = (audioDelayMs ?: 0) > -5_000) { onAdjustAudioDelay(-50) }
                     Text(
                         formatDelay(audioDelayMs ?: 0),
                         style = MaterialTheme.typography.bodyMedium, color = colors.primary,
@@ -782,7 +784,7 @@ private fun VolumeDialog(player: PlaybackEngine, onDismiss: () -> Unit) {
                 Text("Volume", style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
                 Spacer(Modifier.height(20.dp))
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                    StepButton("–", enabled = volume > 0, modifier = Modifier.focusRequester(focus)) { player.adjustVolume(-5) }
+                    StepButton("â", enabled = volume > 0, modifier = Modifier.focusRequester(focus)) { player.adjustVolume(-5) }
                     Text("$volume%", style = MaterialTheme.typography.headlineLarge, color = TEAL, modifier = Modifier.width(120.dp), textAlign = TextAlign.Center)
                     StepButton("+", enabled = volume < 150) { player.adjustVolume(5) }
                 }
@@ -809,7 +811,7 @@ private fun DialogScaffold(title: String, onDismiss: () -> Unit, content: androi
     val colors = OwnTVTheme.colors
     // A REAL dialog window, not an in-place overlay: it owns the D-pad focus scope, so nothing in the
     // HUD behind it (play button, catch-all focusable, stream-info chips) can compete for or steal
-    // focus — which is what intermittently locked the subtitle/audio pickers out of focus on
+    // focus â which is what intermittently locked the subtitle/audio pickers out of focus on
     // codec-heavy (HDR/DTS) streams. Back is handled by the window itself via onDismissRequest.
     androidx.compose.ui.window.Dialog(
         onDismissRequest = onDismiss,
