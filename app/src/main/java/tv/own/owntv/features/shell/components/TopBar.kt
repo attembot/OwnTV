@@ -112,7 +112,8 @@ private fun PlaylistChip(label: String) {
 @Composable
 private fun WeatherChip(info: WeatherInfo) {
     val colors = OwnTVTheme.colors
-    val temp = "${info.temperatureC.toInt()}°C"
+    // Personal fork: display in Fahrenheit (the repository stores Celsius from Open-Meteo).
+    val temp = "${(info.temperatureC * 9f / 5f + 32f).toInt()}°F"
     val location = if (info.city.isNotBlank()) " · ${info.city}" else ""
     Box(Modifier.clip(RoundedCornerShape(999.dp)).background(colors.primaryContainer.copy(alpha = 0.4f)).padding(horizontal = 14.dp, vertical = 7.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

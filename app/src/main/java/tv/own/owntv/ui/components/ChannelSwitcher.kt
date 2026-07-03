@@ -91,11 +91,16 @@ fun ChannelSwitcher(
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.85f))
             .padding(28.dp)
-            .focusGroup()
             // Trap D-pad focus inside the picker. Compose's geometric focus search ignores z-order, so
             // without this, Left/Up off the picker's edge lands on invisible HUD buttons behind the scrim
             // (the HUD is inert and won't reclaim focus) — OK could then trigger a hidden Exit. Back dismisses.
-            .focusProperties { exit = { FocusRequester.Cancel } },
+            //
+            // ORDER MATTERS: focusProperties must come BEFORE focusGroup() so `exit` binds to the group's
+            // own focus target (the picker boundary). Placed after, it propagates to every focusable INSIDE
+            // the picker instead — each row then cancels any move away from itself, freezing the D-pad
+            // entirely (couldn't move from categories to channels).
+            .focusProperties { exit = { FocusRequester.Cancel } }
+            .focusGroup(),
         contentAlignment = Alignment.Center,
     ) {
         Column(
