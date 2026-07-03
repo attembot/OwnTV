@@ -70,6 +70,7 @@ import tv.own.owntv.ui.components.ResumeDialog
 import tv.own.owntv.ui.components.longPressMenuGuard
 import androidx.compose.foundation.layout.width
 import tv.own.owntv.ui.components.SearchBar
+import tv.own.owntv.ui.components.trapVerticalFocusExit
 import tv.own.owntv.ui.components.SortChip
 import tv.own.owntv.ui.components.formatCount
 import tv.own.owntv.ui.components.ContentPanelFill
@@ -225,6 +226,9 @@ private fun SeriesGrid(
                         }
                     }
                 }
+                // Held Up/Down can outrun the lazy grid's composition and escape this pane
+                // (landing on the top bar) — trap vertical exits; Left/Right/Back leave normally.
+                .trapVerticalFocusExit()
                 .focusGroup()
                 .padding(horizontal = Dimens.ScreenPaddingH, vertical = Dimens.ScreenPaddingV),
         ) {

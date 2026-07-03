@@ -46,6 +46,7 @@ import tv.own.owntv.ui.components.OwnTVButtonStyle
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.ContentPanelFill
 import tv.own.owntv.ui.components.roundedPanel
+import tv.own.owntv.ui.components.trapVerticalFocusExit
 import tv.own.owntv.ui.theme.Dimens
 import tv.own.owntv.ui.theme.OwnTVTheme
 
@@ -84,6 +85,9 @@ fun DownloadsScreen(
             // otherwise land on whatever row is horizontally aligned). onEnter fires only for
             // directional entry from outside (internal moves don't re-trigger it).
             .focusProperties { onEnter = { runCatching { firstFocus.requestFocus() } } }
+            // Held Up/Down can outrun the lazy list's composition and escape this pane
+            // (landing on the top bar) — trap vertical exits; Left/Right/Back leave normally.
+            .trapVerticalFocusExit()
             .focusGroup()
             .onFocusChanged { if (it.hasFocus) onChildFocused() }
             .padding(horizontal = Dimens.ScreenPaddingH, vertical = Dimens.ScreenPaddingV),

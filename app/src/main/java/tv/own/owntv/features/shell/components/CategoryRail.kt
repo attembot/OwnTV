@@ -46,6 +46,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.SearchBar
+import tv.own.owntv.ui.components.trapVerticalFocusExit
 import tv.own.owntv.ui.components.RailPanelFill
 import tv.own.owntv.ui.components.roundedPanel
 import tv.own.owntv.ui.theme.Dimens
@@ -135,6 +136,9 @@ fun CategoryRail(
                         }
                     }
                 }
+                // Held Up/Down can outrun the lazy list's composition and escape the rail (landing
+                // on the top bar) — trap vertical exits; Left/Right/Back still leave normally.
+                .trapVerticalFocusExit()
                 .focusGroup(),
             contentPadding = PaddingValues(vertical = Dimens.GapLarge, horizontal = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,

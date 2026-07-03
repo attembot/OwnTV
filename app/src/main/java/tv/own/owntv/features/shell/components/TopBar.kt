@@ -1,6 +1,7 @@
 package tv.own.owntv.features.shell.components
 
 import android.text.format.DateFormat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +27,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -36,6 +39,7 @@ import tv.own.owntv.core.weather.WeatherInfo
 import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.theme.OwnTVTheme
+import tv.own.owntv.ui.theme.ownTvTween
 import java.util.Date
 
 @Composable
@@ -44,6 +48,7 @@ fun TopBar(
     onSearchClick: () -> Unit,
     playlistName: String,
     weatherInfo: WeatherInfo? = null,
+    searchVisible: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val colors = OwnTVTheme.colors
@@ -54,7 +59,7 @@ fun TopBar(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             SectionChip(label = sectionLabel)
-            SearchPill(onClick = onSearchClick)
+            SearchPill(onClick = onSearchClick, visible = searchVisible)
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             if (weatherInfo != null) WeatherChip(info = weatherInfo)
@@ -73,10 +78,16 @@ private fun SectionChip(label: String) {
 }
 
 @Composable
-private fun SearchPill(onClick: () -> Unit) {
+private fun SearchPill(onClick: () -> Unit, visible: Boolean) {
     val colors = OwnTVTheme.colors
+    // Fade instead of remove: the pill keeps its space so the top-bar row never shifts, and it
+    // becomes unfocusable while hidden so an escaping vertical focus search can never land on it.
+    val alpha by animateFloatAsState(if (visible) 1f else 0f, ownTvTween(160), label = "searchPillAlpha")
     FocusableSurface(
         onClick = onClick,
+        modifier = Modifier
+            .graphicsLayer { this.alpha = alpha }
+            .focusProperties { canFocus = visible },
         shape = RoundedCornerShape(999.dp),
         focusedContainerColor = colors.surfaceContainerHigh,
         unfocusedContainerColor = colors.surfaceContainer.copy(alpha = 0.6f),

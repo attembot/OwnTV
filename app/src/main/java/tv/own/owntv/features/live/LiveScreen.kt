@@ -52,6 +52,7 @@ import tv.own.owntv.ui.components.MoveOrderOverlay
 import tv.own.owntv.features.shell.components.PreviewPane
 import tv.own.owntv.features.shell.components.RailCategory
 import tv.own.owntv.ui.components.longPressMenuGuard
+import tv.own.owntv.ui.components.trapVerticalFocusExit
 import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.OwnTVButton
 import tv.own.owntv.ui.components.OwnTVButtonStyle
@@ -185,6 +186,9 @@ fun LiveScreen(
                         }
                     }
                 }
+                // Held Up/Down can outrun the lazy list's composition and escape this pane
+                // (landing on the top bar) — trap vertical exits; Left/Right/Back leave normally.
+                .trapVerticalFocusExit()
                 .focusGroup()
                 .padding(horizontal = Dimens.ScreenPaddingH, vertical = Dimens.ScreenPaddingV),
         ) {

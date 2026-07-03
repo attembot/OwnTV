@@ -1,5 +1,26 @@
 # Changelog
 
+## v4.0.1 — 2026-07-03
+
+### 🐛 Fixes
+
+- **D-pad focus no longer jumps to the top bar while scrolling long lists** — holding Up in a big
+  category rail or channel/movie/series list (e.g. 500 categories) could make focus outrun the list
+  and teleport to the top bar's Search button. Focus now stays inside the panel you're in; you leave
+  it only deliberately with Left/Right or Back.
+- **Top-bar Search button now appears only while the highlight is on the left nav panel** — inside
+  Live TV, Movies, Series, Guide, Downloads or Settings it fades out (keeping its space, so the
+  clock/weather chips never shift) and can't take focus. It fades back in when you return to the
+  nav panel, where it still opens Search as before.
+- **Autoplay next episode no longer fails with a "malformed or corrupted" error** — when an episode
+  ended and autoplay advanced, some providers still held the finished episode's connection slot, so
+  opening the next episode hung and the player gave up with a misleading corruption error (the same
+  episode then played fine manually). A hung open now gets one automatic silent reset-and-retry —
+  the transition shows a few extra seconds of spinner instead of an error. Only a second consecutive
+  hang still surfaces the error.
+- **Player HUD no longer steals D-pad focus from overlays drawn above it** (community PR #41 by
+  [@attembot](https://github.com/attembot) — Michael Botta).
+
 ## v4.0.0 — 2026-07-02
 
 ### 📄 License

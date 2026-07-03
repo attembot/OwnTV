@@ -77,6 +77,7 @@ import tv.own.owntv.ui.components.ContentPanelFill
 import tv.own.owntv.ui.components.roundedPanel
 import tv.own.owntv.ui.components.OwnTVSpinner
 import tv.own.owntv.ui.components.SearchBar
+import tv.own.owntv.ui.components.trapVerticalFocusExit
 import tv.own.owntv.ui.theme.Dimens
 import tv.own.owntv.ui.theme.OwnTVTheme
 import java.text.SimpleDateFormat
@@ -228,6 +229,9 @@ fun EpgScreen(
                     if (runCatching { target.requestFocus() }.isFailure) runCatching { tunedCell.requestFocus() }
                 }
             }
+            // Held Up/Down can outrun the guide's row composition and escape this pane
+            // (landing on the top bar) — trap vertical exits; Left/Right/Back leave normally.
+            .trapVerticalFocusExit()
             .focusGroup()
             .padding(horizontal = 32.dp, vertical = 24.dp),
     ) {

@@ -457,6 +457,9 @@ fun OwnTVShell(
                     onSearchClick = { onSelectSection(MainSection.SEARCH) },
                     playlistName = sourceSummary,
                     weatherInfo = weatherInfo,
+                    // The Search pill only exists while focus sits on the nav panel — inside a
+                    // section it fades out and turns unfocusable, so focus can never jump to it.
+                    searchVisible = focusedLayer == ShellLayer.SIDEBAR,
                 )
                 Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(start = 6.dp, end = 6.dp, bottom = 6.dp)) {
                     when {
@@ -637,8 +640,9 @@ fun OwnTVShell(
                     },
                     // MultiView: drop into the grid seeded with this channel (live only); add more from inside.
                     onMultiView = if (isLiveChannel) ({ liveVm.previewChannel.value?.let { enterMultiView(it) } }) else null,
-                    // Go inert while ANY channel picker is open over the player so the HUD can't steal focus.
-                    inert = pipPicking || mainPicking || cornerBrowsing,
+                    // Go inert while ANY overlay is open over the player — our channel pickers AND upstream's
+                    // channel-list overlay (PR #41) — so the HUD can't steal focus from it.
+                    inert = pipPicking || mainPicking || cornerBrowsing || showChannelList,
                     onChannelUp = zap?.let { z -> { z(-1) } },
                     onChannelDown = zap?.let { z -> { z(1) } },
                     onOpenChannelList = if (isLiveChannel && liveCanZap) { { showChannelList = true } } else null,
