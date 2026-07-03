@@ -228,7 +228,7 @@ fun PlayerHud(
                 Spacer(Modifier.height(8.dp))
                 Text(error ?: "", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.7f), textAlign = TextAlign.Center)
                 // Structured technical detail so a user can report the real cause without adb/logcat:
-                // plain reason â media spec (codec â¢ resolution â¢ decoder) â raw engine/codec line.
+                // plain reason → media spec (codec • resolution • decoder) → raw engine/codec line.
                 errorInfo?.let { info ->
                     info.reason?.takeIf { it.isNotBlank() }?.let {
                         Spacer(Modifier.height(8.dp))
@@ -364,7 +364,7 @@ private fun CenterControls(
         if (timeshifting) {
             // Counts down as the archive catches up to the live edge; grows if you pause.
             Text(
-                if (timeshiftOffsetSec!! <= 1) "â At the live edge" else "â ${mmss(timeshiftOffsetSec)} behind live",
+                if (timeshiftOffsetSec!! <= 1) "● At the live edge" else "● ${mmss(timeshiftOffsetSec)} behind live",
                 style = MaterialTheme.typography.labelLarge,
                 color = OwnTVTheme.colors.accent,
             )
@@ -389,7 +389,7 @@ private fun CenterControls(
     }
 }
 
-/** mm:ss for a seconds offset (e.g. 150 â "2:30"). */
+/** mm:ss for a seconds offset (e.g. 150 → "2:30"). */
 private fun mmss(sec: Int): String = "${sec / 60}:${(sec % 60).toString().padStart(2, '0')}"
 
 // ---------------- Bottom bar ----------------
@@ -441,7 +441,7 @@ private fun BottomBar(
             Spacer(Modifier.height(10.dp))
         }
         when {
-            // Catch-up live channel â a scrubbable live timeline (last LIVE_WINDOW up to the live edge).
+            // Catch-up live channel → a scrubbable live timeline (last LIVE_WINDOW up to the live edge).
             onScrubLive != null -> {
                 LiveTimelineBar(offsetSec = timeshiftOffsetSec ?: 0, onScrub = onScrubLive)
                 Spacer(Modifier.height(10.dp))
@@ -608,7 +608,7 @@ private const val LIVE_SCRUB_STEP_SEC = 60     // per Left/Right press (hold to 
 /** Scrubbable live timeline for a catch-up channel: spans the last [LIVE_WINDOW_SEC] up to the live edge.
  *  Left = back in time, Right = toward live; the thumb is the watched point and the gap to the red LIVE dot
  *  on the right is how far behind live you are. Holding a key scrubs freely; the archive loads when you
- *  settle (the VM debounces). Going past the window keeps working via the âª button — the bar just pins left. */
+ *  settle (the VM debounces). Going past the window keeps working via the ⏪ button — the bar just pins left. */
 @Composable
 private fun LiveTimelineBar(offsetSec: Int, onScrub: (Int) -> Unit) {
     val interaction = remember { MutableInteractionSource() }
@@ -655,7 +655,7 @@ private fun TrackDialog(
     onSelect: (TrackOption) -> Unit,
     onOff: (() -> Unit)?,
     onDismiss: () -> Unit,
-    audioDelayMs: Int? = null,                 // non-null on the Audio dialog (VOD) â show the A/V-sync nudge
+    audioDelayMs: Int? = null,                 // non-null on the Audio dialog (VOD) → show the A/V-sync nudge
     onAdjustAudioDelay: ((Int) -> Unit)? = null,
 ) {
     val colors = OwnTVTheme.colors
