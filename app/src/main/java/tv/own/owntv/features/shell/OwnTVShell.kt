@@ -87,6 +87,19 @@ private enum class CornerPos {
     }
 }
 
+/** PiP window size presets (16:9). The Size control cycles them; the choice is remembered for the
+ *  session (unlike the position, which resets to top-right on each open). These are dp, so the window
+ *  additionally scales with the global UI-zoom density like everything else. */
+private enum class CornerSize(val width: Int, val height: Int) {
+    SMALL(240, 135), MEDIUM(320, 180), LARGE(432, 243);
+
+    fun next(): CornerSize = when (this) {
+        SMALL -> MEDIUM
+        MEDIUM -> LARGE
+        LARGE -> SMALL
+    }
+}
+
 /**
  * The MD3 shell: a fixed navigation panel (Layer 1) plus the active destination. Settings is a
  * single-pane sectioned screen; browse sections keep the Folder Rail → Content → Preview layout.
@@ -147,6 +160,8 @@ fun OwnTVShell(
     var mainPicking by remember { mutableStateOf(false) }
     // Which screen corner the PiP window sits in. Resets to TOP_END each time a corner is (re)opened.
     var cornerPos by remember { mutableStateOf(CornerPos.TOP_END) }
+    // PiP window size — cycled by the Size control, remembered for the session.
+    var cornerSize by remember { mutableStateOf(CornerSize.MEDIUM) }
     // Bumped whenever either window is retuned out-of-band (zap, Change main/PiP, swap) so the audio
     // arbitration below re-applies its plan — retuning unmutes/mutes engines without changing any of the
     // arbitration's other keys, which previously left both windows audible (or both silent).
@@ -640,6 +655,7 @@ fun OwnTVShell(
                     onCornerSwap = if (cornerActive && liveOnExo) swapCorner else null,
                     onCornerAudio = if (cornerActive) toggleCornerAudio else null,
                     onCornerMove = if (cornerActive) ({ cornerPos = cornerPos.next() }) else null,
+                    onCornerResize = if (cornerActive) ({ cornerSize = cornerSize.next() }) else null,
                     onCornerClose = if (cornerActive) closeCorner else null,
                     // Explicit per-window channel pickers, so it's never ambiguous which window retunes:
                     // "Change main" = the full-screen stream, "Change PiP" = the corner. Both keep the
@@ -688,7 +704,7 @@ fun OwnTVShell(
             CornerPos.BOTTOM_END -> Alignment.BottomEnd
         }
         Box(
-            modifier = Modifier.align(cornerAlign).padding(24.dp).size(width = 320.dp, height = 180.dp),
+            modifier = Modifier.align(cornerAlign).padding(24.dp).size(width = cornerSize.width.dp, height = cornerSize.height.dp),
         ) {
             tv.own.owntv.player.PipCornerWindow(
                 engine = pip.engine,
@@ -697,6 +713,7 @@ fun OwnTVShell(
                 onToggleAudio = toggleCornerAudio,
                 onBrowse = { cornerBrowsing = true }, // retune the corner from the playlist, live
                 onMove = { cornerPos = cornerPos.next() }, // cycle through the four corners
+                onResize = { cornerSize = cornerSize.next() }, // cycle Small → Medium → Large
                 onSwap = expandCorner, // window's expand button promotes the corner channel to full-screen
                 onClose = closeCorner,
                 modifier = Modifier.fillMaxSize(),

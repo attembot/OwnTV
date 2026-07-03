@@ -93,6 +93,7 @@ fun PlayerHud(
     onCornerSwap: (() -> Unit)? = null,   // swap the corner stream into the main window (and vice versa)
     onCornerAudio: (() -> Unit)? = null,  // move the audio between the main and corner windows
     onCornerMove: (() -> Unit)? = null,   // cycle the corner window through the four screen corners
+    onCornerResize: (() -> Unit)? = null, // cycle the corner window size (small -> medium -> large)
     onCornerClose: (() -> Unit)? = null,  // close the corner window
     onChangeMain: (() -> Unit)? = null,   // pick a new channel for the FULL-SCREEN window (corner untouched)
     onChangeCorner: (() -> Unit)? = null, // pick a new channel for the PiP corner (main untouched)
@@ -209,7 +210,7 @@ fun PlayerHud(
                     compatMode = compatMode, onToggleCompatMode = onToggleCompatMode,
                     onInfo = { showInfo = !showInfo }, infoOn = showInfo,
                     onOpenDialog = { dialog = it }, onPip = onPip, onMultiView = onMultiView, onBack = onBack,
-                    onCornerSwap = onCornerSwap, onCornerAudio = onCornerAudio, onCornerMove = onCornerMove, onCornerClose = onCornerClose,
+                    onCornerSwap = onCornerSwap, onCornerAudio = onCornerAudio, onCornerMove = onCornerMove, onCornerResize = onCornerResize, onCornerClose = onCornerClose,
                     onChangeMain = onChangeMain, onChangeCorner = onChangeCorner,
                     cornerAudioOn = cornerAudioOn,
                     modifier = Modifier.align(Alignment.BottomStart),
@@ -398,7 +399,7 @@ private fun BottomBar(
     compatMode: Boolean?, onToggleCompatMode: (() -> Unit)?,
     onInfo: (() -> Unit)? = null, infoOn: Boolean = false,
     onOpenDialog: (HudDialog) -> Unit, onPip: (() -> Unit)?, onMultiView: (() -> Unit)? = null, onBack: () -> Unit,
-    onCornerSwap: (() -> Unit)? = null, onCornerAudio: (() -> Unit)? = null, onCornerMove: (() -> Unit)? = null, onCornerClose: (() -> Unit)? = null,
+    onCornerSwap: (() -> Unit)? = null, onCornerAudio: (() -> Unit)? = null, onCornerMove: (() -> Unit)? = null, onCornerResize: (() -> Unit)? = null, onCornerClose: (() -> Unit)? = null,
     onChangeMain: (() -> Unit)? = null, onChangeCorner: (() -> Unit)? = null,
     cornerAudioOn: Boolean = false,
     modifier: Modifier = Modifier,
@@ -430,6 +431,7 @@ private fun BottomBar(
                 // Swap-arrows icon on Sound (not a mute glyph): it MOVES the audio between the two windows.
                 if (onCornerAudio != null) CtrlButton(OwnTVIcon.SWAP, active = cornerAudioOn, label = "Sound") { onCornerAudio() }
                 if (onCornerMove != null) CtrlButton(OwnTVIcon.MOVE, label = "Move") { onCornerMove() }
+                if (onCornerResize != null) CtrlButton(OwnTVIcon.ZOOM, label = "Size") { onCornerResize() }
                 CtrlButton(OwnTVIcon.CLOSE, label = "Close") { onCornerClose() }
             }
             Spacer(Modifier.height(10.dp))

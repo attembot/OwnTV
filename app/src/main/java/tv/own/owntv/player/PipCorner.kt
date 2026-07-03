@@ -89,6 +89,7 @@ fun PipCornerWindow(
     onToggleAudio: () -> Unit,
     onBrowse: () -> Unit,
     onMove: () -> Unit,
+    onResize: () -> Unit,
     onSwap: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
@@ -165,6 +166,7 @@ fun PipCornerWindow(
                 Spacer(Modifier.weight(1f))
                 PipBtn(OwnTVIcon.PLAYLIST, onClick = onBrowse) // retune the corner stream from the playlist
                 PipBtn(OwnTVIcon.MOVE, onClick = onMove)       // cycle the corner through the four screen corners
+                PipBtn(OwnTVIcon.ZOOM, onClick = onResize)     // cycle the window size: small → medium → large
                 PipBtn(OwnTVIcon.FULLSCREEN, onClick = onSwap)  // swap the corner stream into the main window
                 PipBtn(OwnTVIcon.CLOSE, onClick = onClose)
             }
