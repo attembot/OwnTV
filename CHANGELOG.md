@@ -1,5 +1,305 @@
 # Changelog
 
+## v4.0.2 — 2026-07-07
+
+### 🏠 Customizable Home screen — reorder/hide rows, dwell-to-expand hero, On Now mini-guide (community PR #58 by [@codeVerine](https://github.com/codeVerine) — Sagar Mukundan UV)
+
+- **Reorder and show/hide every Home row** via the new **Settings → Home screen** page (per profile):
+  Keep Watching hero, Recent Channels, Favourite Channels, Continue Watching Movies, Continue Watching
+  Series can each be toggled and moved up/down/top/bottom. When every row is hidden, Home says so
+  instead of showing a blank screen. Configs ride with **Backup & Restore** (backup format v8; older
+  backups restore cleanly with defaults).
+- **Filter the Keep Watching hero row** — independent toggles include/exclude live channels, movies and
+  series from the hero strip (e.g. keep it VOD-only). Addresses **#43**.
+- **Redesigned hero cards — dwell-to-expand** — a card stays compact until it holds focus for **3
+  seconds**, then widens to a 16:9 preview with a **blurred-artwork backdrop** (no more stretched
+  channel logos — **#49**). Quick D-pad sweeps never expand; the video preview starts only after the
+  expansion settles, and the row stays anchored on the active item across data refreshes.
+- **"On Now" mini-guide rows** — Recent Channels and Favourite Channels can each display as **Cards**
+  or **On Now**: an inline programme guide with the currently-airing show, live progress bar, and the
+  next ~6 hours, sharing the real EPG renderer. Up/Down picks a channel, Left/Right scrolls the
+  timeline, OK tunes. Favourite Channels defaults to On Now.
+- **New Recent Channels row** (hidden by default) — recently tuned live channels, respecting the active
+  playlist filter.
+- **Times follow the device's 12h/24h clock setting** across Home, Live TV preview, TV Guide and the
+  catch-up dialog (previously always 24h).
+
+### ⚙️ Settings menu reorganized
+
+- **Profiles** moved to the **top** of Settings (own "Profile" group, first focused row).
+- **Live preview** and **Preview audio** moved from Content into the **Playback** group.
+- **App startup** (Home / Last channel / Live TV Favorites) now lives in the **App** group.
+- **Home screen** (new page above) sits in Content; the **Android TV home** toggle + refresh moved into it.
+
+### 🗂️ Multiple playlists — switch the whole app to one playlist (or all)
+
+- **Selecting a playlist as "Default" now actually filters the app.** Previously the Default toggle only
+  changed a label; the Browse screens always merged every playlist. Now choosing a default narrows
+  **Live TV, Movies, Series, TV Guide, Search, and the Home rails (Continue Watching / Favourites)** to
+  that one playlist. Choosing **All playlists** (no default) restores the merged view — exactly the old
+  behaviour. It's a view filter only: nothing is deleted or re‑imported, and switching back to All brings
+  everything straight back.
+- **New top‑bar playlist switcher.** With 2+ playlists, the playlist chip in the top‑right becomes a
+  button (with a ▾) that opens an **All playlists / A / B / C** picker. It applies everywhere instantly and
+  **persists across restarts**, so you can switch without opening Settings.
+- **Default is now chosen in the playlist's Add/Edit form** via a **"Default playlist"** toggle (instead of
+  a per‑row button). The Sources list shows a **DEFAULT** badge as a status marker. Turning the toggle off
+  on the current default clears it back to **All playlists**.
+- **Favourites & History inside each section respect the selected playlist** — with a single playlist
+  active you no longer see another playlist's favourites/history mixed in; the rail counts match too.
+- The selected default is included in **Backup & Restore** (Sources section).
+
+### ✨ VOD engine fallback (movies & series play on more devices)
+
+- **Automatic second-engine retry for Movies & Series** — if a movie or episode terminally fails on
+  the mpv engine (file rejected, decoder stall, all retries exhausted), the same item is now retried
+  automatically on ExoPlayer at the same position before any error is shown. Some devices/providers
+  play streams on ExoPlayer's decoder path that mpv can't open — previously those items just errored
+  even though the hardware could play them (as Live TV, which starts on ExoPlayer, proved). Each item
+  gets one fallback attempt; if **both** engines fail, the error says so explicitly ("Playback failed
+  on both video engines") instead of a misleading single-engine message.
+- **New setting: Settings → Video Player → "Movies & Series player"** — choose which engine plays VOD
+  first: **mpv** (default; widest format support — DTS/TrueHD audio, unusual containers — plus the
+  A/V sync nudge) or **ExoPlayer** (for TVs/providers where mpv can't start movies at all; no
+  DTS/TrueHD decoding and no A/V sync fix). Whichever is picked, the other is still tried
+  automatically on failure, in reverse order. Live TV and catch-up are unaffected. The setting is
+  included in Backup & Restore like the other player preferences.
+- **Player top bar shows the active engine** — the mini chips in the player's top-left (aspect ·
+  resolution · fps · audio) now lead with **MPV** or **EXO** on every stream — Live TV, Movies and
+  Series — so you can always tell at a glance which engine is playing.
+- **Stream Info shows the active engine** — the player's info overlay now leads with an "Engine" row
+  (mpv / ExoPlayer, including *why* ExoPlayer is active: preferred, fallback, or image-subtitle
+  handoff), and shows real ExoPlayer codec/resolution/audio/buffer data while it owns playback.
+- **In-player engine toggle for movies & episodes** — the player's **engine toggle (the ⇄ MPV/EXO
+  pill, same spot as Live TV's compatibility mode)** switches the **current** item between mpv and
+  ExoPlayer at the same position, without changing the global setting. Useful to check whether the
+  other engine exposes a subtitle or audio track the current one doesn't — flip, check the tracks,
+  and stay on whichever works. The pill shows the active engine (teal while on ExoPlayer) — and,
+  like Live's compatibility mode, the choice is **remembered per movie/episode**: a toggled item
+  opens on that engine every time, while everything else keeps following the setting.
+- **Engine toggle restyle + confirmation toast** — the Live "compatibility mode" and the in-player
+  mpv/ExoPlayer switch are no longer a gear icon: they're one labeled pill that shows the active
+  engine (MPV or EXO) and turns teal on the non-default one. Flipping it briefly pops up a small
+  "Switched to MPV" / "Switched to ExoPlayer" note at the bottom of the player, so the change is
+  always confirmed. Applies everywhere the toggle appears: Live TV, Movies, Series, and channels
+  opened from the Guide.
+- While ExoPlayer owns VOD playback: subtitles (text **and** image) and audio tracks are selectable
+  directly on it, autoplay-next keeps working across episodes and seasons, and progress/resume is
+  tracked as usual.
+
+### 🔄 Per-source Auto Refresh (playlists & EPG)
+
+- **Each playlist and EPG source can now refresh itself automatically** — open Settings → Manage
+  sources (playlists) or Settings → EPG sources and pick an **Auto refresh** mode per source: **Off**,
+  **Refresh at startup** (once per cold app start), or a staleness interval (playlists: 6h / 12h / 24h
+  / 48h; EPG: 1h / 3h / 6h / 12h / 24h / 48h). Interval modes are checked on cold start **and** when
+  the app returns to the foreground; a source refreshes only once it's actually stale (now − last
+  successful sync ≥ the chosen threshold), so resuming the app doesn't re-sync everything every time.
+- **Off by default** — new playlist and EPG sources start with Auto refresh **Off**; nothing syncs in
+  the background unless you turn it on. Existing users who had the old "Refresh on startup" toggle
+  enabled are migrated to **Refresh at startup** so their behaviour is unchanged.
+- **Failure-safe freshness** — a failed EPG sync no longer marks the source as freshly synced, so a
+  source that errors stays "stale" and is retried on the next check instead of being skipped for the
+  full interval. Never-synced sources are always treated as stale. Auto refreshes preserve existing
+  data (they never clear-then-reimport); a manual sync still does the full replace.
+
+### 💾 Backup & Restore now covers every persistent setting
+
+- **Auto Refresh selections are backed up** — the per-source playlist and EPG Auto refresh modes ride
+  with the **Profiles & sources** section. On restore, a saved mode is re-applied only if that source
+  still exists; ids that no longer exist are skipped, and an unknown/corrupt mode falls back safely to
+  **Off**. Sync timestamps are **not** backed up — after a restore the app re-derives freshness from
+  the restored mode and the real sync state.
+- **Per-item compatibility mode is backed up** — the Live TV "compatibility mode" pins and the
+  Movies/Series per-item engine pins (mpv / ExoPlayer, set from the player's engine toggle) are now
+  saved and restored with the **App settings** section. They're keyed by stream URL, so they survive a
+  re-sync, and restore **merges** them into any pins you've already set rather than replacing them.
+- **Audit gaps closed** — the **Default source** selection and the legacy **"resume last channel"**
+  preference were being stored but not backed up; both are now included. Every user-facing preference
+  in the settings store is now covered by Backup & Restore.
+- **Download folder is backed up too** — the chosen **Download folder** (Settings → Storage) was the
+  one persistent setting still missing; it now rides with App settings and restores on import. On a
+  different device a path that no longer exists harmlessly falls back to app storage, so a stale
+  restore never breaks downloads.
+- **Backward compatible** — older backup files that lack any of these new fields still restore
+  cleanly: missing Auto refresh defaults to the normal app behaviour (EPG stays Off), and missing
+  compatibility-mode/default-source fields simply leave your current values untouched. Unknown or
+  invalid entries are ignored — a restore never crashes on them.
+- **Customize PIN lock is backed up** — each profile's Customize PIN rides with the **Profiles &
+  sources** section and is restored per profile (PINs for profiles that no longer exist are dropped
+  safely; older backups without the field restore as before).
+
+### 🎬 TMDB metadata enrichment (Movies, Series & Episodes)
+
+- **On-demand TMDB enrichment** — cached posters, plots, cast, genres, ratings and backdrops from TMDB,
+  filling the gaps your playlist leaves. Fully opt-in and cached in Room; no bulk calls. Works out of the
+  box via a shared caching server (no setup), or bring your own TMDB API key / self-hosted server.
+- **Metadata source mode (Settings → Metadata)** — choose **Provider only**, **Provider + TMDB** (provider
+  wins, TMDB fills gaps), or **TMDB only** (TMDB preferred). Advanced key/self-host fields appear only when
+  TMDB is on.
+- **TMDB Details window** — long-press a movie or series (or episode) → **TMDB Details** opens a scrollable
+  window with the backdrop/still, full overview, cast, genres and rating (Back to close).
+- **Series & episode enrichment** — series show pages and, inside a series, a new **episode detail pane**
+  showing each episode's TMDB still, plot, air year and rating (resolved lazily per season).
+- **Sort by rating** — the Movies & Series sort chip now cycles Provider → A–Z → **Rating** (highest first).
+- **Cleaner detail pane / interaction** — the side detail pane is now display-only (single-press plays,
+  long-press for Favorite / Download / TMDB Details), which also fixes D-pad navigation from the grid to the
+  pane. Episode rows lost their play/download icons (single-press plays, long-press for Download / Details).
+  Downloading an already-downloaded item shows a toast instead of re-queuing.
+- **Better title matching** — provider prefixes like `4K-OSN+ - ` are now stripped before searching TMDB, so
+  more messy playlist titles resolve correctly.
+- **Refetch TMDB details (long-press)** — clear a wrong/stale TMDB match (or a 7-day "no match" cache) and
+  re-search immediately, on Movies, Series, and Episodes — no need to wait for the cache to expire. Lets the
+  improved title matcher reach titles that failed before the fix.
+- **Set TMDB name (long-press)** — manual override for titles the matcher still gets wrong: type the exact
+  TMDB title (and optional year) and OwnTV re-searches under that name, on Movies and Series. The override
+  survives playlist re-syncs; Clear reverts to automatic matching. Episodes inherit their series' match.
+- **In-app toasts** — transient notices (refetch, already-downloaded, re-search) now use a themed in-app
+  toast instead of the system toast.
+- **🎞️ In-app trailers (Movies & Series)** — long-press → **Play Trailer** (shown only when TMDB has one)
+  plays the YouTube trailer in a floating window styled like the TMDB Details window, with Exit, a progress
+  bar and D-pad ◀/▶ ±10s seek. Falls back to opening the YouTube app if the built-in player can't run.
+- **Self-hostable metadata server** — the caching-proxy Worker source now ships in `worker/` with a README,
+  so anyone can deploy their own and point OwnTV at it.
+- **Attribution** — Settings → Metadata shows the TMDB logo and the required notice: this product uses the
+  TMDB API but is not endorsed or certified by TMDB.
+
+### 🙈 Hide individual movies & series — and a Customize PIN lock
+
+- **Hide any single movie or series** (not just whole categories) — long-press an item → **Hide**
+  removes it from everywhere at once: global **Search**, in-section search, its **category**, the
+  **All** list and count, **Home** rails (Continue Watching / Favourites), the Android TV **Watch
+  Next** launcher, and **Downloads**. The downloaded file stays on disk and the item returns the
+  moment you unhide it — exactly like Live TV's per-channel hide.
+- **Hidden categories now hide their items everywhere too** — previously hiding a Movies or Series
+  category only dropped the folder from the rail, while its items still showed in **All** and
+  **Search**. Hiding a category now behaves like Live TV: the items vanish from Search, All and the
+  Home/launcher rails until you unhide the category.
+- **Unhide everything from one place** — Settings → **Customize & Hidden Items** (renamed from
+  "Customize Category", since it now manages hidden items too) lists every hidden channel, movie and
+  series per section, each with an **Unhide** button.
+- **Optional PIN lock on the Customize screen** — tap **🔒 Set PIN** at the top-right of Customize &
+  Hidden Items to lock it; afterwards every entry asks for the PIN, so nobody else can unhide items
+  or change your category setup. It is per-profile, asked each time you open the screen, and
+  **deliberately not included in backups** — a lock code shouldn't travel in a readable file, and a
+  restore must never lock you out.
+
+### ✨ External player — play movies, series & downloads in VLC / MX Player
+
+- **New setting: Settings → Video Player → "External player"** — when on, pressing Play on a **Movie**,
+  **Series episode**, or **Download** opens the stream in an external video player (VLC, MX Player, …)
+  instead of the built-in one. Useful for streams this app can't decode, or if you simply prefer another
+  player. Turning it off restores normal in-app playback. The setting is included in **Backup & Restore**
+  like the other player preferences.
+- **Long-press "Play with external player"** — every movie and series episode's long-press menu has a
+  new action that plays just that item externally, **regardless of the global setting**. Completed
+  downloads get an **"External"** button next to Play.
+- **Live TV is unaffected** — channels always play in the built-in player (external routing would lose
+  rewind/catch-up). Movies, Series and Downloads are the only sections that route externally.
+- **Smart hand-off** — if more than one player is installed you get a chooser; if exactly one is set up it
+  opens directly; if none is installed you get a clear "install VLC or MX Player" message instead of a
+  silent failure. Downloaded files are shared safely via a content URI (not a raw file path).
+- **Trade-offs when playing externally** (the same ones every IPTV app has): resume position and
+  prev/next aren't available, and streams that require a custom User-Agent or referer header may not
+  play in the external player. Watch history is still recorded.
+
+### 📺 Live TV closed captions now work (#57)
+
+- **ExoPlayer engine: embedded CEA-608 captions on raw MPEG-TS channels are now detected.** IPTV
+  panels almost never declare captions in the stream tables, so the player never exposed them; the app
+  now surfaces the standard **CC1** track on every `.ts` live channel (HLS channels already worked).
+  Because detection is unconditional, the CC entry also appears on `.ts` channels that carry no
+  captions — selecting it there simply shows nothing.
+- **mpv engine: selecting the CC track now actually renders captions.** CC text can only be extracted
+  by the software video decoder, so while a CC track is selected the channel temporarily switches to
+  software decoding (≤1080p only — the same GL path used by the decoder-rescue fallback) and switches
+  straight back to hardware decoding when CC is turned off or you change channels. Expect a ~1s
+  blip when toggling. On >1080p channels captions stay unavailable on mpv rather than risking
+  stutter; use the ExoPlayer engine there.
+
+### 🌦️ Weather settings submenu — Celsius / Fahrenheit
+
+- The two weather rows on the Settings root are now a proper **Settings → Weather** submenu with three
+  options: **Show weather** (top-bar chip on/off), **Custom location** (city or "lat,lon"; blank =
+  auto-detect — useful on a VPN), and a new **Temperature unit** toggle (**°C / °F**) for the top-bar
+  chip. All three are included in Backup & Restore.
+
+### ⚠️ Low-zoom memory warning (#51)
+
+- **Setting UI Zoom below 85% now asks you to accept the risk first.** Lower zoom draws far more
+  items on screen at once, which can crash devices with limited memory (e.g. 2 GB Fire TV sticks)
+  when combined with large playlists and EPG data. Stepping under 85% shows a one-button warning —
+  **OK** ("I understand and accept the risk") continues, **Back** keeps zoom at 85%. If your zoom is
+  already below 85%, the dialog doesn't nag.
+
+### 🐛 Fixes
+
+- **Fixed D-pad navigation from the Movies/Series grid to the detail pane** — the display-only pane no
+  longer traps focus on the way right.
+- **Fixed episode long-press menu losing focus** — after an action in the episode context menu (e.g.
+  Refetch TMDB details), focus now returns to the episode row instead of jumping away.
+- **Failed TMDB lookups are no longer remembered as "no match"** — a network error, rate limit or proxy
+  outage during a lookup now simply retries on the next open, instead of being negative-cached for 7 days
+  like a genuine "title not on TMDB" answer. The Settings test lookup also distinguishes "server
+  unreachable" from "no match".
+
+- **Live channel-list overlay now matches the channel you launched from Home (#55)** — pressing Left
+  while a Live channel plays opens the quick channel-list overlay. When you started the channel from a
+  Live TV **category**, it correctly listed that category — but when you started it from the **Home**
+  screen (Keep Watching or a Favourites rail), the overlay still showed the *previous* category's list.
+  The Home launch path updated the CH+/CH- zap list but not the list the overlay reads, so the two
+  disagreed. The overlay now reflects the same list you're zapping through — the Keep Watching /
+  Favourites channels you actually opened.
+- **Active nav section stays visible when focus moves away (#47)** — in the left navigation and the
+  category rail, the *selected* item lost all highlight as soon as you moved focus to another item, so
+  at a glance you couldn't tell which section/category was actually active. Both now use a consistent
+  four-state treatment: **selected + focused** (full accent fill) → **focused** cursor (surface fill +
+  teal outline) → **selected but unfocused** (soft tonal fill, accent tint and a persistent left accent
+  bar) → idle. The accent bar gives a colour-independent marker of the active tab for low-contrast
+  panels. Selection/focus boxes are also slightly less rounded (box-style) and the nav bar sits a little
+  closer to the first panel, so the whole left navigation reads as one consistent system.
+- **4K Live channels no longer break playback on some TVs** — on certain low-end panels (e.g. some
+  Hisense models), watching a 4K channel could wedge the TV's hardware video decoder: every channel
+  afterwards took ~20 seconds to start, and it stayed broken until the TV was rebooted (Google TV /
+  higher-end sets were unaffected). The Live engine (ExoPlayer) was *parking* and reusing its decoder
+  between channels instead of releasing it, so the stuck 4K decoder was never handed back. Now, whenever
+  you **leave a UHD (>1080p) channel** — Back, exit full-screen, background, or zap to another channel via
+  CH+/-, the D-pad, or the channel-list overlay — the decoder is **fully released** so the next channel
+  starts cleanly. It's scoped to 4K only, so normal SD/HD zapping keeps the same fast, instant switching.
+- **Live engine pill now shows the engine that's actually playing** — when a Live channel auto-fell-back
+  from ExoPlayer to mpv, the MPV/EXO pill still read **EXO** (it was showing the saved pin, not the live
+  engine), and tapping it appeared to do nothing. The pill now reflects the **running** engine, and one
+  tap always switches it — flipping to mpv (and remembering the channel) or back to ExoPlayer. (The
+  Movies/Series pill already tracked the live engine and is unchanged.)
+- **Live TV zoom / aspect modes now work** — choosing Fit, Fill / Crop, Stretch, Original, Force 16:9
+  or Force 4:3 on a Live TV channel did nothing at all (the picture never changed). Live channels play
+  full-screen on ExoPlayer (the live engine), and that path had no zoom implementation — the mode was
+  stored but never applied to the surface. Zoom/aspect now works on Live TV just like on Movies and
+  Series, whether the channel plays on ExoPlayer or on mpv (a compatibility-mode pin).
+- **Fill / Crop now actually zooms in and crops** — on Movies, Series and Live, "Fill / Crop" could
+  look identical to Fit (especially on 16:9 content), or read as a stretch rather than a crop. It now
+  takes the fitted picture and scales it up ~20% so it always visibly zooms and fills edge-to-edge,
+  regardless of the source's aspect ratio. (Stretch remains a true distort-to-fill.)
+- **Weather chip: VPN-friendly location override + hide toggle (#45)** — the top-bar weather guesses
+  your city from your public IP, so on a VPN it showed the VPN server's city instead of yours. You can
+  now set a manual **Weather location** (Settings → Appearance) — a city name (e.g. *London*) or a
+  raw `lat,lon` pair (e.g. `51.5,-0.12`) — which is geocoded via Open-Meteo and overrides IP lookup.
+  Leave it blank for the previous auto-detect behaviour. There's also a **Show weather** switch to hide
+  the chip entirely. Both settings are included in Backup & Restore. Default ON + blank location means
+  existing users see no change.
+- **Modal D-pad focus can no longer escape into the UI behind it (#48)** — in the Exit, Avatar picker,
+  Rename/Text-input, Resume, App-update and EPG-sync-prompt dialogs, pressing Left/Right/Up/Down from
+  a button could move focus into the browse UI behind the dialog, leaving Cancel/Exit unreachable
+  (only Back could dismiss it). A new all-directions focus trap keeps D-pad focus inside every modal
+  scrim; Back still closes each dialog as before.
+- **Focus returns to the right item after a long-press context menu (#46)** — on Live TV, Movies and
+  Series, long-pressing OK on an item and closing the menu (Cancel / Favourite / Hide / Remove from
+  history / Download) used to jump focus to the left Category rail. Focus now lands back inside the
+  list/grid: on the exact item if it's still there, or on the **nearest surviving neighbour** if it
+  was removed (e.g. unfavouriting on Favorites, or Remove from History) — only leaving the pane when
+  the category becomes empty. The restore is now deterministic (id + position based), fixing an
+  intermittent race where the paged list still held a stale copy of the removed item.
+
 ## v4.0.1 — 2026-07-03
 
 ### 🐛 Fixes

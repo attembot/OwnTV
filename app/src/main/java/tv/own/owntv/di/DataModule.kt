@@ -67,10 +67,19 @@ val dataModule = module {
     single { CustomizationStore(androidContext()) }
     single { tv.own.owntv.core.epg.EpgSourceStore(androidContext()) }
     single { tv.own.owntv.core.player.ForceMpvStore(androidContext()) }
+    single { tv.own.owntv.core.player.ExternalPlayerLauncher(androidContext()) }
     // store, sourceDao, epgRepository
     single { tv.own.owntv.core.epg.EpgMigration(get(), get(), get()) }
     single { M3uParser() }
     single { XtreamClient(get()) }
+    // TMDB metadata enrichment (plan §4): one provider, three tiers resolved from SettingsRepository.
+    single<tv.own.owntv.core.metadata.MetadataProvider> {
+        tv.own.owntv.core.metadata.TmdbProvider(get(), get())
+    }
+    // provider, metadataDao, settings, overrideStore — the on-demand resolve + cache orchestrator (plan §7, §11.2 U5b).
+    single { tv.own.owntv.core.metadata.MetadataRepository(get(), get(), get(), get()) }
+    // Per-content TMDB name overrides (plan §11.2 U5b): DataStore side-store, no Room schema change.
+    single { tv.own.owntv.core.metadata.MetadataOverrideStore(androidContext()) }
     single { WeatherRepository(get(), get()) }
     single { BulkInsertHelper(get()) }
     single {
@@ -126,8 +135,9 @@ val dataModule = module {
     single { LauncherIntegrationRepository(get(), get(), get()) }
     // context, downloadDao, okHttpClient, settings
     single { DownloadManager(androidContext(), get(), get(), get()) }
-    // profileDao, sourceDao, settings, customizationStore, userDataResolver, epgSourceStore, tvHomeRepository
-    single { BackupManager(get(), get(), get(), get(), get(), get(), get()) }
+    // profileDao, sourceDao, settings, customizationStore, userDataResolver, epgSourceStore,
+    // launcherIntegrationRepository, forceMpvStore, vodEngineStore
+    single { BackupManager(get(), get(), get(), get(), get(), get(), get(), get(), get()) }
     // context, okHttpClient — in-app updates from GitHub Releases
     single { UpdateManager(androidContext(), get()) }
     single { CatalogSyncScheduler(androidContext()) }

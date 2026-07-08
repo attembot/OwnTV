@@ -31,6 +31,7 @@ import tv.own.owntv.ui.components.OwnTVAvatar
 import tv.own.owntv.ui.components.ProfileIcon
 import tv.own.owntv.ui.components.OwnTVAvatars
 import tv.own.owntv.ui.components.longPressMenuGuard
+import tv.own.owntv.ui.components.trapAllFocusExit
 import tv.own.owntv.ui.theme.OwnTVTheme
 
 /** Full-screen avatar picker: a grid of the preset cartoon avatars. Picking one applies & closes. */
@@ -52,6 +53,7 @@ fun AvatarPickerDialog(
             // confirm the focused avatar (the "auto-selects first, no pause" bug). longPressMenuGuard
             // swallows OK/Enter until the key is released once, so the user navigates + OK to pick.
             .longPressMenuGuard()
+            .trapAllFocusExit()
             .focusGroup(),
         contentAlignment = Alignment.Center,
     ) {

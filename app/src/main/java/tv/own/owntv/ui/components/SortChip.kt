@@ -50,7 +50,11 @@ fun SortChip(
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                text = if (mode == SortMode.PLAYLIST) playlistLabel else "A–Z",
+                text = when (mode) {
+                    SortMode.PLAYLIST -> playlistLabel
+                    SortMode.ALPHA -> "A–Z"
+                    SortMode.RATING -> "Rating"
+                },
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = if (focused) colors.primary else colors.onSurface,

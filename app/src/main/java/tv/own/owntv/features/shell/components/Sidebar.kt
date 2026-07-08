@@ -41,6 +41,8 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import tv.own.owntv.features.shell.MainSection
 import tv.own.owntv.ui.components.FocusableSurface
+import tv.own.owntv.ui.components.NavAccentBar
+import tv.own.owntv.ui.components.rememberNavLadderColors
 import tv.own.owntv.ui.components.OwnTVAvatar
 import tv.own.owntv.ui.components.NavDuotoneIcon
 import tv.own.owntv.ui.components.OwnTVIcon
@@ -93,7 +95,9 @@ fun Sidebar(
             .focusGroup()
             .width(Dimens.SidebarWidthCollapsed)
             .background(colors.background) // Phase 6 — unified panel surface
-            .padding(horizontal = 12.dp, vertical = 24.dp),
+            // Side inset (6.dp). Combined with the content area's start=0, this leaves a ~6.dp gap
+            // between the nav pills and panel 1. Symmetric, so logo/profile stay centered.
+            .padding(horizontal = 6.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // Phase 2 — brand mark pinned at the top of the rail. Non-focusable, so D-pad entry into the
@@ -300,62 +304,73 @@ private fun NavItem(
     modifier: Modifier = Modifier,
 ) {
     val colors = OwnTVTheme.colors
+    // Box-style corners (17.dp) so every focus/selection box in the app reads as the same "box", close
+    // to the live-TV channel list item, not an over-rounded pill.
+    val shape = RoundedCornerShape(17.dp)
+    // The nav surface itself is transparent + borderless; the shared 4-state nav ladder (NavLadder.kt)
+    // paints the fill, content tint, focus outline and the persistent left accent bar, so the sidebar
+    // and the folder CategoryRail read identically (#47). FocusableSurface still provides the focus
+    // scale, glow and click.
     FocusableSurface(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         selected = active,
-        shape = RoundedCornerShape(26.dp),
-        focusedContainerColor = colors.surfaceContainerHigh,
+        shape = shape,
+        focusedContainerColor = Color.Transparent,
         unfocusedContainerColor = Color.Transparent,
-        selectedContainerColor = colors.secondaryContainer,
+        selectedContainerColor = Color.Transparent,
+        showFocusBorder = false,
         contentAlignment = Alignment.Center,
     ) { focused ->
-        val content = when {
-            active -> colors.onSecondaryContainer
-            focused -> colors.onSurface
-            else -> colors.onSurfaceVariant
-        }
-        // The icon tints to the ACCENT when selected (the label keeps `content`), matching the mockup.
-        val iconColor = when {
-            active -> colors.primary
-            focused -> colors.onSurface
-            else -> colors.onSurfaceVariant
-        }
-        Row(
+        val ladder = rememberNavLadderColors(selected = active, focused = focused)
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = if (expanded) Arrangement.spacedBy(16.dp, Alignment.Start) else Arrangement.Center,
+                .clip(shape)
+                .background(ladder.container)
+                .then(
+                    if (ladder.focusBorder != null) Modifier.border(Dimens.FocusBorderWidth, ladder.focusBorder, shape)
+                    else Modifier
+                ),
         ) {
-            // Monochrome duotone nav icon — tints with the theme (muted idle, accent when selected) via the
-            // shared `content` colour. Still — no per-frame animation on the always-visible nav.
-            NavDuotoneIcon(
-                section = section,
-                color = iconColor,
-                modifier = Modifier.size(28.dp),
-            )
-            if (expanded) {
-                Text(
-                    text = section.label,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = content,
-                    maxLines = 1,
-                    modifier = Modifier.weight(1f),
+            // Persistent left accent bar marking the active section, regardless of focus.
+            NavAccentBar(visible = ladder.showAccentBar, height = 26.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = if (expanded) Arrangement.spacedBy(16.dp, Alignment.Start) else Arrangement.Center,
+            ) {
+                // Monochrome duotone nav icon — tints via the shared ladder (muted idle, white cursor,
+                // accent when active). No per-frame animation on the always-visible nav.
+                NavDuotoneIcon(
+                    section = section,
+                    color = ladder.icon,
+                    modifier = Modifier.size(28.dp),
                 )
-                if (count > 0) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(colors.primaryContainer)
-                            .padding(horizontal = 8.dp, vertical = 2.dp),
-                    ) {
-                        Text(
-                            text = count.toString(),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = colors.onPrimaryContainer,
-                            fontWeight = FontWeight.Bold,
-                        )
+                if (expanded) {
+                    Text(
+                        text = section.label,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = ladder.content,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (count > 0) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(colors.primaryContainer)
+                                .padding(horizontal = 8.dp, vertical = 2.dp),
+                        ) {
+                            Text(
+                                text = count.toString(),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = colors.onPrimaryContainer,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
                     }
                 }
             }

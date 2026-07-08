@@ -44,7 +44,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import tv.own.owntv.ui.components.NavAccentBar
 import tv.own.owntv.ui.components.OwnTVIcon
+import tv.own.owntv.ui.components.rememberNavLadderColors
 import tv.own.owntv.ui.components.SearchBar
 import tv.own.owntv.ui.components.trapVerticalFocusExit
 import tv.own.owntv.ui.components.RailPanelFill
@@ -193,44 +195,24 @@ private fun RailPill(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors = OwnTVTheme.colors
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    // Only ever highlight the FOCUSED pill. The current category shows the green "selected" fill *when
-    // it's the one you're on*; otherwise a focused pill gets the focus outline, and a selected-but-not-
-    // focused pill shows nothing — so the highlight always reads as "where the remote is".
+    // Shared 4-state nav ladder (see NavLadder.kt) — identical treatment to the sidebar nav items so
+    // both panels read the same (#47): active+focused (full fill) → focused cursor (outline) →
+    // selected-idle (tonal fill + left accent bar) → idle.
+    val ladder = rememberNavLadderColors(selected = selected, focused = focused)
     val activeSelected = selected && focused
 
-    // M3 tonal states: the active+focused category uses the primary *container* (soft tonal fill), a
-    // plain focused pill uses a surface-container fill with a primary outline.
-    val bg by animateColorAsState(
-        targetValue = when {
-            activeSelected -> colors.primaryContainer
-            focused -> colors.card
-            else -> Color.Transparent
-        },
-        animationSpec = tv.own.owntv.ui.theme.ownTvTween(140),
-        label = "railPillBg",
-    )
-    val fg by animateColorAsState(
-        targetValue = when {
-            activeSelected -> colors.onPrimaryContainer
-            focused -> colors.accent
-            else -> colors.textSecondary
-        },
-        animationSpec = tv.own.owntv.ui.theme.ownTvTween(140),
-        label = "railPillFg",
-    )
+    // Box-style corners (14.dp), close to the live-TV channel list item, not an over-rounded pill.
+    val shape = if (expanded) RoundedCornerShape(14.dp) else CircleShape
 
-    val shape = if (expanded) RoundedCornerShape(50) else CircleShape
-
-    Row(
+    Box(
         modifier = modifier
             .then(if (expanded) Modifier.fillMaxWidth() else Modifier.size(Dimens.RailPillSize))
             .clip(shape)
-            .background(bg)
+            .background(ladder.container)
             .then(
-                if (focused && !selected) Modifier.border(Dimens.FocusBorderWidth, colors.focusBorder, shape)
+                if (ladder.focusBorder != null) Modifier.border(Dimens.FocusBorderWidth, ladder.focusBorder, shape)
                 else Modifier
             )
             .selectable(
@@ -238,37 +220,46 @@ private fun RailPill(
                 interactionSource = interaction,
                 indication = null,
                 onClick = onClick,
-            )
-            .then(if (expanded) Modifier.padding(horizontal = 10.dp, vertical = 8.dp) else Modifier),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = if (expanded) Arrangement.Start else Arrangement.Center,
+            ),
     ) {
-        // The compact badge (icon or abbreviation) — the row's anchor in both states.
-        Box(
-            modifier = Modifier.size(if (expanded) 36.dp else Dimens.RailPillSize),
-            contentAlignment = Alignment.Center,
+        // Persistent left accent bar marking the active category (only in the expanded full-label rail —
+        // a vertical bar on a compact circle pill would look wrong).
+        NavAccentBar(visible = ladder.showAccentBar && expanded)
+
+        Row(
+            modifier = Modifier
+                .then(if (expanded) Modifier.fillMaxWidth() else Modifier.size(Dimens.RailPillSize))
+                .then(if (expanded) Modifier.padding(horizontal = 10.dp, vertical = 8.dp) else Modifier),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = if (expanded) Arrangement.Start else Arrangement.Center,
         ) {
-            if (category.icon != null) {
-                OwnTVIcon(icon = category.icon, tint = fg, filled = activeSelected, modifier = Modifier.size(if (expanded) 20.dp else Dimens.RailPillSize / 2))
-            } else {
+            // The compact badge (icon or abbreviation) — the row's anchor in both states.
+            Box(
+                modifier = Modifier.size(if (expanded) 36.dp else Dimens.RailPillSize),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (category.icon != null) {
+                    OwnTVIcon(icon = category.icon, tint = ladder.icon, filled = activeSelected, modifier = Modifier.size(if (expanded) 20.dp else Dimens.RailPillSize / 2))
+                } else {
+                    Text(
+                        text = category.abbr,
+                        color = ladder.content,
+                        style = if (expanded) MaterialTheme.typography.labelMedium else MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+            if (expanded) {
+                Spacer(Modifier.width(8.dp))
                 Text(
-                    text = category.abbr,
-                    color = fg,
-                    style = if (expanded) MaterialTheme.typography.labelMedium else MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold,
+                    text = category.fullName,
+                    color = ladder.content,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = if (focused) FontWeight.Bold else FontWeight.Medium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
-        }
-        if (expanded) {
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = category.fullName,
-                color = fg,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = if (focused) FontWeight.Bold else FontWeight.Medium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
         }
     }
 }

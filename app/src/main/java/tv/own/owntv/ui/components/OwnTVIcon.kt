@@ -219,15 +219,7 @@ fun OwnTVIcon(
                 drawPath(triangle(p(4f, 6f), p(11f, 12f), p(4f, 18f)), tint, style = Fill)
                 drawPath(triangle(p(13f, 6f), p(20f, 12f), p(13f, 18f)), tint, style = Fill)
             }
-            OwnTVIcon.SWAP -> {
-                // Two horizontal arrows pointing opposite ways — "move this between the two windows".
-                drawLineStroke(p(4f, 9f), p(19f, 9f), tint, stroke)
-                drawLineStroke(p(16f, 6f), p(19f, 9f), tint, stroke)
-                drawLineStroke(p(16f, 12f), p(19f, 9f), tint, stroke)
-                drawLineStroke(p(20f, 15f), p(5f, 15f), tint, stroke)
-                drawLineStroke(p(8f, 12f), p(5f, 15f), tint, stroke)
-                drawLineStroke(p(8f, 18f), p(5f, 15f), tint, stroke)
-            }
+            // (SWAP is drawn below — upstream added its own ⇄ glyph in v4.0.2; we keep theirs.)
             OwnTVIcon.MOVE -> {
                 // Four-way arrows — "reposition the window".
                 drawLineStroke(p(12f, 4f), p(12f, 20f), tint, stroke)
@@ -308,6 +300,14 @@ fun OwnTVIcon(
             OwnTVIcon.CLOSE -> {
                 drawLineStroke(p(6f, 6f), p(18f, 18f), tint, stroke)
                 drawLineStroke(p(18f, 6f), p(6f, 18f), tint, stroke)
+            }
+            OwnTVIcon.SWAP -> { // ⇄ switch/swap engine (top arrow →, bottom arrow ←)
+                drawLineStroke(p(4f, 9f), p(18f, 9f), tint, stroke)
+                drawLineStroke(p(18f, 9f), p(15f, 6.5f), tint, stroke)
+                drawLineStroke(p(18f, 9f), p(15f, 11.5f), tint, stroke)
+                drawLineStroke(p(6f, 15f), p(20f, 15f), tint, stroke)
+                drawLineStroke(p(6f, 15f), p(9f, 12.5f), tint, stroke)
+                drawLineStroke(p(6f, 15f), p(9f, 17.5f), tint, stroke)
             }
         }
     }

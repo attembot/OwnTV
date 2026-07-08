@@ -38,6 +38,9 @@ fun FocusableSurface(
     selectedContainerColor: Color = OwnTVTheme.colors.card,
     focusedScale: Float = 1f,
     glowElevation: Int = 10,
+    // When false, this surface never draws the built-in focus/selected outline, so the caller can
+    // manage its own border (e.g. the nav ladder, which outlines only the focused-unselected cursor).
+    showFocusBorder: Boolean = true,
     contentAlignment: Alignment = Alignment.Center,
     content: @Composable BoxScope.(focused: Boolean) -> Unit,
 ) {
@@ -59,7 +62,7 @@ fun FocusableSurface(
         animationSpec = tv.own.owntv.ui.theme.ownTvTween(140),
         label = "focusContainer",
     )
-    val showBorder = focused || selected
+    val showBorder = showFocusBorder && (focused || selected)
 
     Box(
         modifier = modifier

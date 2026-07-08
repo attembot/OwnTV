@@ -36,6 +36,8 @@ import tv.own.owntv.core.sync.work.CatalogSyncScheduler
 import tv.own.owntv.core.util.friendlySyncError
 import tv.own.owntv.core.database.dao.resolveExistingProfileId
 import tv.own.owntv.core.launcher.LauncherIntegrationRepository
+import tv.own.owntv.features.settings.data.EpgAutoRefresh
+import tv.own.owntv.features.settings.data.PlaylistAutoRefresh
 import tv.own.owntv.features.settings.data.SettingsRepository
 import tv.own.owntv.ui.theme.AccentColor
 import tv.own.owntv.ui.theme.ThemeMode
@@ -58,6 +60,7 @@ class SettingsViewModel(
     private val launcherIntegrationRepository: LauncherIntegrationRepository,
     private val catalogSyncScheduler: CatalogSyncScheduler,
     private val okHttpClient: okhttp3.OkHttpClient,
+    private val metadataProvider: tv.own.owntv.core.metadata.MetadataProvider,
 ) : ViewModel() {
     companion object {
         private const val TAG = "OwnTVHome"
@@ -239,6 +242,12 @@ class SettingsViewModel(
     val hwDecoding: StateFlow<Boolean> = settings.hwDecoding.stateIn(viewModelScope, SharingStarted.Eagerly, true)
     fun setHwDecoding(enabled: Boolean) { viewModelScope.launch { settings.setHwDecoding(enabled) } }
 
+    val vodPreferExo: StateFlow<Boolean> = settings.vodPreferExo.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    fun setVodPreferExo(enabled: Boolean) { viewModelScope.launch { settings.setVodPreferExo(enabled) } }
+
+    val externalPlayer: StateFlow<Boolean> = settings.externalPlayer.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    fun setExternalPlayer(enabled: Boolean) { viewModelScope.launch { settings.setExternalPlayer(enabled) } }
+
     val updateCheckOnStart: StateFlow<Boolean> =
         settings.updateCheckOnStart.stateIn(viewModelScope, SharingStarted.Eagerly, true)
     fun setUpdateCheckOnStart(enabled: Boolean) { viewModelScope.launch { settings.setUpdateCheckOnStart(enabled) } }
@@ -298,16 +307,35 @@ class SettingsViewModel(
         settings.animationLevel.stateIn(viewModelScope, SharingStarted.Eagerly, tv.own.owntv.ui.theme.AnimationLevel.FULL)
     fun setAnimationLevel(level: tv.own.owntv.ui.theme.AnimationLevel) { viewModelScope.launch { settings.setAnimationLevel(level) } }
 
-    /** Source ids flagged "refresh on startup". */
-    val refreshSourceIds: StateFlow<Set<Long>> = settings.refreshSourceIds
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+    // Weather chip: visibility toggle + manual location override (for VPN users).
+    val weatherEnabled: StateFlow<Boolean> =
+        settings.weatherEnabled.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    fun setWeatherEnabled(enabled: Boolean) { viewModelScope.launch { settings.setWeatherEnabled(enabled) } }
+    val weatherLocation: StateFlow<String> =
+        settings.weatherLocation.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+    fun setWeatherLocation(location: String) { viewModelScope.launch { settings.setWeatherLocation(location) } }
+    val weatherFahrenheit: StateFlow<Boolean> =
+        settings.weatherFahrenheit.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    fun setWeatherFahrenheit(fahrenheit: Boolean) { viewModelScope.launch { settings.setWeatherFahrenheit(fahrenheit) } }
 
-    fun setSourceRefresh(sourceId: Long, enabled: Boolean) {
-        viewModelScope.launch { settings.setSourceRefresh(sourceId, enabled) }
+    /** Per-source playlist auto-refresh selection (Off / Startup / staleness threshold). */
+    val playlistAutoRefresh: StateFlow<Map<Long, PlaylistAutoRefresh>> = settings.playlistAutoRefresh
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+    /** Per-source EPG auto-refresh selection (Off / Startup / staleness threshold). */
+    val epgAutoRefresh: StateFlow<Map<Long, EpgAutoRefresh>> = settings.epgAutoRefresh
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+    fun setPlaylistAutoRefresh(sourceId: Long, mode: PlaylistAutoRefresh) {
+        viewModelScope.launch { settings.setPlaylistAutoRefresh(sourceId, mode) }
+    }
+
+    fun setEpgAutoRefresh(sourceId: Long, mode: EpgAutoRefresh) {
+        viewModelScope.launch { settings.setEpgAutoRefresh(sourceId, mode) }
     }
 
     /** Edit an existing source's settings (no re-import unless the user re-syncs). */
-    fun updateSource(id: Long, name: String, urlOrServer: String, user: String, pass: String, userAgent: String, epgUrl: String, refreshOnStart: Boolean) {
+    fun updateSource(id: Long, name: String, urlOrServer: String, user: String, pass: String, userAgent: String, epgUrl: String, autoRefresh: PlaylistAutoRefresh, isDefault: Boolean = false) {
         viewModelScope.launch {
             val existing = sourceDao.getById(id) ?: return@launch
             sourceRepository.updateSource(
@@ -320,7 +348,13 @@ class SettingsViewModel(
                     epgUrl = epgUrl.trim().takeIf { it.isNotBlank() },
                 ),
             )
-            settings.setSourceRefresh(id, refreshOnStart)
+            settings.setPlaylistAutoRefresh(id, autoRefresh)
+            // Apply the "Default playlist" toggle: on → this becomes the active playlist; off → if this was
+            // the default, clear it back to All. Leaves another playlist's default untouched.
+            when {
+                isDefault -> settings.setDefaultSource(id)
+                settings.defaultSourceId.first() == id -> settings.setDefaultSource(-1L)
+            }
         }
     }
 
@@ -344,13 +378,14 @@ class SettingsViewModel(
         pass: String,
         userAgent: String = "",
         epgUrl: String = "",
-        refreshOnStart: Boolean = false,
+        autoRefresh: PlaylistAutoRefresh = PlaylistAutoRefresh.OFF,
         syncLive: Boolean = true,
         syncMovies: Boolean = true,
         syncSeries: Boolean = true,
+        isDefault: Boolean = false,
     ) {
         val priority = SyncContentTypes(syncLive, syncMovies, syncSeries)
-        runImport(refreshOnStart, priority, enqueueRemainder = true, requiresNetwork = true) { pid ->
+        runImport(autoRefresh, priority, enqueueRemainder = true, requiresNetwork = true, makeDefault = isDefault) { pid ->
             sourceRepository.addXtreamSource(
                 pid, name.ifBlank { "My IPTV" }, server.trim(), user.trim(), pass,
                 userAgent.trim().takeIf { it.isNotBlank() },
@@ -359,9 +394,10 @@ class SettingsViewModel(
         }
     }
 
-    fun addM3u(name: String, url: String, userAgent: String = "", epgUrl: String = "", refreshOnStart: Boolean = false) = runImport(
-        refreshOnStart,
+    fun addM3u(name: String, url: String, userAgent: String = "", epgUrl: String = "", autoRefresh: PlaylistAutoRefresh = PlaylistAutoRefresh.OFF, isDefault: Boolean = false) = runImport(
+        autoRefresh,
         requiresNetwork = !url.isLocalPlaylistPath(),
+        makeDefault = isDefault,
     ) { pid ->
         sourceRepository.addM3uSource(
             pid, name.ifBlank { "My Playlist" }, url.trim(),
@@ -371,10 +407,11 @@ class SettingsViewModel(
     }
 
     private fun runImport(
-        refreshOnStart: Boolean = false,
+        autoRefresh: PlaylistAutoRefresh = PlaylistAutoRefresh.OFF,
         contentTypes: SyncContentTypes = SyncContentTypes(),
         enqueueRemainder: Boolean = false,
         requiresNetwork: Boolean = true,
+        makeDefault: Boolean = false,
         addSource: suspend (Long) -> SourceEntity,
     ) {
         importJob?.cancel()
@@ -388,16 +425,17 @@ class SettingsViewModel(
                     return@launch
                 }
                 val pid = profileDao.resolveExistingProfileId(settings.activeProfileId.first()) ?: return@launch
-                Log.d(TAG, "runImport profile=$pid refreshOnStart=$refreshOnStart")
+                Log.d(TAG, "runImport profile=$pid autoRefresh=$autoRefresh")
                 source = addSource(pid)
                 val freshSync = source.lastSyncAt == null
                 val remainder = if (enqueueRemainder) SyncContentTypes().remainderAfter(contentTypes) else SyncContentTypes(live = false, movies = false, series = false)
-                settings.setSourceRefresh(source.id, refreshOnStart)
+                settings.setPlaylistAutoRefresh(source.id, autoRefresh)
                 when (val r = sourceRepository.sync(source, onProgress = { _progress.value = it }, contentTypes = contentTypes)) {
                     is SyncResult.Success -> {
                         // Settings playlist add: content breakdown only (EPG syncs silently and is
                         // shown on the EPG Sources screen, per the separated-EPG design).
                         val counts = importFinalizer.finalize(source, deferIndexes = freshSync)
+                        if (makeDefault) settings.setDefaultSource(source.id)
                         val syncedSource = sourceDao.getById(source.id) ?: source
                         Log.d(TAG, "runImport sync success sourceId=${source.id} profile=$pid")
                         if (enqueueRemainder) enqueueRemainderSync(source, contentTypes)
@@ -497,7 +535,7 @@ class SettingsViewModel(
         withContext(NonCancellable) {
             catalogSyncScheduler.cancelSync(source.id)
             runCatching { sourceRepository.deleteSource(source) }
-            runCatching { settings.setSourceRefresh(source.id, false) }
+            runCatching { settings.setPlaylistAutoRefresh(source.id, PlaylistAutoRefresh.OFF) }
         }
     }
 
@@ -571,6 +609,67 @@ class SettingsViewModel(
             _proxyTest.value = result.fold(
                 onSuccess = { ProxyTestState.Ok(it) },
                 onFailure = { ProxyTestState.Fail(friendlyProxyError(it)) },
+            )
+        }
+    }
+
+    // --- TMDB metadata enrichment (plan §4) — Phase M1 config + manual "look up title" test ---
+
+    val metadataMode: StateFlow<tv.own.owntv.core.metadata.MetadataMode> =
+        settings.metadataMode.stateIn(viewModelScope, SharingStarted.Eagerly, tv.own.owntv.core.metadata.MetadataMode.PROVIDER_PLUS_TMDB)
+    fun setMetadataMode(mode: tv.own.owntv.core.metadata.MetadataMode) { viewModelScope.launch { settings.setMetadataMode(mode) } }
+
+    val tmdbApiKey: StateFlow<String> =
+        settings.tmdbApiKey.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+    fun setTmdbApiKey(key: String) { viewModelScope.launch { settings.setTmdbApiKey(key) } }
+
+    val metadataServerUrl: StateFlow<String> =
+        settings.metadataServerUrl.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+    fun setMetadataServerUrl(url: String) { viewModelScope.launch { settings.setMetadataServerUrl(url) } }
+
+    /** Which access tier the current config resolves to — shown as the Metadata screen's status chip. */
+    val metadataTier: StateFlow<tv.own.owntv.core.metadata.MetadataConfig.Tier> =
+        settings.metadataConfigFlow
+            .map { it.tier }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, tv.own.owntv.core.metadata.MetadataConfig.Tier.DEFAULT_WORKER)
+
+    sealed interface MetadataTestState {
+        data object Idle : MetadataTestState
+        data object Testing : MetadataTestState
+        /** Top match summary, e.g. "Oppenheimer (2023) · tmdb #872585". */
+        data class Ok(val summary: String) : MetadataTestState
+        data class Fail(val message: String) : MetadataTestState
+    }
+
+    private val _metadataTest = MutableStateFlow<MetadataTestState>(MetadataTestState.Idle)
+    val metadataTest: StateFlow<MetadataTestState> = _metadataTest.asStateFlow()
+
+    fun resetMetadataTest() { _metadataTest.value = MetadataTestState.Idle }
+
+    /** Manual "look up title" through the configured tier — proves the plumbing end-to-end (M1 deliverable). */
+    fun testMetadataLookup(title: String) {
+        if (_metadataTest.value == MetadataTestState.Testing) return
+        val q = title.trim()
+        if (q.isEmpty()) {
+            _metadataTest.value = MetadataTestState.Fail("Enter a title to look up.")
+            return
+        }
+        _metadataTest.value = MetadataTestState.Testing
+        viewModelScope.launch {
+            val result = runCatching { metadataProvider.searchMovie(q) }
+            _metadataTest.value = result.fold(
+                onSuccess = { hits ->
+                    val top = hits?.firstOrNull()
+                    if (hits == null) {
+                        MetadataTestState.Fail("Couldn't reach the metadata server — check network / key / URL.")
+                    } else if (top == null) {
+                        MetadataTestState.Fail("No TMDB match for \"$q\".")
+                    } else {
+                        val yr = top.year?.let { " ($it)" } ?: ""
+                        MetadataTestState.Ok("${top.title}$yr · tmdb #${top.tmdbId}")
+                    }
+                },
+                onFailure = { MetadataTestState.Fail(it.message?.takeIf { m -> m.isNotBlank() } ?: "Lookup failed.") },
             )
         }
     }

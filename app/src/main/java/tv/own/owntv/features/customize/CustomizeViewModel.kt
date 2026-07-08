@@ -56,6 +56,24 @@ class CustomizeViewModel(
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.Eagerly, Ctx(-1L, emptyList()))
 
+    /** Optional PIN lock on this screen (per profile). [loaded]=false while DataStore is still read,
+     *  so the screen never flashes unlocked content before the lock state is known. */
+    data class PinLock(val loaded: Boolean = false, val pin: String? = null)
+
+    val pinLock: StateFlow<PinLock> = ctx
+        .flatMapLatest { c ->
+            if (c.profileId < 0) flowOf(PinLock(loaded = true))
+            else settings.customizePin(c.profileId).map { PinLock(loaded = true, pin = it) }
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, PinLock())
+
+    /** Set (or with null: remove) the PIN lock for this profile. */
+    fun setPin(pin: String?) {
+        val pid = ctx.value.profileId
+        if (pid < 0) return
+        viewModelScope.launch { settings.setCustomizePin(pid, pin) }
+    }
+
     private val _section = MutableStateFlow(MediaType.LIVE)
     val section: StateFlow<MediaType> = _section.asStateFlow()
 
@@ -94,11 +112,11 @@ class CustomizeViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    /** Hidden Live channels (key → label) so they can be unhidden from here. */
-    val hiddenChannels: StateFlow<Map<String, String>> = ctx
-        .flatMapLatest { c ->
+    /** Hidden items of the selected section (key → label) so they can be unhidden from here. */
+    val hiddenChannels: StateFlow<Map<String, String>> = combine(ctx, _section) { c, s -> c to s }
+        .flatMapLatest { (c, s) ->
             if (c.profileId < 0) flowOf(emptyMap())
-            else customize.observe(c.profileId, MediaType.LIVE).map { it.hiddenItems }
+            else customize.observe(c.profileId, s).map { it.hiddenItems }
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
@@ -145,7 +163,7 @@ class CustomizeViewModel(
 
     fun unhideChannel(key: String) {
         viewModelScope.launch {
-            customize.setItemHidden(ctx.value.profileId, MediaType.LIVE, key, "", false)
+            customize.setItemHidden(ctx.value.profileId, _section.value, key, "", false)
         }
     }
 

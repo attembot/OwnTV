@@ -101,6 +101,11 @@ fun PlayerHud(
     onChangeMain: (() -> Unit)? = null,   // pick a new channel for the FULL-SCREEN window (corner untouched)
     onChangeCorner: (() -> Unit)? = null, // pick a new channel for the PiP corner (main untouched)
     cornerAudioOn: Boolean = false,
+    // VOD engine toggle: switch THIS movie/episode between mpv and ExoPlayer (e.g. to reach tracks only
+    // one engine exposes, or to try the other engine on a problem file). null = not a VOD;
+    // true = currently playing on ExoPlayer.
+    vodOnExo: Boolean? = null,
+    onToggleVodEngine: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val isPlaying by player.isPlaying.collectAsStateWithLifecycle()
@@ -113,6 +118,7 @@ fun PlayerHud(
     val volume by player.volume.collectAsStateWithLifecycle()
     val videoRes by player.videoRes.collectAsStateWithLifecycle()
     val streamChips by player.streamChips.collectAsStateWithLifecycle()
+    val engineChip by player.engineChip.collectAsStateWithLifecycle()
     val audioCount by player.audioCount.collectAsStateWithLifecycle()
     val audioDelayMs by player.audioDelayMs.collectAsStateWithLifecycle()
     val subCount by player.subCount.collectAsStateWithLifecycle()
@@ -139,6 +145,19 @@ fun PlayerHud(
     var showFlash by remember { mutableStateOf(false) }
     LaunchedEffect(channelFlash) { if (channelFlash > 0) { showFlash = true; delay(3000); showFlash = false } }
     val zap: (Int) -> Unit = { d -> (if (d < 0) onChannelUp else onChannelDown)?.invoke(); channelFlash++ }
+
+    // Engine-switch confirmation toast: a brief "Switched to MPV/ExoPlayer" at the bottom-center when the
+    // user flips the engine via the HUD toggle. Mirrors the channel-flash pattern above.
+    var engineMsg by remember { mutableStateOf<String?>(null) }
+    var engineFlash by remember { mutableIntStateOf(0) }
+    LaunchedEffect(engineFlash) { if (engineFlash > 0) { delay(1800); engineMsg = null } }
+    // Wrap the engine toggles so a click also surfaces the toast naming the engine we're switching TO.
+    val toggleCompat: (() -> Unit)? = onToggleCompatMode?.let { cb -> {
+        engineMsg = if (compatMode == true) "Switched to ExoPlayer" else "Switched to MPV"; engineFlash++; cb()
+    } }
+    val toggleVod: (() -> Unit)? = onToggleVodEngine?.let { cb -> {
+        engineMsg = if (vodOnExo == true) "Switched to MPV" else "Switched to ExoPlayer"; engineFlash++; cb()
+    } }
 
     LaunchedEffect(forceShow) { if (forceShow) controlsVisible = true }
     LaunchedEffect(controlsVisible, wakeTick, forceShow, inert) {
@@ -197,7 +216,8 @@ fun PlayerHud(
             Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(240.dp)
                 .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)))))
 
-            TopBar(player, isLive, streamChips.ifEmpty { listOfNotNull(videoRes) }, duration, onBack, modifier = Modifier.align(Alignment.TopStart))
+            // The active engine (MPV/EXO) leads the mini chips so users can always tell which player is on.
+            TopBar(player, isLive, listOfNotNull(engineChip) + streamChips.ifEmpty { listOfNotNull(videoRes) }, duration, onBack, modifier = Modifier.align(Alignment.TopStart))
             if (isLive) ChannelCard(player, modifier = Modifier.align(Alignment.TopStart).padding(start = 28.dp, top = 92.dp))
 
             // Hide the transport (play/seek/prev/next) and bottom bar while an error is up — the error
@@ -210,13 +230,34 @@ fun PlayerHud(
                     volume = volume, audioCount = audioCount, subCount = subCount, zoomMode = zoomMode,
                     speedLabel = formatSpeed(speed),
                     onScrubLive = onScrubLive, timeshiftOffsetSec = timeshiftOffsetSec,
-                    compatMode = compatMode, onToggleCompatMode = onToggleCompatMode,
+                    compatMode = compatMode, onToggleCompatMode = toggleCompat,
+                    vodOnExo = vodOnExo, onToggleVodEngine = toggleVod,
                     onInfo = { showInfo = !showInfo }, infoOn = showInfo,
                     onOpenDialog = { dialog = it }, onPip = onPip, onMultiView = onMultiView, onBack = onBack,
                     onCornerSwap = onCornerSwap, onCornerAudio = onCornerAudio, onCornerMove = onCornerMove, onCornerGrow = onCornerGrow, onCornerShrink = onCornerShrink, onCornerClose = onCornerClose,
                     onChangeMain = onChangeMain, onChangeCorner = onChangeCorner,
                     cornerAudioOn = cornerAudioOn,
                     modifier = Modifier.align(Alignment.BottomStart),
+                )
+            }
+        }
+
+        // Engine-switch confirmation toast (bottom-center, semi-transparent) — shown briefly after the
+        // user flips the engine via the HUD's MPV/EXO toggle.
+        engineMsg?.let { msg ->
+            Box(
+                Modifier.align(Alignment.BottomCenter).padding(bottom = 104.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    msg,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Color.Black.copy(alpha = 0.55f))
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }
         }
@@ -400,6 +441,7 @@ private fun BottomBar(
     volume: Int, audioCount: Int, subCount: Int, zoomMode: ZoomMode, speedLabel: String,
     onScrubLive: ((Int) -> Unit)?, timeshiftOffsetSec: Int?,
     compatMode: Boolean?, onToggleCompatMode: (() -> Unit)?,
+    vodOnExo: Boolean?, onToggleVodEngine: (() -> Unit)?,
     onInfo: (() -> Unit)? = null, infoOn: Boolean = false,
     onOpenDialog: (HudDialog) -> Unit, onPip: (() -> Unit)?, onMultiView: (() -> Unit)? = null, onBack: () -> Unit,
     onCornerSwap: (() -> Unit)? = null, onCornerAudio: (() -> Unit)? = null, onCornerMove: (() -> Unit)? = null, onCornerGrow: (() -> Unit)? = null, onCornerShrink: (() -> Unit)? = null, onCornerClose: (() -> Unit)? = null,
@@ -467,10 +509,15 @@ private fun BottomBar(
                 if (onInfo != null) CtrlButton(OwnTVIcon.VIDEO, active = infoOn) { onInfo() }
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                // Live "compatibility mode": pin this channel to mpv (fixes UHD artifacts / streams ExoPlayer
-                // can't decode). Highlighted when active; persists per channel.
+                // Live "compatibility mode" (Live TV + channels opened from the Guide): pin this channel
+                // to mpv. The pill shows the active engine and flips on click (teal while pinned to mpv).
                 if (onToggleCompatMode != null) {
-                    CtrlButton(OwnTVIcon.SETTINGS, active = compatMode == true) { onToggleCompatMode() }
+                    EngineToggle(label = if (compatMode == true) "MPV" else "EXO", active = compatMode == true) { onToggleCompatMode() }
+                }
+                // VOD engine toggle (Movies/Series): flip THIS movie/episode between mpv and ExoPlayer.
+                // The pill shows the active engine (teal while ExoPlayer owns playback).
+                if (onToggleVodEngine != null) {
+                    EngineToggle(label = if (vodOnExo == true) "EXO" else "MPV", active = vodOnExo == true) { onToggleVodEngine() }
                 }
                 // Aspect/zoom works in every mode now — direct mode resizes the surface view itself
                 // (see MpvVideoSurface), GL mode scales internally.
@@ -527,6 +574,30 @@ private fun SpeedButton(label: String, active: Boolean, onClick: () -> Unit) {
 }
 
 private fun formatSpeed(speed: Double): String = if (speed == 1.0) "1.0x" else "${speed}x"
+
+/** The MPV/EXO engine toggle: a one-line pill showing the active engine, flipped on click. Teal while on
+ *  the non-default engine (ExoPlayer for VOD; mpv "compatibility" pin for Live). Mirrors [SpeedButton]. */
+@Composable
+private fun EngineToggle(label: String, active: Boolean, onClick: () -> Unit) {
+    FocusableSurface(
+        onClick = onClick,
+        modifier = Modifier.heightIn(min = 44.dp),
+        shape = RoundedCornerShape(12.dp),
+        focusedContainerColor = Color.White.copy(alpha = 0.16f),
+        unfocusedContainerColor = Color.Transparent,
+        selectedContainerColor = Color.Transparent,
+        contentAlignment = Alignment.Center,
+    ) { focused ->
+        Row(
+            Modifier.padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            OwnTVIcon(OwnTVIcon.SWAP, tint = if (active) TEAL else if (focused) Color.White else Color.White.copy(alpha = 0.78f), filled = true, modifier = Modifier.size(16.dp))
+            Text(label, style = MaterialTheme.typography.labelLarge, color = if (active) TEAL else if (focused) Color.White else Color.White.copy(alpha = 0.78f), fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
 
 @Composable
 private fun CtrlButton(icon: OwnTVIcon, badge: Int? = null, active: Boolean = false, label: String? = null, onClick: () -> Unit) {

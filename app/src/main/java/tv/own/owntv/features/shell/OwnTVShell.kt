@@ -56,6 +56,7 @@ import tv.own.owntv.features.shell.components.AvatarPickerDialog
 import tv.own.owntv.features.shell.components.CategoryRail
 import tv.own.owntv.features.shell.components.ContentPane
 import tv.own.owntv.features.shell.components.ExitDialog
+import tv.own.owntv.features.shell.components.PlaylistPickerDialog
 import tv.own.owntv.features.shell.components.PreviewPane
 import tv.own.owntv.features.shell.components.RailCategory
 import tv.own.owntv.features.shell.components.SettingsScreen
@@ -113,7 +114,11 @@ fun OwnTVShell(
     onSetAvatar: (Int) -> Unit,
     profileName: String,
     sourceSummary: String,
+    playlists: List<tv.own.owntv.core.database.entity.SourceEntity> = emptyList(),
+    activePlaylistId: Long = -1L,
+    onSelectPlaylist: (Long) -> Unit = {},
     weatherInfo: tv.own.owntv.core.weather.WeatherInfo? = null, // Phase 7
+    weatherFahrenheit: Boolean = false,
     activeProfileId: Long?,
     pendingDeepLink: LauncherDeepLink?,
     onDeepLinkConsumed: () -> Unit,
@@ -132,6 +137,7 @@ fun OwnTVShell(
     var focusedLayer by remember { mutableStateOf(ShellLayer.SIDEBAR) }
     var showExit by remember { mutableStateOf(false) }
     var showAvatarPicker by remember { mutableStateOf(false) }
+    var showPlaylistPicker by remember { mutableStateOf(false) }
     var playerMode by remember { mutableStateOf(PlayerMode.NONE) }
     // Deep-link: the Guide's "Add EPG" button switches to Settings and opens EPG Sources → add.
     var openEpgAdd by remember { mutableStateOf(false) }
@@ -174,7 +180,7 @@ fun OwnTVShell(
     val epgCanZap by epgVm.canZap.collectAsStateWithLifecycle()
     // Full-screen is running on the ExoPlayer engine (a promoted Live preview) rather than mpv.
     val liveOnExo by liveVm.liveOnExo.collectAsStateWithLifecycle()
-    val forceMpvUrls by liveVm.forceMpvUrls.collectAsStateWithLifecycle()
+    val vodExoActive by player.exoActiveState.collectAsStateWithLifecycle()
     // Live rewind / timeshift: whether the live channel supports catch-up, and how far behind live we are.
     val canRewindLive by liveVm.canRewindLive.collectAsStateWithLifecycle()
     val timeshiftOffset by liveVm.timeshiftOffsetSec.collectAsStateWithLifecycle()
@@ -417,6 +423,7 @@ fun OwnTVShell(
         when {
             playerMode == PlayerMode.FULLSCREEN -> exitPlayer()
             showAvatarPicker -> showAvatarPicker = false
+            showPlaylistPicker -> showPlaylistPicker = false
             showExit -> showExit = false
             focusedLayer == ShellLayer.SIDEBAR -> showExit = true
             else -> runCatching { sidebarFocus.requestFocus() }
@@ -455,13 +462,24 @@ fun OwnTVShell(
                 TopBar(
                     sectionLabel = selectedSection.label,
                     onSearchClick = { onSelectSection(MainSection.SEARCH) },
-                    playlistName = sourceSummary,
+                    // The chip reflects the active filter: "All playlists" when none is chosen (id <= 0),
+                    // the chosen playlist's name otherwise. With a single playlist there's nothing to switch,
+                    // so just show its name.
+                    playlistName = when {
+                        playlists.size <= 1 -> sourceSummary
+                        activePlaylistId <= 0L -> "All playlists"
+                        else -> playlists.firstOrNull { it.id == activePlaylistId }?.name ?: sourceSummary
+                    },
                     weatherInfo = weatherInfo,
+                    weatherFahrenheit = weatherFahrenheit,
                     // The Search pill only exists while focus sits on the nav panel — inside a
                     // section it fades out and turns unfocusable, so focus can never jump to it.
                     searchVisible = focusedLayer == ShellLayer.SIDEBAR,
+                    // The playlist chip becomes a quick-switcher only when there's more than one to pick.
+                    playlistInteractive = playlists.size > 1,
+                    onPlaylistClick = { showPlaylistPicker = true },
                 )
-                Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(start = 6.dp, end = 6.dp, bottom = 6.dp)) {
+                Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(start = 0.dp, end = 6.dp, bottom = 6.dp)) {
                     when {
                         selectedSection == MainSection.SETTINGS -> SettingsScreen(
                             themeMode = themeMode,
@@ -478,9 +496,12 @@ fun OwnTVShell(
 
                         selectedSection == MainSection.HOME -> HomeScreen(
                             vm = homeVm,
-                            onPlayMovie = { id, pos -> scope.launch { if (movieVm.playByIdAsync(id, pos)) openFullscreen(MainSection.MOVIES) } },
-                            onPlayEpisode = { seriesId, epId, pos -> scope.launch { if (seriesVm.playFromHomeAsync(seriesId, epId, pos)) openFullscreen(MainSection.SERIES) } },
+                            // Skip the fullscreen player when the global external-player toggle is on
+                            // (mounting it spins up mpv even though playback went to the external app).
+                            onPlayMovie = { id, pos -> scope.launch { if (movieVm.playByIdAsync(id, pos) && !movieVm.externalPlayerOn.value) openFullscreen(MainSection.MOVIES) } },
+                            onPlayEpisode = { seriesId, epId, pos -> scope.launch { if (seriesVm.playFromHomeAsync(seriesId, epId, pos) && !seriesVm.externalPlayerOn.value) openFullscreen(MainSection.SERIES) } },
                             onPlayChannel = { id, zap -> scope.launch { if (liveVm.ensurePlayingByIdAsync(id, zap)) openFullscreen(MainSection.LIVE_TV) } },
+                            onOpenGuide = { onSelectSection(MainSection.EPG) },
                             onChildFocused = { focusedLayer = ShellLayer.CONTENT },
                             restoreFocus = restoreFocus,
                             onRestored = { restoreFocus = false },
@@ -651,7 +672,9 @@ fun OwnTVShell(
                     onGoToLive = if (isLiveChannel) liveVm::goToLive else null,
                     onScrubLive = if (isLiveChannel && canRewindLive) liveVm::scrubLive else null,
                     timeshiftOffsetSec = if (isLiveChannel) timeshiftOffset else null,
-                    compatMode = if (isLiveChannel) previewChannel?.streamUrl in forceMpvUrls else null,
+                    // Show the ACTUAL running engine (mpv when pinned OR auto-fallen-back), not just the pin —
+                    // otherwise an auto-fallback to mpv still read "EXO". true = on mpv (pill shows MPV, teal).
+                    compatMode = if (isLiveChannel) !liveOnExo else null,
                     onToggleCompatMode = if (isLiveChannel) liveVm::toggleForceMpv else null,
                     // True PiP corner controls — present only while a second stream is in the corner.
                     // Swap is offered only when the main stream is a promoted live channel (both ExoPlayer),
@@ -668,6 +691,10 @@ fun OwnTVShell(
                     onChangeMain = if (cornerActive && isLiveChannel) ({ mainPicking = true }) else null,
                     onChangeCorner = if (cornerActive) ({ cornerBrowsing = true }) else null,
                     cornerAudioOn = audioOnCorner,
+                    // VOD engine toggle (movies/series only — live and catch-up channels keep their own
+                    // engine handling above): flip the current item between mpv and ExoPlayer.
+                    vodOnExo = if (!isLiveStream && !isLiveChannel) vodExoActive else null,
+                    onToggleVodEngine = if (!isLiveStream && !isLiveChannel) player::toggleVodEngine else null,
                     modifier = Modifier.fillMaxSize(),
                 )
                 if (showChannelList && isLiveChannel && zapChannels.size > 1) {
@@ -781,6 +808,14 @@ fun OwnTVShell(
                 selectedId = avatarId,
                 onSelect = onSetAvatar,
                 onDismiss = { showAvatarPicker = false },
+            )
+        }
+        if (showPlaylistPicker) {
+            PlaylistPickerDialog(
+                playlists = playlists,
+                activeId = activePlaylistId,
+                onSelect = onSelectPlaylist,
+                onDismiss = { showPlaylistPicker = false },
             )
         }
 

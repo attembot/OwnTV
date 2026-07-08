@@ -1,5 +1,6 @@
 *.iml
 .gradle/
+.gradle-cache/
 .idea/
 .kotlin/
 /local.properties
@@ -15,6 +16,7 @@ local.properties
 .claude/
 .planning/
 .serena/
+.codegraph/
 CLAUDE.md
 AGENT_HANDOVER.md
 

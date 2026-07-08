@@ -1,5 +1,10 @@
 <!-- Thanks for contributing to OwnTV! Please fill this in so it's easy to review. -->
 
+## Before you open this PR (required)
+<!-- These are mandatory — PRs that duplicate an existing in-app feature are closed. -->
+- [ ] I read the **[User Guide](https://github.com/ahXN00/OwnTV/blob/main/extras/USER_GUIDE.md)** and checked the app's **Settings** and existing **functions** — this change isn't already possible in the app.
+- [ ] I searched existing issues/PRs and this isn't a duplicate.
+
 ## What does this PR do?
 <!-- A clear summary of the change and how it works. -->
 

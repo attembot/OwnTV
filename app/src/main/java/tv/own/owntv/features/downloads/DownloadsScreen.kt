@@ -62,6 +62,9 @@ fun DownloadsScreen(
     val vm: DownloadsViewModel = koinViewModel()
     val downloads by vm.downloads.collectAsStateWithLifecycle()
     val lastPlayedId by vm.lastPlayedId.collectAsStateWithLifecycle()
+    // Global external-player toggle: never mount the fullscreen in-app player (it spins up mpv)
+    // when playback is handed to an external app.
+    val externalPlayerOn by vm.externalPlayerOn.collectAsStateWithLifecycle()
     val colors = OwnTVTheme.colors
 
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
@@ -111,7 +114,8 @@ fun DownloadsScreen(
                             index == 0 -> Modifier.focusRequester(firstFocus)
                             else -> Modifier
                         },
-                        onPlay = { vm.play(d); onFullscreen() },
+                        onPlay = { vm.play(d); if (!externalPlayerOn) onFullscreen() },
+                        onPlayExternal = { vm.playExternal(d) },
                         onRetry = { vm.retry(d) },
                         onPause = { vm.pause(d) },
                         onResume = { vm.resume(d) },
@@ -126,7 +130,7 @@ fun DownloadsScreen(
 @Composable
 private fun DownloadRow(
     download: DownloadEntity,
-    onPlay: () -> Unit, onRetry: () -> Unit, onPause: () -> Unit, onResume: () -> Unit, onDelete: () -> Unit,
+    onPlay: () -> Unit, onPlayExternal: () -> Unit, onRetry: () -> Unit, onPause: () -> Unit, onResume: () -> Unit, onDelete: () -> Unit,
     focusModifier: Modifier = Modifier,
 ) {
     val colors = OwnTVTheme.colors
@@ -149,7 +153,11 @@ private fun DownloadRow(
         }
         Spacer(Modifier.width(12.dp))
         when (download.status) {
-            DownloadStatus.COMPLETED -> OwnTVButton("Play", onClick = onPlay, icon = OwnTVIcon.PLAY, modifier = focusModifier)
+            DownloadStatus.COMPLETED -> Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OwnTVButton("Play", onClick = onPlay, icon = OwnTVIcon.PLAY, modifier = focusModifier)
+                // Phase B: one-off external playback, independent of the global "External player" toggle.
+                OwnTVButton("External", onClick = onPlayExternal, style = OwnTVButtonStyle.SECONDARY)
+            }
             DownloadStatus.FAILED -> OwnTVButton("Retry", onClick = onRetry, style = OwnTVButtonStyle.SECONDARY, modifier = focusModifier)
             DownloadStatus.PAUSED -> OwnTVButton("Resume", onClick = onResume, style = OwnTVButtonStyle.SECONDARY, modifier = focusModifier)
             DownloadStatus.RUNNING, DownloadStatus.QUEUED -> OwnTVButton("Pause", onClick = onPause, style = OwnTVButtonStyle.SECONDARY, modifier = focusModifier)

@@ -37,6 +37,7 @@ import org.koin.androidx.compose.koinViewModel
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import tv.own.owntv.core.epg.EpgSource
+import tv.own.owntv.features.settings.data.EpgAutoRefresh
 import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.OwnTVButton
 import tv.own.owntv.ui.components.OwnTVButtonStyle
@@ -56,6 +57,7 @@ import tv.own.owntv.core.sync.work.EpgSyncState
 fun EpgSourcesScreen(onBack: () -> Unit, modifier: Modifier = Modifier, startOnAdd: Boolean = false) {
     val vm: EpgSourcesViewModel = koinViewModel()
     val sources by vm.sources.collectAsStateWithLifecycle()
+    val autoRefreshMap by vm.autoRefresh.collectAsStateWithLifecycle()
     val colors = OwnTVTheme.colors
 
     var editing by remember { mutableStateOf<EpgSource?>(null) }
@@ -77,10 +79,12 @@ fun EpgSourcesScreen(onBack: () -> Unit, modifier: Modifier = Modifier, startOnA
     if (adding || editing != null) {
         EpgSourceForm(
             initial = editing,
+            initialAutoRefresh = editing?.let { autoRefreshMap[it.id] } ?: EpgAutoRefresh.OFF,
             loadPlaylistOptions = { vm.playlistEpgOptions() },
-            onSave = { name, url, ua ->
+            onSave = { name, url, ua, autoRefresh ->
                 val e = editing
-                if (e == null) vm.add(name, url, ua) else vm.update(e, name, url, ua)
+                if (e == null) vm.add(name, url, ua, autoRefresh)
+                else { vm.update(e, name, url, ua); vm.setAutoRefresh(e, autoRefresh) }
                 adding = false; editing = null
             },
             onCancel = { adding = false; editing = null },
@@ -121,6 +125,7 @@ fun EpgSourcesScreen(onBack: () -> Unit, modifier: Modifier = Modifier, startOnA
                         .collectAsStateWithLifecycle(EpgSyncState.Idle)
                     EpgRow(
                         source = source,
+                        autoRefresh = autoRefreshMap[source.id] ?: EpgAutoRefresh.OFF,
                         counts = { vm.counts(source.id) },
                         syncState = syncState,
                         onResync = { vm.resync(source) },
@@ -146,6 +151,7 @@ fun EpgSourcesScreen(onBack: () -> Unit, modifier: Modifier = Modifier, startOnA
 @Composable
 private fun EpgRow(
     source: EpgSource,
+    autoRefresh: EpgAutoRefresh,
     counts: suspend () -> Triple<Int, Int, Int>,
     syncState: EpgSyncState,
     onResync: () -> Unit,
@@ -182,6 +188,16 @@ private fun EpgRow(
                         maxLines = 1,
                     )
                 }
+                if (autoRefresh != EpgAutoRefresh.OFF) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "⟳ ${autoRefresh.label}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = colors.onPrimaryContainer,
+                        modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(colors.surfaceContainerHighest).padding(horizontal = 8.dp, vertical = 2.dp),
+                        maxLines = 1,
+                    )
+                }
             }
             Text(source.url, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 1)
             Spacer(Modifier.height(4.dp))
@@ -215,8 +231,9 @@ private fun EpgRow(
 @Composable
 internal fun EpgSourceForm(
     initial: EpgSource?,
+    initialAutoRefresh: EpgAutoRefresh,
     loadPlaylistOptions: suspend () -> List<EpgSourcesViewModel.PlaylistEpg>,
-    onSave: (name: String, url: String, userAgent: String?) -> Unit,
+    onSave: (name: String, url: String, userAgent: String?, autoRefresh: EpgAutoRefresh) -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -224,7 +241,9 @@ internal fun EpgSourceForm(
     var name by remember { mutableStateOf(initial?.name ?: "") }
     var url by remember { mutableStateOf(initial?.url ?: "") }
     var ua by remember { mutableStateOf(initial?.userAgent ?: "") }
+    var autoRefresh by remember { mutableStateOf(initialAutoRefresh) }
     var showPlaylistPicker by remember { mutableStateOf(false) }
+    var showAutoRefreshPicker by remember { mutableStateOf(false) }
     val firstFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { kotlinx.coroutines.delay(60); runCatching { firstFocus.requestFocus() } }
     BackHandler { onCancel() }
@@ -243,10 +262,14 @@ internal fun EpgSourceForm(
         Spacer(Modifier.height(14.dp))
         OwnTVTextField(ua, { ua = it }, label = "User-Agent (optional)", placeholder = "Leave blank for default", modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp))
 
+        Spacer(Modifier.height(14.dp))
+        // Auto-refresh dropdown — same Off/Startup/staleness-threshold semantics as playlist sources.
+        EpgAutoRefreshRow(selected = autoRefresh) { showAutoRefreshPicker = true }
+
         Spacer(Modifier.height(24.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OwnTVButton("Cancel", onClick = onCancel, style = OwnTVButtonStyle.SECONDARY)
-            OwnTVButton(if (initial == null) "Add & sync" else "Save & sync", onClick = { onSave(name, url, ua) }, enabled = url.isNotBlank())
+            OwnTVButton(if (initial == null) "Add & sync" else "Save & sync", onClick = { onSave(name, url, ua, autoRefresh) }, enabled = url.isNotBlank())
         }
     }
 
@@ -256,6 +279,46 @@ internal fun EpgSourceForm(
             onPick = { opt -> if (name.isBlank()) name = opt.name; url = opt.url; showPlaylistPicker = false },
             onDismiss = { showPlaylistPicker = false },
         )
+    }
+    if (showAutoRefreshPicker) {
+        PickerDialog(
+            title = "Auto refresh",
+            options = EpgAutoRefresh.entries.map { it.name to it.label },
+            selected = autoRefresh.name,
+            onSelect = { value ->
+                autoRefresh = runCatching { EpgAutoRefresh.valueOf(value) }.getOrDefault(EpgAutoRefresh.OFF)
+                showAutoRefreshPicker = false
+            },
+            onDismiss = { showAutoRefreshPicker = false },
+        )
+    }
+}
+
+/** A focusable settings row showing the current EPG auto-refresh selection; opens a picker on click. */
+@Composable
+private fun EpgAutoRefreshRow(selected: EpgAutoRefresh, onClick: () -> Unit) {
+    val colors = OwnTVTheme.colors
+    FocusableSurface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp),
+        shape = RoundedCornerShape(14.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) { _ ->
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Auto refresh", style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
+                Text(
+                    "Off, on startup, or when data is stale",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.onSurfaceVariant,
+                )
+            }
+            Text(
+                selected.label,
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.primary,
+            )
+        }
     }
 }
 

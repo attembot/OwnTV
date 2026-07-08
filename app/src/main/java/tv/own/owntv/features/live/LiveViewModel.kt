@@ -2,6 +2,7 @@
 
 package tv.own.owntv.features.live
 
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -58,9 +59,11 @@ import tv.own.owntv.core.model.MediaType
 import tv.own.owntv.core.model.SourceType
 import tv.own.owntv.core.parser.XtEpgEntry
 import tv.own.owntv.core.parser.XtreamClient
+import tv.own.owntv.core.repository.activeProfileSources
 import tv.own.owntv.features.settings.data.SettingsRepository
 import tv.own.owntv.player.OwnTVPlayer
 import tv.own.owntv.ui.components.OwnTVIcon
+import tv.own.owntv.ui.format.formatSystemTime
 
 /** Layer-2 rail selection for Live TV. */
 sealed interface LiveKey {
@@ -77,6 +80,7 @@ data class LiveRailItem(val key: LiveKey, val abbr: String, val title: String, v
 data class EpgNowNext(val now: XtEpgEntry?, val next: XtEpgEntry?, val upcoming: List<XtEpgEntry> = emptyList())
 
 class LiveViewModel(
+    private val appContext: Context,
     private val channelDao: ChannelDao,
     private val categoryDao: CategoryDao,
     private val favoriteDao: FavoriteDao,
@@ -130,13 +134,10 @@ class LiveViewModel(
     // sourceUaMap is a lightweight side-product: sourceId → userAgent, used for synchronous play() calls
     // (playPreview, ensurePlaying) that can't do a DB lookup on the call site.
     private var sourceUaMap: Map<Long, String?> = emptyMap()
-    private val ctx: StateFlow<Ctx> = settings.activeProfileId
-        .flatMapLatest { pid ->
-            if (pid < 0) flowOf(Ctx(pid, emptyList()))
-            else sourceDao.observeForProfile(pid).map { srcs ->
-                sourceUaMap = srcs.associate { it.id to it.userAgent }
-                Ctx(pid, srcs.map { it.id })
-            }
+    private val ctx: StateFlow<Ctx> = activeProfileSources(settings, sourceDao)
+        .map { aps ->
+            sourceUaMap = aps.sources.associate { it.id to it.userAgent }
+            Ctx(aps.profileId, aps.sourceIds)
         }
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.Eagerly, Ctx(-1L, emptyList()))
@@ -504,6 +505,10 @@ class LiveViewModel(
         if (previewEngine.currentUrl == channel.streamUrl) {
             previewEngine.setMuted(false) // promote — instant if already PLAYING, otherwise keeps loading
         } else {
+            // In-player zap to a DIFFERENT channel (CH+/-, D-pad, channel-list overlay): if we're leaving a
+            // UHD channel, fully release its 4K decoder before the reuse/rebuild (no-op for SD/HD). Matches
+            // the Back/exit path — so the Hisense 4K-decoder leak is avoided however you leave the channel.
+            previewEngine.releaseDecoderForUhd()
             previewEngine.play(
                 channel.streamUrl, muted = false,
                 meta = tv.own.owntv.player.MediaMeta(title = channel.name, logoUrl = channel.logoUrl),
@@ -519,17 +524,19 @@ class LiveViewModel(
     /** HUD "compatibility mode" toggle: pin/unpin the current channel to mpv and swap engines live. */
     fun toggleForceMpv() {
         val channel = _previewChannel.value ?: return
-        val turnOn = channel.streamUrl !in forceMpvUrls.value
-        android.util.Log.i(ENGINE_TAG, "compat toggle '${channel.name}' -> ${if (turnOn) "mpv" else "exoplayer"} (currentlyOnExo=${_liveOnExo.value})")
+        // Base the swap on the ACTUAL running engine, not the pin: after an auto-fallback to mpv the channel
+        // runs on mpv while still unpinned, and the old pin-based logic then did nothing on click. Keying off
+        // _liveOnExo makes every click flip the live engine, with the pin following the choice.
+        val goToMpv = _liveOnExo.value // on Exo now → switch to mpv; on mpv now → switch to Exo
+        android.util.Log.i(ENGINE_TAG, "engine toggle '${channel.name}' -> ${if (goToMpv) "mpv" else "exoplayer"} (currentlyOnExo=${_liveOnExo.value})")
         viewModelScope.launch {
-            forceMpvStore.set(channel.streamUrl, turnOn)
-            when {
-                turnOn && _liveOnExo.value -> fallbackToMpv(channel) // ExoPlayer → mpv now
-                !turnOn && !_liveOnExo.value -> {                    // mpv → ExoPlayer now
-                    player.stop()
-                    delay(500) // let mpv's decoder/surface release before ExoPlayer takes over
-                    if (_previewChannel.value?.streamUrl == channel.streamUrl) startOnExo(channel)
-                }
+            forceMpvStore.set(channel.streamUrl, goToMpv) // pin to mpv when choosing mpv; unpin when choosing Exo
+            if (goToMpv) {
+                fallbackToMpv(channel) // ExoPlayer → mpv now
+            } else {                    // mpv → ExoPlayer now
+                player.stop()
+                delay(500) // let mpv's decoder/surface release before ExoPlayer takes over
+                if (_previewChannel.value?.streamUrl == channel.streamUrl) startOnExo(channel)
             }
         }
     }
@@ -544,6 +551,11 @@ class LiveViewModel(
     suspend fun ensurePlayingByIdAsync(channelId: Long, zapChannels: List<ChannelEntity> = emptyList()): Boolean {
         val channel = channelDao.getById(channelId) ?: return false
         zapList = zapChannels
+        // Also drive the left-arrow channel-list overlay, which reads _zapChannels. Without this, a
+        // channel launched from Home (Keep Watching / Favourites) left the overlay showing the stale
+        // list from the previous Live-TV session (#55). CH+/CH- already used zapList, so only the
+        // overlay was wrong — keep both in sync here as watchFullscreen() does.
+        _zapChannels.value = zapChannels
         _canZap.value = zapChannels.size > 1
         ensurePlaying(channel)
         return true
@@ -694,8 +706,7 @@ class LiveViewModel(
             } ?: return@launch
             if (_timeshiftOffsetSec.value == null) return@launch // user jumped back to live meanwhile
             // Show the clock time being watched (handy for the user; no credentials in logs).
-            val localLabel = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
-                .apply { timeZone = java.util.TimeZone.getDefault() }.format(java.util.Date(startMs))
+            val localLabel = formatSystemTime(appContext, startMs)
             _previewChannel.value = ch
             clearLiveOnExo() // archive plays as a VOD-style mpv stream, not the live ExoPlayer channel
             player.play(url, title = ch.name, subtitle = "Rewind · $localLabel", logoUrl = ch.logoUrl, isLive = false, preferSoftware = true, userAgent = sourceUa)
@@ -791,15 +802,15 @@ class LiveViewModel(
         return if (query.isBlank()) {
             when (key) {
                 LiveKey.All -> if (playlist) channelDao.pagingAllOriginal(ids) else channelDao.pagingAll(ids)
-                LiveKey.Favorites -> channelDao.pagingFavoritesManual(c.profileId, ContentOrderEntity.FAV_CONTEXT)
-                LiveKey.History -> channelDao.pagingHistory(c.profileId)
+                LiveKey.Favorites -> channelDao.pagingFavoritesManual(c.profileId, ContentOrderEntity.FAV_CONTEXT, ids)
+                LiveKey.History -> channelDao.pagingHistory(c.profileId, ids)
                 is LiveKey.Folder -> channelDao.pagingByCategoryManual(key.id, c.profileId, folderContextKeys.value[key.id] ?: "")
             }
         } else {
             when (key) {
                 LiveKey.All -> channelDao.searchAll(query, ids)
-                LiveKey.Favorites -> channelDao.searchFavorites(query, c.profileId)
-                LiveKey.History -> channelDao.searchHistory(query, c.profileId)
+                LiveKey.Favorites -> channelDao.searchFavorites(query, c.profileId, ids)
+                LiveKey.History -> channelDao.searchHistory(query, c.profileId, ids)
                 is LiveKey.Folder -> channelDao.searchInCategory(query, key.id)
             }
         }
@@ -815,7 +826,7 @@ class LiveViewModel(
             }
             val items = when (key) {
                 is LiveKey.Folder -> channelDao.snapshotByCategoryManual(key.id, pid, contextKey, 5000)
-                LiveKey.Favorites -> channelDao.snapshotFavoritesManual(pid, contextKey, 5000)
+                LiveKey.Favorites -> channelDao.snapshotFavoritesManual(pid, contextKey, ctx.value.sourceIds.ifEmpty { listOf(-1L) }, 5000)
                 else -> return@launch
             }
             val idx = items.indexOfFirst { it.id == channel.id }
@@ -872,8 +883,8 @@ class LiveViewModel(
         val ids = c.sourceIds.ifEmpty { listOf(-1L) }
         return when (key) {
             LiveKey.All -> if (hiddenCats.isEmpty()) channelDao.countAll(ids) else channelDao.countAllExcluding(ids, hiddenCats.toList())
-            LiveKey.Favorites -> channelDao.countFavorites(c.profileId)
-            LiveKey.History -> historyDao.count(c.profileId, MediaType.LIVE)
+            LiveKey.Favorites -> channelDao.countFavorites(c.profileId, ids)
+            LiveKey.History -> channelDao.countHistory(c.profileId, ids)
             is LiveKey.Folder -> channelDao.countByCategory(key.id)
         }
     }

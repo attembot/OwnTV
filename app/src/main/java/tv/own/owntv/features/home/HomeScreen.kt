@@ -28,10 +28,12 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,6 +46,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -66,6 +69,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import tv.own.owntv.core.database.entity.ChannelEntity
 import tv.own.owntv.core.launcher.LauncherContinuationItem
@@ -80,15 +84,13 @@ import tv.own.owntv.ui.components.OwnTVSpinner
 import tv.own.owntv.ui.components.PosterCard
 import tv.own.owntv.ui.components.ContentPanelFill
 import tv.own.owntv.ui.components.roundedPanel
+import tv.own.owntv.ui.format.formatSystemTime
 import tv.own.owntv.ui.theme.Dimens
 import tv.own.owntv.ui.theme.OwnTVTheme
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import androidx.compose.foundation.layout.widthIn
-import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Date
-import java.util.Locale
 
 @Composable
 fun HomeScreen(
@@ -96,6 +98,7 @@ fun HomeScreen(
     onPlayMovie: (movieId: Long, positionMs: Long) -> Unit,
     onPlayEpisode: (seriesId: Long, episodeId: Long, positionMs: Long) -> Unit,
     onPlayChannel: (channelId: Long, zapChannels: List<ChannelEntity>) -> Unit,
+    onOpenGuide: () -> Unit,
     onChildFocused: () -> Unit,
     restoreFocus: Boolean = false,
     onRestored: () -> Unit = {},
@@ -108,19 +111,40 @@ fun HomeScreen(
     val isPreviewActive by vm.isPreviewActive.collectAsStateWithLifecycle()
     val lastInteractionMs by vm.lastHeroInteractionMs.collectAsStateWithLifecycle()
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val homeScope = rememberCoroutineScope()
     val heroFocus = remember { FocusRequester() }
     val fallbackFocus = remember { FocusRequester() }
-    val firstRowFocus = remember { FocusRequester() }
-    // The SELECTED hero is always shown wide (with its poster) — default the first one, even before the row
-    // is focused. Video only plays once the row is focused (see the preview effect below). Expansion is
-    // decoupled from playback, so the wide card never collapses just because the video hasn't started.
-    var expandedHeroIndex by remember { mutableStateOf(0) }
+    val rowFirstFocusRequesters = remember {
+        HomeRow.entries.associateWith { FocusRequester() }
+    }
+    // Nothing starts expanded: a hero card earns its wide (16:9) state only after 3s of continuous focus
+    // (see the dwell effect below). Moving focus — to another card or out of the row — collapses it again.
+    var expandedHeroIndex by remember { mutableStateOf(-1) }
     var focusedHeroIndex by remember { mutableStateOf(-1) }
+    val orderedRows = state.config.visibleOrder
+    val heroVisible = HomeRow.HERO in orderedRows
+    val hasNonHeroContent = orderedRows.any { it != HomeRow.HERO && rowHasData(it, state) }
+    val showHeroFallback = heroVisible && state.heroItems.isEmpty() && !hasNonHeroContent
+    val renderRows = orderedRows.filter { rowCanRender(it, state, showHeroFallback) }
+    val firstDataRow = renderRows.firstOrNull { it != HomeRow.HERO && rowHasData(it, state) }
+    val showAllHiddenState = orderedRows.isEmpty()
+    val showEmptyState = orderedRows.isNotEmpty() && renderRows.isEmpty()
+    val rowFocusRequester: (HomeRow) -> FocusRequester? = { row ->
+        when (row) {
+            HomeRow.HERO -> when {
+                state.heroItems.isNotEmpty() -> heroFocus
+                showHeroFallback -> fallbackFocus
+                else -> null
+            }
+            else -> rowFirstFocusRequesters[row]
+        }
+    }
 
     val onNonHeroFocused = remember(vm, heroPreviewEngine) {
         {
             vm.setHeroFocused(false)
-            heroPreviewEngine.stop() // stop the video, but keep the selected hero expanded (poster)
+            heroPreviewEngine.stop()
+            expandedHeroIndex = -1
             onChildFocused()
         }
     }
@@ -132,7 +156,17 @@ fun HomeScreen(
         kotlinx.coroutines.delay(40L)
         if (focusedHeroIndex != -1) return@LaunchedEffect
         vm.setHeroFocused(false)
-        heroPreviewEngine.stop() // keep the selected hero expanded (poster); just stop the video
+        heroPreviewEngine.stop()
+        expandedHeroIndex = -1
+    }
+
+    // Dwell-to-expand: a card widens only after 3s of uninterrupted focus. Navigating away cancels the
+    // timer (this effect restarts), so quick D-pad sweeps never expand anything.
+    LaunchedEffect(focusedHeroIndex) {
+        val index = focusedHeroIndex
+        if (index < 0) return@LaunchedEffect
+        kotlinx.coroutines.delay(3_000L)
+        if (focusedHeroIndex == index) expandedHeroIndex = index
     }
 
     LaunchedEffect(previewEnabled) {
@@ -142,21 +176,37 @@ fun HomeScreen(
         }
     }
 
-    LaunchedEffect(state.heroItems, state.continueMovies, state.continueSeries, state.favoriteLive, restoreFocus) {
-        if (state.isEmpty) {
+    // The engine is an app-scoped singleton; make sure the preview can't outlive the Home screen.
+    DisposableEffect(heroPreviewEngine) {
+        onDispose { heroPreviewEngine.stop() }
+    }
+
+    LaunchedEffect(orderedRows, state.heroItems, state.recentLive, state.favoriteLive, state.recentGuide, state.favoriteGuide, state.continueMovies, state.continueSeries, restoreFocus) {
+        if (orderedRows.isEmpty()) {
             if (restoreFocus) onRestored()
             return@LaunchedEffect
         }
-        runCatching { listState.scrollToItem(0) }
+
+        val targetRow = when {
+            restoreFocus && heroVisible && state.heroItems.isNotEmpty() -> HomeRow.HERO
+            restoreFocus && showHeroFallback -> HomeRow.HERO
+            restoreFocus -> firstDataRow
+            else -> null
+        }
+        val targetIndex = targetRow?.let { renderRows.indexOf(it) } ?: 0
+        runCatching { listState.scrollToItem(targetIndex.coerceAtLeast(0)) }
+
         // Only pull focus INTO the Home content when returning from the player (restoreFocus). On a cold
         // start or a tab switch, leave focus on the sidebar's Home item so the nav is immediately navigable.
         if (restoreFocus) {
             kotlinx.coroutines.delay(60)
-            if (state.heroItems.isNotEmpty()) {
-                runCatching { heroFocus.requestFocus() }
-            } else {
-                runCatching { fallbackFocus.requestFocus() }
+            val focusTarget = when {
+                heroVisible && state.heroItems.isNotEmpty() -> heroFocus
+                showHeroFallback -> fallbackFocus
+                firstDataRow != null -> rowFocusRequester(firstDataRow)
+                else -> null
             }
+            if (focusTarget != null) runCatching { focusTarget.requestFocus() }
             onRestored()
         }
     }
@@ -170,23 +220,16 @@ fun HomeScreen(
         HomeSkeleton(modifier = modifier.fillMaxSize())
         return
     }
-    if (state.isEmpty) {
-        EmptyHomeState(
-            modifier = modifier.fillMaxSize(),
-        )
+    if (showAllHiddenState) {
+        AllRowsHiddenState(modifier = modifier.fillMaxSize())
+        return
+    }
+    if (showEmptyState) {
+        EmptyHomeState(modifier = modifier.fillMaxSize())
         return
     }
 
     val hero = state.heroItems.getOrNull(state.activeHeroIndex)
-    val hasMovies = state.continueMovies.isNotEmpty()
-    val hasSeries = state.continueSeries.isNotEmpty()
-    val hasFavorites = state.favoriteLive.isNotEmpty()
-    val firstRowKind = when {
-        hasFavorites -> RowKind.FAVORITES
-        hasMovies -> RowKind.MOVIES
-        hasSeries -> RowKind.SERIES
-        else -> null
-    }
 
     LazyColumn(
         modifier = modifier
@@ -198,107 +241,172 @@ fun HomeScreen(
         contentPadding = PaddingValues(vertical = Dimens.ScreenPaddingV),
         verticalArrangement = Arrangement.spacedBy(Dimens.GapLarge),
     ) {
-        item {
-            if (state.heroItems.isNotEmpty()) {
-                HeroRowSection(
-                    items = state.heroItems,
-                    expandedIndex = expandedHeroIndex,
-                    heroPreviewEngine = heroPreviewEngine,
-                    engineState = engineState,
-                    heroFocusRequester = heroFocus,
-                    onHeroFocusChanged = { index, hasFocus ->
-                        if (hasFocus) {
-                            if (expandedHeroIndex != index) {
-                                heroPreviewEngine.stop() // stop the previous hero's video before switching
-                            }
-                            expandedHeroIndex = index // expand the focused hero immediately (poster shows first)
-                            focusedHeroIndex = index
-                            vm.onHeroUserNavigate(index)
-                            vm.setHeroFocused(true)
-                            onChildFocused()
-                        } else if (focusedHeroIndex == index) {
-                            focusedHeroIndex = -1
+        itemsIndexed(renderRows, key = { _, row -> row.name }) { index, row ->
+            val firstItemFocusRequester = rowFocusRequester(row)
+            val nextRowIndex = renderRows
+                .drop(index + 1)
+                .indexOfFirst { rowFocusRequester(it) != null }
+                .takeIf { it >= 0 }
+                ?.let { index + 1 + it }
+            val onMoveToNextRow: (() -> Unit)? = nextRowIndex?.let { targetIndex ->
+                val targetFocusRequester = rowFocusRequester(renderRows[targetIndex]) ?: return@let null
+                {
+                    homeScope.launch {
+                        val targetIsVisible = listState.layoutInfo.visibleItemsInfo.any { it.index == targetIndex }
+                        if (!targetIsVisible) {
+                            listState.scrollToItem(targetIndex)
+                            kotlinx.coroutines.delay(50)
                         }
-                    },
-                    onPlay = { item ->
-                        when (item) {
-                            is HeroItem.MovieHero -> onPlayMovie(item.movie.id, item.positionMs)
-                            is HeroItem.SeriesHero -> onPlayEpisode(item.series.id, item.episode.id, item.positionMs)
-                            is HeroItem.LiveHero -> onPlayChannel(item.channel.id, state.recentLive)
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            } else {
-                HeroFallbackPane(
-                    modifier = Modifier.fillMaxWidth(),
-                    focusRequester = fallbackFocus,
-                    onChildFocused = onNonHeroFocused,
-                )
+                        runCatching { targetFocusRequester.requestFocus() }
+                    }
+                }
             }
-        }
+            when (row) {
+                HomeRow.HERO -> {
+                    if (state.heroItems.isNotEmpty()) {
+                        HeroRowSection(
+                            items = state.heroItems,
+                            activeHeroIndex = state.activeHeroIndex,
+                            expandedIndex = expandedHeroIndex,
+                            heroPreviewEngine = heroPreviewEngine,
+                            engineState = engineState,
+                            heroFocusRequester = heroFocus,
+                            onHeroFocusChanged = { index, hasFocus ->
+                                if (hasFocus) {
+                                    if (expandedHeroIndex != index) {
+                                        heroPreviewEngine.stop() // stop the previous hero's video before switching
+                                        expandedHeroIndex = -1 // collapse immediately; the dwell timer re-expands after 3s
+                                    }
+                                    focusedHeroIndex = index
+                                    vm.onHeroUserNavigate(index)
+                                    vm.setHeroFocused(true)
+                                    onChildFocused()
+                                } else if (focusedHeroIndex == index) {
+                                    focusedHeroIndex = -1
+                                }
+                            },
+                            onPlay = { item ->
+                                when (item) {
+                                    is HeroItem.MovieHero -> onPlayMovie(item.movie.id, item.positionMs)
+                                    is HeroItem.SeriesHero -> onPlayEpisode(item.series.id, item.episode.id, item.positionMs)
+                                    is HeroItem.LiveHero -> onPlayChannel(item.channel.id, state.recentLive)
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    } else {
+                        HeroFallbackPane(
+                            modifier = Modifier.fillMaxWidth(),
+                            focusRequester = fallbackFocus,
+                            onChildFocused = onNonHeroFocused,
+                        )
+                    }
+                }
 
-        if (hasFavorites) {
-            item {
-                ChannelRailRow(
-                    title = "Favourite Channels",
-                    channels = state.favoriteLive,
-                    onChannelClick = { id -> onPlayChannel(id, state.favoriteLive) },
-                    onFocus = onNonHeroFocused,
-                    firstItemFocusRequester = if (firstRowKind == RowKind.FAVORITES) firstRowFocus else null,
-                )
-            }
-        }
-        if (hasMovies) {
-            item {
-                ContinueWatchingRow(
-                    title = "Continue Watching Movies",
-                    items = state.continueMovies,
-                    onItemClick = { onPlayMovie(it.sourceItemId, it.positionMs) },
-                    onFocus = onNonHeroFocused,
-                    firstItemFocusRequester = if (firstRowKind == RowKind.MOVIES) firstRowFocus else null,
-                )
-            }
-        }
-        if (hasSeries) {
-            item {
-                ContinueWatchingRow(
-                    title = "Continue Watching Series",
-                    items = state.continueSeries,
-                    onItemClick = { onPlayEpisode(0L, it.targetItemId, it.positionMs) },
-                    onFocus = onNonHeroFocused,
-                    firstItemFocusRequester = if (firstRowKind == RowKind.SERIES) firstRowFocus else null,
-                )
+                HomeRow.RECENT_CHANNELS -> if (state.recentLive.isNotEmpty()) {
+                    HomeLiveRow(
+                        title = row.title,
+                        mode = state.config.recentLiveMode,
+                        channels = state.recentLive,
+                        guide = state.recentGuide,
+                        onChannelClick = onPlayChannel,
+                        onFocus = onNonHeroFocused,
+                        firstItemFocusRequester = firstItemFocusRequester,
+                        onContainerDown = onMoveToNextRow,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+
+                HomeRow.FAVORITE_CHANNELS -> if (state.favoriteLive.isNotEmpty()) {
+                    HomeLiveRow(
+                        title = row.title,
+                        mode = state.config.favoriteLiveMode,
+                        channels = state.favoriteLive,
+                        guide = state.favoriteGuide,
+                        onChannelClick = onPlayChannel,
+                        onFocus = onNonHeroFocused,
+                        firstItemFocusRequester = firstItemFocusRequester,
+                        onContainerDown = onMoveToNextRow,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+
+                HomeRow.CONTINUE_MOVIES -> if (state.continueMovies.isNotEmpty()) {
+                    ContinueWatchingRow(
+                        title = row.title,
+                        items = state.continueMovies,
+                        onItemClick = { onPlayMovie(it.sourceItemId, it.positionMs) },
+                        onFocus = onNonHeroFocused,
+                        firstItemFocusRequester = firstItemFocusRequester,
+                    )
+                }
+
+                HomeRow.CONTINUE_SERIES -> if (state.continueSeries.isNotEmpty()) {
+                    ContinueWatchingRow(
+                        title = row.title,
+                        items = state.continueSeries,
+                        onItemClick = { onPlayEpisode(0L, it.targetItemId, it.positionMs) },
+                        onFocus = onNonHeroFocused,
+                        firstItemFocusRequester = firstItemFocusRequester,
+                    )
+                }
             }
         }
     }
 
-    // Video preview: only the EXPANSION is immediate (on navigation, above) — the muted video starts a
-    // moment later, on top of the already-wide card's poster, and only while the row is focused.
-    LaunchedEffect(isPreviewActive, hero, lastInteractionMs) {
-        if (!isPreviewActive || hero == null) {
+    // Video preview starts after the expanded card has settled, so 4K decoder setup does not compete with
+    // the width animation. Until then the expanded card stays on the poster.
+    LaunchedEffect(isPreviewActive, hero, expandedHeroIndex, focusedHeroIndex, lastInteractionMs) {
+        if (!isPreviewActive || hero == null || expandedHeroIndex < 0 || focusedHeroIndex != expandedHeroIndex) {
             heroPreviewEngine.stop()
             return@LaunchedEffect
         }
 
+        val scheduledIndex = expandedHeroIndex
         val scheduledHero = hero
         val interactionStamp = lastInteractionMs
 
         heroPreviewEngine.stop()
-        kotlinx.coroutines.delay(3_000L)
+        kotlinx.coroutines.delay(520L)
         if (!isPreviewActive || interactionStamp != lastInteractionMs) return@LaunchedEffect
+        if (focusedHeroIndex != scheduledIndex || expandedHeroIndex != scheduledIndex) return@LaunchedEffect
         if (scheduledHero != state.heroItems.getOrNull(state.activeHeroIndex)) return@LaunchedEffect
 
         heroPreviewEngine.play(scheduledHero.streamUrl, scheduledHero.seekToMs)
     }
 }
 
-private enum class RowKind { FAVORITES, MOVIES, SERIES }
+private fun rowHasData(row: HomeRow, state: HomeUiState): Boolean = when (row) {
+    HomeRow.HERO -> state.heroItems.isNotEmpty()
+    HomeRow.RECENT_CHANNELS -> when (state.config.recentLiveMode) {
+        HomeLiveRowMode.CARDS -> state.recentLive.isNotEmpty()
+        HomeLiveRowMode.ON_NOW -> state.recentGuide.hasContent
+    }
+    HomeRow.FAVORITE_CHANNELS -> when (state.config.favoriteLiveMode) {
+        HomeLiveRowMode.CARDS -> state.favoriteLive.isNotEmpty()
+        HomeLiveRowMode.ON_NOW -> state.favoriteGuide.hasContent
+    }
+    HomeRow.CONTINUE_MOVIES -> state.continueMovies.isNotEmpty()
+    HomeRow.CONTINUE_SERIES -> state.continueSeries.isNotEmpty()
+}
+
+private fun rowCanRender(row: HomeRow, state: HomeUiState, showHeroFallback: Boolean): Boolean =
+    when (row) {
+        HomeRow.HERO -> state.heroItems.isNotEmpty() || showHeroFallback
+        else -> rowHasData(row, state)
+    }
+
+private fun HeroItem.heroKey(): String = when (this) {
+    is HeroItem.MovieHero -> "movie:${movie.id}"
+    is HeroItem.SeriesHero -> "episode:${episode.id}"
+    is HeroItem.LiveHero -> "live:${channel.id}"
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun HeroRowSection(
     items: List<HeroItem>,
+    activeHeroIndex: Int,
     expandedIndex: Int,
     heroPreviewEngine: HeroPreviewEngine,
     engineState: HeroPreviewEngine.State,
@@ -323,12 +431,37 @@ private fun HeroRowSection(
     var previewRectInRowPx by remember { mutableStateOf<Rect?>(null) }
     var localFocusedIndex by remember { mutableStateOf(-1) }
     var rowWidthDp by remember { mutableStateOf(0.dp) }
+    var alignToActiveHeroKey by remember { mutableStateOf<String?>(null) }
     val heroRowState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val itemsSignature = remember(items) { items.joinToString(separator = "|") { it.heroKey() } }
+    val activeHeroKey = items.getOrNull(activeHeroIndex)?.heroKey()
+
+    LaunchedEffect(itemsSignature) {
+        if (activeHeroIndex !in items.indices) return@LaunchedEffect
+
+        alignToActiveHeroKey = activeHeroKey
+        heroRowState.scrollToItem(activeHeroIndex)
+
+        if (activeHeroIndex == 0 && localFocusedIndex >= 0 && localFocusedIndex != activeHeroIndex) {
+            localFocusedIndex = activeHeroIndex
+            runCatching { heroFocusRequester.requestFocus() }
+        }
+    }
+
+    LaunchedEffect(expandedIndex, items.size) {
+        // The rect is only ever written by the expanded card's onGloballyPositioned; drop it on collapse
+        // so the next expansion can't flash its overlay at the previous card's stale position.
+        if (expandedIndex < 0) {
+            previewRectInRowPx = null
+        } else if (expandedIndex < items.size) {
+            heroRowState.animateScrollToItem(expandedIndex)
+        }
+    }
 
     LaunchedEffect(localFocusedIndex) {
-        if (localFocusedIndex >= 0) {
-            heroRowState.animateScrollToItem(localFocusedIndex)
-        }
+        if (localFocusedIndex < 0) return@LaunchedEffect
+        heroRowState.animateScrollToItem(localFocusedIndex)
     }
 
     val endPadding = (rowWidthDp - Dimens.HeroBaseWidth - Dimens.HomeRowPaddingH).coerceAtLeast(Dimens.HomeRowPaddingH)
@@ -356,17 +489,26 @@ private fun HeroRowSection(
                 state = heroRowState,
                 horizontalArrangement = Arrangement.spacedBy(Dimens.HeroGap),
                 contentPadding = PaddingValues(start = Dimens.HomeRowPaddingH, end = endPadding),
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .focusProperties {
+                        onEnter = {
+                            if (
+                                requestedFocusDirection == FocusDirection.Down ||
+                                requestedFocusDirection == FocusDirection.Up
+                            ) {
+                                scope.launch {
+                                    heroRowState.scrollToItem(0)
+                                    runCatching { heroFocusRequester.requestFocus() }
+                                }
+                                cancelFocusChange()
+                            }
+                        }
+                    },
             ) {
                 itemsIndexed(
                     items,
-                    key = { _, item ->
-                        when (item) {
-                            is HeroItem.MovieHero -> "movie:${item.movie.id}"
-                            is HeroItem.SeriesHero -> "episode:${item.episode.id}"
-                            is HeroItem.LiveHero -> "live:${item.channel.id}"
-                        }
-                    },
+                    key = { _, item -> item.heroKey() },
                 ) { index, item ->
                     val isExpanded = index == expandedIndex
                     val targetWidth = if (isExpanded) expandedWidth else Dimens.HeroBaseWidth
@@ -408,8 +550,22 @@ private fun HeroRowSection(
                                 .height(cardHeight)
                                 .then(if (index == 0) Modifier.focusRequester(heroFocusRequester) else Modifier)
                                 .onFocusChanged { fs ->
-                                    if (fs.hasFocus) localFocusedIndex = index
-                                    onHeroFocusChanged(index, fs.hasFocus)
+                                    val redirectToActiveHero = fs.hasFocus &&
+                                        activeHeroIndex == 0 &&
+                                        index != activeHeroIndex &&
+                                        alignToActiveHeroKey == activeHeroKey
+                                    if (fs.hasFocus) {
+                                        if (redirectToActiveHero) {
+                                            scope.launch {
+                                                heroRowState.scrollToItem(activeHeroIndex)
+                                                runCatching { heroFocusRequester.requestFocus() }
+                                            }
+                                        } else {
+                                            alignToActiveHeroKey = null
+                                            localFocusedIndex = index
+                                        }
+                                    }
+                                    if (!redirectToActiveHero) onHeroFocusChanged(index, fs.hasFocus)
                                 }
                                 .then(
                                     if (isExpanded) Modifier.drawBehind {
@@ -437,14 +593,35 @@ private fun HeroRowSection(
                             contentAlignment = Alignment.Center,
                         ) { focused ->
                             if (isExpanded) {
+                                // No blurred backdrop here: the preview overlay covers this card as soon
+                                // as previewRectInRowPx is known and renders the blur itself — doubling the
+                                // blur underneath just costs frames on TV hardware.
                                 Box(Modifier.fillMaxSize().background(Color.Black)) {
                                     if (!imageUrl.isNullOrBlank()) {
-                                        AsyncImage(
-                                            model = imageUrl,
-                                            contentDescription = null,
-                                            contentScale = ContentScale.Fit,
-                                            modifier = Modifier.fillMaxSize(),
-                                        )
+                                        if (item is HeroItem.LiveHero) {
+                                            AsyncImage(
+                                                model = imageUrl,
+                                                contentDescription = null,
+                                                modifier = Modifier.fillMaxSize().blur(20.dp),
+                                                contentScale = ContentScale.Crop,
+                                                alpha = 0.5f,
+                                            )
+                                            AsyncImage(
+                                                model = imageUrl,
+                                                contentDescription = null,
+                                                contentScale = ContentScale.Fit,
+                                                modifier = Modifier
+                                                    .align(Alignment.Center)
+                                                    .size(80.dp),
+                                            )
+                                        } else {
+                                            AsyncImage(
+                                                model = imageUrl,
+                                                contentDescription = null,
+                                                contentScale = ContentScale.Fit,
+                                                modifier = Modifier.fillMaxSize(),
+                                            )
+                                        }
                                     } else {
                                         Box(
                                             Modifier.fillMaxSize(),
@@ -567,18 +744,46 @@ private fun HeroRowSection(
                                 modifier = Modifier.fillMaxSize(),
                             )
                             if (engineState != HeroPreviewEngine.State.PLAYING) {
+                                // Opaque cover: the SurfaceView below holds the previous preview's last
+                                // frame after stop(), and the parent's black background is punched out by
+                                // the SurfaceView. Everything above (loading images, translucent blur,
+                                // transparent logos, bare fallback icon) relies on this layer to hide it.
+                                Box(Modifier.fillMaxSize().background(Color.Black))
                                 val artUrl = when (expandedItem) {
                                     is HeroItem.MovieHero -> expandedItem.movie.posterUrl
                                     is HeroItem.SeriesHero -> expandedItem.series.posterUrl
                                     is HeroItem.LiveHero -> expandedItem.channel.logoUrl
                                 }
                                 if (!artUrl.isNullOrBlank()) {
-                                    AsyncImage(
-                                        model = artUrl,
-                                        contentDescription = null,
-                                        contentScale = ContentScale.Fit,
-                                        modifier = Modifier.fillMaxSize(),
-                                    )
+                                    if (expandedItem is HeroItem.LiveHero) {
+                                        AsyncImage(
+                                            model = artUrl,
+                                            contentDescription = null,
+                                            modifier = Modifier.fillMaxSize().blur(20.dp),
+                                            contentScale = ContentScale.Crop,
+                                            alpha = 0.5f,
+                                        )
+                                        AsyncImage(
+                                            model = artUrl,
+                                            contentDescription = null,
+                                            contentScale = ContentScale.Fit,
+                                            modifier = Modifier.size(80.dp),
+                                        )
+                                    } else {
+                                        AsyncImage(
+                                            model = artUrl,
+                                            contentDescription = null,
+                                            modifier = Modifier.fillMaxSize().blur(20.dp),
+                                            contentScale = ContentScale.Crop,
+                                            alpha = 0.5f,
+                                        )
+                                        AsyncImage(
+                                            model = artUrl,
+                                            contentDescription = null,
+                                            contentScale = ContentScale.Fit,
+                                            modifier = Modifier.fillMaxSize(),
+                                        )
+                                    }
                                 } else {
                                     val fallback = when (expandedItem) {
                                         is HeroItem.MovieHero -> OwnTVIcon.MOVIES
@@ -717,8 +922,7 @@ private fun finishByLabel(context: Context, positionMs: Long, durationMs: Long, 
     if (remainingMs <= 0L) return null
 
     val finishMs = roundUpToNextQuarterHour(nowMs + remainingMs)
-    val pattern = if (android.text.format.DateFormat.is24HourFormat(context)) "H:mm" else "h:mm a"
-    val time = SimpleDateFormat(pattern, Locale.getDefault()).format(Date(finishMs))
+    val time = formatSystemTime(context, finishMs)
     return "Finish by $time"
 }
 
@@ -828,89 +1032,6 @@ private fun ContinueWatchingRow(
 }
 
 @Composable
-private fun ChannelRailRow(
-    title: String,
-    channels: List<ChannelEntity>,
-    onChannelClick: (Long) -> Unit,
-    onFocus: () -> Unit,
-    firstItemFocusRequester: FocusRequester? = null,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-    ) {
-        Text(
-            text = title.uppercase(),
-            style = MaterialTheme.typography.titleSmall,
-            color = OwnTVTheme.colors.primary,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = Dimens.HomeRowPaddingH),
-        )
-        Spacer(Modifier.height(10.dp))
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(horizontal = Dimens.HomeRowPaddingH),
-            modifier = Modifier.focusGroup(),
-        ) {
-            itemsIndexed(channels, key = { _, channel -> channel.id }) { index, channel ->
-                Box(
-                    modifier = Modifier
-                        .width(180.dp)
-                        .height(100.dp),
-                ) {
-                    FocusableSurface(
-                        onClick = { onChannelClick(channel.id) },
-                        modifier = when {
-                            firstItemFocusRequester != null && index == 0 -> Modifier.focusRequester(firstItemFocusRequester)
-                            else -> Modifier
-                        }.onFocusChanged { if (it.hasFocus) onFocus() },
-                        shape = RoundedCornerShape(14.dp),
-                        focusedScale = 1f,
-                        focusedContainerColor = OwnTVTheme.colors.surfaceContainerHigh,
-                        unfocusedContainerColor = OwnTVTheme.colors.surfaceContainerHigh,
-                        selectedContainerColor = OwnTVTheme.colors.surfaceContainerHigh,
-                    ) { focused ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(OwnTVTheme.colors.surfaceContainerLowest),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                if (!channel.logoUrl.isNullOrBlank()) {
-                                    AsyncImage(
-                                        model = channel.logoUrl,
-                                        contentDescription = null,
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Crop,
-                                    )
-                                } else {
-                                    OwnTVIcon(OwnTVIcon.LIVE_TV, tint = OwnTVTheme.colors.onSurfaceVariant, modifier = Modifier.size(22.dp))
-                                }
-                            }
-                            Text(
-                                text = channel.name,
-                                style = MaterialTheme.typography.titleSmall,
-                                color = if (focused) OwnTVTheme.colors.primary else OwnTVTheme.colors.onSurface,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun HeroFallbackPane(
     modifier: Modifier = Modifier,
     focusRequester: FocusRequester,
@@ -973,6 +1094,38 @@ private fun EmptyHomeState(
             Spacer(Modifier.height(8.dp))
             Text(
                 text = "Continue watching will show up on Home once you have playback history.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = colors.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AllRowsHiddenState(
+    modifier: Modifier = Modifier,
+) {
+    val colors = OwnTVTheme.colors
+    Box(
+        modifier = modifier
+            .focusProperties { canFocus = false }
+            .background(colors.surface),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            BrandLockup(markSize = 84, textSize = 48)
+            Spacer(Modifier.height(16.dp))
+            Text(
+                text = "All Home rows are hidden.",
+                style = MaterialTheme.typography.titleLarge,
+                color = colors.onSurface,
+                maxLines = 1,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "Turn rows back on in Settings → Home screen.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = colors.onSurfaceVariant,
                 maxLines = 2,

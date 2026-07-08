@@ -26,6 +26,7 @@ import tv.own.owntv.core.sync.work.CatalogSyncScheduler
 import tv.own.owntv.core.util.Pin
 import tv.own.owntv.core.util.friendlySyncError
 import tv.own.owntv.core.launcher.LauncherIntegrationRepository
+import tv.own.owntv.features.settings.data.PlaylistAutoRefresh
 import tv.own.owntv.features.settings.data.SettingsRepository
 import java.io.File
 
@@ -109,13 +110,13 @@ class SetupViewModel(
         password: String,
         userAgent: String = "",
         epgUrl: String = "",
-        refreshOnStart: Boolean = false,
+        autoRefresh: PlaylistAutoRefresh = PlaylistAutoRefresh.OFF,
         syncLive: Boolean = true,
         syncMovies: Boolean = true,
         syncSeries: Boolean = true,
     ) {
         val priority = SyncContentTypes(syncLive, syncMovies, syncSeries)
-        runImport(refreshOnStart, priority, enqueueRemainder = true, requiresNetwork = true) { profileId ->
+        runImport(autoRefresh, priority, enqueueRemainder = true, requiresNetwork = true) { profileId ->
             sourceRepository.addXtreamSource(
                 profileId = profileId,
                 name = name.ifBlank { "My IPTV" },
@@ -128,8 +129,8 @@ class SetupViewModel(
         }
     }
 
-    fun startM3u(name: String, url: String, userAgent: String = "", epgUrl: String = "", refreshOnStart: Boolean = false) =
-        runImport(refreshOnStart, requiresNetwork = !url.isLocalPlaylistPath()) { profileId ->
+    fun startM3u(name: String, url: String, userAgent: String = "", epgUrl: String = "", autoRefresh: PlaylistAutoRefresh = PlaylistAutoRefresh.OFF) =
+        runImport(autoRefresh, requiresNetwork = !url.isLocalPlaylistPath()) { profileId ->
             sourceRepository.addM3uSource(
                 profileId = profileId,
                 name = name.ifBlank { "My Playlist" },
@@ -140,7 +141,7 @@ class SetupViewModel(
         }
 
     private fun runImport(
-        refreshOnStart: Boolean = false,
+        autoRefresh: PlaylistAutoRefresh = PlaylistAutoRefresh.OFF,
         contentTypes: SyncContentTypes = SyncContentTypes(),
         enqueueRemainder: Boolean = false,
         requiresNetwork: Boolean = true,
@@ -160,7 +161,7 @@ class SetupViewModel(
                 source = addSource(profileId)
                 val freshSync = source.lastSyncAt == null
                 val remainder = if (enqueueRemainder) SyncContentTypes().remainderAfter(contentTypes) else SyncContentTypes(live = false, movies = false, series = false)
-                settings.setSourceRefresh(source.id, refreshOnStart)
+                settings.setPlaylistAutoRefresh(source.id, autoRefresh)
                 when (val result = sourceRepository.sync(source, onProgress = { _progress.value = it }, contentTypes = contentTypes)) {
                     is SyncResult.Success -> {
                         // Just the playlist content — EPG is added separately (Settings → EPG sources).
@@ -331,7 +332,7 @@ class SetupViewModel(
         withContext(NonCancellable) {
             catalogSyncScheduler.cancelSync(source.id)
             runCatching { sourceRepository.deleteSource(source) }
-            runCatching { settings.setSourceRefresh(source.id, false) }
+            runCatching { settings.setPlaylistAutoRefresh(source.id, PlaylistAutoRefresh.OFF) }
         }
     }
 

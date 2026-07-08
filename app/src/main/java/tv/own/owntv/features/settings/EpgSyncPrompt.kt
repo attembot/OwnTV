@@ -2,6 +2,7 @@ package tv.own.owntv.features.settings
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +33,7 @@ import tv.own.owntv.ui.components.OwnTVButtonStyle
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.OwnTVSpinner
 import tv.own.owntv.ui.components.formatCount
+import tv.own.owntv.ui.components.trapAllFocusExit
 import tv.own.owntv.ui.theme.OwnTVTheme
 
 /** Semi-automatic EPG flow after a playlist import: ask → sync with a live programme count → done. */
@@ -63,7 +65,7 @@ fun EpgSyncDialog(state: EpgSyncUi, onSync: () -> Unit, onDismiss: () -> Unit) {
     if (state is EpgSyncUi.Done) LaunchedEffect(Unit) { delay(1_800); onDismiss() } // auto-close
 
     Box(
-        modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.78f)),
+        modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.78f)).trapAllFocusExit().focusGroup(),
         contentAlignment = Alignment.Center,
     ) {
         Column(

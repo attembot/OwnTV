@@ -50,7 +50,7 @@ fun TextInputDialog(
     LaunchedEffect(Unit) { runCatching { fieldFocus.requestFocus() } }
     BackHandler { onDismiss() }
     Box(
-        modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.75f)).focusGroup(),
+        modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.75f)).trapAllFocusExit().focusGroup(),
         contentAlignment = Alignment.Center,
     ) {
         Column(

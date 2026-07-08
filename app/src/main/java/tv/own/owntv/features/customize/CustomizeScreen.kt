@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -40,6 +41,7 @@ import org.koin.androidx.compose.koinViewModel
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import tv.own.owntv.core.model.MediaType
+import tv.own.owntv.features.profiles.PinDialog
 import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.OwnTVButton
 import tv.own.owntv.ui.components.OwnTVButtonStyle
@@ -48,8 +50,10 @@ import tv.own.owntv.ui.components.roundedPanel
 import tv.own.owntv.ui.theme.OwnTVTheme
 
 /**
- * Settings → Customize: hide / rename / reorder categories per section, and unhide hidden Live
- * channels. Everything is per-profile and survives source re-syncs.
+ * Settings → Customize & Hidden Items: hide / rename / reorder categories per section, and unhide
+ * hidden channels, movies and series. Everything is per-profile and survives source re-syncs.
+ * Optionally locked behind a PIN (set from this screen's top-right) so hidden items can't be
+ * unhidden by someone else — the PIN is asked on every entry.
  */
 @Composable
 fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
@@ -58,11 +62,53 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val rows by vm.rows.collectAsStateWithLifecycle()
     val hiddenChannels by vm.hiddenChannels.collectAsStateWithLifecycle()
     val rangeAnchorKey by vm.rangeAnchorKey.collectAsStateWithLifecycle()
+    val pinLock by vm.pinLock.collectAsStateWithLifecycle()
     val colors = OwnTVTheme.colors
     var renaming by remember { mutableStateOf<CustomizeCatRow?>(null) }
     // The category whose Hide button was clicked to close a range — opens the Show/Hide/Cancel prompt.
     var rangeEnd by remember { mutableStateOf<CustomizeCatRow?>(null) }
+    // PIN gate: asked on every entry (state is per-composition, so leaving the screen re-locks it).
+    var unlocked by remember { mutableStateOf(false) }
+    var pinError by remember { mutableStateOf(false) }
+    // Set/Change/Remove PIN flow (only reachable once unlocked).
+    var editingPin by remember { mutableStateOf<PinEdit?>(null) }
+    var firstPin by remember { mutableStateOf("") }
+    var confirmPinStage by remember { mutableStateOf(false) }
+    var pinMismatch by remember { mutableStateOf(false) }
     val firstFocus = remember { FocusRequester() }
+
+    // Wait for the stored lock state before showing anything (no unlocked flash).
+    if (!pinLock.loaded) {
+        Column(modifier.fillMaxSize().roundedPanel()) {}
+        return
+    }
+    if (pinLock.pin != null && !unlocked) {
+        Column(
+            modifier = modifier.fillMaxSize().roundedPanel().padding(horizontal = 40.dp, vertical = 28.dp),
+        ) {
+            Text("Customize & Hidden Items", style = MaterialTheme.typography.headlineLarge, color = colors.onSurface)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "This screen is PIN-locked.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.onSurfaceVariant,
+            )
+        }
+        PinDialog(
+            title = if (pinError) "Wrong PIN — try again" else "Enter PIN",
+            onSubmit = { entered ->
+                if (entered == pinLock.pin) {
+                    unlocked = true
+                    pinError = false
+                } else {
+                    pinError = true
+                }
+            },
+            onDismiss = onBack,
+        )
+        return
+    }
+
     LaunchedEffect(Unit) { kotlinx.coroutines.delay(60); runCatching { firstFocus.requestFocus() } }
 
     // While a span selection is in progress, Back cancels the selection instead of leaving the screen.
@@ -78,10 +124,39 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             .focusGroup()
             .padding(horizontal = 40.dp, vertical = 28.dp),
     ) {
-        Text("Customize", style = MaterialTheme.typography.headlineLarge, color = colors.onSurface)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "Customize & Hidden Items",
+                style = MaterialTheme.typography.headlineLarge,
+                color = colors.onSurface,
+                modifier = Modifier.weight(1f),
+            )
+            // Optional PIN lock on this screen, controlled from here. Per-profile and NOT exported in
+            // backups. Only reachable once unlocked — to be here with a PIN set the user already
+            // entered it, so changing or removing it needs no further verification.
+            if (pinLock.pin == null) {
+                OwnTVButton(
+                    "🔒 Set PIN",
+                    onClick = { firstPin = ""; confirmPinStage = false; pinMismatch = false; editingPin = PinEdit.SET },
+                )
+            } else {
+                OwnTVButton(
+                    "🔒 Change PIN",
+                    onClick = { firstPin = ""; confirmPinStage = false; pinMismatch = false; editingPin = PinEdit.CHANGE },
+                    style = OwnTVButtonStyle.SECONDARY,
+                )
+                Spacer(Modifier.width(10.dp))
+                OwnTVButton(
+                    "Remove lock",
+                    onClick = { editingPin = PinEdit.REMOVE },
+                    style = OwnTVButtonStyle.SECONDARY,
+                )
+            }
+        }
         Spacer(Modifier.height(4.dp))
         Text(
-            "Hide, rename and reorder categories for this profile. Changes survive re-syncs.",
+            "Hide & unhide channels, movies and series, and rename or reorder categories for this " +
+                "profile. Survives re-syncs.",
             style = MaterialTheme.typography.bodyMedium,
             color = colors.onSurfaceVariant,
         )
@@ -117,14 +192,22 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         }
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
-            // Hidden Live channels first (channels are hidden from the Live preview pane) — kept on
+            // Hidden items of this section first (hidden via each section's long-press menu) — kept on
             // top so they're findable even when a provider has hundreds of categories below.
-            if (section == MediaType.LIVE && hiddenChannels.isNotEmpty()) {
+            if (hiddenChannels.isNotEmpty()) {
                 item {
-                    Text("Hidden channels", style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
+                    Text(
+                        when (section) {
+                            MediaType.LIVE -> "Hidden channels"
+                            MediaType.MOVIE -> "Hidden movies"
+                            else -> "Hidden series"
+                        },
+                        style = MaterialTheme.typography.titleLarge,
+                        color = colors.onSurface,
+                    )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "Unhide to bring a channel back to the lists.",
+                        "Unhide to bring an item back to the lists.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = colors.onSurfaceVariant,
                     )
@@ -200,6 +283,49 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             onShow = { vm.applyRange(row, hidden = false); rangeEnd = null },
             onDismiss = { vm.cancelRange(); rangeEnd = null },
         )
+    }
+
+    editingPin?.let { mode ->
+        when (mode) {
+            PinEdit.REMOVE -> PinConfirmDialog(
+                title = "Remove PIN lock?",
+                message = "The Customize screen will open without asking for a PIN again.",
+                confirmLabel = "Remove",
+                onConfirm = { vm.setPin(null); editingPin = null },
+                onDismiss = { editingPin = null },
+            )
+            // SET and CHANGE are the same flow (enter a new PIN, then confirm). To reach here with a
+            // PIN already set the user unlocked the screen, so neither verifies the old PIN.
+            PinEdit.SET, PinEdit.CHANGE -> {
+                if (confirmPinStage) {
+                    key("confirm", pinMismatch) {
+                        PinDialog(
+                            title = if (pinMismatch) "PINs don't match — re-enter" else "Confirm new PIN",
+                            onSubmit = { entered ->
+                                if (entered == firstPin) {
+                                    vm.setPin(entered); editingPin = null
+                                } else {
+                                    pinMismatch = true
+                                }
+                            },
+                            onDismiss = { editingPin = null },
+                        )
+                    }
+                } else {
+                    key("first") {
+                        PinDialog(
+                            title = "Enter a new PIN",
+                            onSubmit = { entered ->
+                                firstPin = entered
+                                confirmPinStage = true
+                                pinMismatch = false
+                            },
+                            onDismiss = { editingPin = null },
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -330,5 +456,44 @@ private fun CategoryRow(
             onLongClick = onHideLongPress,
             style = OwnTVButtonStyle.SECONDARY,
         )
+    }
+}
+
+/** PIN lock editing flow opened from the Customize header. */
+private enum class PinEdit { SET, CHANGE, REMOVE }
+
+/**
+ * Generic Yes/No confirmation scrim used to remove the Customize PIN lock. Mirrors [RangeHideDialog]'s
+ * structure so D-pad focus and the back button behave the same way as the other scrim dialogs here.
+ */
+@Composable
+private fun PinConfirmDialog(
+    title: String,
+    message: String,
+    confirmLabel: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val colors = OwnTVTheme.colors
+    val confirmFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { confirmFocus.requestFocus() } }
+    BackHandler { onDismiss() }
+    Box(
+        modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.75f)).focusGroup(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            Modifier.width(480.dp).clip(RoundedCornerShape(20.dp)).background(colors.surfaceContainerHigh).padding(28.dp),
+        ) {
+            Text(title, style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
+            Spacer(Modifier.height(6.dp))
+            Text(message, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+            Spacer(Modifier.height(22.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OwnTVButton("Cancel", onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY)
+                Spacer(Modifier.weight(1f))
+                OwnTVButton(confirmLabel, onClick = onConfirm, modifier = Modifier.focusRequester(confirmFocus))
+            }
+        }
     }
 }

@@ -18,3 +18,16 @@ fun Modifier.trapVerticalFocusExit(): Modifier = focusProperties {
         }
     }
 }
+
+/**
+ * Traps D-pad focus inside this group for ALL directions (Up/Down/Left/Right). Apply to a full-screen
+ * modal scrim so a directional press can never escape into the UI behind it. Back is NOT affected — it
+ * must still be handled by a BackHandler above (onExit only blocks directional exits).
+ *
+ * Use this (not [trapVerticalFocusExit]) on modals/dialogs/overlays where every direction must stay
+ * inside the dialog. Inside the group, moves between children are unaffected (onExit only fires when
+ * leaving the group).
+ */
+fun Modifier.trapAllFocusExit(): Modifier = focusProperties {
+    onExit = { cancelFocusChange() }
+}

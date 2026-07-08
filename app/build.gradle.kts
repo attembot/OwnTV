@@ -135,6 +135,10 @@ dependencies {
     implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.datasource.okhttp)
 
+    // In-app YouTube trailer playback (plan §7.3) — WebView-backed IFrame player; the only ToS-clean
+    // way to play YouTube trailers inside the app. Falls back to an "Open in YouTube" intent.
+    implementation(libs.youtube.player)
+
     // Image loading
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)

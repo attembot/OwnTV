@@ -56,9 +56,18 @@ class LivePreviewEngine(
     val state: StateFlow<State> = _state.asStateFlow()
     private val _videoHeight = MutableStateFlow<Int?>(null)
     val videoHeight: StateFlow<Int?> = _videoHeight.asStateFlow()
+    // PAR-corrected display aspect (w/h) + native pixel (w, h), used by ExoPreviewSurface's zoom/letterbox
+    // sizing (see Modifier.videoZoom). Mirrors OwnTVPlayer._videoAspect/_videoSize so live-on-ExoPlayer
+    // zooms identically to live-on-mpv / VOD.
+    private val _videoAspect = MutableStateFlow<Float?>(null)
+    val videoAspect: StateFlow<Float?> = _videoAspect.asStateFlow()
+    private val _videoSize = MutableStateFlow<Pair<Int, Int>?>(null)
+    val videoSize: StateFlow<Pair<Int, Int>?> = _videoSize.asStateFlow()
     // Up-to-4 mini stream chips for the preview pane / player top bar: aspect · resolution · fps · audio.
     private val _streamChips = MutableStateFlow<List<String>>(emptyList())
     override val streamChips: StateFlow<List<String>> = _streamChips.asStateFlow()
+    // This engine IS ExoPlayer — static first chip for the fullscreen top bar.
+    override val engineChip: StateFlow<String?> = MutableStateFlow("EXO")
 
     // --- PlaybackEngine: lets the full-screen HUD drive a promoted preview (play/pause, state, volume) ---
     private val _isPlaying = MutableStateFlow(false)
@@ -105,6 +114,14 @@ class LivePreviewEngine(
     val noVideoDetected: StateFlow<Boolean> = _noVideoDetected.asStateFlow()
     private var noVideoTriggered = false
     private var readySinceMs = 0L
+    // Set true once this tune is observed to be UHD (>1080p). Cheap panels (e.g. some Hisense) leak the 4K
+    // hardware decoder if it's merely parked/reused (ExoPlayer's normal stop) instead of fully released —
+    // every later channel then waits ~20 s for a decoder slot until the TV reboots. So when we LEAVE a UHD
+    // channel via stop() (Back / exit fullscreen / background / leaving the list) we fully release+rebuild
+    // the ExoPlayer so its MediaCodec is handed back cleanly. Deliberately NOT triggered from play(): that
+    // path is also the preview-pane re-tune on every focus, and rebuilding there churns 4K previews and
+    // pushes borderline streams into the mpv fallback. Scoped to UHD only — SD/HD keeps the fast reuse path.
+    @Volatile private var sawUhd = false
 
     // Programmatic codec/audio errors (Reviewer: more reliable than logcat for ExoPlayer, and survives the
     // Android 14+ own-logcat lockdown). MediaCodec.CodecException.diagnosticInfo carries the exact code
@@ -147,6 +164,7 @@ class LivePreviewEngine(
     override fun streamInfo(): List<Pair<String, String>> {
         val p = player ?: return emptyList()
         val out = ArrayList<Pair<String, String>>()
+        out += "Engine" to "ExoPlayer"
         p.videoFormat?.let { f ->
             val line = listOfNotNull(
                 f.sampleMimeType?.substringAfterLast('/')?.let { mimeName(it) },
@@ -398,6 +416,13 @@ class LivePreviewEngine(
             if (videoSize.height > 0) {
                 _videoHeight.value = videoSize.height
                 _videoRes.value = "${videoSize.height}p"
+                if (videoSize.height > 1080) sawUhd = true // mark UHD → full decoder release on leave
+            }
+            if (videoSize.width > 0 && videoSize.height > 0) {
+                // Aspect for zoom/letterbox sizing (PAR-corrected), + native pixel size for Original (1:1).
+                _videoAspect.value =
+                    (videoSize.width.toFloat() * videoSize.pixelWidthHeightRatio) / videoSize.height.toFloat()
+                _videoSize.value = videoSize.width to videoSize.height
             }
             updateStreamChips()
         }
@@ -433,6 +458,19 @@ class LivePreviewEngine(
     /** Start (or switch to) [url] as a muted/unmuted preview. Never throws — a stream ExoPlayer can't set
      *  up just falls back to the channel logo (the full mpv player can still play it). [meta] populates the
      *  full-screen HUD title when this preview is promoted. [userAgent] is the per-source custom UA. */
+    /** Fully release the ExoPlayer instance (and its MediaCodec) — used when leaving a UHD channel so the
+     *  4K hardware decoder is handed back cleanly instead of parked/reused. Keeps [surface] so the next
+     *  [play] rebuilds a fresh player and re-attaches. The next [play] lazily rebuilds via `player ?: build()`. */
+    fun releaseDecoderForUhd() {
+        if (!sawUhd) return // only pay the rebuild when leaving a genuine UHD stream
+        sawUhd = false
+        if (player == null) return
+        LiveDiagnosticsLog.event("UHD channel left — full decoder release+rebuild")
+        player?.run { removeListener(listener); release() }
+        player = null
+        videoRenderer = null
+    }
+
     fun play(url: String, muted: Boolean, meta: MediaMeta = MediaMeta(), userAgent: String? = null) {
         LiveDiagnosticsLog.event("play() url=${HttpClient.redactUrl(url)} muted=$muted")
         stoppingIntentionally = false
@@ -447,7 +485,7 @@ class LivePreviewEngine(
         textTrackList = emptyList(); textSelections = emptyList(); _subCount.value = 0
         _subtitleOn.value = false; _cues.value = emptyList(); _audioUnsupported.value = false
         _noVideoDetected.value = false; noVideoTriggered = false; readySinceMs = 0L
-        _videoHeight.value = null; _streamChips.value = emptyList()
+        _videoHeight.value = null; _videoAspect.value = null; _videoSize.value = null; _streamChips.value = emptyList()
         _videoRes.value = null
         _error.value = null
         _errorInfo.value = null
@@ -516,9 +554,11 @@ class LivePreviewEngine(
         textTrackList = emptyList(); textSelections = emptyList(); _subCount.value = 0
         _subtitleOn.value = false; _cues.value = emptyList(); _audioUnsupported.value = false
         _noVideoDetected.value = false; noVideoTriggered = false; readySinceMs = 0L
-        _videoHeight.value = null; _streamChips.value = emptyList()
+        _videoHeight.value = null; _videoAspect.value = null; _videoSize.value = null; _streamChips.value = emptyList()
         _state.value = State.IDLE
         player?.run { stop(); clearMediaItems() }
+        // Leaving a UHD channel (back / exit fullscreen / background): fully release the 4K decoder.
+        releaseDecoderForUhd()
     }
 
     fun release() {
@@ -531,6 +571,7 @@ class LivePreviewEngine(
         videoRenderer = null
         surface = null
         currentUrl = null
+        sawUhd = false
         _state.value = State.IDLE
     }
 
@@ -571,7 +612,7 @@ class LivePreviewEngine(
         if (p.isPlaying) p.pause() else p.play()
     }
 
-    override fun setZoomMode(mode: ZoomMode) { _zoomMode.value = mode } // surface scaling is Phase 3; renders FIT
+    override fun setZoomMode(mode: ZoomMode) { _zoomMode.value = mode } // ExoPreviewSurface observes this + videoAspect/Size and sizes the surface (see Modifier.videoZoom)
 
     override fun adjustVolume(delta: Int) {
         // Live engine (ExoPlayer) caps at 100% — boost above 100 is mpv-only (Exo can't amplify past unity
@@ -640,6 +681,12 @@ class LivePreviewEngine(
         }
         audioTrackList = audio; audioSelections = aSel; _audioCount.value = audio.size
         textTrackList = text; textSelections = tSel; _subCount.value = text.size
+        if (tv.own.owntv.BuildConfig.DEBUG) {
+            LiveDiagnosticsLog.event(
+                "tracks: audio=${audio.size} text=${text.size}" +
+                    text.joinToString(prefix = " [", postfix = "]") { it.label },
+            )
+        }
         // Audio exists but ExoPlayer can decode none of it → the VM will route this stream to mpv.
         val anySupportedAudio = tracks.groups.any { g ->
             g.type == androidx.media3.common.C.TRACK_TYPE_AUDIO && (0 until g.length).any { g.isTrackSupported(it) }
@@ -654,11 +701,30 @@ class LivePreviewEngine(
     private var cachedHttpDataSource: OkHttpDataSource.Factory? = null
     private var cachedDefaultFactory: DefaultMediaSourceFactory? = null
     private var cachedHlsCcFactory: HlsMediaSource.Factory? = null
-
     private fun httpDataSourceFor(ua: String): OkHttpDataSource.Factory {
         if (ua != dataSourceForUa || cachedHttpDataSource == null) {
             cachedHttpDataSource = OkHttpDataSource.Factory(okHttpClient).setUserAgent(ua)
-            cachedDefaultFactory = DefaultMediaSourceFactory(cachedHttpDataSource!!)
+            // Raw MPEG-TS (typical Xtream live ".ts"): providers rarely declare caption descriptors in
+            // the PMT, so the stock TS extractor never exposes the embedded CEA-608 track (#57).
+            // FLAG_OVERRIDE_CAPTION_DESCRIPTORS makes it expose the standard CC1 track regardless; the
+            // flag only affects TS — every other format sniffs exactly as before. Passed into the same
+            // DefaultMediaSourceFactory that has always handled non-HLS live, so routing is unchanged.
+            // The flag alone is NOT enough: DefaultExtractorsFactory passes an empty subtitle-format
+            // list to DefaultTsPayloadReaderFactory, and with the override flag that empty list is
+            // returned verbatim (= zero CC tracks, even declared ones). The CEA-608 CC1 format must be
+            // supplied explicitly via setTsSubtitleFormats.
+            val cc1 = androidx.media3.common.Format.Builder()
+                .setSampleMimeType(androidx.media3.common.MimeTypes.APPLICATION_CEA608)
+                .setAccessibilityChannel(1) // CC1 — the standard primary caption channel
+                .build()
+            cachedDefaultFactory = DefaultMediaSourceFactory(
+                cachedHttpDataSource!!,
+                androidx.media3.extractor.DefaultExtractorsFactory()
+                    .setTsExtractorFlags(
+                        androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory.FLAG_OVERRIDE_CAPTION_DESCRIPTORS,
+                    )
+                    .setTsSubtitleFormats(listOf(cc1)),
+            )
             cachedHlsCcFactory = HlsMediaSource.Factory(cachedHttpDataSource!!).setExtractorFactory(DefaultHlsExtractorFactory(0, true))
             dataSourceForUa = ua
         }

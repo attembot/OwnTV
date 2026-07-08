@@ -97,14 +97,15 @@ fun Onboarding(firstRun: Boolean, onDone: () -> Unit, onCancel: () -> Unit, modi
                 onSkip = { vm.finish(onDone) },
             )
             Step.ADD_SOURCE -> AddSourceScreen(
-                onStartXtream = { name, server, user, pass, ua, epg, refresh, live, movies, series ->
+                onStartXtream = { name, server, user, pass, ua, epg, refresh, live, movies, series, _ ->
                     vm.startXtream(name, server, user, pass, ua, epg, refresh, live, movies, series)
                     importOrigin = Step.ADD_SOURCE
                     step = Step.IMPORTING
                 },
-                onStartM3u = { name, url, ua, epg, refresh -> vm.startM3u(name, url, ua, epg, refresh); importOrigin = Step.ADD_SOURCE; step = Step.IMPORTING },
+                onStartM3u = { name, url, ua, epg, refresh, _ -> vm.startM3u(name, url, ua, epg, refresh); importOrigin = Step.ADD_SOURCE; step = Step.IMPORTING },
                 onBack = { step = Step.ADD_CONTENT },
                 initial = vm.lastFailedSource, // pre-fill on retry after failed import
+                showDefaultToggle = false, // first playlist in setup: nothing to be "default" over yet
             )
             Step.IMPORTING -> ImportProgressScreen(
                 state = importState,

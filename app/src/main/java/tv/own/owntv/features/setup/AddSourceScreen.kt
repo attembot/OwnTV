@@ -34,6 +34,8 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import tv.own.owntv.core.database.entity.SourceEntity
 import tv.own.owntv.core.model.SourceType
+import tv.own.owntv.features.settings.PickerDialog
+import tv.own.owntv.features.settings.data.PlaylistAutoRefresh
 import tv.own.owntv.ui.components.BrowseMode
 import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.OwnTVButton
@@ -54,16 +56,19 @@ fun AddSourceScreen(
         pass: String,
         userAgent: String,
         epgUrl: String,
-        refreshOnStart: Boolean,
+        autoRefresh: PlaylistAutoRefresh,
         syncLive: Boolean,
         syncMovies: Boolean,
         syncSeries: Boolean,
+        isDefault: Boolean,
     ) -> Unit,
-    onStartM3u: (name: String, url: String, userAgent: String, epgUrl: String, refreshOnStart: Boolean) -> Unit,
+    onStartM3u: (name: String, url: String, userAgent: String, epgUrl: String, autoRefresh: PlaylistAutoRefresh, isDefault: Boolean) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     initial: SourceEntity? = null,
-    initialRefresh: Boolean = false,
+    initialAutoRefresh: PlaylistAutoRefresh = PlaylistAutoRefresh.OFF,
+    initialIsDefault: Boolean = false,
+    showDefaultToggle: Boolean = true,
 ) {
     val colors = OwnTVTheme.colors
     val editing = initial != null
@@ -75,11 +80,13 @@ fun AddSourceScreen(
     var m3uUrl by remember(initial) { mutableStateOf(if (initial != null && initial.type == SourceType.M3U) initial.url else "") }
     var epgUrl by remember(initial) { mutableStateOf(initial?.epgUrl ?: "") }
     var userAgent by remember(initial) { mutableStateOf(initial?.userAgent ?: "") }
-    var refreshOnStart by remember(initialRefresh) { mutableStateOf(initialRefresh) }
+    var autoRefresh by remember(initialAutoRefresh) { mutableStateOf(initialAutoRefresh) }
+    var isDefault by remember(initialIsDefault) { mutableStateOf(initialIsDefault) }
     var syncLive by remember { mutableStateOf(true) }
     var syncMovies by remember { mutableStateOf(true) }
     var syncSeries by remember { mutableStateOf(true) }
     var showFileBrowser by remember { mutableStateOf(false) }
+    var showAutoRefreshPicker by remember { mutableStateOf(false) }
     val firstFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
 
@@ -101,7 +108,7 @@ fun AddSourceScreen(
             Text(if (editing) "Edit source" else "Add your source", style = MaterialTheme.typography.headlineLarge, color = colors.onSurface)
             Spacer(Modifier.height(6.dp))
             Text(
-                if (editing) "Update this source's details, or toggle refresh on startup." else "OwnTV is a player — bring your own M3U or Xtream source.",
+                if (editing) "Update this source's details, or change its auto-refresh setting." else "OwnTV is a player — bring your own M3U or Xtream source.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = colors.onSurfaceVariant,
             )
@@ -147,7 +154,18 @@ fun AddSourceScreen(
             OwnTVTextField(userAgent, { userAgent = it }, label = "User-Agent (optional)", placeholder = "e.g. VLC/3.0.20 LibVLC/3.0.20", modifier = Modifier.fillMaxWidth())
 
             Spacer(Modifier.height(16.dp))
-            ToggleRow(label = "Refresh on startup", desc = "Re-sync this source when the app opens", checked = refreshOnStart) { refreshOnStart = it }
+            // Auto-refresh dropdown (replaces the old binary "Refresh on startup" toggle). Off/Startup or a
+            // staleness threshold — the source is refreshed when its data is at least this old.
+            AutoRefreshRow(selected = autoRefresh) { showAutoRefreshPicker = true }
+
+            if (showDefaultToggle) {
+                Spacer(Modifier.height(16.dp))
+                ToggleRow(
+                    label = "Default playlist",
+                    desc = "Show only this playlist across the app. Turn off for all playlists; change anytime from the top bar.",
+                    checked = isDefault,
+                ) { isDefault = it }
+            }
 
             if (showContentToggles) {
                 Spacer(Modifier.height(20.dp))
@@ -170,8 +188,8 @@ fun AddSourceScreen(
                     label = if (editing) "Save" else "Start Import",
                     onClick = {
                         when (kind) {
-                            SourceKind.XTREAM -> onStartXtream(name, server, username, password, userAgent, epgUrl, refreshOnStart, syncLive, syncMovies, syncSeries)
-                            SourceKind.M3U -> onStartM3u(name, m3uUrl, userAgent, epgUrl, refreshOnStart)
+                            SourceKind.XTREAM -> onStartXtream(name, server, username, password, userAgent, epgUrl, autoRefresh, syncLive, syncMovies, syncSeries, isDefault)
+                            SourceKind.M3U -> onStartM3u(name, m3uUrl, userAgent, epgUrl, autoRefresh, isDefault)
                         }
                     },
                     enabled = canStart,
@@ -193,6 +211,46 @@ fun AddSourceScreen(
               onDismiss = { showFileBrowser = false },
           )
       }
+      if (showAutoRefreshPicker) {
+          PickerDialog(
+              title = "Auto refresh",
+              options = PlaylistAutoRefresh.entries.map { it.name to it.label },
+              selected = autoRefresh.name,
+              onSelect = { value ->
+                  autoRefresh = runCatching { PlaylistAutoRefresh.valueOf(value) }.getOrDefault(PlaylistAutoRefresh.OFF)
+                  showAutoRefreshPicker = false
+              },
+              onDismiss = { showAutoRefreshPicker = false },
+          )
+      }
+    }
+}
+
+/** A focusable settings row showing the current auto-refresh selection; opens a picker on click. */
+@Composable
+private fun AutoRefreshRow(selected: PlaylistAutoRefresh, onClick: () -> Unit) {
+    val colors = OwnTVTheme.colors
+    FocusableSurface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) { _ ->
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Auto refresh", style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
+                Text(
+                    "Off, on startup, or when data is stale",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.onSurfaceVariant,
+                )
+            }
+            Text(
+                selected.label,
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.primary,
+            )
+        }
     }
 }
 

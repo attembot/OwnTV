@@ -44,6 +44,7 @@ import org.koin.androidx.compose.koinViewModel
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import tv.own.owntv.features.customize.CustomizeScreen
+import tv.own.owntv.features.settings.HomeSettingsScreen
 import tv.own.owntv.features.settings.data.SettingsRepository
 import tv.own.owntv.features.update.UpdateDialog
 import tv.own.owntv.features.settings.BackupScreen
@@ -68,7 +69,7 @@ import tv.own.owntv.ui.theme.UiZoom
 
 private enum class TileTone { PRIMARY, SECONDARY, TERTIARY }
 
-private enum class SettingsTab { ROOT, SOURCES, EPG, PROFILES, BACKUP, VIDEO, CUSTOMIZE, NETWORK }
+private enum class SettingsTab { ROOT, SOURCES, EPG, PROFILES, BACKUP, VIDEO, CUSTOMIZE, HOME, NETWORK, METADATA, WEATHER }
 
 /**
  * The MD3 Settings screen (shown when [MainSection.SETTINGS] is active): grouped sections, each row
@@ -130,16 +131,15 @@ fun SettingsScreen(
     val hdr by settingsVm.hdrEnabled.collectAsStateWithLifecycle()
     val surroundSound by settingsVm.surroundSound.collectAsStateWithLifecycle()
     val autoPlayNext by settingsVm.autoPlayNext.collectAsStateWithLifecycle()
-    val androidTvHomeEnabled by settingsVm.androidTvHomeEnabled.collectAsStateWithLifecycle()
     val updateCheckOnStart by settingsVm.updateCheckOnStart.collectAsStateWithLifecycle()
-    val resumeLastChannel by settingsVm.resumeLastChannel.collectAsStateWithLifecycle()
-    val startupMode by settingsVm.startupMode.collectAsStateWithLifecycle()
     val catchupTz by settingsVm.catchupTimezone.collectAsStateWithLifecycle()
     val catchupOffset by settingsVm.catchupOffsetMinutes.collectAsStateWithLifecycle()
     val catchupChannels by settingsVm.catchupChannelCount.collectAsStateWithLifecycle()
     val accent by settingsVm.accent.collectAsStateWithLifecycle()
     val customAccent by settingsVm.customAccent.collectAsStateWithLifecycle()
     val animationLevel by settingsVm.animationLevel.collectAsStateWithLifecycle()
+    val weatherEnabled by settingsVm.weatherEnabled.collectAsStateWithLifecycle()
+    val startupMode by settingsVm.startupMode.collectAsStateWithLifecycle()
 
     // Restore focus to the row a sub-screen was opened from when the user navigates back.
     var lastTab by remember { mutableStateOf<SettingsTab?>(null) }
@@ -150,7 +150,10 @@ fun SettingsScreen(
         SettingsTab.BACKUP to FocusRequester(),
         SettingsTab.VIDEO to FocusRequester(),
         SettingsTab.CUSTOMIZE to FocusRequester(),
+        SettingsTab.HOME to FocusRequester(),
         SettingsTab.NETWORK to FocusRequester(),
+        SettingsTab.METADATA to FocusRequester(),
+        SettingsTab.WEATHER to FocusRequester(),
     ) }
     val open: (SettingsTab) -> Unit = { lastTab = it; tab = it }
     LaunchedEffect(tab) {
@@ -170,7 +173,10 @@ fun SettingsScreen(
         SettingsTab.BACKUP -> { BackupScreen(onBack = { tab = SettingsTab.ROOT }, modifier = modifier); return }
         SettingsTab.VIDEO -> { VideoPlayerSettingsScreen(onBack = { tab = SettingsTab.ROOT }, modifier = modifier); return }
         SettingsTab.CUSTOMIZE -> { CustomizeScreen(onBack = { tab = SettingsTab.ROOT }, modifier = modifier); return }
+        SettingsTab.HOME -> { HomeSettingsScreen(onBack = { tab = SettingsTab.ROOT }, modifier = modifier); return }
         SettingsTab.NETWORK -> { tv.own.owntv.features.settings.NetworkSettingsScreen(onBack = { tab = SettingsTab.ROOT }, modifier = modifier); return }
+        SettingsTab.METADATA -> { tv.own.owntv.features.settings.MetadataSettingsScreen(onBack = { tab = SettingsTab.ROOT }, modifier = modifier); return }
+        SettingsTab.WEATHER -> { tv.own.owntv.features.settings.WeatherSettingsScreen(onBack = { tab = SettingsTab.ROOT }, modifier = modifier); return }
         SettingsTab.ROOT -> Unit
     }
 
@@ -185,7 +191,7 @@ fun SettingsScreen(
             // the last-opened sub-menu's row, then the first row.
             .focusProperties {
                 onEnter = {
-                    val target = dialogReturn ?: rowFocus[lastTab] ?: rowFocus.getValue(SettingsTab.SOURCES)
+                    val target = dialogReturn ?: rowFocus[lastTab] ?: rowFocus.getValue(SettingsTab.PROFILES)
                     dialogReturn = null
                     runCatching { target.requestFocus() }
                 }
@@ -202,6 +208,14 @@ fun SettingsScreen(
         )
         Spacer(Modifier.height(12.dp))
 
+        GroupLabel("Profile")
+        SettingsRow(
+            tone = TileTone.SECONDARY, icon = OwnTVIcon.PERSON,
+            title = "Profiles", desc = "Manage viewers, kids mode & PIN locks",
+            onClick = { open(SettingsTab.PROFILES) }, showChevron = true,
+            modifier = Modifier.focusRequester(rowFocus.getValue(SettingsTab.PROFILES)),
+        )
+        SectionDivider()
         GroupLabel("Content")
         SettingsRow(
             tone = TileTone.PRIMARY, icon = OwnTVIcon.PLAYLIST,
@@ -217,32 +231,22 @@ fun SettingsScreen(
         )
         SettingsRow(
             tone = TileTone.PRIMARY, icon = OwnTVIcon.SORT,
-            title = "Customize Category", desc = "Hide, rename & reorder categories",
+            title = "Customize & Hidden Items", desc = "Hide & unhide items, rename & reorder categories",
             onClick = { open(SettingsTab.CUSTOMIZE) }, showChevron = true,
             modifier = Modifier.focusRequester(rowFocus.getValue(SettingsTab.CUSTOMIZE)),
         )
         SettingsRow(
-            tone = TileTone.SECONDARY, icon = OwnTVIcon.PERSON,
-            title = "Profiles", desc = "Manage viewers, kids mode & PIN locks",
-            onClick = { open(SettingsTab.PROFILES) }, showChevron = true,
-            modifier = Modifier.focusRequester(rowFocus.getValue(SettingsTab.PROFILES)),
+            tone = TileTone.SECONDARY, icon = OwnTVIcon.HOME,
+            title = "Home screen", desc = "Choose, reorder & filter the rows on Home",
+            onClick = { open(SettingsTab.HOME) }, showChevron = true,
+            modifier = Modifier.focusRequester(rowFocus.getValue(SettingsTab.HOME)),
         )
         SettingsRow(
-            tone = TileTone.TERTIARY, icon = OwnTVIcon.LIVE_TV,
-            title = "Live preview", desc = "Auto-play a channel when you focus it",
-            chip = if (livePreview) "On" else "Off",
-            chipTone = if (livePreview) TileTone.PRIMARY else TileTone.SECONDARY,
-            onClick = { settingsVm.setLivePreviewEnabled(!livePreview) },
+            tone = TileTone.PRIMARY, icon = OwnTVIcon.VIDEO,
+            title = "Metadata (TMDB)", desc = "Posters, plots, cast & ratings for Movies and Series",
+            onClick = { open(SettingsTab.METADATA) }, showChevron = true,
+            modifier = Modifier.focusRequester(rowFocus.getValue(SettingsTab.METADATA)),
         )
-        if (livePreview) {
-            SettingsRow(
-                tone = TileTone.SECONDARY, icon = OwnTVIcon.AUDIO,
-                title = "Preview audio", desc = "Play sound in the Live preview",
-                chip = if (previewAudio) "On" else "Off",
-                chipTone = if (previewAudio) TileTone.PRIMARY else TileTone.SECONDARY,
-                onClick = { settingsVm.setLivePreviewAudio(!previewAudio) },
-            )
-        }
         SettingsRow(
             tone = TileTone.TERTIARY, icon = OwnTVIcon.DOWNLOADS,
             title = "Download folder",
@@ -294,9 +298,34 @@ fun SettingsScreen(
             onClick = { dialogReturn = animationsRowFocus; showAnimations = true }, showChevron = true,
             modifier = Modifier.focusRequester(animationsRowFocus),
         )
+        SettingsRow(
+            tone = TileTone.SECONDARY, icon = OwnTVIcon.EPG,
+            title = "Weather",
+            desc = "Top-bar weather chip: show or hide, custom location, and Celsius / Fahrenheit.",
+            chip = if (weatherEnabled) "On" else "Off",
+            chipTone = if (weatherEnabled) TileTone.PRIMARY else TileTone.SECONDARY,
+            onClick = { open(SettingsTab.WEATHER) }, showChevron = true,
+            modifier = Modifier.focusRequester(rowFocus.getValue(SettingsTab.WEATHER)),
+        )
 
         SectionDivider()
         GroupLabel("Playback")
+        SettingsRow(
+            tone = TileTone.TERTIARY, icon = OwnTVIcon.LIVE_TV,
+            title = "Live preview", desc = "Auto-play a channel when you focus it",
+            chip = if (livePreview) "On" else "Off",
+            chipTone = if (livePreview) TileTone.PRIMARY else TileTone.SECONDARY,
+            onClick = { settingsVm.setLivePreviewEnabled(!livePreview) },
+        )
+        if (livePreview) {
+            SettingsRow(
+                tone = TileTone.SECONDARY, icon = OwnTVIcon.AUDIO,
+                title = "Preview audio", desc = "Play sound in the Live preview",
+                chip = if (previewAudio) "On" else "Off",
+                chipTone = if (previewAudio) TileTone.PRIMARY else TileTone.SECONDARY,
+                onClick = { settingsVm.setLivePreviewAudio(!previewAudio) },
+            )
+        }
         SettingsRow(
             tone = TileTone.PRIMARY, icon = OwnTVIcon.VIDEO,
             title = "HDR", desc = "Use HDR output when the video & TV support it",
@@ -311,14 +340,6 @@ fun SettingsScreen(
             chip = if (surroundSound) "On" else "Off",
             chipTone = if (surroundSound) TileTone.PRIMARY else TileTone.SECONDARY,
             onClick = { settingsVm.setSurroundSound(!surroundSound) },
-        )
-        SettingsRow(
-            tone = TileTone.SECONDARY, icon = OwnTVIcon.LIVE_TV,
-            title = "Startup",
-            desc = "Where this profile opens: Home, the last live channel you watched, or Live TV on Favorites.",
-            chip = startupMode.label, chipTone = TileTone.SECONDARY,
-            onClick = { dialogReturn = startupRowFocus; showStartup = true }, showChevron = true,
-            modifier = Modifier.focusRequester(startupRowFocus),
         )
         SettingsRow(
             tone = TileTone.SECONDARY, icon = OwnTVIcon.SKIP_NEXT,
@@ -342,31 +363,6 @@ fun SettingsScreen(
             modifier = Modifier.focusRequester(catchupRowFocus),
         )
         SettingsRow(
-            tone = TileTone.SECONDARY, icon = OwnTVIcon.HISTORY,
-            title = "Android TV home", desc = "Show Continue Watching and recent live channels on the TV home screen",
-            chip = if (androidTvHomeEnabled) "On" else "Off",
-            chipTone = if (androidTvHomeEnabled) TileTone.PRIMARY else TileTone.SECONDARY,
-            onClick = { settingsVm.setAndroidTvHomeEnabled(!androidTvHomeEnabled) },
-        )
-        if (androidTvHomeEnabled) {
-            val tvHomeRefresh by settingsVm.tvHomeRefresh.collectAsStateWithLifecycle()
-            SettingsRow(
-                tone = TileTone.TERTIARY, icon = OwnTVIcon.SHARE,
-                title = "Refresh now", desc = "Rebuild the Continue Watching / recent cards on the Android TV home",
-                chip = when (tvHomeRefresh) {
-                    tv.own.owntv.features.settings.SettingsViewModel.TvHomeRefresh.REFRESHING -> "Rebuilding…"
-                    tv.own.owntv.features.settings.SettingsViewModel.TvHomeRefresh.DONE -> "Done ✓"
-                    else -> null
-                },
-                chipTone = TileTone.PRIMARY,
-                onClick = {
-                    if (tvHomeRefresh == tv.own.owntv.features.settings.SettingsViewModel.TvHomeRefresh.IDLE) {
-                        settingsVm.refreshAndroidTvHome()
-                    }
-                },
-            )
-        }
-        SettingsRow(
             tone = TileTone.TERTIARY, icon = OwnTVIcon.VIDEO,
             title = "Video Player Settings", desc = "Decoder, subtitles, sync",
             onClick = { open(SettingsTab.VIDEO) }, showChevron = true,
@@ -384,6 +380,13 @@ fun SettingsScreen(
 
         SectionDivider()
         GroupLabel("App")
+        SettingsRow(
+            tone = TileTone.SECONDARY, icon = OwnTVIcon.HOME,
+            title = "App startup", desc = "What OwnTV opens when it starts",
+            chip = startupMode.label, chipTone = TileTone.PRIMARY,
+            onClick = { dialogReturn = startupRowFocus; showStartup = true }, showChevron = true,
+            modifier = Modifier.focusRequester(startupRowFocus),
+        )
         SettingsRow(
             tone = TileTone.PRIMARY, icon = OwnTVIcon.DOWNLOADS,
             title = "Check for updates", desc = "Get the latest version from GitHub Releases",
@@ -437,6 +440,15 @@ fun SettingsScreen(
             onDismiss = { showTheme = false },
         )
     }
+    if (showStartup) {
+        tv.own.owntv.features.settings.PickerDialog(
+            title = "App startup",
+            options = tv.own.owntv.features.settings.data.StartupMode.entries.map { it.name to it.label },
+            selected = startupMode.name,
+            onSelect = { settingsVm.setStartupMode(tv.own.owntv.features.settings.data.StartupMode.valueOf(it)); showStartup = false },
+            onDismiss = { showStartup = false },
+        )
+    }
     if (showAnimations) {
         tv.own.owntv.features.settings.PickerDialog(
             title = "Animations",
@@ -444,15 +456,6 @@ fun SettingsScreen(
             selected = animationLevel.name,
             onSelect = { settingsVm.setAnimationLevel(tv.own.owntv.ui.theme.AnimationLevel.valueOf(it)); showAnimations = false },
             onDismiss = { showAnimations = false },
-        )
-    }
-    if (showStartup) {
-        tv.own.owntv.features.settings.PickerDialog(
-            title = "Startup",
-            options = tv.own.owntv.features.settings.data.StartupMode.entries.map { it.name to it.label },
-            selected = startupMode.name,
-            onSelect = { settingsVm.setStartupMode(tv.own.owntv.features.settings.data.StartupMode.valueOf(it)); showStartup = false },
-            onDismiss = { showStartup = false },
         )
     }
     if (showAccent) {
@@ -745,6 +748,11 @@ private fun ZoomDialog(current: Int, onSet: (Int) -> Unit, onDismiss: () -> Unit
     val colors = OwnTVTheme.colors
     val firstFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
+    // Zoom below LOW_RAM_WARN doubles the on-screen item count, which can OOM-crash 2 GB devices
+    // (#51) — the first step under it is gated behind an accept-the-risk warning. Accepting once
+    // arms the rest of this dialog session; if it was opened already below the line, don't nag.
+    var lowZoomAccepted by remember { mutableStateOf(current < UiZoom.LOW_RAM_WARN) }
+    var pendingLowZoom by remember { mutableStateOf<Int?>(null) }
     BackHandler { onDismiss() }
     Box(
         modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)).focusGroup(),
@@ -768,7 +776,8 @@ private fun ZoomDialog(current: Int, onSet: (Int) -> Unit, onDismiss: () -> Unit
                 // so focus always lands inside the dialog — a disabled "+" at MAX zoom was leaving focus
                 // stranded outside, trapping the user at high zoom.
                 StepButton("–", dimmed = current <= UiZoom.MIN, modifier = Modifier.focusRequester(firstFocus)) {
-                    onSet(UiZoom.clamp(current - UiZoom.STEP))
+                    val next = UiZoom.clamp(current - UiZoom.STEP)
+                    if (next < UiZoom.LOW_RAM_WARN && !lowZoomAccepted) pendingLowZoom = next else onSet(next)
                 }
                 Text(
                     UiZoom.label(current),
@@ -786,6 +795,55 @@ private fun ZoomDialog(current: Int, onSet: (Int) -> Unit, onDismiss: () -> Unit
                 OwnTVButton("Reset", onClick = { onSet(UiZoom.DEFAULT) }, style = OwnTVButtonStyle.SECONDARY)
                 Spacer(Modifier.weight(1f))
                 OwnTVButton("Done", onClick = onDismiss)
+            }
+        }
+
+        // Accept-the-risk gate for zoom below LOW_RAM_WARN (#51). One button, focus locked (all
+        // D-pad directions cancelled) — OK accepts and applies the pending step, Back cancels.
+        pendingLowZoom?.let { target ->
+            val acceptFocus = remember { FocusRequester() }
+            LaunchedEffect(Unit) { runCatching { acceptFocus.requestFocus() } }
+            // Composed after the dialog's own BackHandler, so it wins while the warning is up.
+            BackHandler {
+                pendingLowZoom = null
+                runCatching { firstFocus.requestFocus() }
+            }
+            Box(
+                modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.8f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(
+                    modifier = Modifier.width(460.dp).clip(RoundedCornerShape(20.dp)).background(colors.surfaceContainerHigh).padding(28.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text("⚠️ Low zoom warning", style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        "Zoom below ${UiZoom.LOW_RAM_WARN}% shows many more items on screen at once. " +
+                            "On devices with limited memory (e.g. 2 GB TV sticks) this can make the app " +
+                            "unstable or crash, especially with large playlists and EPG data.\n\n" +
+                            "Press OK to continue, or Back to stay at ${UiZoom.LOW_RAM_WARN}%.",
+                        style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(20.dp))
+                    OwnTVButton(
+                        "I understand and accept the risk",
+                        onClick = {
+                            lowZoomAccepted = true
+                            pendingLowZoom = null
+                            onSet(target)
+                            runCatching { firstFocus.requestFocus() }
+                        },
+                        modifier = Modifier
+                            .focusRequester(acceptFocus)
+                            .focusProperties {
+                                up = FocusRequester.Cancel
+                                down = FocusRequester.Cancel
+                                left = FocusRequester.Cancel
+                                right = FocusRequester.Cancel
+                            },
+                    )
+                }
             }
         }
     }

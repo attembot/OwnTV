@@ -39,7 +39,7 @@ This is an **open-source** project — the code is original (not derived from an
 targets **Android TV only** (leanback launcher, D-pad-first UI).
 
 > ### 📖 New here? Read the [**User Guide & Hidden Features →**](extras/USER_GUIDE.md)
-> Long‑press to favourite, **Left** for the channel list, the gear button's **compatibility mode**,
+> Long‑press to favourite, **Left** for the channel list, the MPV/EXO toggle's **compatibility mode**,
 > catch‑up from the Guide, startup landing, A/V‑sync — all the remote shortcuts in one place.
 
 ---
@@ -62,7 +62,10 @@ Scan to join from your phone:
 - **Dual-engine design**
   - **libmpv (FFmpeg)** — movies, series, and any stream ExoPlayer can't open; maximum codec/container compatibility, every audio/subtitle track
   - **Media3 (ExoPlayer)** — Live TV default; near-instant HLS start, instant preview → fullscreen
-  - **Per-channel mpv toggle** — the gear pins a problem channel to mpv (remembered per channel)
+  - **Per-channel mpv toggle** — the MPV/EXO pill pins a problem channel to mpv (remembered per channel)
+  - **VOD engine fallback** — a movie/episode that terminally fails on one engine is retried on the
+    other automatically; a setting picks which plays first (mpv default, or ExoPlayer for devices
+    where mpv can't start VODs)
 - **Direct-to-display rendering** — zero-copy 4K HDR path, app-drawn subtitles, auto software-decode fallback
 - **Channel zapping** — D-pad/CH±/media keys, wraps around; **in-player channel list** (Left with controls hidden)
 - **Audio** — surround sound (opt-in, Dolby/DTS → multichannel LPCM, auto-stereo safety net); volume boost to 150%; A/V sync nudge
@@ -73,16 +76,18 @@ Scan to join from your phone:
 - 📺 **[Complete player design & feature reference →](extras/player.html)**
 
 ### 🧭 Browse
-- **Home screen** — Continue Watching hero carousel (partially-watched movies, episodes, recent channels); feeds system Watch Next on stock Android TV
+- **Home screen** — Continue Watching hero carousel (partially-watched movies, episodes, recent channels) with dwell-to-expand previews; fully customizable per profile (reorder/hide rows, hero filters, "On Now" inline mini-guide rows); feeds system Watch Next on stock Android TV
 - **Sections** — Live TV (preview + real stream resolution badge), Movies, Series, Downloads, EPG Guide
 - **Fixed layout** — stable icon nav · full-label category column · content · preview (never expands/collapses)
-- **Categories** — Favorites & History per section, full names, search box; customize (hide/rename/reorder, range-select); survives re-syncs
+- **Categories** — Favorites & History per section, full names, search box; customize (hide/rename/reorder, range-select); hide/unhide individual channels, movies & series; optional PIN lock; survives re-syncs
 - **Search** — inline per-folder + global; TV-style bars; detailed channel results (category · number); long-press to favorite
+- **Multiple playlists** — merge them all, or narrow the whole app to one via the **top-bar playlist switcher** (or a per-playlist **Default** toggle in Settings); applies to Live/Movies/Series/EPG/Search/Home incl. Favorites & History, and persists across restarts
 - **Sort & view** — playlist order or A–Z; Movies & Series Grid/List toggle
 - **Per-profile startup** — Home, last channel, or Live TV on Favorites
 - **Built for scale** — ~50k channels / ~168k movies via Paging 3
 - **Fast syncing** — priority import (pick e.g. Live TV first, the rest finishes in the background — survives sleep/reboot); incremental re-syncs only write what changed; auto-retrying downloads
 - **Typed M3U playlists** — `type=` / `tvg-type=` tags route entries to **Movies** or **Series** (per-episode `S01E05` lines are grouped into shows, seasons and episodes automatically)
+- 🎬 **TMDB metadata enrichment** — optional, on-demand posters, plots, cast, genres & ratings for Movies, Series and Episodes; **in-app trailers**; manual Refetch / "Set TMDB name" overrides; works with zero setup, your own TMDB key, or a self-hosted [caching proxy](worker/)
 
 ### 🗓️ EPG / TV Guide
 - **Guide grid** — time × channel (XMLTV); now/next/later in preview; two-stage nav (Right selects row, OK browses)
@@ -101,9 +106,10 @@ Scan to join from your phone:
 
 ### 🎨 Personalization & Settings
 - **Appearance** — Material 3 (dark/light/system); any accent color (palette or hex); UI zoom; avatars; animations toggle
-- **Content** — clear watch history (all or per-type)
-- **Video Player** — hardware decoding, zoom, subtitle size/language, audio sync, surround sound, HDR
-- **Backup & Restore** — profiles, sources, customizations, favorites, history, resume, settings; choose what to include
+- **Content** — clear watch history (all or per-type); per-source **Auto refresh** for playlists & EPG (Off by default, startup or 6–48h staleness intervals)
+- **Video Player** — hardware decoding, zoom, subtitle size/language, audio sync, surround sound, HDR, **external player** (VLC / MX Player for movies, series & downloads — global setting or per-item long-press)
+- **Weather** — top-bar weather chip: on/off, custom location (VPN-friendly), **°C / °F**
+- **Backup & Restore** — profiles, sources, customizations, favorites, history, resume, settings, auto-refresh choices, default source and per-item engine/compatibility pins; choose what to include
 - **Updates** — in-app from GitHub Releases; auto-check (toggleable) + manual; installs APK on TV
 - **Android TV home** — feeds system Watch Next row; refresh button
 
@@ -288,6 +294,13 @@ Scan to donate from your phone:
 <a href="https://paypal.me/AshiqHasan"><img src="extras/paypal_qr.jpg" alt="Scan to donate via PayPal" width="170"></a>
 
 Thank you for using OwnTV! 🙏
+
+## 🎬 Credits — TMDB
+
+<img src="extras/tmdb_logo.svg" alt="TMDB" width="200">
+
+Movie & series metadata and trailers are provided by [TMDB](https://www.themoviedb.org/).
+**This product uses the TMDB API but is not endorsed or certified by TMDB.**
 
 ## ⚖️ Legal
 

@@ -112,7 +112,7 @@ fun SearchScreen(
                                         posterUrl = movie.posterUrl,
                                         title = movie.name,
                                         rating = movie.rating,
-                                        onClick = { vm.playMovie(movie); onFullscreen() },
+                                        onClick = { vm.playMovie(movie); if (!vm.externalPlayerOn.value) onFullscreen() },
                                     )
                                 }
                             }

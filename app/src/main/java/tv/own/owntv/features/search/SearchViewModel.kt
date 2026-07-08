@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import tv.own.owntv.core.customize.CustomizationStore
 import tv.own.owntv.core.customize.CustomizeKeys
+import tv.own.owntv.core.database.dao.CategoryDao
 import tv.own.owntv.core.database.dao.ChannelDao
 import tv.own.owntv.core.database.dao.FavoriteDao
 import tv.own.owntv.core.database.dao.HistoryDao
@@ -36,6 +37,7 @@ import tv.own.owntv.core.database.entity.MovieEntity
 import tv.own.owntv.core.database.entity.SeriesEntity
 import tv.own.owntv.core.database.entity.WatchHistoryEntity
 import tv.own.owntv.core.model.MediaType
+import tv.own.owntv.core.repository.activeProfileSources
 import tv.own.owntv.features.settings.data.SettingsRepository
 import tv.own.owntv.player.OwnTVPlayer
 
@@ -51,6 +53,7 @@ data class SearchResults(
 /** Phase 11 — cross-section search over a profile's channels, movies and series. */
 class SearchViewModel(
     private val channelDao: ChannelDao,
+    private val categoryDao: CategoryDao,
     private val movieDao: MovieDao,
     private val seriesDao: SeriesDao,
     private val historyDao: HistoryDao,
@@ -60,16 +63,18 @@ class SearchViewModel(
     private val customize: CustomizationStore,
     private val favoriteDao: FavoriteDao,
     val player: OwnTVPlayer,
+    private val externalPlayerLauncher: tv.own.owntv.core.player.ExternalPlayerLauncher,
 ) : ViewModel() {
+
+    /** Global "External player" toggle — the screen must NOT open the fullscreen in-app player when on. */
+    val externalPlayerOn: kotlinx.coroutines.flow.StateFlow<Boolean> = settings.externalPlayer
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     private data class Ctx(val profileId: Long, val sourceIds: List<Long>)
     // Observe the active profile's sources reactively so adding/removing a playlist refreshes Search
     // immediately (was read once at startup, so a new playlist showed nothing until app restart).
-    private val ctx: StateFlow<Ctx> = settings.activeProfileId
-        .flatMapLatest { pid ->
-            if (pid < 0) flowOf(Ctx(pid, emptyList()))
-            else sourceDao.observeForProfile(pid).map { srcs -> Ctx(pid, srcs.map { it.id }) }
-        }
+    private val ctx: StateFlow<Ctx> = activeProfileSources(settings, sourceDao)
+        .map { aps -> Ctx(aps.profileId, aps.sourceIds) }
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.Eagerly, Ctx(-1L, emptyList()))
 
@@ -93,15 +98,45 @@ class SearchViewModel(
     private suspend fun search(q: String): SearchResults {
         val pid = currentProfileId() ?: return SearchResults()
         val ids = ctx.value.sourceIds.ifEmpty { return SearchResults() }
-        // Respect this profile's customizations: hidden channels never surface, renames are shown.
-        val cust = customize.observe(pid, MediaType.LIVE).first()
+        // Respect this profile's customizations: hidden items and hidden categories never surface,
+        // renames are shown (channels only — movies/series have no per-item rename).
+        val custLive = customize.observe(pid, MediaType.LIVE).first()
+        val custMovie = customize.observe(pid, MediaType.MOVIE).first()
+        val custSeries = customize.observe(pid, MediaType.SERIES).first()
+        val hiddenLiveCats = hiddenCategoryIds(ids, MediaType.LIVE, custLive)
+        val hiddenMovieCats = hiddenCategoryIds(ids, MediaType.MOVIE, custMovie)
+        val hiddenSeriesCats = hiddenCategoryIds(ids, MediaType.SERIES, custSeries)
         return SearchResults(
             channels = channelDao.searchListDetailed(q, ids, LIMIT)
-                .filter { CustomizeKeys.channel(it.channel) !in cust.hiddenItems }
-                .map { row -> cust.itemNames[CustomizeKeys.channel(row.channel)]?.let { row.copy(channel = row.channel.copy(name = it)) } ?: row },
-            movies = movieDao.searchList(q, ids, LIMIT),
-            series = seriesDao.searchList(q, ids, LIMIT),
+                .filter {
+                    CustomizeKeys.channel(it.channel) !in custLive.hiddenItems &&
+                        (it.channel.categoryId == null || it.channel.categoryId !in hiddenLiveCats)
+                }
+                .map { row -> custLive.itemNames[CustomizeKeys.channel(row.channel)]?.let { row.copy(channel = row.channel.copy(name = it)) } ?: row },
+            movies = movieDao.searchList(q, ids, LIMIT)
+                .filter {
+                    CustomizeKeys.movie(it) !in custMovie.hiddenItems &&
+                        (it.categoryId == null || it.categoryId !in hiddenMovieCats)
+                },
+            series = seriesDao.searchList(q, ids, LIMIT)
+                .filter {
+                    CustomizeKeys.series(it) !in custSeries.hiddenItems &&
+                        (it.categoryId == null || it.categoryId !in hiddenSeriesCats)
+                },
         )
+    }
+
+    /** DB ids of this profile's hidden categories for [type] (so hidden groups drop out of search too). */
+    private suspend fun hiddenCategoryIds(
+        sourceIds: List<Long>,
+        type: MediaType,
+        cust: tv.own.owntv.core.customize.SectionCustomizations,
+    ): Set<Long> {
+        if (cust.hiddenCategories.isEmpty()) return emptySet()
+        return categoryDao.observe(sourceIds, type).first()
+            .filter { CustomizeKeys.category(it) in cust.hiddenCategories }
+            .map { it.id }
+            .toSet()
     }
 
     /** Live channels this profile has favourited — so a search result can show a star and toggle it. */
@@ -133,6 +168,11 @@ class SearchViewModel(
 
     fun playMovie(movie: MovieEntity) {
         viewModelScope.launch {
+            // Global external-player toggle: same chokepoint behavior as MovieViewModel.play().
+            if (settings.externalPlayer.first()) {
+                externalPlayerLauncher.launch(movie.streamUrl, movie.name)
+                return@launch
+            }
             val sourceUa = sourceDao.getById(movie.sourceId)?.userAgent
             player.play(movie.streamUrl, title = movie.name, year = movie.year?.toString(), isLive = false, userAgent = sourceUa)
         }

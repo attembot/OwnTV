@@ -27,6 +27,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import tv.own.owntv.ui.components.OwnTVButton
 import tv.own.owntv.ui.components.OwnTVButtonStyle
+import tv.own.owntv.ui.components.trapAllFocusExit
 import tv.own.owntv.ui.theme.OwnTVTheme
 
 /**
@@ -46,6 +47,7 @@ fun ExitDialog(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.65f))
+            .trapAllFocusExit()
             .focusGroup(),
         contentAlignment = Alignment.Center,
     ) {

@@ -40,6 +40,8 @@ import tv.own.owntv.core.model.MediaType
 import tv.own.owntv.core.network.ConnectivityObserver
 import tv.own.owntv.core.repository.EpgRepository
 import tv.own.owntv.core.repository.SourceRepository
+import tv.own.owntv.core.repository.activeProfileSources
+import tv.own.owntv.core.repository.activeSourceIds
 import tv.own.owntv.core.util.friendlySyncError
 import tv.own.owntv.features.settings.data.SettingsRepository
 import tv.own.owntv.player.OwnTVPlayer
@@ -92,10 +94,10 @@ class EpgViewModel(
 
     /** Live categories for the active profile — drives the guide's "Category" picker. */
     val guideCategories: StateFlow<List<tv.own.owntv.core.database.entity.CategoryEntity>> =
-        settings.activeProfileId
-            .flatMapLatest { pid ->
-                if (pid < 0) flowOf(emptyList())
-                else sourceDao.observeForProfile(pid).flatMapLatest { srcs -> categoryDao.observe(srcs.map { it.id }, MediaType.LIVE) }
+        activeProfileSources(settings, sourceDao)
+            .flatMapLatest { aps ->
+                if (aps.sources.isEmpty()) flowOf(emptyList())
+                else categoryDao.observe(aps.sourceIds, MediaType.LIVE)
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
@@ -182,6 +184,14 @@ class EpgViewModel(
             .drop(1)
             .distinctUntilChanged()
             .onEach { if (settings.sortGuide.first() == SettingsRepository.GuideSort.LIVE_TV) load() }
+            .launchIn(viewModelScope)
+        // Reload the guide when the active-playlist filter (Settings "Default" / Browse picker) changes,
+        // so the grid narrows to the chosen playlist's channels (or back to all). drop(1): initial load
+        // is triggered by the screen.
+        settings.defaultSourceId
+            .drop(1)
+            .distinctUntilChanged()
+            .onEach { load() }
             .launchIn(viewModelScope)
     }
 
@@ -480,7 +490,7 @@ class EpgViewModel(
                 )
                 return@launch
             }
-            val playlistIds = sourceRepository.observeSources(pid).first().map { it.id }
+            val playlistIds = activeSourceIds(settings, sourceDao, pid)
             val epgIds = epgSourceStore.getAll().map { it.id }
             // Channels come from the playlists; guide data is matched from BOTH the playlists' own EPG
             // (kept for compatibility) and the standalone EPG sources — by epgChannelId across all ids.
@@ -525,7 +535,8 @@ class EpgViewModel(
                 val byProvider = compareBy<ChannelEntity>({ it.sourceId }, { it.sortOrder }, { it.name.lowercase() })
                 val liveOrdered = when (sortLiveMode) {
                     SettingsRepository.SortMode.ALPHA -> matched.sortedWith(byAlpha)
-                    SettingsRepository.SortMode.PLAYLIST -> matched.sortedWith(byProvider)
+                    // Live/EPG have no rating; RATING can't be selected there, so treat it as provider order.
+                    SettingsRepository.SortMode.PLAYLIST, SettingsRepository.SortMode.RATING -> matched.sortedWith(byProvider)
                 }
                 when (sortGuideMode) {
                     SettingsRepository.GuideSort.ALPHA -> matched.sortedWith(byAlpha)

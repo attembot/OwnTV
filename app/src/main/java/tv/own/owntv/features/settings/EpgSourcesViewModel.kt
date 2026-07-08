@@ -14,6 +14,7 @@ import tv.own.owntv.core.repository.EpgRepository
 import tv.own.owntv.core.repository.SourceRepository
 import tv.own.owntv.core.sync.work.EpgSyncScheduler
 import tv.own.owntv.core.sync.work.EpgSyncState
+import tv.own.owntv.features.settings.data.EpgAutoRefresh
 import tv.own.owntv.features.settings.data.SettingsRepository
 
 /** Manage standalone EPG (XMLTV) sources: list, add (auto-sync), edit, re-sync, delete. */
@@ -33,9 +34,18 @@ class EpgSourcesViewModel(
     val sources: StateFlow<List<EpgSource>> =
         store.sources.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    fun add(name: String, url: String, userAgent: String? = null) {
+    /** Per-source EPG auto-refresh selection (Off / Startup / staleness threshold). */
+    val autoRefresh: StateFlow<Map<Long, EpgAutoRefresh>> = settings.epgAutoRefresh
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    fun setAutoRefresh(source: EpgSource, mode: EpgAutoRefresh) {
+        viewModelScope.launch { settings.setEpgAutoRefresh(source.id, mode) }
+    }
+
+    fun add(name: String, url: String, userAgent: String? = null, autoRefresh: EpgAutoRefresh = EpgAutoRefresh.OFF) {
         viewModelScope.launch {
             val source = store.add(name, url, userAgent)
+            settings.setEpgAutoRefresh(source.id, autoRefresh)
             epgSyncScheduler.enqueueSync(source.id, "add")
         }
     }

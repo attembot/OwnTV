@@ -45,7 +45,7 @@ fun ResumeDialog(
     BackHandler { onDismiss() }
     // Lighter scrim + translucent card: the paused video stays visible behind the prompt.
     Box(
-        modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)).focusGroup(),
+        modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)).trapAllFocusExit().focusGroup(),
         contentAlignment = Alignment.Center,
     ) {
         Column(Modifier.width(440.dp).clip(RoundedCornerShape(20.dp)).background(colors.surfaceContainerHigh.copy(alpha = 0.88f)).padding(28.dp)) {

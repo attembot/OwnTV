@@ -27,6 +27,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.MaterialTheme
@@ -37,6 +42,7 @@ import tv.own.owntv.ui.components.OwnTVButton
 import tv.own.owntv.ui.components.OwnTVButtonStyle
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.OwnTVSpinner
+import tv.own.owntv.ui.components.trapAllFocusExit
 import tv.own.owntv.ui.theme.OwnTVTheme
 
 /**
@@ -62,7 +68,7 @@ fun UpdateDialog(onDismiss: () -> Unit, checkOnOpen: Boolean = false) {
     BackHandler { onDismiss() }
 
     Box(
-        modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.75f)).focusGroup(),
+        modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.75f)).trapAllFocusExit().focusGroup(),
         contentAlignment = Alignment.Center,
     ) {
         Column(Modifier.width(520.dp).clip(RoundedCornerShape(20.dp)).background(colors.surfaceContainerHigh).padding(28.dp)) {
@@ -97,7 +103,7 @@ fun UpdateDialog(onDismiss: () -> Unit, checkOnOpen: Boolean = false) {
                         Text("What's new", style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
                         Spacer(Modifier.height(6.dp))
                         Text(
-                            s.info.notes,
+                            renderReleaseNotes(s.info.notes, headingColor = colors.onSurface),
                             style = MaterialTheme.typography.bodySmall,
                             color = colors.onSurfaceVariant,
                             modifier = Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
@@ -133,5 +139,46 @@ fun UpdateDialog(onDismiss: () -> Unit, checkOnOpen: Boolean = false) {
                 }
             }
         }
+    }
+}
+
+/**
+ * Renders the minimal release notes (from CHANGELOG_APP.md, via the GitHub release body) for the update
+ * dialog. Lightweight Markdown only — enough for our bullet-only format: `### ` section headers become
+ * bold heading lines, `- ` bullets become "• ", and inline `**bold**` spans render bold. Everything else
+ * is shown as-is. Not a full Markdown parser.
+ */
+private fun renderReleaseNotes(notes: String, headingColor: Color): AnnotatedString = buildAnnotatedString {
+    val lines = notes.replace("\r\n", "\n").trim().split("\n")
+    lines.forEachIndexed { index, raw ->
+        if (index > 0) append("\n")
+        val line = raw.trimEnd()
+        when {
+            line.startsWith("### ") ->
+                withStyle(SpanStyle(color = headingColor, fontWeight = FontWeight.Bold)) {
+                    appendInline(line.removePrefix("### ").trim())
+                }
+            line.startsWith("## ") ->
+                withStyle(SpanStyle(color = headingColor, fontWeight = FontWeight.Bold)) {
+                    appendInline(line.removePrefix("## ").trim())
+                }
+            line.startsWith("- ") -> { append("•  "); appendInline(line.removePrefix("- ")) }
+            line.startsWith("* ") -> { append("•  "); appendInline(line.removePrefix("* ")) }
+            else -> appendInline(line)
+        }
+    }
+}
+
+/** Appends [text], turning `**bold**` spans into actual bold runs (leaves other characters untouched). */
+private fun AnnotatedString.Builder.appendInline(text: String) {
+    var i = 0
+    while (i < text.length) {
+        val start = text.indexOf("**", i)
+        if (start < 0) { append(text.substring(i)); break }
+        val end = text.indexOf("**", start + 2)
+        if (end < 0) { append(text.substring(i)); break }
+        append(text.substring(i, start))
+        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(text.substring(start + 2, end)) }
+        i = end + 2
     }
 }
