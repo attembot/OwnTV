@@ -1,5 +1,222 @@
 # Changelog
 
+## v4.1.0 — 2026-07-11
+
+### ✨ New features
+
+- **Playback error log in Settings.** The last ~10 playback failures are now kept on the device —
+  each with its plain-English reason, the stream's codec/resolution spec, the raw engine error, the
+  engine (mpv/ExoPlayer), Live/VOD, and your device model/Android version. Open **Settings →
+  Playback → Playback error log** to read (or clear) them, so you can report exactly what happened
+  even after dismissing the error screen or restarting the app — no adb/logcat needed.
+- **Custom TMDB names are now in Backup & Restore.** Titles/years you hand-corrected via long-press →
+  **Custom TMDB name** (for providers with weird item names) now ride in the backup's Customizations
+  section and are merged back on restore — any stale cached match for a restored key is dropped so the
+  corrected name re-fetches. Two more backup upgrades ride along: your own **TMDB API key** is now
+  included when (and only when) the backup is password-encrypted (same policy as source/proxy
+  passwords), and **recent searches** are backed up with settings. Older backup files still restore
+  fine; older app versions simply ignore the new blocks.
+- **Wider interface zoom range.** **Settings → Interface zoom** now goes from **50% to 150%**
+  (previously 65%–140%), for tighter grids on big screens or larger UI on small/far ones. The
+  existing low-memory warning below 85% still applies.
+
+### ⚡ Performance & reliability
+
+- **Smaller app, faster cold start (R8).** Release builds are now shrunk and optimized by R8 —
+  dead code is stripped and the remaining code is optimized, so there's less to load on
+  low-end TV boxes. Baseline profiles bundled by the UI/player libraries are now actually
+  installed on sideloaded installs (via ProfileInstaller), pre-compiling the hot startup and
+  scrolling paths instead of leaving them to the JIT on first run.
+- **Faster playlist import on huge playlists.** The M3U parser now extracts all `#EXTINF` attributes
+  in a single scan of each line (previously ~10 separate searches per channel), and the detailed
+  per-item timing instrumentation in both the M3U and Xtream parsers is now off unless explicitly
+  enabled for debugging (`setprop log.tag.M3uParser DEBUG` / `log.tag.XtreamClient DEBUG`) — removing
+  millions of clock syscalls from a 100k+ item sync. The single-scan parser also fixes a subtle
+  mis-parse where a key could match inside a longer key (e.g. `type` inside `tvg-type="…"`).
+- **Scheduled syncs now retry after network blips.** A playlist or EPG auto-refresh that failed on a
+  transient error (offline, timeout, connection reset, server 5xx) previously gave up until the next
+  scheduled window, leaving content stale. Both sync workers now ask WorkManager to retry with backoff
+  (up to 3 attempts); permanent errors (bad credentials/URL, malformed data) still fail immediately.
+  Xtream category-list fetches also get up to 3 HTTP attempts, and server 5xx/429 responses are retried
+  safely (only when no data was consumed yet).
+- **Player stability hardening.** The stream-info chips (fps / audio layout) no longer read libmpv
+  properties on the UI thread — on a stalling stream those reads can block for seconds and caused
+  potential freezes/ANRs. Queued freeze-frame callbacks are now cleared when the player is released, so
+  they can never fire against a destroyed surface.
+- **More accurate playback error diagnosis.** The plain-English error mapper no longer mis-labels
+  errors whose stream URL merely *contains* digits like `509`/`403` as HTTP provider errors, and a
+  spurious "out of memory" match on any `-12` substring is fixed. The background codec-error log tail
+  now restarts itself if the system kills it, so error details keep working for the whole session.
+- **Much faster global search on huge catalogs.** Search-as-you-type now uses the full-text index
+  instead of scanning every movie/series/channel name per keystroke — on a 170k-movie catalog each
+  keystroke was a full table scan. Matching is now by word prefix ("harry pot" finds
+  "Harry Potter…"); folder-scoped search keeps the old substring behaviour.
+- **Big folders page faster.** Folders where you never used **Move** (manual reorder) now use the
+  plain indexed query instead of the reorder-aware join that re-sorted the whole folder on every
+  page turn. Folders with manual positions behave exactly as before.
+- **Smoother UI during large syncs.** The live item-count badges (Live/Movies/Series and the EPG
+  programme count) now refresh at most once per second during a bulk import instead of re-counting
+  the whole table after every committed batch.
+- **Posters and channel logos are cached on disk.** Artwork now survives app restarts (capped at
+  250 MB) instead of re-downloading every session, loads offline once seen, and opaque poster
+  bitmaps use half the memory.
+- **Faster, safer backup restore.** Restoring thousands of favorites/history/resume records used to
+  run one database transaction per record; they're now batched (500 per transaction). The
+  profiles-and-sources restore is atomic: a crash mid-restore can no longer leave a half-restored
+  database.
+- **Faster first launch when upgrading from v3.2.0 or older.** The one-time database migration no
+  longer de-duplicates the (huge) cached TV guide row-by-row — it clears the rebuildable guide cache
+  instead, so the first launch after a big version jump is instant. The guide re-downloads on your
+  next EPG sync. (Upgrades from any 4.x version are unaffected.)
+- **Less UI work while browsing.** The most-passed-around UI models (channels, movies, series,
+  home-screen state, EPG now/next, search results, weather, details panes) are now marked immutable
+  for Compose, so screens can skip re-rendering unchanged parts instead of redrawing whole subtrees
+  on every state tick.
+- **TMDB caches no longer grow forever.** Metadata cached for items you haven't opened in 90 days is
+  cleaned up after each playlist sync and simply re-fetches if you come back to them.
+
+### 🐛 Fixes
+
+- **Dialogs no longer get cut off on small screens.** On low-resolution/overscanned TVs, tall popup
+  dialogs (New profile, context menus, Settings dialogs, catch-up & EPG-match pickers, the setup
+  wizard, and more) could extend past the screen with no way to reach the lower buttons — profile
+  creation could not be completed at all. Every popup is now scrollable (D-pad focus scrolls
+  off-screen controls into view) and list pickers cap their height to the screen.
+- **Grids keep your place through background refreshes.** The Movies/Series/Live lists and grids now
+  track items by identity instead of position, so a background re-sync or list update no longer
+  scrambles D-pad focus or recomposes every visible poster.
+
+- **A–Z sorting now applies to categories too.** The sort chip in Live TV, Movies and Series only
+  reordered the items inside a folder — the category rail itself always stayed in provider order.
+  Switching the chip to **A–Z** now also sorts the category folders alphabetically (by their displayed
+  name, so renamed categories sort under their custom name), and the TV Guide's category picker follows
+  the Live TV setting the same way. Categories you manually reordered in **Settings → Customize**
+  stay pinned at the top in your custom order in every mode; the rest sort below them. **Provider**
+  (and **Rating**) modes keep the playlist order exactly as before. The fixed rail entries (All,
+  Favourites, Recent…) never move.
+
+### 🔧 Under the hood
+
+- **CI dev builds are now release builds.** Every push now produces a release-signed, R8-shrunk
+  `OwnTV-dev-<sha>.apk` artifact (previously debug), versioned `99.99.99` so it installs straight
+  over any published release for testing. Publishing a GitHub Release still only happens on `v*`
+  tags. Fork PRs (no signing secrets) still build debug.
+- **Player timing constants named.** The ~15 bare `delay()` literals in the playback engine
+  (decoder-release waits on mpv↔ExoPlayer handoffs, live-reconnect pause, surround/decode
+  verification windows, retry beats) are now named companion constants documented in one place —
+  no behavior change.
+- **Dependency updates.** Koin 4.1.1 → 4.2.2, Coil 3.3.0 → 3.5.0, WorkManager 2.10.0 → 2.11.2.
+  (core-ktx/lifecycle/Compose BOM stay put — their latest versions require compileSdk 37; OkHttp 5
+  is deferred as its own change.)
+- **Sync engine de-duplicated.** The three near-identical Xtream phase implementations
+  (Live/Movies/Series: fresh-vs-stable upsert, per-category 512 fallback, prune) are now one generic
+  phase parameterized per content type, so future fixes to the sync logic land once instead of three
+  times. Behavior-identical; the category refresh also drops a redundant second database lookup.
+- **Media3 (ExoPlayer) bumped 1.10.0 → 1.10.1.** ExoPlayer drives the image-subtitle (PGS/VOBSUB/DVB)
+  handoff and the VOD mpv→Exo fallback, so this patch release lands fixes directly on those paths:
+  a crash when recovering from decoder errors with renderer prewarming (the fallback triggers this),
+  an `ArrayIndexOutOfBoundsException` during HLS stream fallback when the active track set is a subset
+  of the manifest (#3161), and HLS init segments not carrying over across playlist updates when
+  `#EXT-X-MAP` isn't repeated (#3105). It also stops needless MediaCodec resets at frame-rate changes on
+  API < 30. `libmpv` is unchanged at `1.0.0` (still the latest).
+
+## v4.0.3 — 2026-07-09
+
+### ✨ New features
+
+- **Settings: search and quick toggles.** A **"Search settings…"** field at the top of Settings filters
+  the whole screen down to matching rows — results carry their group as a breadcrumb (e.g.
+  `Playback › HDR`) and act exactly like the real row, so you jump straight to a setting without hunting
+  through groups. Above it, a pinned row of one-press **quick toggles** (Live preview · Preview sound ·
+  HDR · Auto-play · Check for update) flips the most-used options without opening a sub-menu. **Back**
+  clears an active search before it leaves Settings.
+- **Search: a launcher home, a detail pane and smarter Back.** The empty Search screen is now a launcher
+  — a **"Jump to"** row (**Continue watching**, **Unwatched**, **Channels**) plus your **recent
+  searches** as chips (with **Clear**). Results moved to a **list + detail** layout: focusing a result
+  shows its poster, plot and rating in a side pane with a **primary action** button (Play / Watch live /
+  Open series), and OK still plays it directly. **Back** clears the query (returning to the launcher)
+  before it leaves Search. "Unwatched" and "Channels" are bounded to your favourites (and recent
+  history) so they stay fast on large playlists.
+- **Downloads: queue groups, a storage bar and clearer failures.** The Downloads list is now grouped
+  into **Active · Waiting · Completed · Failed** sections with counts, a **storage bar** at the top shows
+  free space (e.g. `12.4 GB free of 118 GB`), and a failed download now reads
+  **"Download failed — couldn't reach the source. Tap Retry."** next to its one-press Retry.
+- **Download status on the poster.** Start a download of a movie, a whole series, or a single episode and
+  a compact **status strip** (Downloading / Queued / Paused / Failed, with a progress bar) now appears at
+  the top of that item's poster panel — so you can see it's actually running without opening the
+  Downloads screen. The strip only shows while something is in flight and disappears once complete.
+- **Shell: a shared "Continue" chip.** The top bar now carries a compact **Continue** chip that resumes
+  your most-recent item in one press — **Resume** a movie, **Next up** an episode, or your **Last
+  channel** — labelled with the title and shown on every screen. It only takes focus from the navigation
+  panel (like the search pill), so it never gets in the way while browsing, and hides when there's
+  nothing to resume.
+- **Series episode view: watched state, "Next up" and a "Hide watched" filter.** Episodes now show a ✓
+  (and a dimmed title) once watched to ≥95%, and a thin progress bar when part-watched, so you can see
+  exactly where you are in a season at a glance. Season chips show a `watched/total` count
+  (e.g. `Season 2 · 8/18`). A **"Next up" card** at the top of the episode detail pane surfaces the
+  episode to continue with — the one you're mid-way through, or the next one after the last finished —
+  with a one-press **Play** (and a `Resume <time>` line when in progress). A **"Hide watched"** toggle
+  in the header filters the list down to what's left to watch. Opening a show still focuses your
+  last-watched episode (#22); when that episode is hidden by the filter, focus falls to the first
+  visible one instead of losing focus.
+- **Mark an episode watched / unwatched manually.** Long-press an episode for a new **"Mark as
+  watched"** option (or **"Mark as unwatched"** if it's already watched) — corrects the auto-detected
+  ≥95% state without playing the episode. Marking watched restarts the episode from the beginning the
+  next time you press Play (it won't jump to the credits).
+- **TV Guide: a "now" line, Jump-to-Now, catch-up badges, genre dots and a preview strip.** The guide
+  grid now draws a red vertical line at the current time; a **"Jump to Now"** button in the header
+  scrolls the timeline back to now (handy after browsing the catch-up archive); programmes you can
+  rewind from show a ↻ badge; channel labels get a small colour dot by genre
+  (sport / news / movies / kids / music / docs); and a non-modal strip at the bottom previews the
+  programme under the cursor (title, channel, time, runtime, catch-up, synopsis) without opening the
+  dialog — OK still opens the full detail.
+- **Movies: watched state on posters and a resume label.** Movie posters (and the compact list rows)
+  now show a ✓ badge (with dimmed art) once watched to ≥95%, and a thin progress bar when part-watched,
+  matching the Series episode view. The movie detail pane shows a `Resume <time>` label under the poster
+  when there's an unfinished position, and long-press gains a **"Mark as watched / unwatched"** option
+  (mirrors Series; marking watched still restarts from the beginning on Play).
+- **Player: a next-episode countdown card.** When a series episode nears its end, a card appears with a
+  countdown to the automatic next-episode advance plus **Play now** and **Cancel** — so you can jump
+  early or stop the auto-advance. Works on both the mpv and ExoPlayer engines.
+
+### 🐛 Fixes
+
+- **All seasons now reachable on long-running series.** The season selector on the Series detail screen
+  was a single non-scrolling row, so shows with more seasons than fit on one line (e.g. a 12-season
+  series) had the seasons past the visible ones clipped off the right edge — invisible and unreachable
+  with the D-pad. The selector is now a scrollable rail: Right/Left moves season-by-season and
+  auto-scrolls the focused season into view, and opening a show scrolls straight to the active
+  (last-watched) season.
+- **Clearer 4K decode-guard message.** When a stream's format can't be hardware-decoded on the TV and
+  falls back to software decoding (which can't sustain >1080p), the error now explains the stream's
+  format is the issue rather than implying the TV can't play any 4K content — the TV may still play
+  other 4K videos fine.
+- **Player seek bubble now shows time remaining.** The scrub bubble above the seek thumb was not
+  displaying (padding couldn't lift it out of the bar) and, once fixed, now reads the time left to the
+  end (e.g. `-12:34`) — the elapsed and total times are already shown at the bar's two ends.
+- **Favourite "On Now" now covers every favourite channel.** When the Favourite Channels row was set to
+  **On Now**, the inline mini-guide only looked up programme data for the first ~10 favourites and left
+  the rest without guide info. The builder now reads programme summaries for the whole candidate list in
+  a single batched query, so every visible favourite shows its airing show (community PR #62 by
+  [@codeVerine](https://github.com/codeVerine) — Sagar Mukundan UV).
+- **Home artwork and metadata from TMDB.** The Home hero card and Continue Watching series tiles now
+  prefer **TMDB backdrops, title logos and plot text** when metadata is available, while preserving the
+  provider artwork/text fallbacks. Continue Watching series tiles resolve episode/show artwork on focus
+  and render as **landscape cards** instead of stretched portrait art. The hero's expanded view now uses
+  a landscape backdrop with a title logo, plot and a Play action (community PR #62 by
+  [@codeVerine](https://github.com/codeVerine) — Sagar Mukundan UV). Requires metadata cache v13 (Room
+  migration `12 → 13`, additive `logoPath` column on `metadata_cache`).
+- **Home refreshes after a playlist switch.** Switching the active playlist from the top-bar quick
+  switcher while sitting on Home now updates the hero, Continue Watching, Recent and Favourites rows in
+  place — previously you had to leave and reopen Home to see the new source's content (community PR #62
+  by [@codeVerine](https://github.com/codeVerine) — Sagar Mukundan UV).
+- **Manual reorder now survives Backup & Restore.** The Move up/down positions you set for channels,
+  movies and series (the `content_order` table from v4.0.0) were never written to a backup or restored
+  — the resolver supported it but the backup section picker never asked for it. Backup & Restore now
+  has a dedicated **Manual reorder** section (export and restore) so your custom order comes back after
+  a restore. Existing backup files still restore cleanly; older files simply have no reorder data to
+  apply.
+
 ## v4.0.2 — 2026-07-07
 
 ### 🏠 Customizable Home screen — reorder/hide rows, dwell-to-expand hero, On Now mini-guide (community PR #58 by [@codeVerine](https://github.com/codeVerine) — Sagar Mukundan UV)

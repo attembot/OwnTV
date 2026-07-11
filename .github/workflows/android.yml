@@ -48,24 +48,30 @@ jobs:
             CODE=$(( ${MA:-0} * 10000 + ${MI:-0} * 100 + ${PA:-0} ))   # 1.2.0 -> 10200
             [ "$CODE" -gt 0 ] || CODE=1
           else
-            NAME="0.0.0"
-            CODE=1
+            # Dev (non-tag) builds mirror the local-build fallback in app/build.gradle.kts:
+            # pinned HIGH so a dev APK always installs over any published release
+            # (no INSTALL_FAILED_VERSION_DOWNGRADE) and the in-app updater stays quiet.
+            NAME="99.99.99"
+            CODE=99999
           fi
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
           echo "Version: $NAME (code $CODE)"
 
       - name: Decode signing keystore (if configured)
-        if: env.IS_TAG == 'true'
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
+          # Runs on every push (not just tags) so dev builds are also signed RELEASE builds —
+          # required since R8 was enabled: only assembleRelease exercises shrinking/keep rules,
+          # and a release-signed dev APK installs straight over a published release for testing.
+          # Fork PRs have no secrets, so they fall back to a debug build below.
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
             echo "KEYSTORE_FILE=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
             echo "Release signing configured."
           else
-            echo "No KEYSTORE_BASE64 secret set — the release tag will ship a debug-signed APK."
+            echo "No KEYSTORE_BASE64 secret set — building a debug-signed APK."
           fi
 
       - name: Build APK
@@ -77,9 +83,9 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           chmod +x ./gradlew
-          if [ "$IS_TAG" = "true" ] && [ -n "$KEYSTORE_FILE" ]; then
+          if [ -n "$KEYSTORE_FILE" ]; then
             echo "Building signed release APK"
-            ./gradlew assembleRelease
+            ./gradlew assembleRelease --stacktrace
             SRC=$(ls app/build/outputs/apk/release/*.apk | head -n1)
           else
             echo "Building debug APK"

@@ -88,7 +88,9 @@ fun StorageBrowser(
                 children.filter { it.isFile && (fileExtensions == null || it.extension.lowercase() in fileExtensions) }.sortedBy { it.name.lowercase() }
             } else emptyList()
 
-            LazyColumn(Modifier.heightIn(max = 360.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            // Cap the list to the screen (minus dialog chrome) so the footer buttons stay reachable.
+            val listMax = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp - 200.dp).coerceIn(140.dp, 360.dp)
+            LazyColumn(Modifier.heightIn(max = listMax).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (dir == null) {
                     if (!hasAccess) {
                         item {
@@ -138,7 +140,7 @@ private fun NewFolderDialog(onCreate: (String) -> Unit, onDismiss: () -> Unit) {
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     BackHandler { onDismiss() }
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.8f)).focusGroup(), contentAlignment = Alignment.Center) {
-        Column(Modifier.width(420.dp).clip(RoundedCornerShape(18.dp)).background(colors.surfaceContainerHighest).padding(24.dp)) {
+        Column(Modifier.dialogPanel(width = 420.dp, corner = 18.dp, fill = colors.surfaceContainerHighest)) {
             Text("New folder", style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
             Spacer(Modifier.height(14.dp))
             OwnTVTextField(name, { name = it }, label = "Folder name", placeholder = "e.g. My TV", modifier = Modifier.fillMaxWidth().focusRequester(focus))

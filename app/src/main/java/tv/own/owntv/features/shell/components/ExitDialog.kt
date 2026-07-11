@@ -2,6 +2,8 @@ package tv.own.owntv.features.shell.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -56,6 +58,7 @@ fun ExitDialog(
                 .widthIn(max = 460.dp)
                 .clip(RoundedCornerShape(20.dp))
                 .background(colors.panel)
+                .verticalScroll(rememberScrollState())
                 .padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {

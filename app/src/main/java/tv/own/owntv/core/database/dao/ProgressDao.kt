@@ -74,6 +74,21 @@ interface ProgressDao {
     )
     suspend fun lastWatchedEpisodeId(profileId: Long, seriesId: Long): Long?
 
+    /** All episode resume positions for one series (this profile), reactively — drives the Series screen's
+     *  per-episode watched/progress indicators, season "watched/total" counts, the "Hide watched" filter,
+     *  and the "Next up" card. */
+    @Query(
+        "SELECT * FROM playback_progress WHERE profileId = :profileId AND mediaType = 'EPISODE' " +
+            "AND itemId IN (SELECT id FROM episodes WHERE seriesId = :seriesId)",
+    )
+    fun observeSeriesEpisodeProgress(profileId: Long, seriesId: Long): Flow<List<PlaybackProgressEntity>>
+
+    /** All movie resume positions for this profile, reactively — drives the Movies grid/list
+     *  per-item watched (✓) and in-progress bar indicators. Progress rows exist only for movies the
+     *  user has actually started/finished, so this set is small (not the full catalogue). */
+    @Query("SELECT * FROM playback_progress WHERE profileId = :profileId AND mediaType = 'MOVIE'")
+    fun observeMovieProgress(profileId: Long): Flow<List<PlaybackProgressEntity>>
+
     /**
      * Drops resume positions orphaned by a re-sync (see FavoriteDao.purgeOrphans). Episodes are
      * excluded — they load lazily, so episode progress is kept and re-attached when the show opens.

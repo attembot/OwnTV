@@ -78,6 +78,7 @@ import tv.own.owntv.ui.components.roundedPanel
 import tv.own.owntv.ui.components.OwnTVSpinner
 import tv.own.owntv.ui.components.SearchBar
 import tv.own.owntv.ui.components.trapVerticalFocusExit
+import tv.own.owntv.ui.components.dialogPanel
 import tv.own.owntv.features.epg.GuideGridDefaults
 import tv.own.owntv.features.epg.ProgrammeDetailDialog
 import tv.own.owntv.features.epg.ProgrammeStripCanvas
@@ -129,6 +130,8 @@ fun EpgScreen(
     // Up/Down jump to the adjacent channel at the same time. cursorTime is the highlighted time.
     var inCellMode by remember { mutableStateOf(false) }
     var cursorTime by remember { mutableStateOf(0L) }
+    // The channel whose programme strip currently has focus — drives the non-modal bottom info strip.
+    var focusedChannel by remember { mutableStateOf<ChannelEntity?>(null) }
     // The pending focus target onEnter routes to: our own restore requests cross into this group
     // from outside, so onEnter must cooperate or it would hijack them to the first channel.
     var pendingEnter by remember { mutableStateOf<FocusRequester?>(null) }
@@ -177,6 +180,22 @@ fun EpgScreen(
             androidx.compose.runtime.snapshotFlow { hScroll.maxValue }.first { it > 0 }
         }
         runCatching { hScroll.scrollTo(px) }
+    }
+
+    val scope = rememberCoroutineScope()
+    // "Jump to Now" — scrolls the shared timeline back to the current time. Mirrors the on-mount auto-scroll
+    // above so the user can return to "now" after browsing the catch-up archive. Shown only when "now" is
+    // actually inside the loaded window (it isn't, for example, right after a fresh load with no lookback).
+    val jumpToNow: () -> Unit = {
+        scope.launch {
+            val minutesBack = ((state.now - state.windowStart) / 60_000L).toInt()
+            if (minutesBack <= GuideGridDefaults.SlotMin) return@launch
+            val px = with(density) { (minutesBack * GuideGridDefaults.PxPerMin.value).dp.toPx() }.toInt()
+            kotlinx.coroutines.withTimeoutOrNull(2000) {
+                androidx.compose.runtime.snapshotFlow { hScroll.maxValue }.first { it > 0 }
+            }
+            runCatching { hScroll.scrollTo(px) }
+        }
     }
 
     // In CELL mode, Back steps out to whole-row (ROW) selection instead of leaving the guide.
@@ -246,6 +265,10 @@ fun EpgScreen(
                     SimpleDateFormat("EEE d MMM", Locale.getDefault()).format(Date(headerDate)),
                     style = MaterialTheme.typography.titleMedium, color = colors.onSurfaceVariant,
                 )
+            }
+            // Jump the timeline back to the current time (useful after browsing the catch-up archive).
+            if (state.now in state.windowStart..state.windowEnd) {
+                OwnTVButton("Jump to Now", onClick = jumpToNow, icon = OwnTVIcon.HISTORY, style = OwnTVButtonStyle.SECONDARY)
             }
             Spacer(Modifier.weight(1f))
             // Guide sort: A–Z / Provider / Live TV (mirrors Live) / Catch-up (archive first; hidden when none).
@@ -331,7 +354,7 @@ fun EpgScreen(
                 }
                 Spacer(Modifier.height(8.dp))
 
-                LazyColumn(state = rowListState, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                LazyColumn(modifier = Modifier.weight(1f), state = rowListState, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     itemsIndexed(state.channels, key = { _, ch -> ch.id }) { index, channel ->
                         GuideChannelRow(
                             vm = vm,
@@ -354,9 +377,19 @@ fun EpgScreen(
                             onEnterCell = { cursorTime = state.now; inCellMode = true },
                             onExitToChannels = { inCellMode = false },
                             onMoveCursor = { cursorTime = it },
+                            onStripFocused = { focusedChannel = channel },
+                            categoryColor = guideCategories.firstOrNull { it.id == channel.categoryId }?.name?.let { categoryColor(it) },
                         )
                     }
                 }
+                // Non-modal bottom strip — previews the cursor programme while browsing in CELL mode.
+                GuideInfoStrip(
+                    focusedChannel = focusedChannel,
+                    cursorTime = cursorTime,
+                    inCellMode = inCellMode,
+                    vm = vm,
+                    now = state.now,
+                )
             }
         }
     }
@@ -451,7 +484,9 @@ private fun EpgMatchReviewDialog(
                 style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant,
             )
             Spacer(Modifier.height(12.dp))
-            LazyColumn(Modifier.fillMaxWidth().height(360.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            // Cap to the screen (minus dialog chrome) so the footer buttons stay reachable on small screens.
+            val listHeight = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp - 200.dp).coerceIn(160.dp, 360.dp)
+            LazyColumn(Modifier.fillMaxWidth().height(listHeight), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 itemsIndexed(suggestions, key = { _, s -> s.channel.id }) { index, s ->
                     Row(
                         Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(colors.surface).padding(horizontal = 12.dp, vertical = 8.dp),
@@ -517,7 +552,7 @@ private fun EpgMatchChooserDialog(
             .longPressMenuGuard(), // long-press OK is still held — don't auto-click Auto-match
         contentAlignment = Alignment.Center,
     ) {
-        Column(Modifier.width(440.dp).clip(RoundedCornerShape(20.dp)).background(colors.surfaceContainerHigh).padding(24.dp)) {
+        Column(Modifier.dialogPanel()) {
             Text("Match EPG", style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
             Spacer(Modifier.height(2.dp))
             Text(
@@ -556,6 +591,8 @@ private fun GuideChannelRow(
     onEnterCell: () -> Unit,
     onExitToChannels: () -> Unit,
     onMoveCursor: (Long) -> Unit,
+    onStripFocused: (ChannelEntity) -> Unit,
+    categoryColor: Color?,
 ) {
     val colors = OwnTVTheme.colors
     // Cache peek as the initial value → rows render instantly from the batch-loaded cache, no flash, no
@@ -584,13 +621,24 @@ private fun GuideChannelRow(
             unfocusedContainerColor = colors.surfaceContainerHigh,
             contentAlignment = Alignment.CenterStart,
         ) { focused ->
-            Text(
-                channel.number?.let { "$it  ${channel.name}" } ?: channel.name,
-                style = MaterialTheme.typography.titleSmall,
-                color = if (focused) colors.primary else colors.onSurface,
-                maxLines = 2, overflow = TextOverflow.Ellipsis,
+            Row(
                 modifier = Modifier.padding(horizontal = 12.dp),
-            )
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                // Genre colour dot — best-effort keyword match on the channel's category name; no dot when
+                // the category is unknown (no wrong colour rather than a misleading one).
+                if (categoryColor != null) {
+                    Box(Modifier.size(8.dp).clip(RoundedCornerShape(4.dp)).background(categoryColor))
+                }
+                Text(
+                    channel.number?.let { "$it  ${channel.name}" } ?: channel.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = if (focused) colors.primary else colors.onSurface,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
         // Programme strip = ONE focus target (cells aren't individually focusable). ROW stage outlines
         // the whole strip; OK enters CELL stage where Left/Right move the cursor and Up/Down jump rows.
@@ -598,7 +646,7 @@ private fun GuideChannelRow(
         Box(
             modifier = Modifier.weight(1f).height(GuideGridDefaults.RowHeight)
                 .focusRequester(stripFR)
-                .onFocusChanged { stripFocused = it.isFocused }
+                .onFocusChanged { stripFocused = it.isFocused; if (it.isFocused) onStripFocused(channel) }
                 .onKeyEvent { e ->
                     if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
                     val progs = programmes
@@ -619,12 +667,17 @@ private fun GuideChannelRow(
                 .then(if (rowSelected) Modifier.border(Dimens.FocusBorderWidth, colors.focusBorder, RoundedCornerShape(10.dp)) else Modifier),
         ) {
             programmes?.let { progs ->
+                // Catch-up-eligible programmes for this row — precomputed once per render (not per frame).
+                val catchupIds = remember(progs, channel, now) {
+                    progs.filter { vm.canCatchup(channel, it, now) }.map { it.id }.toSet()
+                }
                 ProgrammeStripCanvas(
                     programmes = progs,
                     windowStart = windowStart,
                     windowEnd = windowEnd,
                     now = now,
                     highlightTime = if (stripFocused && inCellMode) cursorTime else null,
+                    catchupIds = catchupIds,
                     hScroll = hScroll,
                 )
             }
@@ -659,5 +712,76 @@ private fun openAtCursor(progs: List<EpgProgrammeEntity>, cursorTime: Long, onOp
 private fun CenterBox(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, content = content)
+    }
+}
+
+/** Best-effort genre colour from a channel category's free-text name — sport→green, news→red, movie→violet,
+ *  kid→gold, music→blue, docu→teal. Null when unmatched (no dot rather than a misleading colour). */
+private fun categoryColor(name: String?): Color? {
+    if (name.isNullOrBlank()) return null
+    val n = name.lowercase()
+    return when {
+        n.contains("sport") -> Color(0xFF4CAF50)
+        n.contains("news") -> Color(0xFFEF5350)
+        n.contains("movie") || n.contains("film") || n.contains("cinema") -> Color(0xFFAB47BC)
+        n.contains("kid") || n.contains("child") || n.contains("anim") -> Color(0xFFFFB300)
+        n.contains("music") -> Color(0xFF42A5F5)
+        n.contains("docu") -> Color(0xFF26A69A)
+        else -> null
+    }
+}
+
+/** Non-modal bottom strip that previews the cursor programme while browsing a row in CELL mode. No
+ *  focusable controls — it never steals D-pad from the grid; OK still opens the full detail dialog. */
+@Composable
+private fun GuideInfoStrip(
+    focusedChannel: ChannelEntity?,
+    cursorTime: Long,
+    inCellMode: Boolean,
+    vm: EpgViewModel,
+    now: Long,
+) {
+    val colors = OwnTVTheme.colors
+    val formatTime = rememberSystemTimeFormatter()
+    val programme = remember(focusedChannel?.id, cursorTime, inCellMode) {
+        if (!inCellMode || focusedChannel == null || cursorTime <= 0L) null
+        else vm.cachedProgrammes(focusedChannel)?.let { progs ->
+            progs.firstOrNull { cursorTime in it.startMs until it.stopMs }
+                ?: progs.lastOrNull { it.startMs <= cursorTime }
+        }
+    }
+    val synopsis by produceState<String?>(null, programme?.id) {
+        value = programme?.id?.let { vm.programmeDescription(it) }
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+            .clip(RoundedCornerShape(10.dp)).background(colors.surfaceContainerHigh)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        val p = programme
+        if (p != null && focusedChannel != null) {
+            val catchup = vm.canCatchup(focusedChannel, p, now)
+            Column(Modifier.weight(1f)) {
+                Text(p.title, style = MaterialTheme.typography.titleSmall, color = colors.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                val runtimeMin = ((p.stopMs - p.startMs) / 60_000L).coerceAtLeast(0L).toInt()
+                val bits = listOfNotNull(
+                    focusedChannel.name,
+                    "${formatTime(p.startMs)} – ${formatTime(p.stopMs)}",
+                    if (runtimeMin > 0) "${runtimeMin}m" else null,
+                    if (catchup) "↻ catch-up" else null,
+                ).joinToString("  ·  ")
+                Text(bits, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                synopsis?.takeIf { it.isNotBlank() }?.let { s ->
+                    Text(s, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        } else {
+            Text(
+                if (inCellMode) "No programme at this time." else "Move right into a row, then browse with ◀ ▶ to preview a programme.",
+                style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, modifier = Modifier.weight(1f),
+            )
+        }
     }
 }

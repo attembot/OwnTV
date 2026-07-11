@@ -1,5 +1,7 @@
 package tv.own.owntv.features.shell.components
 
+import androidx.compose.runtime.Immutable
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
@@ -52,6 +54,7 @@ import tv.own.owntv.ui.theme.OwnTVTheme
  * provider/TMDB merge and builds image.tmdb.org URLs, so this window is source-agnostic and reused for
  * movie / series / episode.
  */
+@Immutable
 data class MediaDetailsUi(
     val title: String,
     val subtitle: String? = null,       // e.g. "S2 · E5 · aired 2019-04-14"

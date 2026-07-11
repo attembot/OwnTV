@@ -53,6 +53,7 @@ import tv.own.owntv.core.database.entity.SeriesEntity
 import tv.own.owntv.core.database.entity.WatchHistoryEntity
 import tv.own.owntv.core.launcher.LauncherIntegrationRepository
 import tv.own.owntv.core.model.MediaType
+import tv.own.owntv.core.util.throttleLatest
 import tv.own.owntv.core.download.DownloadManager
 import tv.own.owntv.core.repository.SeriesRepository
 import tv.own.owntv.core.storage.StorageAccess
@@ -104,6 +105,15 @@ class SeriesViewModel(
             }
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+    /** Contexts that actually have manual-order rows (C3): only those folders pay the
+     *  unindexable content_order join-sort; everything else stays on the plain indexed query. */
+    private val orderedContexts: StateFlow<Set<String>> = ctx
+        .flatMapLatest { c ->
+            if (c.profileId < 0) flowOf(emptySet())
+            else contentOrderDao.observeContextKeys(c.profileId, MediaType.SERIES).map { it.toSet() }
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
     /** This profile's hide/rename/reorder customizations for Series. */
     private val custom: StateFlow<SectionCustomizations> = ctx
@@ -203,6 +213,24 @@ class SeriesViewModel(
     private val _openedSeries = MutableStateFlow<SeriesEntity?>(null)
     val openedSeries: StateFlow<SeriesEntity?> = _openedSeries.asStateFlow()
 
+    // --- Download status for poster-panel strips (display-only) ---
+
+    /** Active episode-download rows keyed by episode id — for the focused-episode strip. */
+    val episodeDownloadStates: StateFlow<Map<Long, DownloadEntity>> = ctx
+        .flatMapLatest { c -> if (c.profileId < 0) flowOf(emptyList()) else downloadManager.observe(c.profileId) }
+        .map { list -> list.filter { it.mediaType == MediaType.EPISODE }.associateBy { it.itemId } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+    /** All episode downloads for the grid-selected series (entire-series aggregate strip). */
+    val selectedSeriesDownloads: StateFlow<List<DownloadEntity>> = _selectedSeries
+        .flatMapLatest { s -> if (s == null) flowOf(emptyList()) else downloadManager.observeForSeries(s.id) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** All episode downloads for the opened series (aggregate strip inside the episode view). */
+    val openedSeriesDownloads: StateFlow<List<DownloadEntity>> = _openedSeries
+        .flatMapLatest { s -> if (s == null) flowOf(emptyList()) else downloadManager.observeForSeries(s.id) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     private val _selectedSeason = MutableStateFlow(1)
     val selectedSeason: StateFlow<Int> = _selectedSeason.asStateFlow()
 
@@ -270,8 +298,11 @@ class SeriesViewModel(
             else combine(
                 categoryDao.observe(c.sourceIds, MediaType.SERIES),
                 customize.observe(c.profileId, MediaType.SERIES),
-            ) { cats, cust ->
-                defaultRail + cats.applyCustomizations(cust).map { (cat, name) ->
+                sortMode,
+            ) { cats, cust, sort ->
+                // A–Z also sorts the category folders; manually moved categories stay pinned first.
+                val folders = cats.applyCustomizations(cust, alphaRest = sort == SettingsRepository.SortMode.ALPHA)
+                defaultRail + folders.map { (cat, name) ->
                     LiveRailItem(LiveKey.Folder(cat.id), name.take(3).uppercase(), name)
                 }
             }
@@ -282,6 +313,9 @@ class SeriesViewModel(
         _selected, ctx, _search.map { it.trim() }.debounce(300).distinctUntilChanged(), sortMode, _listRefresh,
     ) { key, c, query, sort, _ -> Args(key, c, query, sort) }
         .combine(custResolved) { args, cs -> args to cs }
+        // Rebuild the pager when a folder gains/loses manual order (C3): the fast-path plain
+        // PagingSource doesn't observe content_order, so the switch must recreate it.
+        .combine(orderedContexts) { p, _ -> p }
         .flatMapLatest { (args, cs) ->
             // Hidden items/categories are filtered on each fresh PagingData inside the pager chain —
             // a customization change re-creates the pager (same pattern as Live TV).
@@ -300,7 +334,7 @@ class SeriesViewModel(
     private data class Args(val key: LiveKey, val ctx: Ctx, val query: String, val sort: SettingsRepository.SortMode)
 
     val count: StateFlow<Int> = combine(_selected, ctx, hiddenCategoryIds) { key, c, hidden -> Triple(key, c, hidden) }
-        .flatMapLatest { (key, c, hidden) -> countFlow(key, c, hidden) }
+        .flatMapLatest { (key, c, hidden) -> countFlow(key, c, hidden).throttleLatest() } // C2: cap live COUNT re-runs during bulk sync
         .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
 
     val favoriteIds: StateFlow<Set<Long>> = ctx
@@ -311,6 +345,74 @@ class SeriesViewModel(
     val episodes: StateFlow<List<EpisodeEntity>> = _openedSeries
         .flatMapLatest { s -> if (s == null) flowOf(emptyList()) else seriesDao.episodesBySeries(s.id) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** Per-episode resume progress for the open series (keyed by episode id). Reactive so the UI's watched
+     *  indicators, season counts, "Hide watched" filter, and "Next up" card update the instant a position
+     *  is saved — no manual refresh needed. Re-seeds when the profile or open series changes. */
+    val episodeProgress: StateFlow<Map<Long, PlaybackProgressEntity>> =
+        combine(ctx, _openedSeries) { c, s -> c to s }
+            .flatMapLatest { (c, s) ->
+                if (c.profileId < 0 || s == null) flowOf(emptyList())
+                else progressDao.observeSeriesEpisodeProgress(c.profileId, s.id)
+            }
+            .map { list -> list.associateBy { it.itemId } }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+    /** Episode ids in the open series that have been watched to ≥95% — drives ✓ marks, season "x/y" counts,
+     *  and the "Hide watched" filter. */
+    val completedEpisodeIds: StateFlow<Set<Long>> = episodeProgress
+        .map { prog -> prog.values.filter { isEpisodeCompleted(it) }.map { it.itemId }.toSet() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
+    /** The episode to surface as the "Next up" Play card: the last-watched one if still in progress (resume),
+     *  the first episode after a completed one, the first episode when nothing's been watched yet, or null
+     *  once the whole series is finished (card hides). Mirrors LauncherRecommendationPlanner's CONTINUE/NEXT
+     *  logic (threshold 0.95). */
+    val nextUpEpisodeId: StateFlow<Long?> = combine(episodes, episodeProgress) { eps, prog ->
+        if (eps.isEmpty()) null
+        else {
+            val ordered = eps.sortedWith(compareBy({ it.seasonNumber }, { it.episodeNumber }))
+            val lastWatched = prog.values.maxByOrNull { it.updatedAt }
+            when {
+                lastWatched == null -> ordered.first().id
+                isEpisodeCompleted(lastWatched) -> {
+                    val idx = ordered.indexOfFirst { it.id == lastWatched.itemId }
+                    if (idx in 0 until ordered.size - 1) ordered[idx + 1].id else null
+                }
+                else -> ordered.firstOrNull { it.id == lastWatched.itemId }?.id
+            }
+        }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    /** "Hide watched" toggle for the episode list (off by default). */
+    private val _hideWatched = MutableStateFlow(false)
+    val hideWatched: StateFlow<Boolean> = _hideWatched.asStateFlow()
+    fun setHideWatched(value: Boolean) { _hideWatched.value = value }
+
+    /** ≥95% of duration watched = completed (mirrors LauncherRecommendationPlanner.isCompleted). */
+    private fun isEpisodeCompleted(p: PlaybackProgressEntity): Boolean =
+        p.durationMs > 0 && p.positionMs >= (p.durationMs * 0.95f).toLong()
+
+    /** Mark an episode as watched (shows ✓) without playing it. A 1ms/1ms sentinel satisfies the ≥95%
+     *  completed rule while keeping Play restarting from ~0 (NOT the end) — a real positionMs=durationMs
+     *  would make AUTO/ASK resume jump to the credits. Replaces any existing resume position; the fresh
+     *  updatedAt also re-orders "next up" past it. Reactive, so the ✓ appears immediately. */
+    fun markEpisodeWatched(episode: EpisodeEntity) {
+        viewModelScope.launch {
+            val pid = currentProfileId() ?: return@launch
+            progressDao.save(
+                PlaybackProgressEntity(profileId = pid, mediaType = MediaType.EPISODE, itemId = episode.id, positionMs = 1L, durationMs = 1L),
+            )
+        }
+    }
+
+    /** Mark an episode as unwatched — clears its resume position (removes the ✓ and any progress bar). */
+    fun markEpisodeUnwatched(episode: EpisodeEntity) {
+        viewModelScope.launch {
+            val pid = currentProfileId() ?: return@launch
+            progressDao.clear(pid, MediaType.EPISODE, episode.id)
+        }
+    }
 
     fun select(key: LiveKey) { _selected.value = key }
     fun setSearchQuery(query: String) { _search.value = query }
@@ -679,9 +781,16 @@ class SeriesViewModel(
             }
             LiveKey.Favorites -> seriesDao.pagingFavoritesManual(c.profileId, ContentOrderEntity.FAV_CONTEXT, ids)
             LiveKey.History -> seriesDao.pagingHistory(c.profileId, ids)
-            is LiveKey.Folder ->
-                if (rating) seriesDao.pagingByCategoryRating(key.id)
-                else seriesDao.pagingByCategoryManual(key.id, c.profileId, folderContextKeys.value[key.id] ?: "")
+            is LiveKey.Folder -> {
+                val ctxKey = folderContextKeys.value[key.id] ?: ""
+                when {
+                    rating -> seriesDao.pagingByCategoryRating(key.id)
+                    // C3 fast path: no manual order in this folder → the plain indexed query has
+                    // the identical (sortOrder, name) order without the join-sort.
+                    ctxKey !in orderedContexts.value -> seriesDao.pagingByCategory(key.id)
+                    else -> seriesDao.pagingByCategoryManual(key.id, c.profileId, ctxKey)
+                }
+            }
         } else when (key) {
             LiveKey.All -> seriesDao.searchAll(query, ids)
             LiveKey.Favorites -> seriesDao.searchFavorites(query, c.profileId, ids)

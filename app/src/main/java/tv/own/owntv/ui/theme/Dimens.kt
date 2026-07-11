@@ -23,9 +23,16 @@ object Dimens {
     val IconTileSize = 42.dp
     val IconTileCorner = 12.dp
 
+    val GapTiny = 4.dp
     val GapSmall = 8.dp
     val GapMedium = 16.dp
     val GapLarge = 24.dp
+
+    // Poster tiles (PosterCard) — values match the shipped look exactly; centralized for tuning.
+    val PosterCardCorner = 14.dp
+    val PosterArtCorner = 10.dp
+    val PosterPadding = 6.dp
+    val PosterProgressHeight = 4.dp
 
     // M3 expressive shape scale (larger, rounder than the defaults).
     val CornerSmall = 12.dp

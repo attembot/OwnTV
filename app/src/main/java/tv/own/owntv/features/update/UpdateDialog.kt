@@ -106,7 +106,10 @@ fun UpdateDialog(onDismiss: () -> Unit, checkOnOpen: Boolean = false) {
                             renderReleaseNotes(s.info.notes, headingColor = colors.onSurface),
                             style = MaterialTheme.typography.bodySmall,
                             color = colors.onSurfaceVariant,
-                            modifier = Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
+                            // Cap to the screen (minus dialog chrome) so the Update/Later buttons stay reachable.
+                            modifier = Modifier
+                                .heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp - 260.dp).coerceIn(120.dp, 320.dp))
+                                .verticalScroll(rememberScrollState()),
                         )
                     }
                     Spacer(Modifier.height(20.dp))

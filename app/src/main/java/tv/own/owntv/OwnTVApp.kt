@@ -6,8 +6,10 @@ import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import coil3.request.allowRgb565
 import coil3.request.crossfade
 import okhttp3.OkHttpClient
+import okio.Path.Companion.toOkioPath
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.GlobalContext
@@ -57,6 +59,17 @@ class OwnTVApp : Application(), SingletonImageLoader.Factory, androidx.work.Conf
         ImageLoader.Builder(context)
             .components { add(OkHttpNetworkFetcherFactory(callFactory = { GlobalContext.get().get<OkHttpClient>() })) }
             .memoryCache { MemoryCache.Builder().maxSizePercent(context, 0.10).build() }
+            // Explicit bounded disk cache: posters/logos survive across sessions instead of
+            // re-downloading, capped so a 220k-item catalog can't eat the box's storage.
+            .diskCache {
+                coil3.disk.DiskCache.Builder()
+                    .directory(cacheDir.resolve("image_cache").toOkioPath())
+                    .maxSizeBytes(250L * 1024 * 1024)
+                    .build()
+            }
+            // Opaque poster art doesn't need an alpha channel; RGB_565 halves bitmap memory
+            // under the deliberately small memory cap.
+            .allowRgb565(true)
             .crossfade(true)
             .build()
 

@@ -70,17 +70,18 @@ Scan to join from your phone:
 - **Channel zapping** — D-pad/CH±/media keys, wraps around; **in-player channel list** (Left with controls hidden)
 - **Audio** — surround sound (opt-in, Dolby/DTS → multichannel LPCM, auto-stereo safety net); volume boost to 150%; A/V sync nudge
 - **Subtitles** — text (SRT/ASS) + image (PGS/VOBSUB/DVB on its own layer) + closed captions (CEA-608/708)
-- **Resume & auto-play** — per-title resume prompt, auto-play next episode (across seasons), opens on last-watched episode
+- **Resume & auto-play** — per-title resume prompt, auto-play next episode (across seasons) with a next-episode countdown card, opens on last-watched episode, watched ✓ / progress indicators on movies and episodes
 - **Mini-player / PiP** — dock any stream and keep browsing
 - **Stream info overlay** — live codec · resolution · fps · HDR · bitrate · decoder readout
 - 📺 **[Complete player design & feature reference →](extras/player.html)**
 
 ### 🧭 Browse
-- **Home screen** — Continue Watching hero carousel (partially-watched movies, episodes, recent channels) with dwell-to-expand previews; fully customizable per profile (reorder/hide rows, hero filters, "On Now" inline mini-guide rows); feeds system Watch Next on stock Android TV
+- **Home screen** — Continue Watching hero carousel (partially-watched movies, episodes, recent channels) with dwell-to-expand previews that pull in **TMDB backdrops, title logos and plot**; fully customizable per profile (reorder/hide rows, hero filters, "On Now" inline mini-guide rows); feeds system Watch Next on stock Android TV
 - **Sections** — Live TV (preview + real stream resolution badge), Movies, Series, Downloads, EPG Guide
 - **Fixed layout** — stable icon nav · full-label category column · content · preview (never expands/collapses)
 - **Categories** — Favorites & History per section, full names, search box; customize (hide/rename/reorder, range-select); hide/unhide individual channels, movies & series; optional PIN lock; survives re-syncs
-- **Search** — inline per-folder + global; TV-style bars; detailed channel results (category · number); long-press to favorite
+- **Search** — inline per-folder + global; launcher home (Continue / Unwatched / Channels + recent searches); **list + detail pane** with a primary action per result; Back clears the query first; long-press to favorite
+- **Continue chip** — shared top-bar chip resumes your most-recent movie / episode / channel in one press, on every screen
 - **Multiple playlists** — merge them all, or narrow the whole app to one via the **top-bar playlist switcher** (or a per-playlist **Default** toggle in Settings); applies to Live/Movies/Series/EPG/Search/Home incl. Favorites & History, and persists across restarts
 - **Sort & view** — playlist order or A–Z; Movies & Series Grid/List toggle
 - **Per-profile startup** — Home, last channel, or Live TV on Favorites
@@ -102,14 +103,16 @@ Scan to join from your phone:
 - Multiple profiles (own favorites/history/resume); PIN locks (salted hash); kids flag; "Who's watching?" gate; shared sources
 
 ### ⬇️ Downloads
-- Offline movies & episodes (never Live TV); pause/resume; user-chosen folder; states shown in grids
+- Offline movies & episodes (never Live TV); pause/resume/retry; user-chosen folder; **Active / Waiting / Completed / Failed** queue groups; **storage bar** with free space
+- **Poster status strip** — a download's live status (Downloading / Queued / Paused, with progress) shows on the movie / series / episode poster panel while it's in flight
 
 ### 🎨 Personalization & Settings
+- **Settings search & quick toggles** — filter Settings with a search box (results show their group, e.g. `Playback › HDR`); one-press quick toggles for the most-used options
 - **Appearance** — Material 3 (dark/light/system); any accent color (palette or hex); UI zoom; avatars; animations toggle
 - **Content** — clear watch history (all or per-type); per-source **Auto refresh** for playlists & EPG (Off by default, startup or 6–48h staleness intervals)
 - **Video Player** — hardware decoding, zoom, subtitle size/language, audio sync, surround sound, HDR, **external player** (VLC / MX Player for movies, series & downloads — global setting or per-item long-press)
 - **Weather** — top-bar weather chip: on/off, custom location (VPN-friendly), **°C / °F**
-- **Backup & Restore** — profiles, sources, customizations, favorites, history, resume, settings, auto-refresh choices, default source and per-item engine/compatibility pins; choose what to include
+- **Backup & Restore** — profiles, sources, customizations, favorites, history, resume, manual Move positions, settings, auto-refresh choices, default source, per-item engine/compatibility pins and custom TMDB names; choose what to include
 - **Updates** — in-app from GitHub Releases; auto-check (toggleable) + manual; installs APK on TV
 - **Android TV home** — feeds system Watch Next row; refresh button
 

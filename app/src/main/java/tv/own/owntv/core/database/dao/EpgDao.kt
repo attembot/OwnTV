@@ -55,10 +55,6 @@ interface EpgDao {
     @Query("SELECT * FROM epg_programmes WHERE epgChannelId = :epgChannelId AND stopMs > :now ORDER BY startMs ASC LIMIT :limit")
     fun upcoming(epgChannelId: String, now: Long, limit: Int): Flow<List<EpgProgrammeEntity>>
 
-    /** All programmes overlapping a time window for the given sources — drives the full guide grid. */
-    @Query("SELECT * FROM epg_programmes WHERE sourceId IN (:sourceIds) AND stopMs > :from AND startMs < :to ORDER BY epgChannelId ASC, startMs ASC")
-    suspend fun programmesInWindow(sourceIds: List<Long>, from: Long, to: Long): List<EpgProgrammeEntity>
-
     /** Lightweight guide rows: the grid needs titles/times, not potentially huge XMLTV descriptions. */
     @Query(
         "SELECT id, sourceId, epgChannelId, startMs, stopMs, title, NULL AS description, 0 AS contentHash " +
@@ -99,6 +95,14 @@ interface EpgDao {
             "AND stopMs > :from AND startMs < :to ORDER BY startMs ASC",
     )
     suspend fun programmeSummariesForChannel(sourceIds: List<Long>, epgKey: String, from: Long, to: Long): List<EpgProgrammeEntity>
+
+    /** Lightweight rows for several Home On Now channels at once. */
+    @Query(
+        "SELECT id, sourceId, epgChannelId, startMs, stopMs, title, NULL AS description, 0 AS contentHash " +
+            "FROM epg_programmes WHERE epgChannelId IN (:epgKeys) AND sourceId IN (:sourceIds) " +
+            "AND stopMs > :from AND startMs < :to ORDER BY epgChannelId ASC, startMs ASC",
+    )
+    suspend fun programmeSummariesForChannels(sourceIds: List<Long>, epgKeys: List<String>, from: Long, to: Long): List<EpgProgrammeEntity>
 
     /** How many programmes are stored for these sources (to tell "no guide yet" from "empty window"). */
     @Query("SELECT COUNT(*) FROM epg_programmes WHERE sourceId IN (:sourceIds)")

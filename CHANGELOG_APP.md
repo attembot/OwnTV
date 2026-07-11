@@ -3,13 +3,73 @@
 > Short release notes shown inside the app's update dialog: two parts per version — New features
 > (by name) and Fixes. The full, detailed changelog is [CHANGELOG.md](CHANGELOG.md). Hand-maintained —
 > edit this file directly alongside CHANGELOG.md, condensing per version (do not copy bullets verbatim).
+>
+> **Rule: bullet points only — no descriptions.** Each line is a short bolded feature/fix title and
+> nothing more. The ONLY extra detail ever allowed is a contribution credit for community work
+> (e.g. `(community PR #40 by @codeVerine)`). Issue numbers that are part of a title (e.g. `(#57)`) are
+> fine; explanatory parentheticals are not. Descriptions belong in CHANGELOG.md, never here.
+
+## v4.1.0 — 2026-07-11
+
+### ✨ New features
+
+- **Playback error log in Settings**
+- **Custom TMDB names are now in Backup & Restore**
+- **Wider interface zoom range (50%–150%)**
+
+### 🐛 Fixes
+
+- **Smaller app, faster cold start (R8)**
+- **Less UI work while browsing**
+- **Dialogs no longer get cut off on small screens**
+- **A–Z sorting now applies to categories too**
+- **Grids keep your place through background refreshes**
+- **Much faster global search on huge catalogs**
+- **Faster playlist import on huge playlists**
+- **Big folders page faster**
+- **Smoother UI during large syncs**
+- **Posters and channel logos are cached on disk**
+- **Faster, safer backup restore**
+- **Faster first launch when upgrading from v3.2.0 or older**
+- **Scheduled syncs now retry after network blips**
+- **Player stability hardening**
+- **More accurate playback error diagnosis**
+
+### 🔧 Under the hood
+
+- **ExoPlayer updated to 1.10.1**
+- **Koin, Coil & WorkManager updated**
+
+## v4.0.3 — 2026-07-09
+
+### ✨ New features
+
+- **Settings: search field & one-press quick toggles**
+- **Search: launcher home (Continue / Unwatched / Channels + recent searches), list + detail pane**
+- **Downloads: Active / Waiting / Completed / Failed groups, storage bar & clearer failures**
+- **Download status strip on movie, series & episode poster panels**
+- **Shell: shared "Continue" chip to resume your last movie / episode / channel**
+- **Series: watched indicators, "Next up" card, "Hide watched" filter & manual mark-as-watched/unwatched**
+- **TV Guide: "now" line, Jump-to-Now, catch-up ↻ badges, genre dots & a bottom preview strip**
+- **Movies: watched ✓ & progress on posters, resume label & manual mark-as-watched/unwatched**
+- **Player: next-episode countdown card with Play now / Cancel**
+
+### 🐛 Fixes
+
+- **All seasons now reachable on long-running series**
+- **Clearer 4K decode-guard message**
+- **Player seek bubble now shows the time remaining**
+- **Favourite "On Now" mini-guide now covers every favourite channel** (community PR #62 by @codeVerine)
+- **Home hero & Continue Watching tiles now use TMDB backdrops, logos & plot** (community PR #62 by @codeVerine)
+- **Home now refreshes in place after switching the top-bar playlist** (community PR #62 by @codeVerine)
+- **Manual reorder (Move positions) now included in Backup & Restore**
 
 ## v4.0.2 — 2026-07-07
 
 ### ✨ New features
 
 - 🏠 **Customizable Home screen — reorder/hide rows, dwell-to-expand hero, On Now mini-guide** (community PR #58 by @codeVerine)
-- ⚙️ **Settings menu reorganized** (Profiles on top; Live preview under Playback; App startup under App)
+- ⚙️ **Settings menu reorganized**
 - 🗂️ **Multiple playlists — switch the whole app to one playlist (or all)**
 - ✨ **VOD engine fallback (movies & series play on more devices)**
 - 🔄 **Per-source Auto Refresh (playlists & EPG)**
@@ -17,8 +77,8 @@
 - 🎬 **TMDB metadata enrichment (Movies, Series & Episodes)**
 - 🎞️ **In-app trailers for Movies & Series**
 - 🙈 **Hide individual movies & series — and a Customize PIN lock**
-- ✨ **External player — play movies, series & downloads in VLC / MX Player** (global setting + per-item long-press; Live TV stays in-app)
-- 📺 **Live TV closed captions now work (#57)** (CEA-608 CC on both ExoPlayer & mpv engines)
+- ✨ **External player — play movies, series & downloads in VLC / MX Player**
+- 📺 **Live TV closed captions now work (#57)**
 - 🌦️ **Weather settings submenu — Celsius / Fahrenheit**
 - ⚠️ **Low-zoom memory warning (#51)**
 

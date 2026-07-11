@@ -3,6 +3,7 @@
 package tv.own.owntv.features.live
 
 import android.content.Context
+import androidx.compose.runtime.Immutable
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -56,6 +57,7 @@ import tv.own.owntv.core.database.entity.FavoriteEntity
 import tv.own.owntv.core.database.entity.WatchHistoryEntity
 import tv.own.owntv.core.launcher.LauncherIntegrationRepository
 import tv.own.owntv.core.model.MediaType
+import tv.own.owntv.core.util.throttleLatest
 import tv.own.owntv.core.model.SourceType
 import tv.own.owntv.core.parser.XtEpgEntry
 import tv.own.owntv.core.parser.XtreamClient
@@ -74,9 +76,11 @@ sealed interface LiveKey {
 }
 
 /** A rail entry. Favorites/History carry an [icon] (rendered instead of the abbreviation). */
+@Immutable
 data class LiveRailItem(val key: LiveKey, val abbr: String, val title: String, val icon: OwnTVIcon? = null)
 
 /** Now-playing + up-next EPG for the focused channel (null entries when the guide is unavailable). */
+@Immutable
 data class EpgNowNext(val now: XtEpgEntry?, val next: XtEpgEntry?, val upcoming: List<XtEpgEntry> = emptyList())
 
 class LiveViewModel(
@@ -151,6 +155,15 @@ class LiveViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
+    /** Contexts that actually have manual-order rows (C3): only those folders pay the
+     *  unindexable content_order join-sort; everything else stays on the plain indexed query. */
+    private val orderedContexts: StateFlow<Set<String>> = ctx
+        .flatMapLatest { c ->
+            if (c.profileId < 0) flowOf(emptySet())
+            else contentOrderDao.observeContextKeys(c.profileId, MediaType.LIVE).map { it.toSet() }
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
     private val _selected = MutableStateFlow<LiveKey>(LiveKey.All)
     val selectedKey: StateFlow<LiveKey> = _selected.asStateFlow()
 
@@ -204,8 +217,10 @@ class LiveViewModel(
     val railItems: StateFlow<List<LiveRailItem>> = ctx
         .flatMapLatest { c ->
             if (c.profileId < 0) flowOf(defaultRail)
-            else combine(categoryDao.observe(c.sourceIds, MediaType.LIVE), custom) { cats, cust ->
-                defaultRail + cats.applyCustomizations(cust).map { (cat, name) ->
+            else combine(categoryDao.observe(c.sourceIds, MediaType.LIVE), custom, sortMode) { cats, cust, sort ->
+                // A–Z also sorts the category folders; manually moved categories stay pinned first.
+                val folders = cats.applyCustomizations(cust, alphaRest = sort == SettingsRepository.SortMode.ALPHA)
+                defaultRail + folders.map { (cat, name) ->
                     LiveRailItem(LiveKey.Folder(cat.id), abbreviate(name), name)
                 }
             }
@@ -219,6 +234,9 @@ class LiveViewModel(
         sortMode,
         custResolved,
     ) { key, c, query, sort, cs -> Args(key, c, query, sort, cs) }
+        // Rebuild the pager when a folder gains/loses manual order (C3): the fast-path plain
+        // PagingSource doesn't observe content_order, so the switch must recreate it.
+        .combine(orderedContexts) { args, _ -> args }
         .flatMapLatest { (key, c, query, sort, cs) ->
             // Customizations are applied to each fresh PagingData inside the pager chain — a PagingData
             // that the UI already collected must never be re-transformed (Paging forbids re-collection,
@@ -302,7 +320,7 @@ class LiveViewModel(
     }
 
     val count: StateFlow<Int> = combine(_selected, ctx, hiddenCategoryIds) { key, c, hidden -> Triple(key, c, hidden) }
-        .flatMapLatest { (key, c, hidden) -> countFlow(key, c, hidden) }
+        .flatMapLatest { (key, c, hidden) -> countFlow(key, c, hidden).throttleLatest() } // C2: cap live COUNT re-runs during bulk sync
         .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
 
     val favoriteIds: StateFlow<Set<Long>> = ctx
@@ -804,7 +822,13 @@ class LiveViewModel(
                 LiveKey.All -> if (playlist) channelDao.pagingAllOriginal(ids) else channelDao.pagingAll(ids)
                 LiveKey.Favorites -> channelDao.pagingFavoritesManual(c.profileId, ContentOrderEntity.FAV_CONTEXT, ids)
                 LiveKey.History -> channelDao.pagingHistory(c.profileId, ids)
-                is LiveKey.Folder -> channelDao.pagingByCategoryManual(key.id, c.profileId, folderContextKeys.value[key.id] ?: "")
+                is LiveKey.Folder -> {
+                    val ctxKey = folderContextKeys.value[key.id] ?: ""
+                    // C3 fast path: no manual order in this folder → the plain indexed query has
+                    // the identical (sortOrder, name) order without the join-sort.
+                    if (ctxKey !in orderedContexts.value) channelDao.pagingByCategory(key.id)
+                    else channelDao.pagingByCategoryManual(key.id, c.profileId, ctxKey)
+                }
             }
         } else {
             when (key) {

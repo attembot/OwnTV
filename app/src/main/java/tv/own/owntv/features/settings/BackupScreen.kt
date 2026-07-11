@@ -39,6 +39,7 @@ import tv.own.owntv.core.backup.BackupManager
 import tv.own.owntv.ui.components.BrowseMode
 import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.OwnTVButton
+import tv.own.owntv.ui.components.dialogPanel
 import tv.own.owntv.ui.components.OwnTVButtonStyle
 import tv.own.owntv.ui.components.OwnTVSpinner
 import tv.own.owntv.ui.components.OwnTVTextField
@@ -230,7 +231,7 @@ private fun BackupPasswordDialog(
     BackHandler { onDismiss() }
 
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)).focusGroup(), contentAlignment = Alignment.Center) {
-        Column(Modifier.width(560.dp).clip(RoundedCornerShape(20.dp)).background(colors.surfaceContainerHigh).padding(28.dp)) {
+        Column(Modifier.dialogPanel(width = 560.dp, padding = 28.dp)) {
             Text(title, style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
             Spacer(Modifier.height(12.dp))
             Text(message, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
@@ -270,7 +271,7 @@ private fun SectionPickerDialog(
     BackHandler { onDismiss() }
 
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)).focusGroup(), contentAlignment = Alignment.Center) {
-        Column(Modifier.width(560.dp).clip(RoundedCornerShape(20.dp)).background(colors.surfaceContainerHigh).padding(28.dp)) {
+        Column(Modifier.dialogPanel(width = 560.dp, padding = 28.dp)) {
             Text(title, style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
             Spacer(Modifier.height(16.dp))
 

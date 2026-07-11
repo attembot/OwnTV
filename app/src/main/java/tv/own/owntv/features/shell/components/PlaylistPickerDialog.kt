@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -91,8 +92,13 @@ fun PlaylistPickerDialog(
     }
 }
 
-/** Caps the list height so a long playlist set scrolls inside the dialog instead of overflowing it. */
-private fun Modifier.heightScrollCap(): Modifier = this.height(340.dp)
+/** Caps the list height so a long playlist set scrolls inside the dialog instead of overflowing it —
+ *  relative to the screen so the dialog never clips on small/low-res displays. */
+@Composable
+private fun Modifier.heightScrollCap(): Modifier {
+    val max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp - 180.dp).coerceIn(160.dp, 340.dp)
+    return this.heightIn(max = max)
+}
 
 @Composable
 private fun PlaylistRow(

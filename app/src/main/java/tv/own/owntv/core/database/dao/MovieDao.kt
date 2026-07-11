@@ -134,6 +134,15 @@ interface MovieDao {
     @Query("SELECT * FROM movies WHERE sourceId IN (:sourceIds) AND name LIKE '%' || :query || '%' ORDER BY name ASC LIMIT :limit")
     suspend fun searchList(query: String, sourceIds: List<Long>, limit: Int): List<MovieEntity>
 
+    /** FTS-backed bounded list for global as-you-type search: index-served prefix-token match instead
+     *  of the leading-wildcard LIKE above, which scans all ~170k rows per keystroke. [ftsQuery] must be
+     *  a sanitized FTS MATCH expression (see SearchViewModel.ftsQueryFor). */
+    @Query(
+        "SELECT * FROM movies WHERE sourceId IN (:sourceIds) " +
+            "AND id IN (SELECT rowid FROM movies_fts WHERE movies_fts MATCH :ftsQuery) ORDER BY name ASC LIMIT :limit",
+    )
+    suspend fun searchListFts(ftsQuery: String, sourceIds: List<Long>, limit: Int): List<MovieEntity>
+
     @Query(
         "SELECT m.* FROM movies m INNER JOIN favorites f ON f.itemId = m.id AND f.mediaType = 'MOVIE' " +
             "WHERE f.profileId = :profileId AND m.sourceId IN (:sourceIds) AND m.name LIKE '%' || :query || '%' ORDER BY f.addedAt DESC",
@@ -180,4 +189,21 @@ interface MovieDao {
             "WHERE h.profileId = :profileId ORDER BY h.watchedAt DESC LIMIT :limit",
     )
     fun recentlyWatched(profileId: Long, limit: Int): Flow<List<MovieEntity>>
+
+    /** Search "Continue" chip: recently-watched snapshot (one-shot), scoped to the active sources. */
+    @Query(
+        "SELECT m.* FROM movies m " +
+            "INNER JOIN watch_history h ON h.itemId = m.id AND h.mediaType = 'MOVIE' " +
+            "WHERE h.profileId = :profileId AND m.sourceId IN (:sourceIds) ORDER BY h.watchedAt DESC LIMIT :limit",
+    )
+    suspend fun recentlyWatchedSnapshot(profileId: Long, sourceIds: List<Long>, limit: Int): List<MovieEntity>
+
+    /** Search "Unwatched" chip: favourite movies with no watch-history row (bounded by favourites). */
+    @Query(
+        "SELECT m.* FROM movies m " +
+            "INNER JOIN favorites f ON f.itemId = m.id AND f.mediaType = 'MOVIE' AND f.profileId = :profileId " +
+            "LEFT JOIN watch_history h ON h.itemId = m.id AND h.mediaType = 'MOVIE' AND h.profileId = :profileId " +
+            "WHERE m.sourceId IN (:sourceIds) AND h.itemId IS NULL ORDER BY f.addedAt DESC LIMIT :limit",
+    )
+    suspend fun unwatchedFavorites(profileId: Long, sourceIds: List<Long>, limit: Int): List<MovieEntity>
 }

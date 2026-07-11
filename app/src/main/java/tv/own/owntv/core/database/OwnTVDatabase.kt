@@ -74,7 +74,7 @@ import tv.own.owntv.core.database.entity.TvProviderProgramEntity
         SeriesFtsEntity::class,
         EpisodeFtsEntity::class,
     ],
-    version = 12, // v7: content_order (Move). v8: contentHash + browse/unique indexes. v9: EPG contentHash + natural key. v10: TMDB metadata cache. v11: movies/series rating-sort indexes. v12: metadata_cache trailerKey
+    version = 13, // v7: content_order (Move). v8: contentHash + browse/unique indexes. v9: EPG contentHash + natural key. v10: TMDB metadata cache. v11: movies/series rating-sort indexes. v12: metadata_cache trailerKey. v13: metadata_cache logoPath
 
     exportSchema = true,
 )
@@ -253,18 +253,25 @@ abstract class OwnTVDatabase : RoomDatabase() {
 
         /**
          * v8 → v9: incremental EPG sync (PR #40) — `contentHash` on programmes plus the natural-key
-         * unique index. Pre-existing duplicate rows are removed before the unique index is created.
+         * unique index.
+         *
+         * D1 rewrite (body only; the resulting schema is unchanged and still matches the committed
+         * 9.json): the original ran a row-wise de-dup
+         * (`DELETE ... WHERE id NOT IN (SELECT MIN(id) ... GROUP BY ...)`) — a full unindexed
+         * self-scan of the largest table, synchronously on first open after upgrade (multi-second
+         * hang on big guides). `epg_programmes` is a rebuildable cache with no user data attached,
+         * so simply truncate it: the unique index is then free to create on an empty table, and the
+         * guide re-downloads on the next EPG sync. Only affects upgrades from v3.2.0 or older
+         * (DB ≤ 8); everyone on 4.x already ran the old body (Room never re-runs a completed
+         * migration). Lesson for future heavy migrations: probe first or truncate rebuildable
+         * caches — never row-wise de-dup a cache table.
          */
         val MIGRATION_8_9 = object : androidx.room.migration.Migration(8, 9) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 if (!hasColumn(db, "epg_programmes", "contentHash")) {
                     db.execSQL("ALTER TABLE `epg_programmes` ADD COLUMN `contentHash` INTEGER NOT NULL DEFAULT 0")
                 }
-                db.execSQL(
-                    "DELETE FROM `epg_programmes` WHERE `id` NOT IN (" +
-                        "SELECT MIN(`id`) FROM `epg_programmes` GROUP BY `sourceId`, `epgChannelId`, `startMs`" +
-                        ")",
-                )
+                db.execSQL("DELETE FROM `epg_programmes`")
                 db.execSQL(
                     "CREATE UNIQUE INDEX IF NOT EXISTS `index_epg_programmes_natural_key` " +
                         "ON `epg_programmes` (`sourceId`, `epgChannelId`, `startMs`)",
@@ -333,6 +340,16 @@ abstract class OwnTVDatabase : RoomDatabase() {
         val MIGRATION_11_12 = object : androidx.room.migration.Migration(11, 12) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE `metadata_cache` ADD COLUMN `trailerKey` TEXT")
+            }
+        }
+
+        /**
+         * v12 → v13: nullable `logoPath` on the metadata_cache table (Home hero title-logo treatment).
+         * Additive column on a pure cache table; existing rows simply use text-title fallback until refreshed.
+         */
+        val MIGRATION_12_13 = object : androidx.room.migration.Migration(12, 13) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `metadata_cache` ADD COLUMN `logoPath` TEXT")
             }
         }
 

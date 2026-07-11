@@ -43,6 +43,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemContentType
+import androidx.paging.compose.itemKey
 import coil3.compose.AsyncImage
 import org.koin.androidx.compose.koinViewModel
 import androidx.tv.material3.MaterialTheme
@@ -66,6 +68,8 @@ import tv.own.owntv.ui.components.formatCount
 import tv.own.owntv.ui.components.ContentPanelFill
 import tv.own.owntv.ui.components.PreviewPanelFill
 import tv.own.owntv.ui.components.roundedPanel
+import tv.own.owntv.ui.components.dialogPanel
+import tv.own.owntv.ui.components.gridFocusTarget
 import tv.own.owntv.ui.format.rememberSystemTimeFormatter
 import tv.own.owntv.ui.theme.Dimens
 import tv.own.owntv.ui.theme.OwnTVTheme
@@ -252,18 +256,22 @@ fun LiveScreen(
                 }
             } else {
                 LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    items(channels.itemCount) { index ->
+                    items(
+                        count = channels.itemCount,
+                        key = channels.itemKey { it.id },
+                        contentType = channels.itemContentType { "channel" },
+                    ) { index ->
                         val channel = channels[index]
                         if (channel != null) {
                             ChannelRow(
                                 channel = channel,
                                 isFavorite = favoriteIds.contains(channel.id),
-                                modifier = when {
-                                    channel.id == contextChannelId -> Modifier.focusRequester(contextFocus)
-                                    channel.id == previewChannel?.id -> Modifier.focusRequester(selFocus)
-                                    index == 0 -> Modifier.focusRequester(firstItemFocus)
-                                    else -> Modifier
-                                },
+                                modifier = Modifier.gridFocusTarget(
+                                    itemId = channel.id, index = index,
+                                    contextId = contextChannelId, contextFocus = contextFocus,
+                                    selectedId = previewChannel?.id, selectedFocus = selFocus,
+                                    firstItemFocus = firstItemFocus,
+                                ),
                                 onFocus = { vm.onChannelFocused(channel) },
                                 onClick = {
                                     vm.watchFullscreen(channel, channels.itemSnapshotList.items.filterNotNull())
@@ -433,7 +441,7 @@ private fun ChannelContextMenu(
         contentAlignment = Alignment.Center,
     ) {
         Column(
-            modifier = Modifier.width(440.dp).clip(RoundedCornerShape(20.dp)).background(colors.surfaceContainerHigh).padding(24.dp),
+            modifier = Modifier.dialogPanel(),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(channelName, style = MaterialTheme.typography.titleMedium, color = colors.onSurface, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
@@ -655,6 +663,9 @@ private fun CatchupDialog(
         Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.7f)).focusGroup(),
         contentAlignment = Alignment.Center,
     ) {
+        // Inner list is height-capped to the screen (minus the dialog chrome) so the Close button
+        // stays reachable on small/low-res screens; the outer column can't verticalScroll (LazyColumn).
+        val listHeight = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp - 200.dp).coerceIn(160.dp, 360.dp)
         Column(Modifier.width(620.dp).clip(RoundedCornerShape(20.dp)).background(colors.surfaceContainerHigh).padding(24.dp)) {
             Text("Catch-up · $channelName", style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
             Spacer(Modifier.height(2.dp))
@@ -668,7 +679,7 @@ private fun CatchupDialog(
                         style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant,
                     )
                 } else {
-                    LazyColumn(Modifier.fillMaxWidth().height(360.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    LazyColumn(Modifier.fillMaxWidth().height(listHeight), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         items(progs, key = { it.id }) { p ->
                             FocusableSurface(
                                 onClick = { onPick(p) },
@@ -727,6 +738,8 @@ internal fun EpgMatchDialog(
         Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.7f)).focusGroup(),
         contentAlignment = Alignment.Center,
     ) {
+        // Same small-screen cap as CatchupDialog: search bar + buttons must stay reachable.
+        val listHeight = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp - 260.dp).coerceIn(140.dp, 300.dp)
         Column(Modifier.width(580.dp).clip(RoundedCornerShape(20.dp)).background(colors.surfaceContainerHigh).padding(24.dp)) {
             Text("Match EPG", style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
             Spacer(Modifier.height(2.dp))
@@ -744,7 +757,7 @@ internal fun EpgMatchDialog(
                     if (query.isBlank()) "No EPG data yet — add an EPG source in Settings." else "No guide channels match “$query”.",
                     style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant,
                 )
-                else -> LazyColumn(Modifier.fillMaxWidth().height(300.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                else -> LazyColumn(Modifier.fillMaxWidth().height(listHeight), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(list, key = { it.id }) { epg ->
                         FocusableSurface(
                             onClick = { onPick(epg.epgChannelId) },

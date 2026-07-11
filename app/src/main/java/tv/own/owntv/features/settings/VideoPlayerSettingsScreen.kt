@@ -46,6 +46,7 @@ import androidx.tv.material3.Text
 import tv.own.owntv.player.ZoomMode
 import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.OwnTVButton
+import tv.own.owntv.ui.components.dialogPanel
 import tv.own.owntv.ui.components.OwnTVButtonStyle
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.theme.Dimens
@@ -384,7 +385,9 @@ internal fun PickerDialog(
                 )
                 Spacer(Modifier.height(12.dp))
             }
-            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 360.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            // Cap the list to the screen (minus dialog chrome) so Close stays reachable on small screens.
+            val listMax = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp - 220.dp).coerceIn(140.dp, 360.dp)
+            LazyColumn(Modifier.fillMaxWidth().heightIn(max = listMax), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 itemsIndexed(shown, key = { _, o -> o.first }) { index, (value, label) ->
                     val isSel = value == selected
                     FocusableSurface(
@@ -429,7 +432,7 @@ internal fun StepperDialog(
     BackHandler { onDismiss() }
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)), contentAlignment = Alignment.Center) {
         Column(
-            modifier = Modifier.width(460.dp).clip(RoundedCornerShape(20.dp)).background(colors.surfaceContainerHigh).padding(28.dp),
+            modifier = Modifier.dialogPanel(width = 460.dp, padding = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(title, style = MaterialTheme.typography.titleLarge, color = colors.onSurface)

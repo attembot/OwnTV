@@ -2,6 +2,8 @@ package tv.own.owntv.features.setup
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -224,7 +226,9 @@ private fun ExistingSourcesScreen(sources: List<SourceEntity>, onAdd: (Set<Long>
             Spacer(Modifier.height(6.dp))
             Text("Pick the playlists to add to this profile.", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
             Spacer(Modifier.height(20.dp))
-            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 320.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Cap to the screen (minus header/footer) so Back/Add stay reachable on small screens.
+            val listMax = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp - 260.dp).coerceIn(140.dp, 320.dp)
+            LazyColumn(Modifier.fillMaxWidth().heightIn(max = listMax), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(sources, key = { it.id }) { src ->
                     val checked = src.id in selected
                     FocusableSurface(
@@ -399,6 +403,11 @@ private fun ImportProgressScreen(
 @Composable
 private fun Centered(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
     Box(modifier = Modifier.fillMaxSize().padding(40.dp), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, content = content)
+        // Scrollable so wizard steps taller than a small/low-res screen keep all buttons reachable.
+        Column(
+            modifier = Modifier.verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            content = content,
+        )
     }
 }

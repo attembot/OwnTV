@@ -48,7 +48,7 @@ fun ResumeDialog(
         modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)).trapAllFocusExit().focusGroup(),
         contentAlignment = Alignment.Center,
     ) {
-        Column(Modifier.width(440.dp).clip(RoundedCornerShape(20.dp)).background(colors.surfaceContainerHigh.copy(alpha = 0.88f)).padding(28.dp)) {
+        Column(Modifier.dialogPanel(padding = 28.dp, fill = colors.surfaceContainerHigh.copy(alpha = 0.88f))) {
             Text("Resume playback?", style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
             Spacer(Modifier.height(8.dp))
             Text(

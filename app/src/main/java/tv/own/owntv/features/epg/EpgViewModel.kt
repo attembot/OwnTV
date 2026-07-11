@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
@@ -97,7 +98,10 @@ class EpgViewModel(
         activeProfileSources(settings, sourceDao)
             .flatMapLatest { aps ->
                 if (aps.sources.isEmpty()) flowOf(emptyList())
-                else categoryDao.observe(aps.sourceIds, MediaType.LIVE)
+                else combine(categoryDao.observe(aps.sourceIds, MediaType.LIVE), settings.sortLive) { cats, sort ->
+                    // Mirror Live TV's A–Z toggle: categories sort alphabetically when it's active.
+                    if (sort == SettingsRepository.SortMode.ALPHA) cats.sortedBy { it.name.lowercase() } else cats
+                }
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 

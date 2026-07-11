@@ -40,6 +40,8 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import tv.own.owntv.core.database.entity.EpgProgrammeEntity
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.OwnTVButton
 import tv.own.owntv.ui.components.OwnTVButtonStyle
@@ -62,6 +64,7 @@ internal fun ProgrammeStripCanvas(
     windowEnd: Long,
     now: Long,
     highlightTime: Long?,
+    catchupIds: Set<Long>,
     hScroll: androidx.compose.foundation.ScrollState,
 ) {
     val colors = OwnTVTheme.colors
@@ -86,6 +89,11 @@ internal fun ProgrammeStripCanvas(
             if (now in p.startMs until p.stopMs) "NOW · $t" else t
         }
     }
+    // Vertical "now" marker + catch-up glyph — measured once, reused each frame.
+    val nowColor = Color(0xFFFF5C5C)
+    val nowLinePx = with(density) { 2.dp.toPx() }
+    val catchupStyle = MaterialTheme.typography.labelSmall.copy(color = colors.primary)
+    val catchupGlyph = remember(catchupStyle) { measurer.measure("↻", catchupStyle) }
 
     val scrollPx = hScroll.value.toFloat() // read in composable scope so Canvas redraws on scroll
     Canvas(Modifier.fillMaxSize()) {
@@ -113,6 +121,17 @@ internal fun ProgrammeStripCanvas(
                 drawText(title, topLeft = Offset(x + padPx, top))
                 drawText(time, topLeft = Offset(x + padPx, top + title.size.height + 2))
             }
+            // Catch-up badge (↻) at the cell's top-right — only on programmes this channel can rewind from.
+            if (p.id in catchupIds && w > 50f) {
+                drawText(catchupGlyph, topLeft = Offset(x + w - catchupGlyph.size.width - 4f, 3f))
+            }
+        }
+        // Vertical "now" marker — drawn on every row so it reads as one continuous line down the grid.
+        if (now in windowStart..windowEnd) {
+            val nowX = ((now - windowStart) / 60_000f) * pxPerMin - scrollPx
+            if (nowX in 0f..viewW) {
+                drawLine(color = nowColor, start = Offset(nowX, 0f), end = Offset(nowX, h), strokeWidth = nowLinePx)
+            }
         }
     }
 }
@@ -139,7 +158,11 @@ internal fun ProgrammeDetailDialog(
     Popup(onDismissRequest = onDismiss, properties = PopupProperties(focusable = true)) {
         BackHandler { onDismiss() }
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.75f)), contentAlignment = Alignment.Center) {
-            Column(Modifier.widthIn(max = 560.dp).clip(RoundedCornerShape(20.dp)).background(colors.surfaceContainerHigh).padding(28.dp)) {
+            // Scrollable: long XMLTV descriptions can exceed a small screen's height.
+            Column(
+                Modifier.widthIn(max = 560.dp).clip(RoundedCornerShape(20.dp)).background(colors.surfaceContainerHigh)
+                    .verticalScroll(rememberScrollState()).padding(28.dp),
+            ) {
                 Text(channelName.uppercase(), style = MaterialTheme.typography.labelMedium, color = colors.primary, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(6.dp))
                 Text(programme.title, style = MaterialTheme.typography.headlineSmall, color = colors.onSurface)

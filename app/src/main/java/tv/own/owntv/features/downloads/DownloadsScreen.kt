@@ -65,15 +65,21 @@ fun DownloadsScreen(
     // Global external-player toggle: never mount the fullscreen in-app player (it spins up mpv)
     // when playback is handed to an external app.
     val externalPlayerOn by vm.externalPlayerOn.collectAsStateWithLifecycle()
+    val storage by vm.storage.collectAsStateWithLifecycle()
     val colors = OwnTVTheme.colors
+
+    // Grouped rows (Active / Waiting / Completed / Failed) with section headers interleaved.
+    val rows = remember(downloads) { buildDownloadRows(downloads) }
+    val firstItemId = rows.firstNotNullOfOrNull { (it as? DownloadListRow.Item)?.download?.id }
 
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     val selFocus = remember { androidx.compose.ui.focus.FocusRequester() }
     val firstFocus = remember { androidx.compose.ui.focus.FocusRequester() }
-    // Returning from the player: scroll to and focus the download you just played.
-    LaunchedEffect(restoreFocus, downloads.size) {
+    // Returning from the player: scroll to and focus the download you just played (index within the
+    // grouped rows, so headers don't throw the target off).
+    LaunchedEffect(restoreFocus, rows.size) {
         if (!restoreFocus || downloads.isEmpty()) return@LaunchedEffect
-        val idx = lastPlayedId?.let { id -> downloads.indexOfFirst { it.id == id } } ?: -1
+        val idx = lastPlayedId?.let { id -> rows.indexOfFirst { it is DownloadListRow.Item && it.download.id == id } } ?: -1
         if (idx >= 0) {
             runCatching { listState.scrollToItem(idx) }
             kotlinx.coroutines.delay(60)
@@ -100,32 +106,96 @@ fun DownloadsScreen(
         Text("Movies & episodes saved for offline playback.", style = MaterialTheme.typography.titleMedium, color = colors.onSurfaceVariant)
         Spacer(Modifier.height(18.dp))
 
+        storage?.let {
+            StorageBar(it)
+            Spacer(Modifier.height(16.dp))
+        }
+
         if (downloads.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("No downloads yet. Open a movie or episode and press Download.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge)
             }
         } else {
             LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.focusGroup()) {
-                itemsIndexed(downloads, key = { _, d -> d.id }) { index, d ->
-                    DownloadRow(
-                        download = d,
-                        focusModifier = when {
-                            d.id == lastPlayedId -> Modifier.focusRequester(selFocus)
-                            index == 0 -> Modifier.focusRequester(firstFocus)
-                            else -> Modifier
-                        },
-                        onPlay = { vm.play(d); if (!externalPlayerOn) onFullscreen() },
-                        onPlayExternal = { vm.playExternal(d) },
-                        onRetry = { vm.retry(d) },
-                        onPause = { vm.pause(d) },
-                        onResume = { vm.resume(d) },
-                        onDelete = { vm.delete(d) },
-                    )
+                itemsIndexed(rows, key = { _, r -> r.key }) { _, r ->
+                    when (r) {
+                        is DownloadListRow.Header -> SectionHeader(r.label, r.count)
+                        is DownloadListRow.Item -> {
+                            val d = r.download
+                            DownloadRow(
+                                download = d,
+                                focusModifier = when {
+                                    d.id == lastPlayedId -> Modifier.focusRequester(selFocus)
+                                    d.id == firstItemId -> Modifier.focusRequester(firstFocus)
+                                    else -> Modifier
+                                },
+                                onPlay = { vm.play(d); if (!externalPlayerOn) onFullscreen() },
+                                onPlayExternal = { vm.playExternal(d) },
+                                onRetry = { vm.retry(d) },
+                                onPause = { vm.pause(d) },
+                                onResume = { vm.resume(d) },
+                                onDelete = { vm.delete(d) },
+                            )
+                        }
+                    }
                 }
             }
         }
     }
 }
+
+/** A display row in the grouped Downloads list: either a section header or a download. */
+private sealed interface DownloadListRow {
+    val key: String
+    data class Header(val label: String, val count: Int) : DownloadListRow {
+        override val key get() = "hdr_$label"
+    }
+    data class Item(val download: DownloadEntity) : DownloadListRow {
+        override val key get() = "d_${download.id}"
+    }
+}
+
+/** Groups downloads into Active / Waiting / Completed / Failed with a header before each non-empty group. */
+private fun buildDownloadRows(downloads: List<DownloadEntity>): List<DownloadListRow> {
+    val active = downloads.filter { it.status == DownloadStatus.RUNNING || it.status == DownloadStatus.PAUSED }
+    val waiting = downloads.filter { it.status == DownloadStatus.QUEUED }
+    val completed = downloads.filter { it.status == DownloadStatus.COMPLETED }
+    val failed = downloads.filter { it.status == DownloadStatus.FAILED }
+    return buildList {
+        listOf("Active" to active, "Waiting" to waiting, "Completed" to completed, "Failed" to failed).forEach { (label, list) ->
+            if (list.isNotEmpty()) {
+                add(DownloadListRow.Header(label, list.size))
+                list.forEach { add(DownloadListRow.Item(it)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionHeader(label: String, count: Int) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
+        Text(label.uppercase(), style = MaterialTheme.typography.titleSmall, color = OwnTVTheme.colors.primary, fontWeight = FontWeight.Bold)
+        Text("$count", style = MaterialTheme.typography.labelMedium, color = OwnTVTheme.colors.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun StorageBar(info: tv.own.owntv.core.download.DownloadStorageInfo) {
+    val colors = OwnTVTheme.colors
+    Column(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Storage", style = MaterialTheme.typography.labelLarge, color = colors.onSurfaceVariant, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.weight(1f))
+            Text("${gb(info.freeBytes)} free of ${gb(info.totalBytes)}", style = MaterialTheme.typography.labelLarge, color = colors.primary, fontWeight = FontWeight.SemiBold)
+        }
+        Spacer(Modifier.height(6.dp))
+        Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(colors.surfaceContainerLowest)) {
+            Box(Modifier.fillMaxWidth(info.usedFraction).height(6.dp).clip(RoundedCornerShape(3.dp)).background(colors.primary))
+        }
+    }
+}
+
+private fun gb(bytes: Long): String = if (bytes <= 0) "—" else "%.1f GB".format(bytes / 1_073_741_824.0)
 
 @Composable
 private fun DownloadRow(
@@ -180,7 +250,7 @@ private fun StatusLine(d: DownloadEntity) {
     val colors = OwnTVTheme.colors
     when (d.status) {
         DownloadStatus.COMPLETED -> Text("Downloaded · ${mb(d.totalBytes)}", style = MaterialTheme.typography.bodySmall, color = colors.primary, fontWeight = FontWeight.SemiBold)
-        DownloadStatus.FAILED -> Text("Download failed", style = MaterialTheme.typography.bodySmall, color = Color(0xFFEF4444))
+        DownloadStatus.FAILED -> Text("Download failed — couldn't reach the source. Tap Retry.", style = MaterialTheme.typography.bodySmall, color = Color(0xFFEF4444))
         DownloadStatus.QUEUED -> Text("Queued…", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
         else -> { // RUNNING / PAUSED
             val frac = if (d.totalBytes > 0) (d.downloadedBytes.toFloat() / d.totalBytes).coerceIn(0f, 1f) else 0f

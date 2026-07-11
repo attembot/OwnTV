@@ -39,6 +39,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import tv.own.owntv.core.database.entity.ProfileEntity
 import tv.own.owntv.ui.components.FocusableSurface
+import tv.own.owntv.ui.components.dialogPanel
 import tv.own.owntv.ui.components.OwnTVAvatar
 import tv.own.owntv.ui.components.OwnTVAvatars
 import tv.own.owntv.ui.components.OwnTVButton
@@ -61,12 +62,10 @@ internal fun ProfileScrim(onDismiss: () -> Unit, content: @Composable () -> Unit
                 .background(Color.Black.copy(alpha = 0.75f)),
             contentAlignment = Alignment.Center,
         ) {
+            // Scrollable so small/low-res screens can still reach the lower controls (Kids
+            // toggle / PIN / Create were clipped and unreachable on a cut-off screen).
             Column(
-                modifier = Modifier
-                    .width(480.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(OwnTVTheme.colors.surfaceContainerHigh)
-                    .padding(28.dp),
+                modifier = Modifier.dialogPanel(width = 480.dp, padding = 28.dp),
             ) { content() }
         }
     }

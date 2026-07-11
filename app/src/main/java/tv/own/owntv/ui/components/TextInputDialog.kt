@@ -54,7 +54,7 @@ fun TextInputDialog(
         contentAlignment = Alignment.Center,
     ) {
         Column(
-            Modifier.width(480.dp).clip(RoundedCornerShape(20.dp)).background(colors.surfaceContainerHigh).padding(28.dp),
+            Modifier.dialogPanel(width = 480.dp, padding = 28.dp),
         ) {
             Text(title, style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
             if (hint != null) {

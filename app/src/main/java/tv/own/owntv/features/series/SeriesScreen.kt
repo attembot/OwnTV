@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -45,6 +46,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemContentType
+import androidx.paging.compose.itemKey
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
@@ -70,6 +73,7 @@ import tv.own.owntv.ui.components.OwnTVSpinner
 import tv.own.owntv.ui.components.PosterCard
 import tv.own.owntv.ui.components.ProgressRing
 import tv.own.owntv.ui.components.ResumeDialog
+import tv.own.owntv.ui.components.formatTimestamp
 import tv.own.owntv.ui.components.SetTmdbNameDialog
 import tv.own.owntv.ui.components.TrailerPlayerScreen
 import tv.own.owntv.ui.components.longPressMenuGuard
@@ -81,6 +85,8 @@ import tv.own.owntv.ui.components.formatCount
 import tv.own.owntv.ui.components.ContentPanelFill
 import tv.own.owntv.ui.components.PreviewPanelFill
 import tv.own.owntv.ui.components.roundedPanel
+import tv.own.owntv.ui.components.dialogPanel
+import tv.own.owntv.ui.components.gridFocusTarget
 import tv.own.owntv.ui.theme.Dimens
 import tv.own.owntv.ui.theme.OwnTVTheme
 
@@ -153,7 +159,7 @@ private fun SeriesContextMenu(
         contentAlignment = Alignment.Center,
     ) {
         Column(
-            modifier = Modifier.width(440.dp).clip(RoundedCornerShape(20.dp)).background(colors.surfaceContainerHigh).padding(24.dp),
+            modifier = Modifier.dialogPanel(),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(title, style = MaterialTheme.typography.titleMedium, color = colors.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -203,6 +209,7 @@ private fun SeriesGrid(
     val viewMode by vm.viewMode.collectAsStateWithLifecycle()
     val selectedSeries by vm.selectedSeries.collectAsStateWithLifecycle()
     val selectedSeriesMeta by vm.selectedSeriesMeta.collectAsStateWithLifecycle()
+    val selectedSeriesDownloads by vm.selectedSeriesDownloads.collectAsStateWithLifecycle()
     val metadataMode by vm.metadataMode.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
     val toast = rememberInAppToast()
@@ -351,18 +358,22 @@ private fun SeriesGrid(
                     state = listState,
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(series.itemCount) { index ->
+                    items(
+                        count = series.itemCount,
+                        key = series.itemKey { it.id },
+                        contentType = series.itemContentType { "series" },
+                    ) { index ->
                         val s = series[index]
                         if (s != null) {
                             SeriesListRow(
                                 series = s,
                                 isFavorite = favoriteIds.contains(s.id),
-                                modifier = when {
-                                    s.id == contextSeriesId -> Modifier.focusRequester(contextFocus)
-                                    s.id == selectedSeries?.id -> Modifier.focusRequester(gridSelFocus)
-                                    index == 0 -> Modifier.focusRequester(firstItemFocus)
-                                    else -> Modifier
-                                },
+                                modifier = Modifier.gridFocusTarget(
+                                    itemId = s.id, index = index,
+                                    contextId = contextSeriesId, contextFocus = contextFocus,
+                                    selectedId = selectedSeries?.id, selectedFocus = gridSelFocus,
+                                    firstItemFocus = firstItemFocus,
+                                ),
                                 onFocus = { vm.onSeriesFocused(s) },
                                 onClick = { vm.openSeries(s) },
                                 onLongClick = { contextSeries = s; contextSeriesId = s.id; contextSeriesIndex = index },
@@ -377,7 +388,11 @@ private fun SeriesGrid(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(series.itemCount) { index ->
+                    items(
+                        count = series.itemCount,
+                        key = series.itemKey { it.id },
+                        contentType = series.itemContentType { "series" },
+                    ) { index ->
                         val s = series[index]
                         if (s != null) {
                             PosterCard(
@@ -385,12 +400,12 @@ private fun SeriesGrid(
                                 title = s.name,
                                 rating = s.rating,
                                 isFavorite = favoriteIds.contains(s.id),
-                                modifier = when {
-                                    s.id == contextSeriesId -> Modifier.focusRequester(contextFocus)
-                                    s.id == selectedSeries?.id -> Modifier.focusRequester(gridSelFocus)
-                                    index == 0 -> Modifier.focusRequester(firstItemFocus)
-                                    else -> Modifier
-                                },
+                                modifier = Modifier.gridFocusTarget(
+                                    itemId = s.id, index = index,
+                                    contextId = contextSeriesId, contextFocus = contextFocus,
+                                    selectedId = selectedSeries?.id, selectedFocus = gridSelFocus,
+                                    firstItemFocus = firstItemFocus,
+                                ),
                                 onFocus = { vm.onSeriesFocused(s) },
                                 onClick = { vm.openSeries(s) },
                                 onLongClick = { contextSeries = s; contextSeriesId = s.id; contextSeriesIndex = index },
@@ -424,6 +439,11 @@ private fun SeriesGrid(
                 Column(
                     modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(Dimens.CardCorner)).background(OwnTVTheme.colors.panel).verticalScroll(rememberScrollState()).padding(Dimens.GapLarge),
                 ) {
+                    // Non-focusable status strip — only present while this series' episodes are downloading.
+                    tv.own.owntv.ui.components.downloadStripFor(selectedSeriesDownloads)?.let {
+                        tv.own.owntv.ui.components.DownloadStatusStrip(it)
+                        Spacer(Modifier.height(12.dp))
+                    }
                     // Tall portrait poster (like the list / a phone screen), centred in the pane.
                     Box(modifier = Modifier.fillMaxWidth().height(340.dp), contentAlignment = Alignment.Center) {
                         Box(
@@ -607,6 +627,10 @@ private fun EpisodeDetailPane(
     episode: EpisodeEntity?,
     meta: tv.own.owntv.core.database.entity.MetadataCacheEntity?,
     tmdbWins: Boolean,
+    nextUpEpisode: EpisodeEntity?,
+    nextUpPositionMs: Long,
+    onPlayNextUp: () -> Unit,
+    downloadStrip: tv.own.owntv.ui.components.DownloadStripState? = null,
 ) {
     val colors = OwnTVTheme.colors
     if (episode == null) {
@@ -623,6 +647,30 @@ private fun EpisodeDetailPane(
         meta?.rating?.takeIf { it > 0 }?.let { "★ %.1f".format(it) },
     )
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Dimens.GapLarge)) {
+        // Non-focusable status strip — the focused episode's own download, else the series' aggregate.
+        if (downloadStrip != null) {
+            tv.own.owntv.ui.components.DownloadStatusStrip(downloadStrip)
+            Spacer(Modifier.height(14.dp))
+        }
+        // "Next up" Play card — the series' resume/continue target. Hidden when there's no next-up (all
+        // caught up) or when it's the same episode already focused (OK plays it anyway).
+        nextUpEpisode?.takeIf { it.id != episode.id }?.let { nup ->
+            Column(
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                    .background(colors.primaryContainer.copy(alpha = 0.22f)).padding(12.dp),
+            ) {
+                Text("Next up", style = MaterialTheme.typography.labelSmall, color = colors.primary)
+                Spacer(Modifier.height(4.dp))
+                Text("S${nup.seasonNumber} · E${nup.episodeNumber}  ${nup.name}", style = MaterialTheme.typography.titleMedium, color = colors.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (nextUpPositionMs > 0) {
+                    Spacer(Modifier.height(2.dp))
+                    Text("Resume ${formatTimestamp(nextUpPositionMs)}", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+                }
+                Spacer(Modifier.height(10.dp))
+                OwnTVButton(label = "Play", onClick = onPlayNextUp, icon = OwnTVIcon.PLAY, modifier = Modifier.fillMaxWidth())
+            }
+            Spacer(Modifier.height(14.dp))
+        }
         Box(
             modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp)).background(colors.surfaceContainerLowest),
             contentAlignment = Alignment.Center,
@@ -650,11 +698,13 @@ private fun EpisodeDetailPane(
 @Composable
 private fun EpisodeContextMenu(
     title: String,
+    watched: Boolean,
     hasTmdbDetails: Boolean,
     canRefetchTmdb: Boolean,
     onShowDetails: () -> Unit,
     onDownload: () -> Unit,
     onPlayExternal: () -> Unit,
+    onToggleWatched: () -> Unit,
     onRefetch: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -667,7 +717,7 @@ private fun EpisodeContextMenu(
         contentAlignment = Alignment.Center,
     ) {
         Column(
-            modifier = Modifier.width(440.dp).clip(RoundedCornerShape(20.dp)).background(colors.surfaceContainerHigh).padding(24.dp),
+            modifier = Modifier.dialogPanel(),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(title, style = MaterialTheme.typography.titleMedium, color = colors.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -675,6 +725,13 @@ private fun EpisodeContextMenu(
             OwnTVButton("Download", onClick = onDownload, style = OwnTVButtonStyle.SECONDARY, icon = OwnTVIcon.DOWNLOADS, modifier = Modifier.fillMaxWidth().focusRequester(focus))
             // Phase B: one-off external playback, independent of the global "External player" toggle.
             OwnTVButton("Play with external player", onClick = onPlayExternal, style = OwnTVButtonStyle.SECONDARY, icon = OwnTVIcon.PLAY, modifier = Modifier.fillMaxWidth())
+            // Manual override of the ≥95% auto-detected watched state (option 2 of the design pass).
+            OwnTVButton(
+                if (watched) "Mark as unwatched" else "Mark as watched",
+                onClick = onToggleWatched,
+                style = OwnTVButtonStyle.SECONDARY,
+                modifier = Modifier.fillMaxWidth(),
+            )
             if (hasTmdbDetails) {
                 OwnTVButton("TMDB Details", onClick = onShowDetails, style = OwnTVButtonStyle.SECONDARY, icon = OwnTVIcon.MENU, modifier = Modifier.fillMaxWidth())
             }
@@ -726,8 +783,17 @@ private fun EpisodeView(
     val lastPlayedId by vm.lastPlayedEpisodeId.collectAsStateWithLifecycle()
     val selectedEpisode by vm.selectedEpisode.collectAsStateWithLifecycle()
     val selectedEpisodeMeta by vm.selectedEpisodeMeta.collectAsStateWithLifecycle()
+    val episodeDownloadStates by vm.episodeDownloadStates.collectAsStateWithLifecycle()
+    val openedSeriesDownloads by vm.openedSeriesDownloads.collectAsStateWithLifecycle()
     val metadataMode by vm.metadataMode.collectAsStateWithLifecycle()
+    val episodeProgress by vm.episodeProgress.collectAsStateWithLifecycle()
+    val completedIds by vm.completedEpisodeIds.collectAsStateWithLifecycle()
+    val hideWatched by vm.hideWatched.collectAsStateWithLifecycle()
+    val nextUpId by vm.nextUpEpisodeId.collectAsStateWithLifecycle()
     val epListState = androidx.compose.foundation.lazy.rememberLazyListState()
+    // Season selector rail state — long-running shows can have more seasons than fit on one line
+    // (12+); the selector scrolls chip-by-chip with D-pad focus and keeps the active season in view.
+    val seasonRowState = androidx.compose.foundation.lazy.rememberLazyListState()
     val selFocus = remember { androidx.compose.ui.focus.FocusRequester() }
     val firstEpFocus = remember { androidx.compose.ui.focus.FocusRequester() }
     var initialFocused by remember { mutableStateOf(false) }
@@ -745,6 +811,11 @@ private fun EpisodeView(
     val seasons = episodes.map { it.seasonNumber }.distinct().sorted()
     val activeSeason = if (seasons.contains(selectedSeason)) selectedSeason else seasons.firstOrNull() ?: 1
     val seasonEpisodes = episodes.filter { it.seasonNumber == activeSeason }
+    // "Hide watched" filter — drops episodes watched to ≥95%. Focus-index math below uses this list so a
+    // filtered-out last-watched episode falls back to the first visible one instead of losing focus.
+    val visibleEpisodes = remember(seasonEpisodes, hideWatched, completedIds) {
+        if (hideWatched) seasonEpisodes.filterNot { it.id in completedIds } else seasonEpisodes
+    }
 
     // Opening a show: grab focus on the LAST-WATCHED episode if there is one (#22), else the first
     // episode (the grid that had focus is unmounted, so focus would otherwise die and fall back to the
@@ -753,9 +824,9 @@ private fun EpisodeView(
     LaunchedEffect(loading, seasonEpisodes.isNotEmpty(), restoreFocus) {
         if (initialFocused) return@LaunchedEffect
         if (restoreFocus) { initialFocused = true; return@LaunchedEffect }
-        if (!loading && seasonEpisodes.isNotEmpty()) {
+        if (!loading && visibleEpisodes.isNotEmpty()) {
             initialFocused = true
-            val idx = lastPlayedId?.let { id -> seasonEpisodes.indexOfFirst { it.id == id } } ?: -1
+            val idx = lastPlayedId?.let { id -> visibleEpisodes.indexOfFirst { it.id == id } } ?: -1
             kotlinx.coroutines.delay(80)
             if (idx >= 0) {
                 runCatching { epListState.scrollToItem(idx) }
@@ -787,15 +858,24 @@ private fun EpisodeView(
     }
 
     // Returning from fullscreen: scroll to and focus the episode you were watching.
-    LaunchedEffect(restoreFocus, seasonEpisodes.size) {
+    LaunchedEffect(restoreFocus, visibleEpisodes.size) {
         if (!restoreFocus) return@LaunchedEffect
-        val idx = lastPlayedId?.let { id -> seasonEpisodes.indexOfFirst { it.id == id } } ?: -1
+        val idx = lastPlayedId?.let { id -> visibleEpisodes.indexOfFirst { it.id == id } } ?: -1
         if (idx >= 0) {
             runCatching { epListState.scrollToItem(idx) }
             kotlinx.coroutines.delay(60)
             runCatching { selFocus.requestFocus() }
         }
         onRestored()
+    }
+
+    // Keep the active season scrolled into view in the season rail (opening on a deep season, or after
+    // the user switches season). Without this a show that opens on, say, season 8 would still show 1–7.
+    LaunchedEffect(activeSeason, seasons.size) {
+        if (seasons.size > 1) {
+            val idx = seasons.indexOf(activeSeason)
+            if (idx >= 0) runCatching { seasonRowState.scrollToItem(idx) }
+        }
     }
 
     Column(
@@ -815,6 +895,15 @@ private fun EpisodeView(
                 style = OwnTVButtonStyle.SECONDARY,
                 icon = OwnTVIcon.STAR,
             )
+            // "Hide watched" toggle (moved up from the season rail). Shown only once the series has at
+            // least one watched episode; filters the active season's episode list.
+            if (completedIds.isNotEmpty()) {
+                OwnTVButton(
+                    label = if (hideWatched) "Show watched" else "Hide watched",
+                    onClick = { vm.setHideWatched(!hideWatched) },
+                    style = OwnTVButtonStyle.SECONDARY,
+                )
+            }
         }
         Spacer(Modifier.height(16.dp))
 
@@ -830,16 +919,30 @@ private fun EpisodeView(
                 Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     Column(modifier = Modifier.weight(1.4f).fillMaxHeight()) {
                         if (seasons.size > 1) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                seasons.forEach { season ->
-                                    SeasonChip(season = season, selected = season == activeSeason) { vm.selectSeason(season) }
+                            LazyRow(
+                                state = seasonRowState,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                items(seasons, key = { it }) { season ->
+                                    val seasonEps = episodes.filter { it.seasonNumber == season }
+                                    SeasonChip(
+                                        season = season,
+                                        selected = season == activeSeason,
+                                        completedCount = seasonEps.count { it.id in completedIds },
+                                        totalCount = seasonEps.size,
+                                        onClick = { vm.selectSeason(season) },
+                                    )
                                 }
                             }
                             Spacer(Modifier.height(14.dp))
                         }
                         LazyColumn(state = epListState, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            items(seasonEpisodes.size) { index ->
-                                val ep = seasonEpisodes[index]
+                            items(visibleEpisodes.size) { index ->
+                                val ep = visibleEpisodes[index]
+                                val prog = episodeProgress[ep.id]
+                                val completed = ep.id in completedIds
+                                val progressFraction = prog?.takeIf { !completed && it.durationMs > 0 }
+                                    ?.let { (it.positionMs.toFloat() / it.durationMs).coerceIn(0f, 1f) }
                                 val epModifier = Modifier
                                     .then(if (ep.id == lastPlayedId) Modifier.focusRequester(selFocus) else Modifier)
                                     .then(if (index == 0) Modifier.focusRequester(firstEpFocus) else Modifier)
@@ -847,6 +950,8 @@ private fun EpisodeView(
                                 EpisodeRow(
                                     episode = ep,
                                     lastWatched = ep.id == lastPlayedId,
+                                    completed = completed,
+                                    progressFraction = progressFraction,
                                     onClick = { startEpisode(ep) },
                                     onFocus = { vm.onEpisodeFocused(ep) },
                                     onLongClick = { contextEpisode = ep; contextEpisodeId = ep.id },
@@ -858,7 +963,19 @@ private fun EpisodeView(
                     Box(modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(Dimens.CardCorner)).background(OwnTVTheme.colors.panel)) {
                         val ep = selectedEpisode
                         val meta = selectedEpisodeMeta?.takeIf { it.episodeId == ep?.id }?.cache
-                        EpisodeDetailPane(ep, meta, metadataMode.tmdbWins)
+                        val nextUpEp = nextUpId?.let { id -> episodes.firstOrNull { it.id == id } }
+                        val nextUpPos = nextUpEp?.let { episodeProgress[it.id]?.positionMs } ?: 0L
+                        EpisodeDetailPane(
+                            episode = ep,
+                            meta = meta,
+                            tmdbWins = metadataMode.tmdbWins,
+                            nextUpEpisode = nextUpEp,
+                            nextUpPositionMs = nextUpPos,
+                            onPlayNextUp = { nextUpEp?.let { startEpisode(it) } },
+                            // The focused episode's own download, else the whole-series aggregate.
+                            downloadStrip = (ep?.let { e -> episodeDownloadStates[e.id]?.let { tv.own.owntv.ui.components.downloadStripFor(listOf(it)) } })
+                                ?: tv.own.owntv.ui.components.downloadStripFor(openedSeriesDownloads),
+                        )
                     }
                 }
             }
@@ -888,6 +1005,7 @@ private fun EpisodeView(
         val alreadyDownloaded = downloads[ep.id] != null
         EpisodeContextMenu(
             title = "S${ep.seasonNumber} · E${ep.episodeNumber}  ${ep.name}",
+            watched = ep.id in completedIds,
             hasTmdbDetails = metadataMode.enrich && cacheForEp != null,
             canRefetchTmdb = metadataMode.enrich,
             onShowDetails = { contextEpisode = null; detailsEpisode = ep },
@@ -898,6 +1016,10 @@ private fun EpisodeView(
                 } else vm.downloadEpisode(ep)
             },
             onPlayExternal = { contextEpisode = null; vm.playEpisodeExternal(ep) },
+            onToggleWatched = {
+                contextEpisode = null
+                if (ep.id in completedIds) vm.markEpisodeUnwatched(ep) else vm.markEpisodeWatched(ep)
+            },
             onRefetch = {
                 contextEpisode = null
                 toast.show("Refetching TMDB details…")
@@ -929,8 +1051,9 @@ private fun EpisodeView(
 }
 
 @Composable
-private fun SeasonChip(season: Int, selected: Boolean, onClick: () -> Unit) {
+private fun SeasonChip(season: Int, selected: Boolean, completedCount: Int, totalCount: Int, onClick: () -> Unit) {
     val colors = OwnTVTheme.colors
+    val label = if (totalCount > 0) "Season $season  ·  $completedCount/$totalCount" else "Season $season"
     FocusableSurface(
         onClick = onClick,
         selected = selected,
@@ -941,7 +1064,7 @@ private fun SeasonChip(season: Int, selected: Boolean, onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) { _ ->
         Text(
-            "Season $season",
+            label,
             style = MaterialTheme.typography.labelLarge,
             color = if (selected) colors.onPrimaryContainer else colors.onSurface,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
@@ -953,14 +1076,17 @@ private fun SeasonChip(season: Int, selected: Boolean, onClick: () -> Unit) {
 private fun EpisodeRow(
     episode: EpisodeEntity,
     lastWatched: Boolean,
+    completed: Boolean,
+    progressFraction: Float?,
     onClick: () -> Unit,
     onFocus: () -> Unit = {},
     onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val colors = OwnTVTheme.colors
-    // Row is now clean text (number + name + last-watched). Play = single-press; Download / TMDB Details
-    // moved to long-press (§11.1). The focused episode drives the right detail pane.
+    // Row is clean text (number + name + last-watched). Play = single-press; Download / TMDB Details
+    // moved to long-press (§11.1). The focused episode drives the right detail pane. Watched state:
+    // ✓ + dimmed name when completed (≥95%); a thin progress bar hugging the bottom edge when part-watched.
     FocusableSurface(
         onClick = onClick,
         onLongClick = onLongClick,
@@ -969,22 +1095,45 @@ private fun EpisodeRow(
         contentAlignment = Alignment.CenterStart,
     ) { focused ->
         LaunchedEffect(focused) { if (focused) onFocus() }
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Box(
-                modifier = Modifier.size(34.dp).clip(RoundedCornerShape(8.dp)).background(colors.surfaceContainerLowest),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(episode.episodeNumber.toString(), style = MaterialTheme.typography.labelLarge, color = colors.onSurfaceVariant)
-            }
-            Text(episode.name, style = MaterialTheme.typography.titleMedium, color = if (focused) colors.primary else colors.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-            // Mark the episode you last watched so it's findable even when it isn't focused (#22).
-            if (lastWatched) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Box(
+                    modifier = Modifier.size(34.dp).clip(RoundedCornerShape(8.dp)).background(if (completed) colors.primaryContainer else colors.surfaceContainerLowest),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (completed) {
+                        Text("✓", style = MaterialTheme.typography.titleMedium, color = colors.onPrimaryContainer)
+                    } else {
+                        Text(episode.episodeNumber.toString(), style = MaterialTheme.typography.labelLarge, color = colors.onSurfaceVariant)
+                    }
+                }
                 Text(
-                    "Last watched",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = colors.onPrimaryContainer,
-                    modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(colors.primaryContainer).padding(horizontal = 8.dp, vertical = 3.dp),
+                    episode.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = when {
+                        focused -> colors.primary
+                        completed -> colors.onSurfaceVariant
+                        else -> colors.onSurface
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
                 )
+                // Mark the episode you last watched so it's findable even when it isn't focused (#22).
+                if (lastWatched) {
+                    Text(
+                        "Last watched",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = colors.onPrimaryContainer,
+                        modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(colors.primaryContainer).padding(horizontal = 8.dp, vertical = 3.dp),
+                    )
+                }
+            }
+            // Part-watched: a thin progress bar hugging the row's bottom edge (track + fill).
+            if (progressFraction != null) {
+                Box(modifier = Modifier.fillMaxWidth().height(2.dp).background(colors.surfaceContainerLowest)) {
+                    Box(modifier = Modifier.fillMaxWidth(progressFraction).height(2.dp).background(colors.primary))
+                }
             }
         }
     }

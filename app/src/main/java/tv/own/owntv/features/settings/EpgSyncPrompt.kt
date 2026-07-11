@@ -34,6 +34,7 @@ import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.OwnTVSpinner
 import tv.own.owntv.ui.components.formatCount
 import tv.own.owntv.ui.components.trapAllFocusExit
+import tv.own.owntv.ui.components.dialogPanel
 import tv.own.owntv.ui.theme.OwnTVTheme
 
 /** Semi-automatic EPG flow after a playlist import: ask → sync with a live programme count → done. */
@@ -69,7 +70,7 @@ fun EpgSyncDialog(state: EpgSyncUi, onSync: () -> Unit, onDismiss: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Column(
-            modifier = Modifier.width(480.dp).clip(RoundedCornerShape(20.dp)).background(colors.surfaceContainerHigh).padding(28.dp),
+            modifier = Modifier.dialogPanel(width = 480.dp, padding = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             when (state) {

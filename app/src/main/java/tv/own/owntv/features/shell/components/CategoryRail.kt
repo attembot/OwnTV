@@ -1,5 +1,7 @@
 package tv.own.owntv.features.shell.components
 
+import androidx.compose.runtime.Immutable
+
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
@@ -58,6 +60,7 @@ import tv.own.owntv.ui.theme.OwnTVTheme
  * A category as shown in the rail: a 2–3 char abbreviation plus its full name. Special rails
  * (Favorites / History) render an [icon] instead of the abbreviation.
  */
+@Immutable
 data class RailCategory(val abbr: String, val fullName: String, val icon: OwnTVIcon? = null)
 
 /**

@@ -34,6 +34,7 @@ import tv.own.owntv.core.sync.SyncCounts
 import tv.own.owntv.core.sync.work.CatalogSyncState
 import tv.own.owntv.core.sync.work.CatalogSyncScheduler
 import tv.own.owntv.core.util.friendlySyncError
+import tv.own.owntv.core.util.throttleLatest
 import tv.own.owntv.core.database.dao.resolveExistingProfileId
 import tv.own.owntv.core.launcher.LauncherIntegrationRepository
 import tv.own.owntv.features.settings.data.EpgAutoRefresh
@@ -106,8 +107,11 @@ class SettingsViewModel(
         }
     }
 
-    /** Stored EPG programme count for a source — the row shows it as the EPG status. */
-    fun epgCount(sourceId: Long): kotlinx.coroutines.flow.Flow<Int> = epgDao.countForSource(sourceId)
+    /** Stored EPG programme count for a source — the row shows it as the EPG status.
+     *  Throttled (C2): an EPG sync commits in batches; each batch would otherwise re-run a
+     *  COUNT(*) over the largest table mid-write. */
+    fun epgCount(sourceId: Long): kotlinx.coroutines.flow.Flow<Int> =
+        epgDao.countForSource(sourceId).throttleLatest()
 
     /** Content counts (channels/movies/series) for a source — shown on each Playlists row. */
     fun contentCounts(sourceId: Long): kotlinx.coroutines.flow.Flow<SyncCounts> =

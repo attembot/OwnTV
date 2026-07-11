@@ -37,7 +37,8 @@ or **narrow the whole app to just one**.
 - **Quick switcher (top bar):** when you have 2+ playlists, the **playlist chip in the top‑right** becomes a
   button with a **▾**. Open it to pick **All playlists** or a single playlist. Your choice applies **everywhere
   at once** — Live TV, Movies, Series, TV Guide, Search, and the Home rails (Continue Watching / Favourites) —
-  and **sticks after a restart**. No need to go into Settings to switch.
+  and **sticks after a restart**. Home refreshes in place after you pick, so you don't have to leave and
+  return to see the new source. No need to go into Settings to switch.
 - **Set a default playlist (Settings → Sources):** open **Add / Edit** on a playlist and turn on
   **“Default playlist.”** That playlist becomes the one shown across the app. The Sources list shows a
   **DEFAULT** badge on it — it's a status marker, not a button.
@@ -56,9 +57,15 @@ or **narrow the whole app to just one**.
   live channels**, newest first.
 - **Dwell to expand:** hold focus on a hero card for **3 seconds** and it widens to a big 16:9 preview and
   starts a **muted video preview**. Quick D‑pad sweeps never expand, so browsing stays snappy. Press **OK**
-  to **resume right where you left off**.
+  to **resume right where you left off**. When **TMDB metadata** is available, the expanded hero shows a
+  **landscape backdrop**, the show's **title logo**, a short **plot** and a **Play** action.
 - Below are more rows — **Favourite Channels**, **Continue Watching Movies/Series**, and an optional
-  **Recent Channels** row (off by default).
+  **Recent Channels** row (off by default). **Continue Watching series** tiles resolve **episode/show
+  artwork from TMDB** when available and show as **landscape cards** (with a `S## E##` chip and a
+  progress bar), falling back to the provider poster otherwise.
+- ▶️ **"Continue" chip (top bar, every screen):** a compact chip resumes your **most‑recent** item in one
+  press — **Resume** a movie, **Next up** an episode, or your **Last channel** — labelled with the title.
+  Reach it from the navigation panel (like the search pill); it hides when there's nothing to resume.
 - 🧩 **Make Home yours (Settings → Home screen, per profile):** **reorder or hide every row**, **filter the
   Keep Watching hero** (include/exclude live channels, movies, series), and switch the live‑channel rows
   between **Cards** and **On Now** — an inline mini‑guide showing what's airing now with a progress bar and
@@ -72,7 +79,7 @@ or **narrow the whole app to just one**.
 - **Categories** are in the second column. Long category names **wrap to two lines** so they're never cut off.
 - **Live preview**: focus a channel and its video plays in the preview pane (with the **real stream
   resolution**, e.g. `1080p`/`4K`, so a mislabelled "4K" channel can't fool you). Toggle this in
-  **Settings → Live preview**; sound for the preview is **Settings → Preview audio**.
+  **Settings → Playback → Live preview**; sound for the preview is **Settings → Playback → Preview audio**.
 - ⭐ **Add to Favourites (and more)**: **long‑press OK** on a channel to open the quick menu — **Favourite,
   Rename, Hide, Match EPG, Catch‑up**. (Closing it returns you to the same channel.)
 - 🔄 **Move channels** (reorder within folders/Favorites): **long‑press OK** on a channel and choose **Move** —
@@ -106,6 +113,14 @@ or **narrow the whole app to just one**.
 - ▶️ **Play catch‑up from the guide**: move **Right** into the timeline to a **past programme**, press
   **OK** to open its details, then choose **"Watch from start"** to replay it from the archive. Scroll
   **Left/Right** along the timeline to pick the programme you want.
+- 📍 **"Now" line & Jump to Now**: a red vertical line marks the current time across the grid; the
+  **Jump to Now** button (top‑right) scrolls the timeline back to now — handy after browsing the
+  catch‑up archive.
+- ↻ **Catch‑up & genre hints**: programmes you can rewind from show a ↻ badge, and each channel label
+  carries a small colour dot by genre (sport / news / movies / kids / music / docs).
+- 📋 **Cursor preview strip**: while browsing a row (move **Right** into the timeline), a strip at the
+  bottom shows the programme under the cursor — title, channel, time, runtime, catch‑up, synopsis —
+  without opening it. Press **OK** to open the full details.
 - **EPG is opt‑in**: add guide feeds in **Settings → EPG Sources**. After importing a playlist you'll be
   offered a one‑tap **sync now** (with a live programme count), or you can sync later from Settings.
 - **Auto‑match EPG**: the guide can smart‑match your channels to guide data; you can also fix one channel
@@ -127,7 +142,21 @@ or **narrow the whole app to just one**.
   **Settings → Resume** — **Ask**, **Auto** (silently continues), or **Never**.
 - ⏭️ **Auto‑play next episode**: when an episode ends, the next one starts automatically — and it rolls into
   the **next season** when the current one finishes. Toggle in **Settings → Auto‑play next episode**.
+- ⏳ **Next‑episode countdown**: in the last ~30 seconds of an episode a card counts down to the auto‑advance,
+  with **Play now** (jump immediately) and **Cancel** (stop the auto‑advance for this episode).
 - Series **open on your last‑watched episode**.
+- ✅ **Watched state at a glance**: episodes (Series) and movie posters/list rows show a ✓ (dimmed) once
+  watched to ≥95%, and a thin progress bar when part‑watched. Series season chips show a `watched/total`
+  count (e.g. `Season 2 · 8/18`).
+- ✏️ **Mark a movie watched / unwatched**: long‑press a movie → **Mark as watched** (or **unwatched**). A
+  **Resume <time>** label appears under the poster in the detail pane while a movie is part‑watched.
+- ▶️ **"Next up" card** (Series): the episode detail pane shows a **Next up** card with a one‑press
+  **Play** for the episode to continue with — the one you're mid‑way through, or the next after the last
+  finished one (resume time shown when in progress).
+- 🙈 **Hide watched** (Series, header button): filters the episode list to what's left to watch.
+- ✏️ **Mark as watched / unwatched** (Series): long‑press an episode → **Mark as watched** (or **Mark as
+  unwatched** if already watched) to correct the auto‑detected state without playing it. Marking watched
+  restarts the episode from the beginning next time you press Play.
 - 🔄 **Move movies/series** (reorder within categories/Favorites): **long‑press OK** on any title and choose **Move** —
   a full‑screen reorder overlay opens. Use **D‑pad Up/Down** to move, **OK** to save, **Back** to cancel.
 - 📥 **Download via long‑press**: **long‑press OK** on a movie or episode and choose **Download** to queue it
@@ -177,6 +206,8 @@ or **narrow the whole app to just one**.
   episode to see its TMDB still, plot and rating. Episode rows: **single-press plays**, **long-press** for
   Download / TMDB Details.
 - **Sorting:** the sort chip cycles **Provider → A–Z → Rating**. Rating shows the highest-rated titles first.
+  **A–Z also sorts the category folders** (in Live TV too) — categories you manually reordered in
+  **Settings → Customize** stay pinned at the top; the rest sort alphabetically below them.
 - **Refetch TMDB details:** long-press a movie, series, or episode → **Refetch TMDB details** forces a fresh
   TMDB search — it clears a wrong/stale match (or a 7-day "no match" cache) and re-searches at once, so you
   don't have to wait for the cache to expire. Use it when the art/plot is missing or looks wrong.
@@ -204,8 +235,28 @@ or **narrow the whole app to just one**.
 
 ## 🔎 Search
 
-- The **Search** tab searches **Live, Movies and Series together**, with a detailed result view.
+- The **Search** tab searches **Live, Movies and Series together**.
+- 🚀 **Launcher home**: with the box empty, Search shows a **"Jump to"** row — **Continue watching**,
+  **Unwatched** and **Channels** — plus your **recent searches** as chips (tap **Clear** to wipe them).
+  Tap a chip to jump straight in without typing.
+- 🖼️ **Detail pane**: focus any result to see its **poster, plot and rating** on the right, with a
+  **primary action** button (Play / Watch live / Open series). Pressing **OK** on the result still plays
+  it directly.
+- ↩️ **Back**: the first **Back** clears your query (back to the launcher); a second **Back** leaves Search.
 - You can **favourite a channel straight from search** via **long‑press**.
+
+---
+
+## 📥 Downloads
+
+- The **Downloads** tab groups items into **Active · Waiting · Completed · Failed**, with a **storage
+  bar** at the top showing free space.
+- **Long‑press / OK** a card for **Pause · Resume · Retry · Delete**. A failed download tells you to
+  **Tap Retry**.
+- 📍 **See it downloading without leaving the page**: when you start a download of a **movie**, a **whole
+  series**, or a **single episode**, a small **status strip** (Downloading / Queued / Paused, with a
+  progress bar) appears at the top of that item's **poster panel**. It only shows while a download is in
+  flight and disappears once it finishes.
 
 ---
 
@@ -250,6 +301,10 @@ Bring up the controls in any full‑screen player (press OK / a direction). The 
 
 ## ⚙️ Settings worth knowing
 
+- 🔎 **Search settings** — type in the **"Search settings…"** box at the top to filter the whole screen to
+  matching rows; results show their group (e.g. `Playback › HDR`) and open the setting directly. **Back**
+  clears the search first. Above it, one‑press **quick toggles** (Live preview · Preview sound · HDR ·
+  Auto‑play · Check for update) flip the most‑used options without opening a sub‑menu.
 - 🧭 **Menu layout** — **Profiles** is the first row; **Live preview / Preview audio** are under
   **Playback**; **App startup** is under **App**; the **Home screen** page is under Content.
 - 🚀 **App startup** — where each profile opens: **Home**, **Last channel** (auto‑plays the channel you last
@@ -275,13 +330,19 @@ Bring up the controls in any full‑screen player (press OK / a direction). The 
   receiver**. On TV speakers or a stereo soundbar it can make **audio lag behind video (lip‑sync drift)** —
   if you enable it and see drift, fix it live with the player's **Audio → A/V sync** nudge. Most people
   should leave this off.
+- 🩺 **Playback error log** (Playback) — the last ~10 playback failures with their plain‑English
+  reason, stream details and device info. If a channel or movie errored and you dismissed the
+  message, open this to read (or clear) exactly what happened — perfect for bug reports, no computer
+  needed.
 - 🔄 **Check updates on startup** — get notified when a newer version is on GitHub Releases.
 - 💾 **Backup & Restore** — export/restore your profiles, sources, customizations, favorites, history,
-  resume positions and app settings. On export you can set a **backup password** to encrypt saved
-  passwords (source & proxy); without one, passwords are left out of the file. Restoring an encrypted
+  resume positions, **manual Move positions** and app settings. On export you can set a **backup password** to encrypt saved
+  passwords (source & proxy, plus your own TMDB API key if set); without one, passwords are left out of
+  the file. Restoring an encrypted
   backup asks for that password — enter it to bring passwords back, or **Skip** to restore everything
   else and re‑enter passwords later. Backups also preserve your **per‑source Auto refresh** choices,
-  your **default source**, and any **compatibility‑mode / per‑item engine pins** (Live and Movies/Series),
+  your **default source**, any **compatibility‑mode / per‑item engine pins** (Live and Movies/Series),
+  your **custom TMDB names** (long‑press → Custom TMDB name) and recent searches,
   so a restored setup behaves exactly like the original. Older backup files still restore fine — anything
   they don't contain just keeps its default.
 - 🧹 **Clear watch history** — wipe a profile's recently‑watched / continue rows.

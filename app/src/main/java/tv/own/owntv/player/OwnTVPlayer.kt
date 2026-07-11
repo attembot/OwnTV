@@ -1,5 +1,7 @@
 package tv.own.owntv.player
 
+import androidx.compose.runtime.Immutable
+
 import android.content.Context
 import android.view.Surface
 import dev.jdtech.mpv.MPVLib
@@ -26,6 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * owns playback its tracks reuse this field as an opaque ordinal). [image] flags an image-based subtitle
  * (PGS/VOBSUB/DVB) — selecting one on a VOD hands playback to ExoPlayer to render it. [typeIndex] is the
  * track's 0-based position among tracks of its own type, used to line a picked sub up with ExoPlayer's. */
+@Immutable
 data class TrackOption(
     val label: String,
     val mpvId: Int,
@@ -51,6 +54,7 @@ private val EXO_SAFE_AUDIO_CODECS = setOf(
 )
 
 /** Metadata shown in the player HUD (breadcrumb path, year, channel logo). */
+@Immutable
 data class MediaMeta(
     val title: String? = null,
     val subtitle: String? = null,
@@ -59,9 +63,11 @@ data class MediaMeta(
 )
 
 /** An item in a play queue (e.g. a season's episodes), for prev/next. */
+@Immutable
 data class PlaylistItem(val url: String, val meta: MediaMeta = MediaMeta())
 
 /** Whether prev/next are available in the current queue. */
+@Immutable
 data class NavState(val hasPrev: Boolean, val hasNext: Boolean)
 
 /** Video scaling modes exposed in the player's zoom menu. */
@@ -100,6 +106,20 @@ class OwnTVPlayer(
         const val LIVE_STALL_POLL_MS = 2_500L   // poll interval for the live no-progress watchdog
         const val LIVE_STALL_LIMIT = 4           // polls of no progress (~10s) before treating it as a stall
         const val MAX_LIVE_RECONNECTS = 6        // consecutive stall-reconnects before the error UI takes over
+        // --- Engine-handoff / reconnect timing --------------------------------------------------------
+        // Hardware assumptions live here, tunable in one place. TV boxes expose ONE hardware decoder:
+        // when playback moves between mpv and ExoPlayer the outgoing engine's MediaCodec must finish
+        // releasing before the incoming engine claims it, or the claim fails instantly.
+        const val DECODER_RELEASE_MS = 600L        // outgoing engine's MediaCodec release (engine swap / next episode)
+        const val SURFACE_HANDOFF_MS = 500L        // shorter release wait on the surface-attach handoff paths
+        const val CORE_RESET_SETTLE_MS = 500L      // fresh mpv core + recreated surface settle after a hard reset
+        const val EXO_POSITION_TICK_MS = 500L      // ExoPlayer position/duration emit interval while Exo is active
+        const val SURROUND_CHECK_MS = 7_000L       // wait before verifying surround audio actually produces sound
+        const val DECODE_CHECK_MS = 4_000L         // wait before verifying video decode actually produces frames
+        const val LIVE_RECONNECT_DELAY_MS = 3_500L // pause before reconnecting a dropped live stream
+        const val EOF_GRACE_MS = 1_500L            // grace for a late FILE_LOADED after an early EOF on live
+        const val FALLBACK_RETRY_DELAY_MS = 300L   // brief spinner beat before retrying with a URL/UA variant
+        const val RENDER_RECONFIG_MS = 200L        // let a render-config change apply before resuming
         // Warn-level mpv lines worth keeping as the failure reason (HTTP codes, open/decode failures, …).
         val FAILURE_RX = Regex(
             "http|error|fail|refus|timed out|unrecogn|cannot|no such|invalid|denied|forbidden|not found|" +
@@ -479,6 +499,18 @@ class OwnTVPlayer(
     private val _nav = MutableStateFlow(NavState(false, false))
     val nav: StateFlow<NavState> = _nav.asStateFlow()
 
+    // Title of the next queued item (in-season next episode), for the HUD's "Next episode in Ns" card.
+    // Null when there's no next item (single movie, or the season's last episode).
+    private val _nextUpTitle = MutableStateFlow<String?>(null)
+    val nextUpTitle: StateFlow<String?> = _nextUpTitle.asStateFlow()
+
+    // Set true when the user hits "Cancel" on the next-episode countdown card — suppresses the automatic
+    // end-of-file advance for the CURRENT item only. Reset on every fresh load (see loadUrl).
+    private var autoNextCancelled = false
+
+    /** HUD "Cancel" on the next-episode countdown: skip the automatic advance for the current item. */
+    fun cancelAutoNext() { autoNextCancelled = true }
+
     // Emitted when the LAST item of an episode queue finishes naturally and auto-play is on, so the
     // series ViewModel can continue into the next season (it has the full series; the player only has
     // the current season's queue). Within-season advance is handled by the player itself.
@@ -576,14 +608,32 @@ class OwnTVPlayer(
     private fun updateStreamChips() {
         val w = currentWidthPx; val h = currentHeightPx
         if (w <= 0 || h <= 0) { _streamChips.value = emptyList(); return }
-        val chips = ArrayList<String>(4)
-        aspectLabel(w, h)?.let { chips += it }
-        _videoRes.value?.let { chips += it }
-        (_videoFps.value ?: mpv?.getPropertyString("container-fps")?.toFloatOrNull())?.let { if (it > 0) chips += "${Math.round(it)} FPS" }
-        when (mpv?.getPropertyInt("audio-params/channel-count")) {
-            1 -> "MONO"; 2 -> "STEREO"; 6 -> "5.1"; 8 -> "7.1"; else -> null
-        }?.let { chips += it }
-        _streamChips.value = chips
+        val base = ArrayList<String>(4)
+        aspectLabel(w, h)?.let { base += it }
+        _videoRes.value?.let { base += it }
+        val knownFps = _videoFps.value
+        val m = mpv
+        if (m == null) {
+            knownFps?.let { if (it > 0) base += "${Math.round(it)} FPS" }
+            _streamChips.value = base
+            return
+        }
+        // Synchronous libmpv reads can block for seconds while the core is stuck in a stalling network
+        // read (same reason all writes go through mpvExecutor) — never issue them from the UI thread.
+        // runCatching also covers a rejected execute() after release() shut the executor down.
+        runCatching {
+            mpvExecutor.execute {
+                val chips = ArrayList<String>(4).apply { addAll(base) }
+                runCatching {
+                    (knownFps ?: m.getPropertyString("container-fps")?.toFloatOrNull())
+                        ?.let { if (it > 0) chips += "${Math.round(it)} FPS" }
+                    when (m.getPropertyInt("audio-params/channel-count")) {
+                        1 -> "MONO"; 2 -> "STEREO"; 6 -> "5.1"; 8 -> "7.1"; else -> null
+                    }?.let { chips += it }
+                }
+                _streamChips.value = chips
+            }
+        }
     }
     private fun aspectLabel(w: Int, h: Int): String? {
         if (w <= 0 || h <= 0) return null
@@ -771,7 +821,7 @@ class OwnTVPlayer(
                 setPropertyString("vo", "null")
                 runCatching { this.detachSurface() } // mpv's detachSurface (the receiver), not OwnTVPlayer's
                 scope.launch {
-                    delay(600) // let mpv's MediaCodec finish releasing before ExoPlayer claims the decoder
+                    delay(DECODER_RELEASE_MS) // let mpv's MediaCodec finish releasing before ExoPlayer claims the decoder
                     if (gen != loadGeneration) return@launch // superseded meanwhile
                     pendingUrl = url
                     pendingSeekMs = pos
@@ -834,7 +884,7 @@ class OwnTVPlayer(
             // then start ExoPlayer on whatever surface is current (a recreated one re-points via
             // attachSurface → exoEngine.setSurface).
             scope.launch {
-                delay(500)
+                delay(CORE_RESET_SETTLE_MS)
                 val s = attachedSurface ?: return@launch
                 startExo(url, pos, s, sub = null)
             }
@@ -846,7 +896,7 @@ class OwnTVPlayer(
                 setPropertyString("vo", "null")
                 runCatching { this.detachSurface() }
                 scope.launch {
-                    delay(500) // let mpv's MediaCodec release — a busy decoder would fail Exo instantly
+                    delay(SURFACE_HANDOFF_MS) // let mpv's MediaCodec release — a busy decoder would fail Exo instantly
                     val s = attachedSurface ?: return@launch
                     startExo(url, pos, s, sub = null)
                 }
@@ -896,7 +946,7 @@ class OwnTVPlayer(
             // Remember the choice for THIS item (like Live's compatibility mode remembers the channel).
             scope.launch { vodEngineStore.pin(url, tv.own.owntv.core.player.VodEnginePin.MPV) }
             scope.launch {
-                delay(600) // let ExoPlayer's MediaCodec finish releasing before mpv claims the decoder
+                delay(DECODER_RELEASE_MS) // let ExoPlayer's MediaCodec finish releasing before mpv claims the decoder
                 if (currentUrl != url) return@launch // superseded (user zapped/backed out meanwhile)
                 forceSurfaceResetNextLoad = true
                 loadUrl(url, MediaMeta(currentTitle, currentSubtitle, currentYear, currentLogoUrl), isLive = false, pos, resetRetries = false)
@@ -927,7 +977,7 @@ class OwnTVPlayer(
                 setPropertyString("vo", "null")
                 runCatching { this.detachSurface() }
                 scope.launch {
-                    delay(600) // let mpv's MediaCodec finish releasing before ExoPlayer claims the decoder
+                    delay(DECODER_RELEASE_MS) // let mpv's MediaCodec finish releasing before ExoPlayer claims the decoder
                     if (gen != loadGeneration) return@launch // superseded meanwhile
                     // Start Exo on a FRESH surface: attachSurface sees pendingExoStart and routes the
                     // recreated surface straight into startExo (mpv never touches it).
@@ -965,12 +1015,12 @@ class OwnTVPlayer(
         val dur = _duration.value
         val pos = _position.value
         val reachedEnd = dur > 0 && pos >= dur - 8_000
-        if (reachedEnd && autoPlayNext && playlist.isNotEmpty()) {
+        if (reachedEnd && autoPlayNext && !autoNextCancelled && playlist.isNotEmpty()) {
             val gen = loadGeneration
             if (playlistIndex < playlist.size - 1) {
-                scope.launch { delay(600); if (gen == loadGeneration) next() } // next ep (loadUrl drops Exo)
+                scope.launch { delay(DECODER_RELEASE_MS); if (gen == loadGeneration) next() } // next ep (loadUrl drops Exo)
             } else {
-                scope.launch { delay(600); if (gen == loadGeneration) _queueEnded.tryEmit(Unit) } // → next season
+                scope.launch { delay(DECODER_RELEASE_MS); if (gen == loadGeneration) _queueEnded.tryEmit(Unit) } // → next season
             }
         }
     }
@@ -1002,7 +1052,7 @@ class OwnTVPlayer(
     private fun startExoTick() {
         exoTickJob?.cancel()
         exoTickJob = scope.launch {
-            while (exoActive) { exoEngine?.emitPositionDuration(); delay(500) }
+            while (exoActive) { exoEngine?.emitPositionDuration(); delay(EXO_POSITION_TICK_MS) }
         }
     }
 
@@ -1035,7 +1085,7 @@ class OwnTVPlayer(
         _subTrackList.value = _subTrackList.value.map { it.copy(selected = thenSelectSid != null && it.mpvId == thenSelectSid) }
         _buffering.value = true
         scope.launch {
-            delay(600) // let ExoPlayer's MediaCodec finish releasing before mpv claims the decoder
+            delay(DECODER_RELEASE_MS) // let ExoPlayer's MediaCodec finish releasing before mpv claims the decoder
             if (currentUrl != url) return@launch // superseded (user zapped/backed out meanwhile)
             forceSurfaceResetNextLoad = true // Exo left the surface dirty — mpv gets a fresh one
             loadUrl(url, MediaMeta(currentTitle, currentSubtitle, currentYear, currentLogoUrl), isLiveContent, pos, resetRetries = false)
@@ -1157,7 +1207,10 @@ class OwnTVPlayer(
             _error.collect {
                 _errorInfo.value = if (it != null) {
                     val raw = diagnostics.recentError() ?: lastMpvError
-                    ErrorInfo(reason = raw?.let(PlayerErrors::reasonFor), spec = mediaSpec(), raw = raw)
+                    val info = ErrorInfo(reason = raw?.let(PlayerErrors::reasonFor), spec = mediaSpec(), raw = raw)
+                    // Persist for Settings → "Playback error log" (users can't pull logcat after the fact).
+                    PlaybackErrorLog.log(context, if (exoActive) "exoplayer" else "mpv", isLiveContent, info)
+                    info
                 } else null
             }
         }
@@ -1221,6 +1274,7 @@ class OwnTVPlayer(
 
     private fun updateNav() {
         _nav.value = NavState(playlistIndex > 0, playlistIndex < playlist.size - 1)
+        _nextUpTitle.value = playlist.getOrNull(playlistIndex + 1)?.meta?.title
     }
 
     private fun loadUrl(
@@ -1263,6 +1317,7 @@ class OwnTVPlayer(
         // the SAME item passes resetRetries=false to keep that state.
         if (resetRetries) {
             autoRetries = 0
+            autoNextCancelled = false // genuinely new item → re-arm the auto-advance / countdown card
             liveStallReconnects = 0 // genuinely new item → fresh live-reconnect budget
             triedAltFormat = false
             triedSoftwareForVideo = false
@@ -1391,7 +1446,7 @@ class OwnTVPlayer(
                             _buffering.value = true
                             hardReset()
                             if (url != null) {
-                                delay(500) // let the fresh mpv core + recreated surface settle
+                                delay(CORE_RESET_SETTLE_MS) // let the fresh mpv core + recreated surface settle
                                 loadUrl(url, MediaMeta(currentTitle, currentSubtitle, currentYear, currentLogoUrl), isLiveContent, seekMs, resetRetries = false)
                             }
                             return@launch
@@ -1724,6 +1779,8 @@ class OwnTVPlayer(
     }
 
     fun release() {
+        // Queued freeze-frame/PixelCopy callbacks must never fire after teardown (released surface/bitmap).
+        freezeHandler.removeCallbacksAndMessages(null)
         errorCheckJob?.cancel()
         exoTickJob?.cancel()
         exoActive = false
@@ -1998,8 +2055,9 @@ class OwnTVPlayer(
         decodeGuardTripped = true
         val res = resolutionLabel(h) ?: "${h}p"
         val msg = if (hwDecoding) {
-            "This TV's hardware decoder doesn't support this $res video, and software decoding " +
-                "above 1080p would overload the TV."
+            "This stream's format couldn't be hardware-decoded on this TV, so it fell back to " +
+                "software decoding — which can't sustain $res without overloading the TV. The TV " +
+                "may still play other 4K content fine; this particular stream's format is the issue."
         } else {
             "Hardware decoding is turned off — software decoding can't handle $res video. " +
                 "Enable it in Settings → Video Player."
@@ -2125,7 +2183,7 @@ class OwnTVPlayer(
                 if (!isLiveContent) {
                     val sgen = loadGeneration
                     scope.launch {
-                        delay(7_000)
+                        delay(SURROUND_CHECK_MS)
                         if (sgen != loadGeneration || surroundOutputBroken || !surroundSound) return@launch
                         mpvAsync {
                             if (getPropertyString("seeking") == "yes") return@mpvAsync // catching up — not a real runaway
@@ -2149,7 +2207,7 @@ class OwnTVPlayer(
                 // so read it directly once it has settled (the observed event also runs enforceDecodeGuard).
                 val gen = loadGeneration
                 scope.launch {
-                    delay(4_000)
+                    delay(DECODE_CHECK_MS)
                     if (gen != loadGeneration) return@launch
                     mpvAsync {
                         val hw = getPropertyString("hwdec-current") ?: ""
@@ -2227,7 +2285,7 @@ class OwnTVPlayer(
                         // Unclassified END_FILE is not always a final failure: slow or flaky live
                         // streams can still report FILE_LOADED shortly after. Give mpv a short grace
                         // window; FILE_LOADED clears expectingPlayback/cancels this path.
-                        delay(1500)
+                        delay(EOF_GRACE_MS)
                         if (!expectingPlayback || gen != loadGeneration) return@launch
                         // No internet → don't burn the retry budget on a dead connection; surface the
                         // offline error straight away.
@@ -2249,7 +2307,7 @@ class OwnTVPlayer(
                             autoRetries = 0
                             android.util.Log.w(TAG, "catch-up path URL rejected — trying timeshift.php fallback")
                             _buffering.value = true
-                            delay(300)
+                            delay(FALLBACK_RETRY_DELAY_MS)
                             if (gen == loadGeneration) {
                                 loadUrl(catchupAlt, MediaMeta(currentTitle, currentSubtitle, currentYear, currentLogoUrl), isLiveContent, 0L, resetRetries = false)
                             }
@@ -2259,7 +2317,7 @@ class OwnTVPlayer(
                             val alt = tsUrl.dropLast(3) + ".m3u8"
                             android.util.Log.w(TAG, "live .ts didn't start — trying .m3u8 fallback")
                             _buffering.value = true
-                            delay(300)
+                            delay(FALLBACK_RETRY_DELAY_MS)
                             if (gen == loadGeneration) {
                                 loadUrl(alt, MediaMeta(currentTitle, currentSubtitle, currentYear, currentLogoUrl), isLiveContent, 0L, resetRetries = false)
                             }
@@ -2290,7 +2348,7 @@ class OwnTVPlayer(
                             forceSoftwareThisLoad = true
                             _buffering.value = true
                             mpvAsync { applyRenderConfig() }
-                            delay(200)
+                            delay(RENDER_RECONFIG_MS)
                             if (gen == loadGeneration && currentUrl != null) {
                                 loadUrl(
                                     currentUrl!!, MediaMeta(currentTitle, currentSubtitle, currentYear, currentLogoUrl),
@@ -2306,7 +2364,7 @@ class OwnTVPlayer(
                             forceFullProbe = true
                             android.util.Log.w(TAG, "playback failed — retrying once with short vlc User-Agent")
                             _buffering.value = true
-                            delay(300)
+                            delay(FALLBACK_RETRY_DELAY_MS)
                             if (gen == loadGeneration && currentUrl != null) {
                                 loadUrl(
                                     currentUrl!!, MediaMeta(currentTitle, currentSubtitle, currentYear, currentLogoUrl),
@@ -2338,7 +2396,7 @@ class OwnTVPlayer(
                         _buffering.value = true
                         val gen = loadGeneration
                         scope.launch {
-                            delay(3500)
+                            delay(LIVE_RECONNECT_DELAY_MS)
                             if (gen == loadGeneration && currentUrl != null) retry() else _buffering.value = false
                         }
                     }
@@ -2350,14 +2408,14 @@ class OwnTVPlayer(
                     val dur = _duration.value
                     val pos = _position.value
                     val reachedEnd = dur > 0 && pos >= dur - 8_000
-                    if (reachedEnd && autoPlayNext && playlist.isNotEmpty()) {
+                    if (reachedEnd && autoPlayNext && !autoNextCancelled && playlist.isNotEmpty()) {
                         // Advance after a short settle (let the ended episode's decoder release). The fresh
                         // Surface in loadUrl is what actually prevents the back-to-back >1080p 0x80001000.
                         val gen = loadGeneration
                         if (playlistIndex < playlist.size - 1) {
-                            scope.launch { delay(600); if (gen == loadGeneration) next() } // next ep, same season
+                            scope.launch { delay(DECODER_RELEASE_MS); if (gen == loadGeneration) next() } // next ep, same season
                         } else {
-                            scope.launch { delay(600); if (gen == loadGeneration) _queueEnded.tryEmit(Unit) } // → next season
+                            scope.launch { delay(DECODER_RELEASE_MS); if (gen == loadGeneration) _queueEnded.tryEmit(Unit) } // → next season
                         }
                     }
                 }

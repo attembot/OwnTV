@@ -17,6 +17,7 @@ local.properties
 .planning/
 .serena/
 .codegraph/
+.zcode/
 CLAUDE.md
 AGENT_HANDOVER.md
 
@@ -28,3 +29,4 @@ signing.properties
 
 # Internal planning documents — kept local, never committed
 future-plan/
+

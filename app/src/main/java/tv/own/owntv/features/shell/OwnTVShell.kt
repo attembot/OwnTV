@@ -190,6 +190,8 @@ fun OwnTVShell(
     var showChannelList by remember { mutableStateOf(false) }
     val zapChannels by liveVm.zapChannels.collectAsStateWithLifecycle()
     val previewChannel by liveVm.previewChannel.collectAsStateWithLifecycle()
+    // Batch 7 — the single most-recent resumable item, surfaced as a shared top-bar "Continue" chip.
+    val continueTarget by homeVm.continueTarget.collectAsStateWithLifecycle()
 
     // "Resume last channel on startup" (opt-in, default off): once when the shell first appears, if enabled
     // and nothing is playing, jump straight back into the last live channel watched. Reads the setting once
@@ -413,7 +415,7 @@ fun OwnTVShell(
         if (selectedSection != MainSection.HOME || playerMode != PlayerMode.NONE) homeVm.stopPreview()
     }
 
-    LaunchedEffect(selectedSection, playerMode, activeProfileId) {
+    LaunchedEffect(selectedSection, playerMode, activeProfileId, activePlaylistId) {
         if (selectedSection == MainSection.HOME && playerMode == PlayerMode.NONE && (activeProfileId?.let { it >= 0 } == true)) {
             homeVm.refresh()
         }
@@ -478,6 +480,28 @@ fun OwnTVShell(
                     // The playlist chip becomes a quick-switcher only when there's more than one to pick.
                     playlistInteractive = playlists.size > 1,
                     onPlaylistClick = { showPlaylistPicker = true },
+                    // Batch 7 — shared "Continue" chip: one-press resume of the most-recent item.
+                    continueLabel = continueTarget?.let { "${it.actionLabel} · ${it.name}" },
+                    continueIcon = when (continueTarget?.kind) {
+                        tv.own.owntv.features.home.ContinueKind.LIVE -> OwnTVIcon.LIVE_TV
+                        tv.own.owntv.features.home.ContinueKind.MOVIE -> OwnTVIcon.MOVIES
+                        tv.own.owntv.features.home.ContinueKind.EPISODE -> OwnTVIcon.SERIES
+                        null -> OwnTVIcon.PLAY
+                    },
+                    onContinueClick = {
+                        continueTarget?.let { t ->
+                            scope.launch {
+                                when (t.kind) {
+                                    tv.own.owntv.features.home.ContinueKind.LIVE ->
+                                        if (liveVm.ensurePlayingByIdAsync(t.channelId)) openFullscreen(MainSection.LIVE_TV)
+                                    tv.own.owntv.features.home.ContinueKind.MOVIE ->
+                                        if (movieVm.playByIdAsync(t.movieId, t.positionMs) && !movieVm.externalPlayerOn.value) openFullscreen(MainSection.MOVIES)
+                                    tv.own.owntv.features.home.ContinueKind.EPISODE ->
+                                        if (seriesVm.playFromHomeAsync(t.seriesId, t.episodeId, t.positionMs) && !seriesVm.externalPlayerOn.value) openFullscreen(MainSection.SERIES)
+                                }
+                            }
+                        }
+                    },
                 )
                 Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(start = 0.dp, end = 6.dp, bottom = 6.dp)) {
                     when {

@@ -271,6 +271,7 @@ fun HomeScreen(
                             heroPreviewEngine = heroPreviewEngine,
                             engineState = engineState,
                             heroFocusRequester = heroFocus,
+                            heroMetadata = state.heroMetadata,
                             onHeroFocusChanged = { index, hasFocus ->
                                 if (hasFocus) {
                                     if (expandedHeroIndex != index) {
@@ -345,8 +346,14 @@ fun HomeScreen(
                     ContinueWatchingRow(
                         title = row.title,
                         items = state.continueSeries,
+                        posterOverrides = state.continuationArtwork,
+                        landscapeTiles = true,
                         onItemClick = { onPlayEpisode(0L, it.targetItemId, it.positionMs) },
                         onFocus = onNonHeroFocused,
+                        onItemFocus = {
+                            onNonHeroFocused()
+                            vm.resolveSeriesContinuationArtwork(it)
+                        },
                         firstItemFocusRequester = firstItemFocusRequester,
                     )
                 }
@@ -402,6 +409,24 @@ private fun HeroItem.heroKey(): String = when (this) {
     is HeroItem.LiveHero -> "live:${channel.id}"
 }
 
+private fun expandedHeroImageUrl(item: HeroItem, metadata: HomeHeroMetadata?): String? = when (item) {
+    is HeroItem.MovieHero ->
+        metadata?.backdropUrl
+            ?: item.movie.backdropUrl?.takeIf { it.isNotBlank() }
+            ?: item.movie.posterUrl?.takeIf { it.isNotBlank() }
+    is HeroItem.SeriesHero ->
+        metadata?.backdropUrl
+            ?: item.series.backdropUrl?.takeIf { it.isNotBlank() }
+            ?: item.series.posterUrl?.takeIf { it.isNotBlank() }
+    is HeroItem.LiveHero -> item.channel.logoUrl?.takeIf { it.isNotBlank() }
+}
+
+private fun expandedHeroPlot(item: HeroItem, metadata: HomeHeroMetadata?): String? = when (item) {
+    is HeroItem.MovieHero -> metadata?.plot ?: item.movie.plot?.takeIf { it.isNotBlank() }
+    is HeroItem.SeriesHero -> metadata?.plot ?: item.episode.plot?.takeIf { it.isNotBlank() } ?: item.series.plot?.takeIf { it.isNotBlank() }
+    is HeroItem.LiveHero -> null
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun HeroRowSection(
@@ -411,6 +436,7 @@ private fun HeroRowSection(
     heroPreviewEngine: HeroPreviewEngine,
     engineState: HeroPreviewEngine.State,
     heroFocusRequester: FocusRequester,
+    heroMetadata: Map<String, HomeHeroMetadata>,
     onHeroFocusChanged: (index: Int, hasFocus: Boolean) -> Unit,
     onPlay: (HeroItem) -> Unit,
     modifier: Modifier = Modifier,
@@ -523,6 +549,8 @@ private fun HeroRowSection(
                         is HeroItem.SeriesHero -> item.series.posterUrl
                         is HeroItem.LiveHero -> item.channel.logoUrl
                     }
+                    val itemMetadata = heroMetadata[item.heroKey()]
+                    val expandedImageUrl = expandedHeroImageUrl(item, itemMetadata)
 
                     val heroGlowColor = colors.focusGlow
                     Box(
@@ -597,17 +625,18 @@ private fun HeroRowSection(
                                 // as previewRectInRowPx is known and renders the blur itself — doubling the
                                 // blur underneath just costs frames on TV hardware.
                                 Box(Modifier.fillMaxSize().background(Color.Black)) {
-                                    if (!imageUrl.isNullOrBlank()) {
+                                    val cardImageUrl = expandedImageUrl ?: imageUrl
+                                    if (!cardImageUrl.isNullOrBlank()) {
                                         if (item is HeroItem.LiveHero) {
                                             AsyncImage(
-                                                model = imageUrl,
+                                                model = cardImageUrl,
                                                 contentDescription = null,
                                                 modifier = Modifier.fillMaxSize().blur(20.dp),
                                                 contentScale = ContentScale.Crop,
                                                 alpha = 0.5f,
                                             )
                                             AsyncImage(
-                                                model = imageUrl,
+                                                model = cardImageUrl,
                                                 contentDescription = null,
                                                 contentScale = ContentScale.Fit,
                                                 modifier = Modifier
@@ -616,9 +645,9 @@ private fun HeroRowSection(
                                             )
                                         } else {
                                             AsyncImage(
-                                                model = imageUrl,
+                                                model = cardImageUrl,
                                                 contentDescription = null,
-                                                contentScale = ContentScale.Fit,
+                                                contentScale = ContentScale.Crop,
                                                 modifier = Modifier.fillMaxSize(),
                                             )
                                         }
@@ -746,14 +775,11 @@ private fun HeroRowSection(
                             if (engineState != HeroPreviewEngine.State.PLAYING) {
                                 // Opaque cover: the SurfaceView below holds the previous preview's last
                                 // frame after stop(), and the parent's black background is punched out by
-                                // the SurfaceView. Everything above (loading images, translucent blur,
-                                // transparent logos, bare fallback icon) relies on this layer to hide it.
+                                // the SurfaceView. The loading images and fallback icon rely on this layer
+                                // to hide it.
                                 Box(Modifier.fillMaxSize().background(Color.Black))
-                                val artUrl = when (expandedItem) {
-                                    is HeroItem.MovieHero -> expandedItem.movie.posterUrl
-                                    is HeroItem.SeriesHero -> expandedItem.series.posterUrl
-                                    is HeroItem.LiveHero -> expandedItem.channel.logoUrl
-                                }
+                                val expandedMeta = heroMetadata[expandedItem.heroKey()]
+                                val artUrl = expandedHeroImageUrl(expandedItem, expandedMeta)
                                 if (!artUrl.isNullOrBlank()) {
                                     if (expandedItem is HeroItem.LiveHero) {
                                         AsyncImage(
@@ -773,14 +799,7 @@ private fun HeroRowSection(
                                         AsyncImage(
                                             model = artUrl,
                                             contentDescription = null,
-                                            modifier = Modifier.fillMaxSize().blur(20.dp),
                                             contentScale = ContentScale.Crop,
-                                            alpha = 0.5f,
-                                        )
-                                        AsyncImage(
-                                            model = artUrl,
-                                            contentDescription = null,
-                                            contentScale = ContentScale.Fit,
                                             modifier = Modifier.fillMaxSize(),
                                         )
                                     }
@@ -815,19 +834,30 @@ private fun HeroRowSection(
                                 .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
                                 .widthIn(max = Dimens.HeroOverlayMaxWidth),
                         ) {
+                            val expandedMeta = heroMetadata[expandedItem.heroKey()]
                             val title = when (expandedItem) {
                                 is HeroItem.MovieHero -> expandedItem.item.title
                                 is HeroItem.SeriesHero -> expandedItem.item.title
                                 is HeroItem.LiveHero -> expandedItem.channel.name
                             }
-                            Text(
-                                text = title,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = colors.onSurface,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                fontWeight = FontWeight.Bold,
-                            )
+                            val logoUrl = expandedMeta?.logoUrl?.takeIf { expandedItem !is HeroItem.LiveHero }
+                            if (!logoUrl.isNullOrBlank()) {
+                                AsyncImage(
+                                    model = logoUrl,
+                                    contentDescription = title,
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier.width(260.dp).height(58.dp),
+                                )
+                            } else {
+                                Text(
+                                    text = title,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = colors.onSurface,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                            }
 
                             val subtitle = when (expandedItem) {
                                 is HeroItem.MovieHero ->
@@ -855,6 +885,18 @@ private fun HeroRowSection(
                                     style = MaterialTheme.typography.bodySmall,
                                     color = colors.primary,
                                     maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+
+                            val plot = expandedHeroPlot(expandedItem, expandedMeta)
+                            if (!plot.isNullOrBlank()) {
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    text = plot,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = colors.onSurfaceVariant,
+                                    maxLines = 3,
                                     overflow = TextOverflow.Ellipsis,
                                 )
                             }
@@ -989,8 +1031,11 @@ private fun HeroPreviewSurface(
 private fun ContinueWatchingRow(
     title: String,
     items: List<LauncherContinuationItem>,
+    posterOverrides: Map<String, String> = emptyMap(),
+    landscapeTiles: Boolean = false,
     onItemClick: (LauncherContinuationItem) -> Unit,
     onFocus: () -> Unit,
+    onItemFocus: (LauncherContinuationItem) -> Unit = { onFocus() },
     firstItemFocusRequester: FocusRequester? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -1011,22 +1056,146 @@ private fun ContinueWatchingRow(
             modifier = Modifier.focusGroup(),
         ) {
             itemsIndexed(items, key = { _, item -> item.stableKey }) { index, item ->
-                Box(Modifier.width(150.dp)) {
-                    PosterCard(
-                        posterUrl = item.posterUrl,
-                        title = item.title,
-                        progressFraction = if (item.durationMs > 0) {
-                            (item.positionMs.toFloat() / item.durationMs.toFloat()).coerceIn(0f, 1f)
-                        } else null,
-                        modifier = when {
-                            firstItemFocusRequester != null && index == 0 -> Modifier.focusRequester(firstItemFocusRequester)
-                            else -> Modifier
-                        },
-                        onFocus = onFocus,
-                        onClick = { onItemClick(item) },
-                    )
+                val itemModifier = when {
+                    firstItemFocusRequester != null && index == 0 -> Modifier.focusRequester(firstItemFocusRequester)
+                    else -> Modifier
+                }
+                val progress = continuationProgress(item)
+                if (landscapeTiles) {
+                    val overrideImageUrl = posterOverrides[item.stableKey]
+                    Box(Modifier.width(275.dp)) {
+                        LandscapeContinuationCard(
+                            imageUrl = overrideImageUrl ?: item.posterUrl,
+                            cropImage = !overrideImageUrl.isNullOrBlank(),
+                            title = item.title,
+                            chipText = seasonEpisodeChip(item),
+                            progressFraction = progress,
+                            modifier = itemModifier,
+                            onFocus = { onItemFocus(item) },
+                            onClick = { onItemClick(item) },
+                        )
+                    }
+                } else {
+                    Box(Modifier.width(150.dp)) {
+                        PosterCard(
+                            posterUrl = posterOverrides[item.stableKey] ?: item.posterUrl,
+                            title = item.title,
+                            progressFraction = progress,
+                            modifier = itemModifier,
+                            onFocus = { onItemFocus(item) },
+                            onClick = { onItemClick(item) },
+                        )
+                    }
                 }
             }
+        }
+    }
+}
+
+private fun continuationProgress(item: LauncherContinuationItem): Float? =
+    if (item.durationMs > 0) {
+        (item.positionMs.toFloat() / item.durationMs.toFloat()).coerceIn(0f, 1f)
+    } else {
+        null
+    }
+
+private fun seasonEpisodeChip(item: LauncherContinuationItem): String? {
+    val season = item.seasonNumber?.takeIf { it > 0 }
+    val episode = item.episodeNumber?.takeIf { it > 0 }
+    return when {
+        season != null && episode != null -> "S%02d E%02d".format(season, episode)
+        season != null -> "S%02d".format(season)
+        episode != null -> "E%02d".format(episode)
+        else -> null
+    }
+}
+
+@Composable
+private fun LandscapeContinuationCard(
+    imageUrl: String?,
+    cropImage: Boolean,
+    title: String,
+    chipText: String?,
+    progressFraction: Float?,
+    modifier: Modifier = Modifier,
+    onFocus: () -> Unit,
+    onClick: () -> Unit,
+) {
+    val colors = OwnTVTheme.colors
+    FocusableSurface(
+        onClick = onClick,
+        modifier = modifier.onFocusChanged { if (it.hasFocus) onFocus() },
+        shape = RoundedCornerShape(14.dp),
+        focusedScale = 1.04f,
+        glowElevation = 14,
+        focusedContainerColor = colors.surfaceContainerHigh,
+        unfocusedContainerColor = colors.surfaceContainerHigh,
+        selectedContainerColor = colors.surfaceContainerHigh,
+        contentAlignment = Alignment.Center,
+    ) { focused ->
+        Column(modifier = Modifier.fillMaxWidth().padding(6.dp)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(colors.surfaceContainerLowest),
+            ) {
+                if (!imageUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = imageUrl,
+                        contentDescription = null,
+                        contentScale = if (cropImage) ContentScale.Crop else ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        OwnTVIcon(OwnTVIcon.SERIES, tint = colors.onSurfaceVariant, modifier = Modifier.size(36.dp))
+                    }
+                }
+
+                if (!chipText.isNullOrBlank()) {
+                    Text(
+                        text = chipText,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(8.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(Color.Black.copy(alpha = 0.62f))
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                    )
+                }
+
+                if (progressFraction != null && progressFraction > 0f) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .background(Color.Black.copy(alpha = 0.4f)),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(progressFraction.coerceIn(0f, 1f))
+                                .height(4.dp)
+                                .background(colors.primary),
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                title,
+                style = MaterialTheme.typography.labelLarge,
+                color = if (focused) colors.primary else colors.onSurface,
+                maxLines = 2,
+                minLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }

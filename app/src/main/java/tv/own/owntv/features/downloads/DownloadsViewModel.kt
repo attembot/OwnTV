@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import tv.own.owntv.core.customize.CustomizationStore
 import tv.own.owntv.core.customize.CustomizeKeys
@@ -74,6 +75,11 @@ class DownloadsViewModel(
             ?: false
         else -> false
     }
+
+    /** Free/total space on the download volume — recomputed whenever the download list changes. */
+    val storage: StateFlow<tv.own.owntv.core.download.DownloadStorageInfo?> = downloads
+        .mapLatest { downloadManager.storageInfo() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val _lastPlayedId = MutableStateFlow<Long?>(null)
     val lastPlayedId: StateFlow<Long?> = _lastPlayedId.asStateFlow()

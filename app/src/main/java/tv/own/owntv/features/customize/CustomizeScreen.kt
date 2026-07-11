@@ -44,6 +44,7 @@ import tv.own.owntv.core.model.MediaType
 import tv.own.owntv.features.profiles.PinDialog
 import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.OwnTVButton
+import tv.own.owntv.ui.components.dialogPanel
 import tv.own.owntv.ui.components.OwnTVButtonStyle
 import tv.own.owntv.ui.components.TextInputDialog
 import tv.own.owntv.ui.components.roundedPanel
@@ -344,7 +345,7 @@ private fun RangeHideDialog(count: Int, onHide: () -> Unit, onShow: () -> Unit, 
         contentAlignment = Alignment.Center,
     ) {
         Column(
-            Modifier.width(480.dp).clip(RoundedCornerShape(20.dp)).background(colors.surfaceContainerHigh).padding(28.dp),
+            Modifier.dialogPanel(width = 480.dp, padding = 28.dp),
         ) {
             Text("Hide or show categories", style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
             Spacer(Modifier.height(6.dp))
@@ -483,7 +484,7 @@ private fun PinConfirmDialog(
         contentAlignment = Alignment.Center,
     ) {
         Column(
-            Modifier.width(480.dp).clip(RoundedCornerShape(20.dp)).background(colors.surfaceContainerHigh).padding(28.dp),
+            Modifier.dialogPanel(width = 480.dp, padding = 28.dp),
         ) {
             Text(title, style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
             Spacer(Modifier.height(6.dp))

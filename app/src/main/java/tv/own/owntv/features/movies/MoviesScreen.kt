@@ -44,6 +44,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemContentType
+import androidx.paging.compose.itemKey
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -71,6 +73,8 @@ import tv.own.owntv.ui.components.ResumeDialog
 import tv.own.owntv.ui.components.SetTmdbNameDialog
 import tv.own.owntv.ui.components.TrailerPlayerScreen
 import tv.own.owntv.ui.components.longPressMenuGuard
+import tv.own.owntv.ui.components.dialogPanel
+import tv.own.owntv.ui.components.gridFocusTarget
 import androidx.compose.foundation.layout.width
 import tv.own.owntv.ui.components.SearchBar
 import tv.own.owntv.ui.components.trapVerticalFocusExit
@@ -119,6 +123,7 @@ fun MoviesScreen(
     var contextMovieIndex by remember { mutableStateOf(-1) }
     val contextFocus = remember { FocusRequester() }
     val selectedProgress by vm.selectedProgress.collectAsStateWithLifecycle()
+    val movieProgress by vm.movieProgress.collectAsStateWithLifecycle()
     val downloadStates by vm.downloadStates.collectAsStateWithLifecycle()
     val movies = vm.movies.collectAsLazyPagingItems()
     val resumeMode by vm.resumeMode.collectAsStateWithLifecycle()
@@ -278,18 +283,24 @@ fun MoviesScreen(
                     state = listState,
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(movies.itemCount) { index ->
+                    items(
+                        count = movies.itemCount,
+                        key = movies.itemKey { it.id },
+                        contentType = movies.itemContentType { "movie" },
+                    ) { index ->
                         val movie = movies[index]
                         if (movie != null) {
+                            val prog = movieProgress[movie.id]
                             MovieListRow(
                                 movie = movie,
                                 isFavorite = favoriteIds.contains(movie.id),
-                                modifier = when {
-                                    movie.id == contextMovieId -> Modifier.focusRequester(contextFocus)
-                                    movie.id == selectedMovie?.id -> Modifier.focusRequester(selFocus)
-                                    index == 0 -> Modifier.focusRequester(firstItemFocus)
-                                    else -> Modifier
-                                },
+                                completed = prog?.let { vm.isMovieCompleted(it) } == true,
+                                modifier = Modifier.gridFocusTarget(
+                                    itemId = movie.id, index = index,
+                                    contextId = contextMovieId, contextFocus = contextFocus,
+                                    selectedId = selectedMovie?.id, selectedFocus = selFocus,
+                                    firstItemFocus = firstItemFocus,
+                                ),
                                 onFocus = { vm.onMovieFocused(movie) },
                                 onClick = { startMovie(movie) },
                                 onLongClick = { contextMovie = movie; contextMovieId = movie.id; contextMovieIndex = index },
@@ -304,20 +315,29 @@ fun MoviesScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(movies.itemCount) { index ->
+                    items(
+                        count = movies.itemCount,
+                        key = movies.itemKey { it.id },
+                        contentType = movies.itemContentType { "movie" },
+                    ) { index ->
                         val movie = movies[index]
                         if (movie != null) {
+                            val prog = movieProgress[movie.id]
+                            val done = prog?.let { vm.isMovieCompleted(it) } == true
                             PosterCard(
                                 posterUrl = movie.posterUrl,
                                 title = movie.name,
                                 rating = movie.rating,
+                                completed = done,
+                                progressFraction = if (done || prog == null || prog.durationMs <= 0) null
+                                    else (prog.positionMs.toFloat() / prog.durationMs).takeIf { it > 0f },
                                 isFavorite = favoriteIds.contains(movie.id),
-                                modifier = when {
-                                    movie.id == contextMovieId -> Modifier.focusRequester(contextFocus)
-                                    movie.id == selectedMovie?.id -> Modifier.focusRequester(selFocus)
-                                    index == 0 -> Modifier.focusRequester(firstItemFocus)
-                                    else -> Modifier
-                                },
+                                modifier = Modifier.gridFocusTarget(
+                                    itemId = movie.id, index = index,
+                                    contextId = contextMovieId, contextFocus = contextFocus,
+                                    selectedId = selectedMovie?.id, selectedFocus = selFocus,
+                                    firstItemFocus = firstItemFocus,
+                                ),
                                 onFocus = { vm.onMovieFocused(movie) },
                                 onClick = { startMovie(movie) },
                                 onLongClick = { contextMovie = movie; contextMovieId = movie.id; contextMovieIndex = index },
@@ -333,6 +353,8 @@ fun MoviesScreen(
                 movie = selectedMovie,
                 meta = selectedMovieMeta?.takeIf { it.movieId == selectedMovie?.id }?.cache,
                 tmdbWins = metadataMode.tmdbWins,
+                resumePositionMs = selectedProgress?.takeIf { !vm.isMovieCompleted(it) }?.positionMs?.takeIf { it > 0 },
+                downloadStrip = selectedMovie?.let { m -> downloadStates[m.id]?.let { tv.own.owntv.ui.components.downloadStripFor(listOf(it)) } },
             )
         }
     }
@@ -351,9 +373,11 @@ fun MoviesScreen(
         val alreadyDownloaded = downloadStates[m.id] != null
         // TMDB Details is shown only when enrichment is on AND a confident match resolved for THIS movie.
         val cacheForM = selectedMovieMeta?.takeIf { it.movieId == m.id }?.cache
+        val watched = selectedProgress?.takeIf { selectedMovie?.id == m.id }?.let { vm.isMovieCompleted(it) } ?: false
         MovieContextMenu(
             title = m.name,
             isFavorite = favoriteIds.contains(m.id),
+            watched = watched,
             canMove = selectedKey is LiveKey.Folder || selectedKey == LiveKey.Favorites,
             isHistory = selectedKey == LiveKey.History,
             hasTmdbDetails = metadataMode.enrich && cacheForM != null,
@@ -361,6 +385,10 @@ fun MoviesScreen(
             canRefetchTmdb = metadataMode.enrich,
             onShowDetails = { contextMovie = null; detailsMovie = m },
             onToggleFavorite = { vm.toggleFavorite(m); contextMovie = null },
+            onToggleWatched = {
+                if (watched) vm.markMovieUnwatched(m) else vm.markMovieWatched(m)
+                contextMovie = null
+            },
             onMove = { contextMovie = null; vm.enterMoveMode(m, selectedKey) },
             onHide = { vm.hideMovie(m); contextMovie = null },
             onRemoveFromHistory = { vm.removeFromHistory(m.id); contextMovie = null },
@@ -462,6 +490,7 @@ fun MoviesScreen(
 private fun MovieContextMenu(
     title: String,
     isFavorite: Boolean,
+    watched: Boolean,
     canMove: Boolean,
     isHistory: Boolean,
     hasTmdbDetails: Boolean,
@@ -469,6 +498,7 @@ private fun MovieContextMenu(
     canRefetchTmdb: Boolean,
     onShowDetails: () -> Unit,
     onToggleFavorite: () -> Unit,
+    onToggleWatched: () -> Unit,
     onMove: () -> Unit,
     onHide: () -> Unit,
     onRemoveFromHistory: () -> Unit,
@@ -489,7 +519,7 @@ private fun MovieContextMenu(
         contentAlignment = Alignment.Center,
     ) {
         Column(
-            modifier = Modifier.width(440.dp).clip(RoundedCornerShape(20.dp)).background(colors.surfaceContainerHigh).padding(24.dp),
+            modifier = Modifier.dialogPanel(),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(title, style = MaterialTheme.typography.titleMedium, color = colors.onSurface, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
@@ -498,6 +528,11 @@ private fun MovieContextMenu(
                 if (isFavorite) "Remove from Favourites" else "Add to Favourites",
                 onClick = onToggleFavorite, style = OwnTVButtonStyle.SECONDARY, icon = OwnTVIcon.STAR,
                 modifier = Modifier.fillMaxWidth().focusRequester(focus),
+            )
+            OwnTVButton(
+                if (watched) "Mark as unwatched" else "Mark as watched",
+                onClick = onToggleWatched, style = OwnTVButtonStyle.SECONDARY,
+                modifier = Modifier.fillMaxWidth(),
             )
             if (canMove) OwnTVButton("Move", onClick = onMove, style = OwnTVButtonStyle.SECONDARY, modifier = Modifier.fillMaxWidth())
             if (isHistory) OwnTVButton("Remove from History", onClick = onRemoveFromHistory, style = OwnTVButtonStyle.SECONDARY, modifier = Modifier.fillMaxWidth())
@@ -532,6 +567,8 @@ private fun MovieDetailsPane(
     movie: MovieEntity?,
     meta: tv.own.owntv.core.database.entity.MetadataCacheEntity?,
     tmdbWins: Boolean,
+    resumePositionMs: Long? = null,
+    downloadStrip: tv.own.owntv.ui.components.DownloadStripState? = null,
 ) {
     val colors = OwnTVTheme.colors
     if (movie == null) {
@@ -554,6 +591,11 @@ private fun MovieDetailsPane(
             .verticalScroll(rememberScrollState())
             .padding(Dimens.GapLarge),
     ) {
+        // Non-focusable download status strip — only present while this movie is actually downloading.
+        if (downloadStrip != null) {
+            tv.own.owntv.ui.components.DownloadStatusStrip(downloadStrip)
+            Spacer(Modifier.height(12.dp))
+        }
         // Tall portrait poster (like the list / a phone screen), centred in the pane.
         Box(modifier = Modifier.fillMaxWidth().height(340.dp), contentAlignment = Alignment.Center) {
             Box(
@@ -573,6 +615,16 @@ private fun MovieDetailsPane(
             }
         }
         Spacer(Modifier.height(14.dp))
+        // Always-visible, non-focusable resume label (kept above the title, not further down in the
+        // pane, since movie metadata below can push a lower placement out of view once it scrolls long).
+        if (resumePositionMs != null) {
+            Text(
+                "Resume ${tv.own.owntv.ui.components.formatTimestamp(resumePositionMs)}",
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.primary,
+            )
+            Spacer(Modifier.height(6.dp))
+        }
         Text(movie.name, style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
         Spacer(Modifier.height(6.dp))
         Text(metaLine(movie, meta, tmdbWins), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
@@ -658,6 +710,7 @@ private fun jsonList(json: String?): List<String> {
 private fun MovieListRow(
     movie: MovieEntity,
     isFavorite: Boolean,
+    completed: Boolean = false,
     onFocus: () -> Unit,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
@@ -691,13 +744,25 @@ private fun MovieListRow(
                 Text(
                     movie.name,
                     style = MaterialTheme.typography.titleSmall,
-                    color = if (focused) colors.primary else colors.onSurface,
+                    color = when {
+                        focused -> colors.primary
+                        completed -> colors.onSurfaceVariant
+                        else -> colors.onSurface
+                    },
                     maxLines = 1,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 )
                 val meta = metaLine(movie)
                 if (meta.isNotBlank()) {
                     Text(meta, style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant, maxLines = 1)
+                }
+            }
+            if (completed) {
+                Box(
+                    modifier = Modifier.size(20.dp).clip(RoundedCornerShape(50)).background(colors.primary),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("✓", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = colors.onPrimary)
                 }
             }
             if (isFavorite) {

@@ -52,6 +52,7 @@ import tv.own.owntv.core.database.entity.PlaybackProgressEntity
 import tv.own.owntv.core.database.entity.WatchHistoryEntity
 import tv.own.owntv.core.launcher.LauncherIntegrationRepository
 import tv.own.owntv.core.model.MediaType
+import tv.own.owntv.core.util.throttleLatest
 import tv.own.owntv.features.live.LiveRailItem
 import tv.own.owntv.features.live.LiveKey
 import tv.own.owntv.core.download.DownloadManager
@@ -99,6 +100,15 @@ class MovieViewModel(
             }
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+    /** Contexts that actually have manual-order rows (C3): only those folders pay the
+     *  unindexable content_order join-sort; everything else stays on the plain indexed query. */
+    private val orderedContexts: StateFlow<Set<String>> = ctx
+        .flatMapLatest { c ->
+            if (c.profileId < 0) flowOf(emptySet())
+            else contentOrderDao.observeContextKeys(c.profileId, MediaType.MOVIE).map { it.toSet() }
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
     /** This profile's hide/rename/reorder customizations for Movies. */
     private val custom: StateFlow<SectionCustomizations> = ctx
@@ -219,8 +229,11 @@ class MovieViewModel(
             else combine(
                 categoryDao.observe(c.sourceIds, MediaType.MOVIE),
                 customize.observe(c.profileId, MediaType.MOVIE),
-            ) { cats, cust ->
-                defaultRail + cats.applyCustomizations(cust).map { (cat, name) ->
+                sortMode,
+            ) { cats, cust, sort ->
+                // A–Z also sorts the category folders; manually moved categories stay pinned first.
+                val folders = cats.applyCustomizations(cust, alphaRest = sort == SettingsRepository.SortMode.ALPHA)
+                defaultRail + folders.map { (cat, name) ->
                     LiveRailItem(LiveKey.Folder(cat.id), name.take(3).uppercase(), name)
                 }
             }
@@ -231,6 +244,9 @@ class MovieViewModel(
         _selected, ctx, _search.map { it.trim() }.debounce(300).distinctUntilChanged(), sortMode, _listRefresh,
     ) { key, c, query, sort, _ -> Args(key, c, query, sort) }
         .combine(custResolved) { args, cs -> args to cs }
+        // Rebuild the pager when a folder gains/loses manual order (C3): the fast-path plain
+        // PagingSource doesn't observe content_order, so the switch must recreate it.
+        .combine(orderedContexts) { p, _ -> p }
         .flatMapLatest { (args, cs) ->
             // Hidden items/categories are filtered on each fresh PagingData inside the pager chain —
             // a customization change re-creates the pager (same pattern as Live TV).
@@ -249,13 +265,20 @@ class MovieViewModel(
     private data class Args(val key: LiveKey, val ctx: Ctx, val query: String, val sort: SettingsRepository.SortMode)
 
     val count: StateFlow<Int> = combine(_selected, ctx, hiddenCategoryIds) { key, c, hidden -> Triple(key, c, hidden) }
-        .flatMapLatest { (key, c, hidden) -> countFlow(key, c, hidden) }
+        .flatMapLatest { (key, c, hidden) -> countFlow(key, c, hidden).throttleLatest() } // C2: cap live COUNT re-runs during bulk sync
         .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
 
     val favoriteIds: StateFlow<Set<Long>> = ctx
         .flatMapLatest { favoriteDao.observeFavoriteIds(it.profileId, MediaType.MOVIE) }
         .map { it.toSet() }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
+    /** Resume/watched progress for the visible movies, keyed by movie id — drives the ✓ tick and the
+     *  in-progress bar on posters/list rows. Only started/finished movies have a row, so this is small. */
+    val movieProgress: StateFlow<Map<Long, PlaybackProgressEntity>> = ctx
+        .flatMapLatest { c -> if (c.profileId < 0) flowOf(emptyList()) else progressDao.observeMovieProgress(c.profileId) }
+        .map { list -> list.associateBy { it.itemId } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
     val selectedProgress: StateFlow<PlaybackProgressEntity?> = combine(_selectedMovie, ctx) { m, c -> m to c }
         .flatMapLatest { (m, c) ->
@@ -415,6 +438,29 @@ class MovieViewModel(
         }
     }
 
+    /** ≥95% of duration watched = completed (mirrors SeriesViewModel.isEpisodeCompleted). */
+    fun isMovieCompleted(p: PlaybackProgressEntity): Boolean =
+        p.durationMs > 0 && p.positionMs >= (p.durationMs * 0.95f).toLong()
+
+    /** Mark a movie as watched (shows ✓) without playing it — same synthetic 1ms/1ms sentinel trick used
+     *  for episodes (satisfies the ≥95% completed rule while keeping Play restarting from ~0). */
+    fun markMovieWatched(movie: MovieEntity) {
+        viewModelScope.launch {
+            val pid = currentProfileId() ?: return@launch
+            progressDao.save(
+                PlaybackProgressEntity(profileId = pid, mediaType = MediaType.MOVIE, itemId = movie.id, positionMs = 1L, durationMs = 1L),
+            )
+        }
+    }
+
+    /** Mark a movie as unwatched — clears its resume position (removes the ✓ and any progress bar). */
+    fun markMovieUnwatched(movie: MovieEntity) {
+        viewModelScope.launch {
+            val pid = currentProfileId() ?: return@launch
+            progressDao.clear(pid, MediaType.MOVIE, movie.id)
+        }
+    }
+
     /** Persist the resume position if the player is actually playing the tracked movie. */
     fun saveProgressNow() {
         val m = playingMovie ?: return
@@ -528,9 +574,16 @@ class MovieViewModel(
             }
             LiveKey.Favorites -> movieDao.pagingFavoritesManual(c.profileId, ContentOrderEntity.FAV_CONTEXT, ids)
             LiveKey.History -> movieDao.pagingHistory(c.profileId, ids)
-            is LiveKey.Folder ->
-                if (rating) movieDao.pagingByCategoryRating(key.id)
-                else movieDao.pagingByCategoryManual(key.id, c.profileId, folderContextKeys.value[key.id] ?: "")
+            is LiveKey.Folder -> {
+                val ctxKey = folderContextKeys.value[key.id] ?: ""
+                when {
+                    rating -> movieDao.pagingByCategoryRating(key.id)
+                    // C3 fast path: no manual order in this folder → the plain indexed query has
+                    // the identical (sortOrder, name) order without the join-sort.
+                    ctxKey !in orderedContexts.value -> movieDao.pagingByCategory(key.id)
+                    else -> movieDao.pagingByCategoryManual(key.id, c.profileId, ctxKey)
+                }
+            }
         } else when (key) {
             LiveKey.All -> movieDao.searchAll(query, ids)
             LiveKey.Favorites -> movieDao.searchFavorites(query, c.profileId, ids)

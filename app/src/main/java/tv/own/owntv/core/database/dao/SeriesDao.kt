@@ -152,6 +152,13 @@ interface SeriesDao {
     @Query("SELECT * FROM series WHERE sourceId IN (:sourceIds) AND name LIKE '%' || :query || '%' ORDER BY name ASC LIMIT :limit")
     suspend fun searchList(query: String, sourceIds: List<Long>, limit: Int): List<SeriesEntity>
 
+    /** FTS-backed bounded list for global as-you-type search (see MovieDao.searchListFts). */
+    @Query(
+        "SELECT * FROM series WHERE sourceId IN (:sourceIds) " +
+            "AND id IN (SELECT rowid FROM series_fts WHERE series_fts MATCH :ftsQuery) ORDER BY name ASC LIMIT :limit",
+    )
+    suspend fun searchListFts(ftsQuery: String, sourceIds: List<Long>, limit: Int): List<SeriesEntity>
+
     @Query(
         "SELECT s.* FROM series s INNER JOIN favorites f ON f.itemId = s.id AND f.mediaType = 'SERIES' " +
             "WHERE f.profileId = :profileId AND s.sourceId IN (:sourceIds) AND s.name LIKE '%' || :query || '%' ORDER BY f.addedAt DESC",
@@ -189,6 +196,22 @@ interface SeriesDao {
             "WHERE h.profileId = :profileId AND s.sourceId IN (:sourceIds) AND s.name LIKE '%' || :query || '%' ORDER BY h.watchedAt DESC",
     )
     fun searchHistory(query: String, profileId: Long, sourceIds: List<Long>): PagingSource<Int, SeriesEntity>
+
+    /** Search "Continue" chip: recently-watched series snapshot (one-shot). */
+    @Query(
+        "SELECT s.* FROM series s INNER JOIN watch_history h ON h.itemId = s.id AND h.mediaType = 'SERIES' " +
+            "WHERE h.profileId = :profileId AND s.sourceId IN (:sourceIds) ORDER BY h.watchedAt DESC LIMIT :limit",
+    )
+    suspend fun recentlyWatchedSnapshot(profileId: Long, sourceIds: List<Long>, limit: Int): List<SeriesEntity>
+
+    /** Search "Unwatched" chip: favourite series with no watch-history row (bounded by favourites). */
+    @Query(
+        "SELECT s.* FROM series s " +
+            "INNER JOIN favorites f ON f.itemId = s.id AND f.mediaType = 'SERIES' AND f.profileId = :profileId " +
+            "LEFT JOIN watch_history h ON h.itemId = s.id AND h.mediaType = 'SERIES' AND h.profileId = :profileId " +
+            "WHERE s.sourceId IN (:sourceIds) AND h.itemId IS NULL ORDER BY f.addedAt DESC LIMIT :limit",
+    )
+    suspend fun unwatchedFavorites(profileId: Long, sourceIds: List<Long>, limit: Int): List<SeriesEntity>
 
     // --- Seasons ---
     @Insert(onConflict = OnConflictStrategy.REPLACE)

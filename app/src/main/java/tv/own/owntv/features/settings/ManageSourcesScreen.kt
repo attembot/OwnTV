@@ -45,6 +45,7 @@ import tv.own.owntv.core.sync.work.CatalogSyncState
 import tv.own.owntv.features.settings.data.PlaylistAutoRefresh
 import tv.own.owntv.features.setup.AddSourceScreen
 import tv.own.owntv.ui.components.OwnTVButton
+import tv.own.owntv.ui.components.dialogPanel
 import tv.own.owntv.ui.components.OwnTVButtonStyle
 import tv.own.owntv.ui.components.OwnTVSpinner
 import tv.own.owntv.ui.components.roundedPanel
@@ -339,7 +340,7 @@ internal fun ConfirmDialog(title: String, message: String, onConfirm: () -> Unit
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     BackHandler { onDismiss() }
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.75f)).focusGroup(), contentAlignment = Alignment.Center) {
-        Column(Modifier.width(460.dp).clip(RoundedCornerShape(20.dp)).background(colors.surfaceContainerHigh).padding(28.dp)) {
+        Column(Modifier.dialogPanel(width = 460.dp, padding = 28.dp)) {
             Text(title, style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
             Spacer(Modifier.height(10.dp))
             Text(message, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)

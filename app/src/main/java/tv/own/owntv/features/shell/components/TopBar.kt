@@ -52,6 +52,10 @@ fun TopBar(
     searchVisible: Boolean = true,
     playlistInteractive: Boolean = false,
     onPlaylistClick: () -> Unit = {},
+    // Batch 7 — shared "Continue" chip (resume last movie/episode/channel). Null label = nothing to resume.
+    continueLabel: String? = null,
+    continueIcon: OwnTVIcon = OwnTVIcon.PLAY,
+    onContinueClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val colors = OwnTVTheme.colors
@@ -63,6 +67,11 @@ fun TopBar(
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             SectionChip(label = sectionLabel)
             SearchPill(onClick = onSearchClick, visible = searchVisible)
+            // Only focusable while the nav panel holds focus (same rule as the search pill) so it can
+            // never trap D-pad focus inside a section.
+            if (continueLabel != null) {
+                ContinueChip(label = continueLabel, icon = continueIcon, onClick = onContinueClick, visible = searchVisible)
+            }
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             if (weatherInfo != null) WeatherChip(info = weatherInfo, fahrenheit = weatherFahrenheit)
@@ -101,6 +110,32 @@ private fun SearchPill(onClick: () -> Unit, visible: Boolean) {
         Row(Modifier.padding(horizontal = 14.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OwnTVIcon(icon = OwnTVIcon.SEARCH, tint = colors.onSurfaceVariant, modifier = Modifier.size(16.dp))
             Text("Search", style = MaterialTheme.typography.labelLarge, color = colors.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun ContinueChip(label: String, icon: OwnTVIcon, onClick: () -> Unit, visible: Boolean) {
+    val colors = OwnTVTheme.colors
+    val alpha by animateFloatAsState(if (visible) 1f else 0f, label = "continueChipAlpha")
+    FocusableSurface(
+        onClick = onClick,
+        modifier = Modifier
+            .graphicsLayer { this.alpha = alpha }
+            .focusProperties { canFocus = visible },
+        shape = RoundedCornerShape(999.dp),
+        focusedContainerColor = colors.primary,
+        unfocusedContainerColor = colors.primaryContainer.copy(alpha = 0.6f),
+        contentAlignment = Alignment.Center,
+    ) { focused ->
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            val fg = if (focused) colors.onPrimary else colors.onPrimaryContainer
+            OwnTVIcon(icon = icon, tint = fg, modifier = Modifier.size(16.dp))
+            Text(label, style = MaterialTheme.typography.labelLarge, color = fg, fontWeight = FontWeight.SemiBold, maxLines = 1)
         }
     }
 }

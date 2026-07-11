@@ -1,5 +1,6 @@
 package tv.own.owntv.core.backup
 
+import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -18,8 +19,9 @@ import tv.own.owntv.features.settings.data.SettingsRepository
 /**
  * Phase 12 — backup & restore of the painful-to-re-enter setup: **profiles** (name/avatar/kids/PIN),
  * **sources** (URLs + credentials + per-source UA) and their profile links, plus per-profile
- * **customizations** (hidden/renamed/reordered categories & channels), favorites, watch history and
- * resume positions — as a JSON file. The user picks which [Section]s to include on export and which
+ * **customizations** (hidden/renamed/reordered categories & channels), favorites, watch history,
+ * resume positions and manual Move positions — as a JSON file. The user picks which [Section]s to
+ * include on export and which
  * to apply on restore. Content (channels/movies/series) is NOT backed up — it's large and re-syncs
  * from the sources after restore. Profile/source ids are preserved on restore, so customization keys
  * stay valid.
@@ -34,14 +36,18 @@ class BackupManager(
     private val launcherIntegrationRepository: LauncherIntegrationRepository,
     private val forceMpvStore: tv.own.owntv.core.player.ForceMpvStore,
     private val vodEngineStore: tv.own.owntv.core.player.VodEngineStore,
+    private val db: tv.own.owntv.core.database.OwnTVDatabase,
+    private val tmdbOverrides: tv.own.owntv.core.metadata.MetadataOverrideStore,
+    private val metadataDao: tv.own.owntv.core.database.dao.MetadataDao,
 ) {
     /** What a backup can contain; the user multi-selects these for export and restore. */
     enum class Section(val label: String, val desc: String) {
         SOURCES("Profiles & sources", "Viewers, PINs, playlists, EPG feeds and credentials"),
-        CUSTOMIZE("Customizations", "Hidden/renamed/reordered categories, channels & EPG matches"),
+        CUSTOMIZE("Customizations", "Hidden/renamed/reordered categories, channels, EPG matches & custom TMDB names"),
         FAVORITES("Favorites", "Starred channels, movies and series"),
         HISTORY("Watch history", "Recently watched lists"),
         RESUME("Resume positions", "Where you stopped in movies & episodes"),
+        MANUAL_REORDER("Manual reorder", "Your Move up/down positions for channels, movies and series"),
         SETTINGS("App settings", "Theme, accent, player & layout preferences"),
     }
 
@@ -66,7 +72,7 @@ class BackupManager(
             val seal: ((String) -> JSONObject)? = key?.let { k -> { plain -> BackupCrypto.encrypt(k, plain) } }
 
             val root = JSONObject().apply {
-                put("version", 8) // v8: home configs (CUSTOMIZE) + customize PINs (SOURCES); compat-mode pins (SETTINGS)
+                put("version", 9) // v9: custom TMDB names (CUSTOMIZE), encrypted TMDB API key + recent searches (SETTINGS)
                 put("sections", JSONArray().apply { sections.forEach { put(it.name) } })
                 if (salt != null) put("crypto", BackupCrypto.cryptoBlock(salt))
                 if (Section.SOURCES in sections) {
@@ -84,6 +90,9 @@ class BackupManager(
                 if (Section.CUSTOMIZE in sections) {
                     put("customizations", JSONObject().apply { customize.exportAll().forEach { (k, v) -> put(k, v) } })
                     put("homeConfigs", settings.exportHomeConfigs())
+                    // User-corrected TMDB titles/years. Keyed by "type:sourceId:remoteId|name" — source ids
+                    // are preserved on restore, so the map rides verbatim. Optional block; older readers ignore it.
+                    tmdbOverrides.exportJson().takeIf { it.isNotBlank() }?.let { put("tmdbOverrides", it) }
                 }
                 // Favorites / history / resume positions, exported with stable keys (see UserDataResolver).
                 val kinds = kindsFor(sections)
@@ -94,6 +103,9 @@ class BackupManager(
                     // so importSettings ignores it); omitted entirely when there is no passphrase.
                     val proxyPass = settings.currentProxyPassword()
                     if (seal != null && proxyPass.isNotEmpty()) s.put("proxy_pass_enc", seal(proxyPass))
+                    // The user's own TMDB API key: same secret policy — encrypted with a passphrase, else omitted.
+                    val tmdbKey = settings.currentTmdbApiKey()
+                    if (seal != null && tmdbKey.isNotEmpty()) s.put("tmdb_key_enc", seal(tmdbKey))
                     put("settings", s)
                     // Per-item "compatibility mode" engine pins (Live + VOD). Keyed by stream URL, so no
                     // id remapping needed on restore. Optional block — older readers just ignore it.
@@ -125,7 +137,8 @@ class BackupManager(
             if (root.has("profiles") || root.has("sources")) out += Section.SOURCES
             if (
                 root.optJSONObject("customizations")?.keys()?.hasNext() == true ||
-                root.optJSONObject("homeConfigs")?.keys()?.hasNext() == true
+                root.optJSONObject("homeConfigs")?.keys()?.hasNext() == true ||
+                root.optString("tmdbOverrides").isNotBlank()
             ) out += Section.CUSTOMIZE
             if (root.optJSONObject("settings")?.keys()?.hasNext() == true) out += Section.SETTINGS
             root.optJSONArray("userData")?.let { arr ->
@@ -134,6 +147,7 @@ class BackupManager(
                         "fav" -> out += Section.FAVORITES
                         "his" -> out += Section.HISTORY
                         "prog" -> out += Section.RESUME
+                        "order" -> out += Section.MANUAL_REORDER
                     }
                 }
             }
@@ -184,14 +198,19 @@ class BackupManager(
                 val links = root.optJSONArray("links") ?: JSONArray()
 
                 profileDao.getAllOnce().forEach { profile -> runCatching { launcherIntegrationRepository.clearProfile(profile.id) } }
-                profileDao.deleteAll()       // cascades favorites/history/progress/profile_source
-                sourceDao.deleteAllSources() // cascades content + profile_source
+                // B3: one transaction around the destructive wipe + re-insert — a crash mid-import
+                // used to leave a half-restored DB (profiles gone, sources partially written); now
+                // it's all-or-nothing, and thousands of row inserts share one commit/fsync.
+                db.withTransaction {
+                    profileDao.deleteAll()       // cascades favorites/history/progress/profile_source
+                    sourceDao.deleteAllSources() // cascades content + profile_source
 
-                for (i in 0 until profiles.length()) profileDao.insert(profileFrom(profiles.getJSONObject(i)))
-                for (i in 0 until sources.length()) sourceDao.insert(sourceFrom(sources.getJSONObject(i), unseal))
-                for (i in 0 until links.length()) {
-                    val l = links.getJSONObject(i)
-                    sourceDao.link(ProfileSourceCrossRef(profileId = l.getLong("profileId"), sourceId = l.getLong("sourceId")))
+                    for (i in 0 until profiles.length()) profileDao.insert(profileFrom(profiles.getJSONObject(i)))
+                    for (i in 0 until sources.length()) sourceDao.insert(sourceFrom(sources.getJSONObject(i), unseal))
+                    for (i in 0 until links.length()) {
+                        val l = links.getJSONObject(i)
+                        sourceDao.link(ProfileSourceCrossRef(profileId = l.getLong("profileId"), sourceId = l.getLong("sourceId")))
+                    }
                 }
                 epgSources.importJson(root.optString("epgSources").takeIf { it.isNotBlank() })
                 val profileIds = profileDao.getAllOnce().map { it.id }.toSet()
@@ -216,6 +235,16 @@ class BackupManager(
                     count += cust.size
                 }
                 root.optJSONObject("homeConfigs")?.let { settings.importHomeConfigs(it, existingProfileIds) }
+                // Custom TMDB names: merge (backup wins per key), then drop any cached match/details stored
+                // under the imported keys so the corrected title is re-fetched instead of showing stale art.
+                root.optString("tmdbOverrides").takeIf { it.isNotBlank() }?.let { raw ->
+                    runCatching {
+                        tmdbOverrides.importJson(raw).forEach { k ->
+                            metadataDao.deleteMatch(k)
+                            metadataDao.deleteCache(k)
+                        }
+                    }
+                }
             }
 
             // Favorites/history/progress: stashed as pending records — they attach automatically as
@@ -239,6 +268,9 @@ class BackupManager(
                     // Proxy password: decrypt if we have a key; if encrypted but no key, leave blank.
                     if (s.has("proxy_pass_enc")) {
                         unseal(s.opt("proxy_pass_enc"))?.let { settings.setProxyPassword(it) }
+                    }
+                    if (s.has("tmdb_key_enc")) {
+                        unseal(s.opt("tmdb_key_enc"))?.let { settings.setTmdbApiKey(it) }
                     }
                     count += s.length()
                 }
@@ -275,6 +307,7 @@ class BackupManager(
             }
         }
         root.optJSONObject("settings")?.opt("proxy_pass_enc")?.let { if (BackupCrypto.isEncrypted(it)) return it as JSONObject }
+        root.optJSONObject("settings")?.opt("tmdb_key_enc")?.let { if (BackupCrypto.isEncrypted(it)) return it as JSONObject }
         return null
     }
 
@@ -282,6 +315,7 @@ class BackupManager(
         if (Section.FAVORITES in sections) add("fav")
         if (Section.HISTORY in sections) add("his")
         if (Section.RESUME in sections) add("prog")
+        if (Section.MANUAL_REORDER in sections) add("order")
     }
 
     // --- mapping ---

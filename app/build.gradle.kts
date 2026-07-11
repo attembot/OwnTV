@@ -60,7 +60,10 @@ android {
     buildTypes {
         release {
             optimization {
-                enable = false
+                enable = true
+                keepRules {
+                    files("proguard-rules.pro")
+                }
             }
             if (releaseKeystore != null) {
                 signingConfig = signingConfigs.getByName("release")
@@ -113,6 +116,10 @@ dependencies {
 
     // WorkManager (durable background sync)
     implementation(libs.androidx.work.runtime)
+
+    // Baseline profiles: installs the merged library profiles (Compose, Media3, Room, ...) into
+    // ART on first launch. OwnTV is sideloaded, so without this the bundled profiles never apply.
+    implementation(libs.androidx.profileinstaller)
 
     // Database (Room, via KSP) + Paging
     implementation(libs.androidx.room.runtime)
