@@ -108,6 +108,10 @@ fun PlayerHud(
     // true = currently playing on ExoPlayer.
     vodOnExo: Boolean? = null,
     onToggleVodEngine: (() -> Unit)? = null,
+    // Live guide card (Before / Now playing / Next for the playing channel) — supplied by the shell
+    // (the EPG data lives in LiveViewModel, not the player). Rendered on the right edge whenever the
+    // controls are visible, like the top-bar channel card; informational only, never focusable.
+    liveEpgCard: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val isPlaying by player.isPlaying.collectAsStateWithLifecycle()
@@ -240,6 +244,9 @@ fun PlayerHud(
             // Hide the transport (play/seek/prev/next) and bottom bar while an error is up — the error
             // overlay owns the screen with its own Retry, so the play/rewind/forward must not show behind it.
             if (error == null) {
+                if (liveEpgCard != null) {
+                    Box(Modifier.align(Alignment.CenterEnd).padding(end = 28.dp)) { liveEpgCard() }
+                }
                 CenterControls(player, nav, isPlaying, isLive, onRewindLive, onForwardLive, onGoToLive, timeshiftOffsetSec, playFocus, modifier = Modifier.align(Alignment.Center))
 
                 BottomBar(

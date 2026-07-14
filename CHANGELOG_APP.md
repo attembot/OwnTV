@@ -9,6 +9,23 @@
 > (e.g. `(community PR #40 by @codeVerine)`). Issue numbers that are part of a title (e.g. `(#57)`) are
 > fine; explanatory parentheticals are not. Descriptions belong in CHANGELOG.md, never here.
 
+## v4.1.2 — 2026-07-14
+
+### ✨ New features
+
+- **⚡ Run in background during the first playlist import**
+- **📡 Stalker portals: live TV first, movies & series sync in the background automatically**
+- **🚀 Adaptive portal speed & delta-checked faster re-syncs (Stalker)**
+- **🔄 Background-sync status pill**
+- **📺 Live player guide card — Before / Now playing / Next**
+
+### 🐛 Fixes
+
+- **Guide programme popup: last button was cut off**
+- **Guide programme popup: long-press no longer selects in one go**
+- **Settings → Home screen: focus lands on the first row**
+- **Failed background import keeps the playlist for re-sync**
+
 ## v4.1.1 — 2026-07-14
 
 ### ✨ New features

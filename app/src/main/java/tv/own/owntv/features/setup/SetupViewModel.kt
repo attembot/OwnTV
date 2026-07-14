@@ -22,6 +22,7 @@ import tv.own.owntv.core.repository.SourceRepository
 import tv.own.owntv.core.sync.ImportStage
 import tv.own.owntv.core.sync.SyncContentTypes
 import tv.own.owntv.core.sync.SyncResult
+import tv.own.owntv.core.sync.withRemainderNote
 import tv.own.owntv.core.sync.work.CatalogSyncScheduler
 import tv.own.owntv.core.util.Pin
 import tv.own.owntv.core.util.friendlySyncError
@@ -53,6 +54,10 @@ class SetupViewModel(
     // Semi-auto EPG: after the first playlist imports, offer a one-tap guide sync (with a live count) if it
     // has a guide feed.
     private var pendingEpgSource: SourceEntity? = null
+    // Set when the user leaves the wizard with "Run in background". A late Success must not raise
+    // the EPG Ask prompt into the dead wizard UI, and a late failure must not silently DELETE the
+    // source the user thinks they added — keep it (credentials intact) and only wipe partial content.
+    private var backgroundHandoff = false
     private val _epgSync = MutableStateFlow<tv.own.owntv.features.settings.EpgSyncUi>(tv.own.owntv.features.settings.EpgSyncUi.Hidden)
     val epgSync: StateFlow<tv.own.owntv.features.settings.EpgSyncUi> = _epgSync.asStateFlow()
 
@@ -132,14 +137,16 @@ class SetupViewModel(
 
     /** Stalker/MAC portal onboarding — mirrors SettingsViewModel.addStalker: the handshake is verified
      *  BEFORE the source is saved, so a typo'd portal/MAC fails with a clear error instead of leaving a
-     *  dead source on the brand-new profile. */
+     *  dead source on the brand-new profile. Staged automatically (no toggles): live syncs in the
+     *  foreground (fast — one bulk get_all_channels), movies/series go to the background remainder
+     *  worker, because Stalker VOD has no bulk endpoint (~14 items/page → thousands of requests). */
     fun startStalker(name: String, portalUrl: String, mac: String, userAgent: String = "", autoRefresh: PlaylistAutoRefresh = PlaylistAutoRefresh.OFF) {
         val canonicalMac = tv.own.owntv.core.stalker.StalkerClient.canonicalizeMac(mac)
         if (canonicalMac == null) {
             _state.value = ImportState.Failed("Invalid MAC address — use AA:BB:CC:DD:EE:FF")
             return
         }
-        runImport(autoRefresh, requiresNetwork = true) { profileId ->
+        runImport(autoRefresh, contentTypes = STALKER_PRIORITY, enqueueRemainder = true, requiresNetwork = true) { profileId ->
             stalkerAuth.testConnection(
                 tv.own.owntv.core.stalker.StalkerCredentials(
                     sourceId = STALKER_TEST_SOURCE_ID,
@@ -196,8 +203,10 @@ class SetupViewModel(
                         if (enqueueRemainder) enqueueRemainderSync(source, contentTypes)
                         if (freshSync && !remainder.hasAny) catalogSyncScheduler.enqueueContentIndexBuild(reason = "fresh_add")
                         lastFailedSource = null
-                        _state.value = ImportState.Success(counts.summary(includeEpg = false).withWarnings(result))
-                        if (epgRepository.guideUrl(syncedSource) != null) {
+                        _state.value = ImportState.Success(
+                            counts.summary(includeEpg = false).withWarnings(result).withRemainderNote(remainder),
+                        )
+                        if (!backgroundHandoff && epgRepository.guideUrl(syncedSource) != null) {
                             pendingEpgSource = syncedSource
                             _epgSync.value = tv.own.owntv.features.settings.EpgSyncUi.Ask(syncedSource.name)
                         }
@@ -345,6 +354,20 @@ class SetupViewModel(
         _progress.value = null
     }
 
+    /**
+     * "Run in background": enter the app now while the import keeps running. This ViewModel is
+     * activity-scoped, so the in-flight [importJob] survives leaving the wizard — the sync continues
+     * exactly as if the user had waited (success still runs ImportFinalizer + the remainder enqueue).
+     * Deliberately does NOT cancel: cancelling would run [cleanupFailedAdd] and delete the source.
+     * The semi-auto EPG prompt is skipped (its dialog lives in the wizard); EPG stays user-initiated
+     * from Settings → EPG Sources, matching the app's EPG opt-in policy.
+     */
+    fun continueInBackground(onDone: () -> Unit = {}) {
+        backgroundHandoff = true
+        dismissPendingEpg()
+        finish(onDone)
+    }
+
     /** Completes onboarding → makes the new profile active, routing the app into the shell. */
     fun finish(onDone: () -> Unit = {}) {
         viewModelScope.launch {
@@ -357,8 +380,16 @@ class SetupViewModel(
         if (source == null) return
         withContext(NonCancellable) {
             catalogSyncScheduler.cancelSync(source.id)
-            runCatching { sourceRepository.deleteSource(source) }
-            runCatching { settings.setPlaylistAutoRefresh(source.id, PlaylistAutoRefresh.OFF) }
+            if (backgroundHandoff) {
+                // The user already entered the app with "Run in background" — deleting the source
+                // would make the playlist they just added silently vanish. Keep it so they can
+                // re-sync from Settings → Playlists; wipe only the partial content (a never-synced
+                // source re-syncs via insertFresh, which assumes empty tables — leftovers duplicate).
+                runCatching { sourceRepository.clearSourceContent(source.id) }
+            } else {
+                runCatching { sourceRepository.deleteSource(source) }
+                runCatching { settings.setPlaylistAutoRefresh(source.id, PlaylistAutoRefresh.OFF) }
+            }
         }
     }
 
@@ -368,5 +399,8 @@ class SetupViewModel(
     private companion object {
         /** Sentinel sourceId for the pre-save Stalker handshake (same as SettingsViewModel's). */
         const val STALKER_TEST_SOURCE_ID = -1L
+
+        /** Stalker foreground pass: live only; movies/series are always the background remainder. */
+        val STALKER_PRIORITY = SyncContentTypes(live = true, movies = false, series = false)
     }
 }

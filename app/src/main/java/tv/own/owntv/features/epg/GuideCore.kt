@@ -6,6 +6,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -46,6 +48,7 @@ import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.OwnTVButton
 import tv.own.owntv.ui.components.OwnTVButtonStyle
 import tv.own.owntv.ui.components.OwnTVIcon
+import tv.own.owntv.ui.components.longPressMenuGuard
 import tv.own.owntv.ui.format.rememberSystemTimeFormatter
 import tv.own.owntv.ui.theme.Dimens
 import tv.own.owntv.ui.theme.OwnTVTheme
@@ -137,6 +140,7 @@ internal fun ProgrammeStripCanvas(
 }
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 internal fun ProgrammeDetailDialog(
     channelName: String,
     programme: EpgProgrammeEntity,
@@ -159,7 +163,13 @@ internal fun ProgrammeDetailDialog(
     LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
     Popup(onDismissRequest = onDismiss, properties = PopupProperties(focusable = true)) {
         BackHandler { onDismiss() }
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.75f)), contentAlignment = Alignment.Center) {
+        Box(
+            // The dialog can be opened by a long-press on the programme cell; the OK key is often still
+            // held when it appears, which would instantly fire the focused action. Swallow OK until it's
+            // released once so the held long-press only reveals the dialog, then the user chooses.
+            Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.75f)).longPressMenuGuard(),
+            contentAlignment = Alignment.Center,
+        ) {
             // Scrollable: long XMLTV descriptions can exceed a small screen's height.
             Column(
                 Modifier.widthIn(max = 560.dp).clip(RoundedCornerShape(20.dp)).background(colors.surfaceContainerHigh)
@@ -175,16 +185,14 @@ internal fun ProgrammeDetailDialog(
                     Text(description.orEmpty(), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
                 }
                 Spacer(Modifier.height(24.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OwnTVButton("Close", onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY)
-                    // Favourite the channel without leaving the guide; the label flips in place.
-                    OwnTVButton(
-                        if (isFavorite) "Unfavourite" else "Favourite",
-                        onClick = onToggleFavorite,
-                        style = OwnTVButtonStyle.SECONDARY,
-                        icon = OwnTVIcon.FAVORITE,
-                    )
-                    Spacer(Modifier.weight(1f))
+                // FlowRow so the actions wrap to a second line on narrower screens instead of the last
+                // button being clipped off the dialog edge (4 buttons don't fit one row when catch-up adds
+                // "Watch from start" + "Watch channel").
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
                     // Catch-up channels: replay this programme from its start (seekable archive playback).
                     if (canCatchup) {
                         OwnTVButton("Watch from start", onClick = onPlayCatchup, icon = OwnTVIcon.PLAY, modifier = Modifier.focusRequester(fr))
@@ -192,6 +200,14 @@ internal fun ProgrammeDetailDialog(
                     } else {
                         OwnTVButton("Watch channel", onClick = onWatch, icon = OwnTVIcon.PLAY, modifier = Modifier.focusRequester(fr))
                     }
+                    // Favourite the channel without leaving the guide; the label flips in place.
+                    OwnTVButton(
+                        if (isFavorite) "Unfavourite" else "Favourite",
+                        onClick = onToggleFavorite,
+                        style = OwnTVButtonStyle.SECONDARY,
+                        icon = OwnTVIcon.FAVORITE,
+                    )
+                    OwnTVButton("Close", onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY)
                 }
             }
         }

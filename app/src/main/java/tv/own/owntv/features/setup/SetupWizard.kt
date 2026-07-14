@@ -120,6 +120,7 @@ fun Onboarding(firstRun: Boolean, onDone: () -> Unit, onCancel: () -> Unit, modi
                 onContinue = { vm.finish(onDone) }, // playlist + its EPG synced (auto)
                 onRetry = { vm.reset(); step = importOrigin },
                 onCancel = { vm.cancelImport(); step = importOrigin },
+                onBackground = { vm.continueInBackground(onDone) }, // enter the app; sync keeps running
             )
             Step.EXISTING -> ExistingSourcesScreen(
                 sources = existing,
@@ -354,9 +355,12 @@ private fun ImportProgressScreen(
     onContinue: () -> Unit,
     onRetry: () -> Unit,
     onCancel: () -> Unit,
+    onBackground: () -> Unit,
 ) {
     val colors = OwnTVTheme.colors
     val fr = remember { FocusRequester() }
+    val bgFr = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { bgFr.requestFocus() } }
     LaunchedEffect(state) {
         if (state is SetupViewModel.ImportState.Success || state is SetupViewModel.ImportState.Failed) runCatching { fr.requestFocus() }
     }
@@ -382,7 +386,18 @@ private fun ImportProgressScreen(
                     color = colors.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(24.dp))
-                OwnTVButton("Cancel", onClick = onCancel, style = OwnTVButtonStyle.SECONDARY)
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // Enter the app right away; the import keeps running (VM is activity-scoped) and
+                    // content appears as it lands — no need to sit through a big movies/series sync.
+                    OwnTVButton("Run in background", onClick = onBackground, icon = OwnTVIcon.PLAY, modifier = Modifier.focusRequester(bgFr))
+                    OwnTVButton("Cancel", onClick = onCancel, style = OwnTVButtonStyle.SECONDARY)
+                }
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "You can start watching while the rest of the catalog loads.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.onSurfaceVariant,
+                )
             }
             is SetupViewModel.ImportState.Success -> {
                 Text("All set!", style = MaterialTheme.typography.headlineLarge, color = colors.onSurface)

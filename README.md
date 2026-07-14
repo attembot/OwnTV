@@ -85,9 +85,9 @@ Scan to join from your phone:
 - **Sort & view** — playlist order or A–Z; Movies & Series Grid/List toggle
 - **Per-profile startup** — Home, last channel, or Live TV on Favorites
 - **Built for scale** — ~50k channels / ~168k movies via Paging 3
-- **Fast syncing** — priority import (pick e.g. Live TV first, the rest finishes in the background — survives sleep/reboot); incremental re-syncs only write what changed; auto-retrying downloads
+- **Fast syncing** — priority import (pick e.g. Live TV first, the rest finishes in the background — survives sleep/reboot); **Run in background** button during the first import with an unobtrusive status pill; incremental re-syncs only write what changed; auto-retrying downloads
 - **Typed M3U playlists** — `type=` / `tvg-type=` tags route entries to **Movies** or **Series** (per-episode `S01E05` lines are grouped into shows, seasons and episodes automatically)
-- 📡 **Stalker / Ministra portals** — add a source with just a **Portal URL + MAC address**; Live TV, Movies & Series (lazy episode loading), downloads, EPG/catch-up and TMDB enrichment all work; play links are minted per-play and **auto-renewed when they expire** (long live sessions and long downloads survive token resets); MAG User-Agent presets for picky portals
+- 📡 **Stalker / Ministra portals** — add a source with just a **Portal URL + MAC address**; live TV imports in seconds and the movies/series catalog **syncs in the background automatically** (adaptive request speed, delta-checked re-syncs); Live TV, Movies & Series (lazy episode loading), downloads, EPG/catch-up and TMDB enrichment all work; play links are minted per-play and **auto-renewed when they expire** (long live sessions and long downloads survive token resets); MAG User-Agent presets for picky portals
 - 🎬 **TMDB metadata enrichment** — optional, on-demand posters, plots, cast, genres & ratings for Movies, Series and Episodes; **in-app trailers**; manual Refetch / "Set TMDB name" overrides; works with zero setup, your own TMDB key, or a self-hosted [caching proxy](worker/)
 
 ### 🗓️ EPG / TV Guide

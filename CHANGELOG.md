@@ -1,5 +1,54 @@
 # Changelog
 
+## v4.1.2 — 2026-07-14
+
+### ⚡ Background catalog sync
+
+- **"Run in background" during the first import** — the setup wizard's sync screen (and any first
+  playlist import) now has a **Run in background** button: enter the app immediately and start
+  watching while the catalog keeps loading. Works for M3U, Xtream and Stalker alike. If a
+  backgrounded import later fails, the playlist is **kept** (with its credentials) so you can
+  re-sync it from Settings → Playlists — previously a failed add was silently removed.
+- **Stalker portals sync live TV first, movies & series in the background — automatically.**
+  Stalker has no bulk VOD endpoint (its catalog is paged ~14 items per request), so a big portal's
+  movies/series crawl took minutes. Adding a portal now imports live channels in seconds and hands
+  the movies/series crawl to a background worker that survives app restarts and retries transient
+  failures. No toggles to understand — it's the default for every Stalker add.
+- **Adaptive portal speed** — the Stalker VOD/series crawl now learns how many parallel requests a
+  portal tolerates (ramping up on success, backing off instantly on rate-limit/overload errors)
+  instead of using a fixed pool. Tolerant portals sync significantly faster; strict portals stop
+  erroring pages.
+- **Faster Stalker re-syncs (delta check)** — on a refresh, a category whose item count is
+  unchanged on the portal is skipped entirely instead of re-walking all its pages. On a stable
+  catalog this cuts a re-sync from thousands of requests to roughly one per category.
+- **Background-sync status pill** — a small semi-transparent pill at the bottom of the screen shows
+  "Syncing *playlist* · N items" whenever any catalog sync runs in the background (a backgrounded
+  first import, the movies/series remainder, auto refresh). It never takes D-pad focus and hides
+  during fullscreen playback.
+- **Clearer "All set!" message for staged imports** — when movies/series are still loading in the
+  background, the import-success screen now says so explicitly (and points at the status pill), so
+  a fresh Stalker add no longer looks like it "only synced live TV".
+
+### 📺 Live player guide card
+
+- **Before / Now playing / Next on the player controls** — bringing up the controls on a live
+  channel now shows a guide card on the right edge: the programme that just ended, what's on now
+  (with times and a short description), and what's next. Uses your XMLTV guide first, falling back
+  to the provider's short-EPG API (Xtream and Stalker); channels without guide data simply show no
+  card. Informational only — it never takes D-pad focus.
+
+### 🐛 Fixes
+
+- **Guide programme popup: last button was cut off** — with catch-up channels the four actions
+  (Watch from start / Watch channel / Favourite / Close) overflowed the dialog edge. The buttons
+  now wrap to a second row when they don't fit.
+- **Guide programme popup: long-press acted in one go** — opening a programme with a held OK could
+  instantly trigger the focused button. The dialog now swallows OK until the key is released once,
+  so a long-press only opens it and the next press selects.
+- **Settings → Home screen: focus didn't enter the list** — opening Home screen settings left
+  D-pad focus on the sidebar instead of the first row (the only sub-settings screen missing the
+  initial focus request; all others were audited and are correct).
+
 ## v4.1.1 — 2026-07-14
 
 ### 📡 Stalker / Ministra portal support

@@ -32,6 +32,7 @@ import tv.own.owntv.core.sync.ImportStage
 import tv.own.owntv.core.sync.SyncContentTypes
 import tv.own.owntv.core.sync.SyncResult
 import tv.own.owntv.core.sync.SyncCounts
+import tv.own.owntv.core.sync.withRemainderNote
 import tv.own.owntv.core.sync.work.CatalogSyncState
 import tv.own.owntv.core.sync.work.CatalogSyncScheduler
 import tv.own.owntv.core.util.friendlySyncError
@@ -561,8 +562,10 @@ class SettingsViewModel(
 
     /**
      * Save a Stalker source. Verifies the portal handshake first (same as Test connection) so a
-     * typo'd portal/MAC fails with a clear error instead of saving a dead source; the full catalog
-     * sync (live + VOD + series) then runs like any other source.
+     * typo'd portal/MAC fails with a clear error instead of saving a dead source. Staged
+     * automatically: live syncs in the foreground (one bulk get_all_channels), movies/series are
+     * enqueued as the background remainder — Stalker VOD has no bulk endpoint (~14 items/page), so
+     * blocking the user on that crawl would take minutes on large catalogs.
      */
     fun addStalker(name: String, portalUrl: String, mac: String, userAgent: String = "", autoRefresh: PlaylistAutoRefresh = PlaylistAutoRefresh.OFF, isDefault: Boolean = false) {
         val canonicalMac = tv.own.owntv.core.stalker.StalkerClient.canonicalizeMac(mac)
@@ -570,7 +573,8 @@ class SettingsViewModel(
             _importState.value = ImportState.Failed("Invalid MAC address — use AA:BB:CC:DD:EE:FF")
             return
         }
-        runImport(autoRefresh, requiresNetwork = true, makeDefault = isDefault) { pid ->
+        val priority = SyncContentTypes(live = true, movies = false, series = false)
+        runImport(autoRefresh, priority, enqueueRemainder = true, requiresNetwork = true, makeDefault = isDefault) { pid ->
             stalkerAuth.testConnection(
                 tv.own.owntv.core.stalker.StalkerCredentials(
                     sourceId = STALKER_TEST_SOURCE_ID,
@@ -655,7 +659,9 @@ class SettingsViewModel(
                         if (enqueueRemainder) enqueueRemainderSync(source, contentTypes)
                         if (freshSync && !remainder.hasAny) catalogSyncScheduler.enqueueContentIndexBuild(reason = "fresh_add")
                         _lastFailedSource = null
-                        _importState.value = ImportState.Success(counts.summary(includeEpg = false).withWarnings(r))
+                        _importState.value = ImportState.Success(
+                            counts.summary(includeEpg = false).withWarnings(r).withRemainderNote(remainder),
+                        )
                         // Offer a one-tap EPG sync if this playlist actually has a guide feed.
                         if (epgRepository.guideUrl(syncedSource) != null) {
                             pendingEpgSource = syncedSource

@@ -81,7 +81,7 @@ data class LiveRailItem(val key: LiveKey, val abbr: String, val title: String, v
 
 /** Now-playing + up-next EPG for the focused channel (null entries when the guide is unavailable). */
 @Immutable
-data class EpgNowNext(val now: XtEpgEntry?, val next: XtEpgEntry?, val upcoming: List<XtEpgEntry> = emptyList())
+data class EpgNowNext(val now: XtEpgEntry?, val next: XtEpgEntry?, val upcoming: List<XtEpgEntry> = emptyList(), val previous: XtEpgEntry? = null)
 
 class LiveViewModel(
     private val appContext: Context,
@@ -914,7 +914,8 @@ class LiveViewModel(
             val future = epgDao.upcoming(epgKey, now, 6).first().filter { it.startMs > (nowProg?.startMs ?: 0) }
             val nextProg = future.firstOrNull()
             if (nowProg != null || nextProg != null) {
-                val result = EpgNowNext(nowProg?.toXt(), nextProg?.toXt(), future.drop(1).take(4).map { it.toXt() })
+                val prevProg = epgDao.previousProgramme(epgKey, nowProg?.startMs ?: now)
+                val result = EpgNowNext(nowProg?.toXt(), nextProg?.toXt(), future.drop(1).take(4).map { it.toXt() }, previous = prevProg?.toXt())
                 epgCache[ch.id] = CachedEpg(now, result)
                 return@withContext result
             }
@@ -935,7 +936,9 @@ class LiveViewModel(
         val current = entries.firstOrNull { it.startMs <= now && it.stopMs > now }
             ?: entries.firstOrNull { it.stopMs > now }
         val future = entries.filter { it.startMs > (current?.startMs ?: now) }.sortedBy { it.startMs }
-        val result = EpgNowNext(current, future.firstOrNull(), future.drop(1).take(4))
+        // Short-EPG responses sometimes include the just-finished programme — surface it as "Before".
+        val previous = entries.filter { it.stopMs <= (current?.startMs ?: now) }.maxByOrNull { it.stopMs }
+        val result = EpgNowNext(current, future.firstOrNull(), future.drop(1).take(4), previous = previous)
         epgCache[ch.id] = CachedEpg(now, result)
         result
     }

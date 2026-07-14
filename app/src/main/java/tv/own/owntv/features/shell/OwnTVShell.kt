@@ -635,6 +635,12 @@ fun OwnTVShell(
         }
       }
 
+      // Unobtrusive background-sync pill (bottom middle): visible while any catalog sync runs —
+      // backgrounded first import, remainder worker, auto refresh — but never over fullscreen video.
+      if (playerMode != PlayerMode.FULLSCREEN) {
+          tv.own.owntv.features.shell.components.SyncStatusPill(modifier = Modifier.align(Alignment.BottomCenter))
+      }
+
       // Player surface — hoisted so it persists across fullscreen <-> mini (same call site = the
       // SurfaceView isn't recreated when docking/expanding, so playback never blips).
       if (playerMode != PlayerMode.NONE) {
@@ -721,6 +727,13 @@ fun OwnTVShell(
                     // engine handling above): flip the current item between mpv and ExoPlayer.
                     vodOnExo = if (!isLiveStream && !isLiveChannel) vodExoActive else null,
                     onToggleVodEngine = if (!isLiveStream && !isLiveChannel) player::toggleVodEngine else null,
+                    // Guide card for the playing channel (nowNext follows previewChannel = what's playing).
+                    liveEpgCard = if (isLiveChannel) {
+                        {
+                            val epg by liveVm.nowNext.collectAsStateWithLifecycle()
+                            tv.own.owntv.features.shell.components.LiveEpgCard(epg = epg)
+                        }
+                    } else null,
                     modifier = Modifier.fillMaxSize(),
                 )
                 if (showChannelList && isLiveChannel && zapChannels.size > 1) {

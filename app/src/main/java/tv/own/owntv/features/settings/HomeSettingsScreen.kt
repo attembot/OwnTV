@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -48,6 +49,10 @@ fun HomeSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val colors = OwnTVTheme.colors
 
     val firstFocus = remember { FocusRequester() }
+    // onEnter alone can miss when entering this screen: the first row lives inside a LazyColumn and may
+    // not be composed/attached the instant focus crosses in, so focus falls back to the sidebar. Request
+    // it once after first layout (matches VideoPlayerSettingsScreen); onEnter still covers dialog returns.
+    LaunchedEffect(Unit) { kotlinx.coroutines.delay(60); runCatching { firstFocus.requestFocus() } }
 
     BackHandler { onBack() }
 
