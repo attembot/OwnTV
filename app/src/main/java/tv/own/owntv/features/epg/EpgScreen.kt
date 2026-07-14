@@ -113,6 +113,7 @@ fun EpgScreen(
     val sortGuide by vm.sortGuide.collectAsStateWithLifecycle()
     val categoryFilter by vm.categoryFilter.collectAsStateWithLifecycle()
     val guideCategories by vm.guideCategories.collectAsStateWithLifecycle()
+    val favoriteIds by vm.favoriteChannelIds.collectAsStateWithLifecycle()
     var showCategoryPicker by remember { mutableStateOf(false) }
     val colors = OwnTVTheme.colors
     val hScroll = rememberScrollState()
@@ -400,16 +401,20 @@ fun EpgScreen(
             programme = p,
             loadDescription = { vm.programmeDescription(it) },
             canCatchup = vm.canCatchup(channel, p, state.now),
+            isFavorite = channel.id in favoriteIds,
+            onToggleFavorite = { vm.toggleFavoriteChannel(channel) },
             onWatch = { detail = null; vm.noteChannelTuned(channel); if (onPlayChannel != null) onPlayChannel(channel, state.channels) else { vm.play(channel); onFullscreen() } },
             onPlayCatchup = { detail = null; vm.playCatchup(channel, p); onFullscreen() },
             onDismiss = { detail = null },
         )
     }
 
-    // Long-press a channel → choose how to match its EPG: auto (match this one by name) or manual pick.
+    // Long-press a channel → channel options: favourite toggle + EPG match (auto or manual pick).
     matchChooser?.let { channel ->
         EpgMatchChooserDialog(
             channelName = channel.name,
+            isFavorite = channel.id in favoriteIds,
+            onToggleFavorite = { vm.toggleFavoriteChannel(channel) },
             onAuto = { vm.autoMatchOne(channel); matchChooser = null },
             onManual = { matchChooser = null; matchingChannel = channel },
             onDismiss = { matchChooser = null },
@@ -538,6 +543,8 @@ private fun EpgMatchReviewDialog(
 @Composable
 private fun EpgMatchChooserDialog(
     channelName: String,
+    isFavorite: Boolean,
+    onToggleFavorite: () -> Unit,
     onAuto: () -> Unit,
     onManual: () -> Unit,
     onDismiss: () -> Unit,
@@ -549,20 +556,27 @@ private fun EpgMatchChooserDialog(
 
     Box(
         Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)).focusGroup()
-            .longPressMenuGuard(), // long-press OK is still held — don't auto-click Auto-match
+            .longPressMenuGuard(), // long-press OK is still held — don't auto-click the first option
         contentAlignment = Alignment.Center,
     ) {
         Column(Modifier.dialogPanel()) {
-            Text("Match EPG", style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
+            Text(channelName, style = MaterialTheme.typography.titleLarge, color = colors.onSurface, maxLines = 1)
             Spacer(Modifier.height(2.dp))
             Text(
-                "Set the guide data for “$channelName”.",
+                "Favourite this channel, or set its guide data.",
                 style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant,
             )
             Spacer(Modifier.height(16.dp))
-            OwnTVButton("Auto-match", onClick = onAuto, icon = OwnTVIcon.EPG, modifier = Modifier.fillMaxWidth().focusRequester(firstFocus))
+            OwnTVButton(
+                if (isFavorite) "Remove from favourites" else "Add to favourites",
+                onClick = { onToggleFavorite(); onDismiss() },
+                icon = OwnTVIcon.FAVORITE,
+                modifier = Modifier.fillMaxWidth().focusRequester(firstFocus),
+            )
             Spacer(Modifier.height(10.dp))
-            OwnTVButton("Pick manually", onClick = onManual, style = OwnTVButtonStyle.SECONDARY, icon = OwnTVIcon.SEARCH, modifier = Modifier.fillMaxWidth())
+            OwnTVButton("Auto-match EPG", onClick = onAuto, style = OwnTVButtonStyle.SECONDARY, icon = OwnTVIcon.EPG, modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(10.dp))
+            OwnTVButton("Pick EPG manually", onClick = onManual, style = OwnTVButtonStyle.SECONDARY, icon = OwnTVIcon.SEARCH, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(16.dp))
             OwnTVButton("Cancel", onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY)
         }

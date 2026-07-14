@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +35,7 @@ import tv.own.owntv.core.model.SourceType
 import tv.own.owntv.core.parser.XtreamClient
 import tv.own.owntv.core.customize.CustomizationStore
 import tv.own.owntv.core.customize.CustomizeKeys
+import tv.own.owntv.core.customize.applyCustomizations
 import tv.own.owntv.core.database.entity.ChannelEntity
 import tv.own.owntv.core.database.entity.EpgProgrammeEntity
 import tv.own.owntv.core.database.entity.WatchHistoryEntity
@@ -87,20 +89,24 @@ class EpgViewModel(
     val player: OwnTVPlayer,
     private val favoriteDao: tv.own.owntv.core.database.dao.FavoriteDao,
     private val categoryDao: tv.own.owntv.core.database.dao.CategoryDao,
+    private val streamUrlResolver: tv.own.owntv.core.stalker.StreamUrlResolver,
 ) : ViewModel() {
 
     /** Guide category filter: null = all channels, otherwise only that category's channels (#8). */
     private val _categoryFilter = MutableStateFlow<Long?>(null)
     val categoryFilter: StateFlow<Long?> = _categoryFilter.asStateFlow()
 
-    /** Live categories for the active profile — drives the guide's "Category" picker. */
+    /** Live categories for the active profile — drives the guide's "Category" picker. Applies the
+     *  profile's Live customizations like the Live TV rail does: hidden categories stay out of the
+     *  picker, renames show, manually reordered categories stay pinned first. */
     val guideCategories: StateFlow<List<tv.own.owntv.core.database.entity.CategoryEntity>> =
         activeProfileSources(settings, sourceDao)
             .flatMapLatest { aps ->
                 if (aps.sources.isEmpty()) flowOf(emptyList())
-                else combine(categoryDao.observe(aps.sourceIds, MediaType.LIVE), settings.sortLive) { cats, sort ->
-                    // Mirror Live TV's A–Z toggle: categories sort alphabetically when it's active.
-                    if (sort == SettingsRepository.SortMode.ALPHA) cats.sortedBy { it.name.lowercase() } else cats
+                else combine(categoryDao.observe(aps.sourceIds, MediaType.LIVE), settings.sortLive, custom) { cats, sort, cust ->
+                    // Mirror Live TV: hidden filtered + renames + pinned order; A–Z sorts the rest.
+                    cats.applyCustomizations(cust, alphaRest = sort == SettingsRepository.SortMode.ALPHA)
+                        .map { (cat, name) -> if (name == cat.name) cat else cat.copy(name = name) }
                 }
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -239,8 +245,18 @@ class EpgViewModel(
         lastTunedChannelId = channel.id
         _canZap.value = _state.value.channels.size > 1
         viewModelScope.launch {
-            val sourceUa = sourceDao.getById(channel.sourceId)?.userAgent
-            player.play(channel.streamUrl, title = channel.name, logoUrl = channel.logoUrl, isLive = true, userAgent = sourceUa)
+            val source = sourceDao.getById(channel.sourceId)
+            // Stalker stores the portal cmd — mint a playable URL (create_link) before playing. (The
+            // shell normally routes Guide tunes through LiveViewModel.watchFullscreen; this fallback
+            // path must still never hand a raw cmd to the engine.)
+            val url = if (streamUrlResolver.needsResolve(source)) {
+                runCatching { streamUrlResolver.resolve(source!!, channel.streamUrl) }
+                    .onFailure { android.util.Log.w("EpgViewModel", "stalker resolve failed channelId=${channel.id}", it) }
+                    .getOrNull() ?: return@launch
+            } else {
+                channel.streamUrl
+            }
+            player.play(url, title = channel.name, logoUrl = channel.logoUrl, isLive = true, userAgent = source?.userAgent)
             val pid = currentProfileId() ?: return@launch
             runCatching {
                 historyDao.record(WatchHistoryEntity(profileId = pid, mediaType = MediaType.LIVE, itemId = channel.id))
@@ -273,6 +289,15 @@ class EpgViewModel(
     /** Build the catch-up URL for a [programme] on [channel], or null if the provider can't serve it. */
     private suspend fun catchupUrlFor(channel: ChannelEntity, programme: EpgProgrammeEntity): String? {
         val source = sourceDao.getById(channel.sourceId) ?: return null
+        // Stalker archive URLs are minted per-play via create_link (Phase E §5.6); the others are
+        // pure string templates handled by CatchupUrl.
+        if (source.type == SourceType.STALKER) {
+            return channel.remoteId?.let { rid ->
+                runCatching { streamUrlResolver.resolveCatchup(source, rid, programme.startMs, programme.stopMs) }
+                    .onFailure { android.util.Log.w("EpgViewModel", "Stalker catch-up resolve failed channelId=${channel.id}", it) }
+                    .getOrNull()
+            }
+        }
         return CatchupUrl.forSource(channel, programme, source, settings.resolveCatchupTimeZone(), xtream)
     }
 
@@ -288,6 +313,26 @@ class EpgViewModel(
     private val custom: StateFlow<SectionCustomizations> = settings.activeProfileId
         .flatMapLatest { pid -> if (pid < 0) flowOf(SectionCustomizations()) else customize.observe(pid, MediaType.LIVE) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, SectionCustomizations())
+
+    /** Live channels this profile has favourited — so the Guide can show/toggle a channel's star. */
+    val favoriteChannelIds: StateFlow<Set<Long>> = settings.activeProfileId
+        .flatMapLatest { pid -> if (pid < 0) flowOf(emptyList()) else favoriteDao.observeFavoriteIds(pid, MediaType.LIVE) }
+        .map { it.toSet() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
+    /** Add/remove a channel from Favourites directly from the Guide (channel long-press / detail). */
+    fun toggleFavoriteChannel(channel: ChannelEntity) {
+        viewModelScope.launch {
+            val pid = currentProfileId() ?: return@launch
+            if (favoriteChannelIds.value.contains(channel.id)) {
+                favoriteDao.remove(pid, MediaType.LIVE, channel.id)
+            } else {
+                favoriteDao.add(tv.own.owntv.core.database.entity.FavoriteEntity(profileId = pid, mediaType = MediaType.LIVE, itemId = channel.id))
+            }
+            // The "Favorites" guide sort shows only favourited channels — refresh it to match.
+            if (settings.sortGuide.first() == SettingsRepository.GuideSort.FAVORITES) load()
+        }
+    }
 
     /** The channel's current manual EPG match (or null if auto-matched). */
     fun currentEpgMatch(channel: ChannelEntity): String? = custom.value.epgMatches[CustomizeKeys.channel(channel)]
@@ -525,12 +570,19 @@ class EpgViewModel(
             val favoriteIds = favoriteDao.observeFavoriteIds(pid, MediaType.LIVE).first().toSet()
             val sortLiveMode = settings.sortLive.first()
             val sortGuideMode = settings.sortGuide.first()
-            val categoryFilter = _categoryFilter.value
+            // Hidden categories keep their channels out of the guide too (parity with Live TV), and a
+            // filter pointing at a now-hidden category falls back to "All" instead of an empty grid.
+            val hiddenCatIds =
+                if (cust.hiddenCategories.isEmpty()) emptySet()
+                else categoryDao.observe(ids, MediaType.LIVE).first()
+                    .filter { CustomizeKeys.category(it) in cust.hiddenCategories }.map { it.id }.toSet()
+            val categoryFilter = _categoryFilter.value?.takeIf { it !in hiddenCatIds }
             // Heavy work — filter hidden, apply renames + manual EPG matches, sort, category-filter — runs off
             // the main thread (#3/#5) so a 50k-channel playlist never freezes the UI building the guide list.
             val channels = withContext(Dispatchers.Default) {
                 val auto = rawChannels
                     .filter { CustomizeKeys.channel(it) !in cust.hiddenItems }
+                    .filter { it.categoryId == null || it.categoryId !in hiddenCatIds }
                     .map { ch -> cust.itemNames[CustomizeKeys.channel(ch)]?.let { ch.copy(name = it) } ?: ch }
                 val matched = applyEpgMatches(auto, cust, playlistIds, q)
                 // Order the guide by its own sort. LIVE_TV mirrors the Live sort; CATCHUP floats archive

@@ -1,5 +1,111 @@
 # Changelog
 
+## v4.1.1 — 2026-07-14
+
+### 📡 Stalker / Ministra portal support
+
+- **New source type: Stalker (MAC portal)** — add a portal with just a Portal URL + MAC address
+  (no username/password). Third source type alongside M3U and Xtream, with the same Default-playlist
+  toggle, playlist switcher, per-source Auto refresh, Backup & Restore (the MAC is encrypted like a
+  password), and TMDB enrichment. Available everywhere sources are added — including the
+  **first-run setup wizard**, so a portal + MAC is enough to onboard.
+- **Test connection before saving** (handshake + profile check), with clear errors for a bad MAC,
+  an unreachable portal, or clock drift ("check the TV's date & time"). When the portal reports a
+  subscription expiry, the result shows it.
+- **MAG User-Agent presets** (MAG250/254/270/420) in the add-source form, plus the per-source
+  User-Agent override, so a portal's UA whitelist change never needs an app update.
+- **Live TV** from a Stalker portal plays on both engines (ExoPlayer preview/fullscreen + mpv
+  compatibility mode), with embedded subtitles, zap, and the engine toggle. Stream URLs are minted
+  at play time and **silently re-resolved if they expire mid-session** (Stalker links are
+  short-lived) — a long live watch survives a ~2–4 h token reset.
+- **Movies & Series** sync and play: per-category catalog import with a shared concurrency budget
+  (movies + series import simultaneously, with a bulk single-dump fast path where the portal
+  supports it), lazy per-season episode loading, and next/previous/autoplay across a season — each
+  episode mints its own fresh stream link. External player playback works too.
+- **Downloads** work for Stalker movies and episodes like any other source: the link is resolved
+  when the download starts, and if it expires mid-download the app fetches a fresh one and resumes
+  from where it stopped (HTTP Range).
+- **EPG & catch-up**: now/next comes from the portal's short-EPG API; the full guide uses an XMLTV
+  feed (advertised by the portal, or pasted in Settings → EPG). Channels with a provider archive
+  get the existing catch-up features — Guide "Watch from start", the Live TV catch-up picker, and
+  live rewind.
+- **Fast, resilient sync**: bulk `get_all_channels` fast path (thousands of channels in seconds)
+  with paged fallback, and transient portal errors (HTTP 429/5xx) retried with backoff so a hiccup
+  never drops a category. Re-syncs and auto refreshes are non-destructive (favorites, history and
+  progress survive).
+
+### 🧭 Sidebar Menu Customization
+
+- **Show only the icons that match your playlist.** A playlist that only has VOD no longer clutters
+  the side menu with Live TV / Guide; a Live-only playlist hides Movies / Series / Downloads. Open
+  **Settings → Sidebar Menu Customization** and switch **Behavior** between **Static** (manually
+  hide any of the six icons — Home, Live TV, Movies, Series, Downloads, Guide) and **Dynamic** (the
+  icons auto-adapt to what the active playlist actually contains).
+- **Dynamic** reuses the existing per-source content counts (Home & Settings always show; Live/Guide
+  show when there are channels; Movies/Series when their tables have rows; Downloads when Movies or
+  Series exist — Live has no download). Counts re-evaluate on their own after every sync, so the
+  rail updates the moment content arrives. With the top-bar picker on "All playlists", counts are
+  unioned across the profile's sources.
+- **Static** is the default (all icons visible) — existing users see no change until they opt in.
+  Settings is always pinned at the bottom and can never be hidden; hiding every browse icon lands
+  the app on Settings.
+- **Focus & fallback:** if the section you're viewing becomes hidden, the app jumps to the first
+  still-visible browse item (or Settings if all are hidden); opening the screen lands focus on its
+  first row.
+- The mode and hidden-icon set are part of **Backup & Restore**.
+
+### ✨ Improvements
+
+- **Favourites from the TV Guide.** Add or remove a channel from Favourites without leaving the
+  Guide: **long-press a channel label** for the channel menu (favourite toggle + the existing EPG
+  match options), or use the **Favourite** button in a programme's details dialog. Stars show up
+  immediately in Live TV, Search, and the Home rail, and the Guide's "Favorites" sort refreshes in
+  place.
+
+- **Subscription expiry in Manage sources.** Each Xtream and Stalker playlist row now shows an
+  "Expires …" note with the account's end date (read from the provider when the screen opens).
+  M3U playlists have no account, so they don't show one.
+
+- **Deleting a playlist now shows its progress.** Removing a source with a huge catalog
+  (hundreds of thousands of channels/movies/episodes) can take a while — the source row in
+  **Settings → Manage sources** now shows a "DELETING…" badge with a spinner until the removal
+  finishes, and the row's Edit/Re-sync/Delete buttons are hidden meanwhile so it can't be
+  touched mid-delete. The removal also now always runs to completion even if you leave the
+  Settings screen while it's working.
+
+### 🐛 Fixes
+
+- **Updating from 4.0.x/4.1.0 could crash the app at launch (database self-heal).** If a large
+  playlist or EPG import was ever interrupted mid-sync (TV standby, low memory, force-stop), the
+  import speed-up that temporarily drops SQLite indexes could leave some of them missing. That was
+  invisible in daily use, but the next app update re-validates the whole database schema — so the
+  update crashed the app on every launch until the previous version was reinstalled. The database
+  now **self-heals**: the final migration and every database open recreate any missing index or
+  search (FTS) table (idempotent and effectively instant on healthy installs), every index-restore
+  pass shares one canonical index list so a gap can never persist again, and the post-import index
+  rebuild now covers the rating-sort indexes it previously missed. Verified against every public
+  upgrade path (v1.0.0 → current) — updating preserves all playlists, favorites, history and
+  progress; no reinstall needed.
+- **Hidden categories are now respected in the TV Guide.** Categories hidden via Customize no
+  longer appear in the Guide's "Category" dropdown, and their channels stay out of the guide grid
+  (matching Live TV). The dropdown also now shows your category **renames** and keeps manually
+  **reordered** categories pinned first, like the Live TV rail. If the category you were filtering
+  by gets hidden, the Guide falls back to "All" instead of showing an empty grid.
+- **Download retry & failure polish.** Retrying a download now stops the old attempt before
+  starting fresh (previously the two could race and corrupt the restart); a failed download keeps
+  its real partial byte count instead of showing 0; and a resume that finds the file already fully
+  downloaded is marked completed instead of failing.
+
+### 🔧 Under the hood
+
+- **Sync engine split into per-source-type modules.** The single large `SyncManager` was split
+  into a thin dispatcher plus `XtreamSyncer`, `M3uSyncer` and a shared `SyncSupport` toolbox
+  (chunked inserts, stable upserts, category refresh, pruning) — groundwork for the upcoming
+  Stalker portal source type. No behavior change; import/sync logic and logging are identical.
+- **Migration tests modernized.** The database migration test suite now runs every chain to the
+  current schema version (it had stopped at v9), and gains a regression test that deliberately
+  drops indexes from a v12 database and asserts the new self-heal repairs it during the upgrade.
+
 ## v4.1.0 — 2026-07-11
 
 ### ✨ New features

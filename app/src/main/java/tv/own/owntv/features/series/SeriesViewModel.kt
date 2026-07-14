@@ -83,6 +83,7 @@ class SeriesViewModel(
     private val contentOrderDao: ContentOrderDao,
     private val metadata: tv.own.owntv.core.metadata.MetadataRepository,
     private val externalPlayerLauncher: tv.own.owntv.core.player.ExternalPlayerLauncher,
+    private val streamUrlResolver: tv.own.owntv.core.stalker.StreamUrlResolver,
 ) : ViewModel() {
 
     data class SeriesMoveState(val items: List<SeriesEntity>, val activeIndex: Int, val contextKey: String)
@@ -559,12 +560,27 @@ class SeriesViewModel(
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     /** Phase B: long-press "Play with external player" — always external, regardless of the global toggle. */
+    /** Stalker episodes resolve to a real URL at play time (create_link, series=<ep>); anything else
+     *  returns streamUrl as-is. Null = resolve failed — the caller should not start playback. */
+    private suspend fun resolvedEpisodeUrlOrNull(episode: EpisodeEntity): String? {
+        val show = seriesDao.getSeriesById(episode.seriesId)
+        val source = show?.let { sourceDao.getById(it.sourceId) }
+        if (!streamUrlResolver.needsResolve(source)) return episode.streamUrl
+        return try {
+            streamUrlResolver.resolve(source!!, episode.streamUrl, vod = true, episode = episode.episodeNumber)
+        } catch (e: Exception) {
+            Log.w(TAG, "stalker resolve failed episodeId=${episode.id}", e)
+            null
+        }
+    }
+
     fun playEpisodeExternal(episode: EpisodeEntity) {
         _lastPlayedEpisodeId.value = episode.id
         viewModelScope.launch {
             val pid = currentProfileId()
             Log.d(TAG, "playEpisodeExternal episodeId=${episode.id}")
-            externalPlayerLauncher.launch(episode.streamUrl, episode.name)
+            val url = resolvedEpisodeUrlOrNull(episode) ?: return@launch
+            externalPlayerLauncher.launch(url, episode.name)
             if (pid != null) {
                 runCatching {
                     historyDao.record(WatchHistoryEntity(profileId = pid, mediaType = MediaType.EPISODE, itemId = episode.id))
@@ -594,7 +610,8 @@ class SeriesViewModel(
             // in-app HUD/progress tick are not, since OwnTV can't observe the external app.
             if (settings.externalPlayer.first()) {
                 Log.d(TAG, "playEpisodeQueue seriesId=${show.id} episodeId=${episode.id} -> external player")
-                externalPlayerLauncher.launch(episode.streamUrl, episode.name)
+                val url = resolvedEpisodeUrlOrNull(episode) ?: return@launch
+                externalPlayerLauncher.launch(url, episode.name)
                 if (pid != null) {
                     runCatching {
                         historyDao.record(WatchHistoryEntity(profileId = pid, mediaType = MediaType.EPISODE, itemId = episode.id))
@@ -607,7 +624,12 @@ class SeriesViewModel(
             }
             val startIndex = queue.indexOfFirst { it.id == episode.id }.coerceAtLeast(0)
             Log.d(TAG, "playEpisodeQueue seriesId=${show.id} episodeId=${episode.id} profile=$pid queue=${queue.size} startIndex=$startIndex startPositionMs=$startPositionMs")
-            val sourceUa = sourceDao.getById(show.sourceId)?.userAgent
+            val source = sourceDao.getById(show.sourceId)
+            val sourceUa = source?.userAgent
+            // Stalker (D-2): every queue item resolves its playable URL right before IT loads — the
+            // stored streamUrl is the season cmd (shared by the whole season), and the per-episode
+            // create_link URL is short-lived, so next/prev/autoplay must each mint a fresh one.
+            val needsResolve = streamUrlResolver.needsResolve(source)
             player.playEpisodes(
                 items = queue.map { ep ->
                     PlaylistItem(
@@ -616,6 +638,9 @@ class SeriesViewModel(
                             title = ep.name,
                             subtitle = listOfNotNull(show.name, "Season ${ep.seasonNumber}").joinToString(" · "),
                         ),
+                        resolveUrl = if (needsResolve && source != null) {
+                            { streamUrlResolver.resolve(source, ep.streamUrl, vod = true, episode = ep.episodeNumber) }
+                        } else null,
                     )
                 },
                 startIndex = startIndex,

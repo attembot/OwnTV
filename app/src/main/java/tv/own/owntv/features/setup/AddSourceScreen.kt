@@ -45,7 +45,24 @@ import tv.own.owntv.ui.components.OwnTVTextField
 import tv.own.owntv.ui.components.roundedPanel
 import tv.own.owntv.ui.theme.OwnTVTheme
 
-private enum class SourceKind { XTREAM, M3U }
+private enum class SourceKind { XTREAM, M3U, STALKER }
+
+/** UI state of the Stalker "Test connection" probe (mapped from the owning ViewModel's state). */
+sealed interface StalkerTestUi {
+    data object Idle : StalkerTestUi
+    data object Testing : StalkerTestUi
+    data class Ok(val message: String) : StalkerTestUi
+    data class Failed(val message: String) : StalkerTestUi
+}
+
+/** MAG User-Agent presets (plan §7 "Header/UA pickiness") — value goes into the User-Agent field. */
+private val MAG_UA_PRESETS = listOf(
+    "Default (MAG200)" to "",
+    "MAG250" to "Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG250 stbapp ver: 2 rev: 250 Safari/533.3",
+    "MAG254" to "Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG254 stbapp ver: 2 rev: 250 Safari/533.3",
+    "MAG270" to "Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG270 stbapp ver: 2 rev: 250 Safari/533.3",
+    "MAG420" to "Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/601.1 (KHTML, like Gecko) MAG420 stbapp ver: 4 rev: 2721 Safari/601.1",
+)
 
 @Composable
 fun AddSourceScreen(
@@ -69,15 +86,30 @@ fun AddSourceScreen(
     initialAutoRefresh: PlaylistAutoRefresh = PlaylistAutoRefresh.OFF,
     initialIsDefault: Boolean = false,
     showDefaultToggle: Boolean = true,
+    // Stalker portal (plan Phase B). Null = the Stalker option is hidden (e.g. the setup wizard).
+    onStartStalker: ((name: String, portalUrl: String, mac: String, userAgent: String, autoRefresh: PlaylistAutoRefresh, isDefault: Boolean) -> Unit)? = null,
+    onTestStalker: ((portalUrl: String, mac: String, userAgent: String) -> Unit)? = null,
+    stalkerTest: StalkerTestUi = StalkerTestUi.Idle,
 ) {
     val colors = OwnTVTheme.colors
     val editing = initial != null
-    var kind by remember { mutableStateOf(if (initial?.type == SourceType.M3U) SourceKind.M3U else SourceKind.XTREAM) }
+    var kind by remember {
+        mutableStateOf(
+            when (initial?.type) {
+                SourceType.M3U -> SourceKind.M3U
+                SourceType.STALKER -> SourceKind.STALKER
+                else -> SourceKind.XTREAM
+            },
+        )
+    }
     var name by remember(initial) { mutableStateOf(initial?.name ?: "") }
     var server by remember(initial) { mutableStateOf(if (initial != null && initial.type == SourceType.XTREAM) initial.url else "") }
     var username by remember(initial) { mutableStateOf(initial?.username ?: "") }
     var password by remember(initial) { mutableStateOf(initial?.password ?: "") }
     var m3uUrl by remember(initial) { mutableStateOf(if (initial != null && initial.type == SourceType.M3U) initial.url else "") }
+    var portalUrl by remember(initial) { mutableStateOf(if (initial != null && initial.type == SourceType.STALKER) initial.url else "") }
+    var mac by remember(initial) { mutableStateOf(initial?.mac ?: "") }
+    var showUaPresetPicker by remember { mutableStateOf(false) }
     var epgUrl by remember(initial) { mutableStateOf(initial?.epgUrl ?: "") }
     var userAgent by remember(initial) { mutableStateOf(initial?.userAgent ?: "") }
     var autoRefresh by remember(initialAutoRefresh) { mutableStateOf(initialAutoRefresh) }
@@ -91,9 +123,11 @@ fun AddSourceScreen(
     LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
 
     val showContentToggles = kind == SourceKind.XTREAM && !editing
+    val macValid = tv.own.owntv.core.stalker.StalkerClient.canonicalizeMac(mac) != null
     val canStart = when (kind) {
         SourceKind.XTREAM -> server.isNotBlank() && username.isNotBlank() && password.isNotBlank() && (syncLive || syncMovies || syncSeries)
         SourceKind.M3U -> m3uUrl.isNotBlank()
+        SourceKind.STALKER -> tv.own.owntv.core.stalker.StalkerClient.isValidPortalUrl(portalUrl) && macValid
     }
 
     Box(modifier.fillMaxSize().roundedPanel()) {
@@ -119,6 +153,9 @@ fun AddSourceScreen(
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 KindChip("Xtream", kind == SourceKind.XTREAM, Modifier.weight(1f).then(if (!editing) Modifier.focusRequester(firstFocus) else Modifier)) { if (!editing) kind = SourceKind.XTREAM }
                 KindChip("M3U / M3U8", kind == SourceKind.M3U, Modifier.weight(1f)) { if (!editing) kind = SourceKind.M3U }
+                if (onStartStalker != null) {
+                    KindChip("Stalker (MAC)", kind == SourceKind.STALKER, Modifier.weight(1f)) { if (!editing) kind = SourceKind.STALKER }
+                }
             }
             Spacer(Modifier.height(20.dp))
 
@@ -145,6 +182,43 @@ fun AddSourceScreen(
                         style = OwnTVButtonStyle.SECONDARY,
                         modifier = Modifier.fillMaxWidth(),
                     )
+                }
+                SourceKind.STALKER -> {
+                    OwnTVTextField(portalUrl, { portalUrl = it }, label = "Portal URL", placeholder = "http://host:port/c/", keyboardType = KeyboardType.Uri, modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(14.dp))
+                    OwnTVTextField(mac, { mac = it }, label = "MAC address", placeholder = "00:1A:79:AA:BB:CC", modifier = Modifier.fillMaxWidth())
+                    if (mac.isNotBlank() && !macValid) {
+                        Spacer(Modifier.height(6.dp))
+                        Text("Enter 12 hex digits, e.g. 00:1A:79:AA:BB:CC", style = MaterialTheme.typography.bodySmall, color = Color(0xFFEF4444))
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    OwnTVButton(
+                        label = "Device model preset (User-Agent)…",
+                        onClick = { showUaPresetPicker = true },
+                        style = OwnTVButtonStyle.SECONDARY,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (onTestStalker != null) {
+                        Spacer(Modifier.height(10.dp))
+                        OwnTVButton(
+                            label = if (stalkerTest is StalkerTestUi.Testing) "Testing…" else "Test connection",
+                            onClick = { onTestStalker(portalUrl, mac, userAgent) },
+                            style = OwnTVButtonStyle.SECONDARY,
+                            enabled = canStart && stalkerTest !is StalkerTestUi.Testing,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        when (stalkerTest) {
+                            is StalkerTestUi.Ok -> {
+                                Spacer(Modifier.height(6.dp))
+                                Text("✓ ${stalkerTest.message}", style = MaterialTheme.typography.bodySmall, color = colors.primary)
+                            }
+                            is StalkerTestUi.Failed -> {
+                                Spacer(Modifier.height(6.dp))
+                                Text(stalkerTest.message, style = MaterialTheme.typography.bodySmall, color = Color(0xFFEF4444))
+                            }
+                            else -> Unit
+                        }
+                    }
                 }
             }
 
@@ -190,6 +264,7 @@ fun AddSourceScreen(
                         when (kind) {
                             SourceKind.XTREAM -> onStartXtream(name, server, username, password, userAgent, epgUrl, autoRefresh, syncLive, syncMovies, syncSeries, isDefault)
                             SourceKind.M3U -> onStartM3u(name, m3uUrl, userAgent, epgUrl, autoRefresh, isDefault)
+                            SourceKind.STALKER -> onStartStalker?.invoke(name, portalUrl, mac, userAgent, autoRefresh, isDefault)
                         }
                     },
                     enabled = canStart,
@@ -209,6 +284,18 @@ fun AddSourceScreen(
                   if (name.isBlank()) name = file.nameWithoutExtension
               },
               onDismiss = { showFileBrowser = false },
+          )
+      }
+      if (showUaPresetPicker) {
+          PickerDialog(
+              title = "Device model preset",
+              options = MAG_UA_PRESETS.map { (label, _) -> label to label },
+              selected = MAG_UA_PRESETS.firstOrNull { it.second == userAgent }?.first ?: MAG_UA_PRESETS.first().first,
+              onSelect = { label ->
+                  userAgent = MAG_UA_PRESETS.firstOrNull { it.first == label }?.second ?: ""
+                  showUaPresetPicker = false
+              },
+              onDismiss = { showUaPresetPicker = false },
           )
       }
       if (showAutoRefreshPicker) {

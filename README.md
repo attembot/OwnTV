@@ -4,7 +4,7 @@
 
 <p align="center">
   <b>Your own IPTV player for Android TV</b><br>
-  <sub>Fast · modern · remote-first — bring your own M3U or Xtream sources</sub>
+  <sub>Fast · modern · remote-first — bring your own M3U, Xtream or Stalker (MAC) sources</sub>
 </p>
 
 <p align="center">
@@ -26,10 +26,9 @@
 
 OwnTV is a native **Android TV** IPTV **player** built with Kotlin, Jetpack Compose for TV, and a
 **dual playback engine** — **libmpv (FFmpeg)** for movies/series and maximum compatibility, **ExoPlayer
-(Media3)** for near-instant Live TV. It's a *player only* — you bring your own Xtream login or M3U playlist
-(by **URL or a local `.m3u`/`.m3u8` file** on the device), and OwnTV gives you a fast, modern, remote-first
-way to browse
-and watch them.
+(Media3)** for near-instant Live TV. It's a *player only* — you bring your own Xtream login, M3U playlist
+(by **URL or a local `.m3u`/`.m3u8` file** on the device), or **Stalker/Ministra portal (Portal URL + MAC
+address)**, and OwnTV gives you a fast, modern, remote-first way to browse and watch them.
 
 > ⚠️ OwnTV does **not** provide any channels, playlists, subscriptions, streams, or media content.
 > You are responsible for adding your own legally accessible sources.
@@ -88,6 +87,7 @@ Scan to join from your phone:
 - **Built for scale** — ~50k channels / ~168k movies via Paging 3
 - **Fast syncing** — priority import (pick e.g. Live TV first, the rest finishes in the background — survives sleep/reboot); incremental re-syncs only write what changed; auto-retrying downloads
 - **Typed M3U playlists** — `type=` / `tvg-type=` tags route entries to **Movies** or **Series** (per-episode `S01E05` lines are grouped into shows, seasons and episodes automatically)
+- 📡 **Stalker / Ministra portals** — add a source with just a **Portal URL + MAC address**; Live TV, Movies & Series (lazy episode loading), downloads, EPG/catch-up and TMDB enrichment all work; play links are minted per-play and **auto-renewed when they expire** (long live sessions and long downloads survive token resets); MAG User-Agent presets for picky portals
 - 🎬 **TMDB metadata enrichment** — optional, on-demand posters, plots, cast, genres & ratings for Movies, Series and Episodes; **in-app trailers**; manual Refetch / "Set TMDB name" overrides; works with zero setup, your own TMDB key, or a self-hosted [caching proxy](worker/)
 
 ### 🗓️ EPG / TV Guide
@@ -110,6 +110,7 @@ Scan to join from your phone:
 - **Settings search & quick toggles** — filter Settings with a search box (results show their group, e.g. `Playback › HDR`); one-press quick toggles for the most-used options
 - **Appearance** — Material 3 (dark/light/system); any accent color (palette or hex); UI zoom; avatars; animations toggle
 - **Content** — clear watch history (all or per-type); per-source **Auto refresh** for playlists & EPG (Off by default, startup or 6–48h staleness intervals)
+- **Sidebar Menu Customization** — **Static** (manually hide any side icon) or **Dynamic** (icons auto-adapt to what the active playlist contains — a VOD-only playlist hides Live TV/Guide, a Live-only playlist hides Movies/Series/Downloads); included in backups
 - **Video Player** — hardware decoding, zoom, subtitle size/language, audio sync, surround sound, HDR, **external player** (VLC / MX Player for movies, series & downloads — global setting or per-item long-press)
 - **Weather** — top-bar weather chip: on/off, custom location (VPN-friendly), **°C / °F**
 - **Backup & Restore** — profiles, sources, customizations, favorites, history, resume, manual Move positions, settings, auto-refresh choices, default source, per-item engine/compatibility pins and custom TMDB names; choose what to include
@@ -130,7 +131,7 @@ Scan to join from your phone:
 <table>
   <tr>
     <td align="center"><img src="extras/screenshots/Home.png" alt="Home screen"><br><sub>Home — Continue Watching</sub></td>
-    <td align="center"><img src="extras/screenshots/Main_View.png" alt="Main view"><br><sub>Main view</sub></td>
+    <td align="center"><img src="extras/screenshots/Series_Episodes.png" alt="Series episodes"><br><sub>Series — episodes</sub></td>
   </tr>
   <tr>
     <td align="center"><img src="extras/screenshots/LiveTV_with_PreviewON.png" alt="Live TV with preview"><br><sub>Live TV — preview playing</sub></td>
@@ -144,14 +145,9 @@ Scan to join from your phone:
     <td align="center"><img src="extras/screenshots/Settings_Main.png" alt="Settings"><br><sub>Settings</sub></td>
     <td align="center"><img src="extras/screenshots/EPG_loaded.png" alt="TV Guide"><br><sub>TV Guide (EPG)</sub></td>
   </tr>
-  <tr>
-    <td align="center"><img src="extras/screenshots/Settings_Personalization.png" alt="Personalization"><br><sub>Personalization</sub></td>
-    <td align="center"></td>
-  </tr>
 </table>
 
-More in **[extras/screenshots/](extras/screenshots/)** — Live TV (preview off), playlist management,
-profiles & sources settings.
+More in **[extras/screenshots/](extras/screenshots/)** — playlist management, EPG & profile settings.
 
 ---
 
@@ -195,7 +191,7 @@ profiles & sources settings.
 
 ```
 tv.own.owntv/
-├── core/        database (Room), network, parser (M3U/Xtream/XMLTV), repository, sync, util
+├── core/        database (Room), network, parser (M3U/Xtream/XMLTV), stalker (MAC portal), repository, sync, util
 ├── player/      libmpv + ExoPlayer engines (PlaybackEngine) + Compose surfaces + HUD + mini-player
 ├── ui/          theme + reusable components (focus surface, cards, state views, avatars)
 ├── features/    setup, shell, live, movies, series, search, downloads, epg, profiles, settings
@@ -244,7 +240,7 @@ https://github.com/ahXN00/OwnTV/releases/latest/download/OwnTV.apk
 ```
 
 On first launch you'll go through onboarding: accept the disclaimer, create a profile, then **add a
-source** (M3U or Xtream) — or import a backup. After it imports, browse from the sidebar and open the
+source** (M3U, Xtream, or Stalker/MAC portal) — or import a backup. After it imports, browse from the sidebar and open the
 **Guide** for the EPG. Everything is managed under **Settings**.
 
 **Tested on:** a real **TCL Google TV**, and the **Android Studio emulator** (both the Android TV and

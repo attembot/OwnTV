@@ -58,6 +58,7 @@ import tv.own.owntv.ui.theme.OwnTVTheme
 fun Sidebar(
     selected: MainSection,
     onSelect: (MainSection) -> Unit,
+    visibleSections: Set<MainSection>,
     avatarId: Int,
     onPickAvatar: () -> Unit,
     profileName: String,
@@ -77,7 +78,14 @@ fun Sidebar(
     // Phase 4 — Search left the rail for the top bar, so when Search is the active section there's no nav
     // item to receive the entry-focus redirect below. Fall back to Home so BACK / left out of Search still
     // lands in the rail instead of stranding focus in the content area.
-    val focusSection = if (selected == MainSection.SEARCH) MainSection.HOME else selected
+    // v4.3.0 — the selected section may also be hidden (Nav menu customization); if so, land focus on the
+    // first visible browse item (or Settings if every browse item is hidden) so the rail always has a target.
+    val focusSection = when {
+        selected == MainSection.SEARCH -> MainSection.HOME
+        selected == MainSection.SETTINGS -> MainSection.SETTINGS
+        selected in visibleSections -> selected
+        else -> MainSection.browseOrder.firstOrNull { it in visibleSections } ?: MainSection.SETTINGS
+    }
 
     Column(
         modifier = modifier
@@ -124,7 +132,7 @@ fun Sidebar(
             }
 
             Column(modifier = Modifier.fillMaxWidth()) {
-                MainSection.entries.filter { it.isBrowse }.forEach { section ->
+                MainSection.browseOrder.filter { it in visibleSections }.forEach { section ->
                     NavItem(
                         section = section,
                         active = section == selected,

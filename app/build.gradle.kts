@@ -57,6 +57,12 @@ android {
         }
     }
 
+    testOptions {
+        // JVM unit tests hit android.util.Log / SystemClock in the code under test (StalkerAuthManager
+        // etc.); return defaults (no-op log, 0 clock) instead of "not mocked" crashes.
+        unitTests.isReturnDefaultValues = true
+    }
+
     buildTypes {
         release {
             optimization {

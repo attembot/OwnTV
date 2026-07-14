@@ -724,7 +724,10 @@ private fun EpisodeContextMenu(
             Spacer(Modifier.height(4.dp))
             OwnTVButton("Download", onClick = onDownload, style = OwnTVButtonStyle.SECONDARY, icon = OwnTVIcon.DOWNLOADS, modifier = Modifier.fillMaxWidth().focusRequester(focus))
             // Phase B: one-off external playback, independent of the global "External player" toggle.
-            OwnTVButton("Play with external player", onClick = onPlayExternal, style = OwnTVButtonStyle.SECONDARY, icon = OwnTVIcon.PLAY, modifier = Modifier.fillMaxWidth())
+            OwnTVButton(
+                "Play with external player", onClick = onPlayExternal, style = OwnTVButtonStyle.SECONDARY, icon = OwnTVIcon.PLAY,
+                modifier = Modifier.fillMaxWidth(),
+            )
             // Manual override of the ≥95% auto-detected watched state (option 2 of the design pass).
             OwnTVButton(
                 if (watched) "Mark as unwatched" else "Mark as watched",

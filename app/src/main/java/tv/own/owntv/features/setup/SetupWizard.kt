@@ -105,6 +105,11 @@ fun Onboarding(firstRun: Boolean, onDone: () -> Unit, onCancel: () -> Unit, modi
                     step = Step.IMPORTING
                 },
                 onStartM3u = { name, url, ua, epg, refresh, _ -> vm.startM3u(name, url, ua, epg, refresh); importOrigin = Step.ADD_SOURCE; step = Step.IMPORTING },
+                onStartStalker = { name, portalUrl, mac, ua, refresh, _ ->
+                    vm.startStalker(name, portalUrl, mac, ua, refresh)
+                    importOrigin = Step.ADD_SOURCE
+                    step = Step.IMPORTING
+                },
                 onBack = { step = Step.ADD_CONTENT },
                 initial = vm.lastFailedSource, // pre-fill on retry after failed import
                 showDefaultToggle = false, // first playlist in setup: nothing to be "default" over yet

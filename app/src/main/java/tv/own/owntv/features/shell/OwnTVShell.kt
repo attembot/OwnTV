@@ -106,6 +106,7 @@ private const val CORNER_SCALE_STEP = 10
 @Composable
 fun OwnTVShell(
     selectedSection: MainSection,
+    visibleSections: Set<MainSection>,
     onSelectSection: (MainSection) -> Unit,
     themeMode: ThemeMode,
     uiZoomPercent: Int,
@@ -442,6 +443,7 @@ fun OwnTVShell(
             Sidebar(
                 selected = selectedSection,
                 onSelect = onSelectSection,
+                visibleSections = visibleSections,
                 avatarId = avatarId,
                 onPickAvatar = { showAvatarPicker = true },
                 profileName = profileName,

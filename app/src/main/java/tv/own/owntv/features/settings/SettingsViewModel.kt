@@ -11,6 +11,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filter
@@ -54,6 +55,8 @@ class SettingsViewModel(
     private val epgDao: tv.own.owntv.core.database.dao.EpgDao,
     private val importFinalizer: tv.own.owntv.core.sync.ImportFinalizer,
     private val channelDao: tv.own.owntv.core.database.dao.ChannelDao,
+    private val movieDao: tv.own.owntv.core.database.dao.MovieDao,
+    private val seriesDao: tv.own.owntv.core.database.dao.SeriesDao,
     private val historyDao: tv.own.owntv.core.database.dao.HistoryDao,
     private val progressDao: tv.own.owntv.core.database.dao.ProgressDao,
     private val epgRepository: tv.own.owntv.core.repository.EpgRepository,
@@ -62,9 +65,15 @@ class SettingsViewModel(
     private val catalogSyncScheduler: CatalogSyncScheduler,
     private val okHttpClient: okhttp3.OkHttpClient,
     private val metadataProvider: tv.own.owntv.core.metadata.MetadataProvider,
+    private val stalkerAuth: tv.own.owntv.core.stalker.StalkerAuthManager,
+    private val stalkerClient: tv.own.owntv.core.stalker.StalkerClient,
+    private val xtreamClient: tv.own.owntv.core.parser.XtreamClient,
 ) : ViewModel() {
     companion object {
         private const val TAG = "OwnTVHome"
+
+        /** Sentinel session key for pre-save "Test connection" handshakes (no real source id yet). */
+        private const val STALKER_TEST_SOURCE_ID = -1L
     }
 
     // Semi-auto EPG: after a playlist import, if the playlist has a guide URL we offer to sync the EPG now
@@ -134,6 +143,47 @@ class SettingsViewModel(
     val sources: StateFlow<List<SourceEntity>> = settings.activeProfileId
         .flatMapLatest { pid -> if (pid < 0) flowOf(emptyList()) else sourceRepository.observeSources(pid) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /**
+     * Subscription expiry per source id — the "Expires …" note in the Manage-sources row (Phase F).
+     * Xtream reads `user_info.exp_date` from the panel; Stalker reads `account_info`/`get_profile`
+     * (see [stalkerExpiryOf]). M3U is a plain playlist file with no account concept — never listed.
+     * Fetched once per source per ViewModel lifetime (in-memory cache; only while the screen is
+     * subscribed); any failure simply leaves the line off the row.
+     */
+    private val expiryCache = java.util.concurrent.ConcurrentHashMap<Long, String>()
+    val sourceExpiry: StateFlow<Map<Long, String>> = sources
+        .map { list ->
+            val out = HashMap<Long, String>()
+            for (s in list) {
+                if (s.type != tv.own.owntv.core.model.SourceType.XTREAM &&
+                    s.type != tv.own.owntv.core.model.SourceType.STALKER
+                ) continue
+                val value = expiryCache[s.id] ?: fetchExpiry(s)?.also { expiryCache[s.id] = it } ?: continue
+                out[s.id] = value
+            }
+            out
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    private suspend fun fetchExpiry(s: SourceEntity): String? = runCatching {
+        when (s.type) {
+            tv.own.owntv.core.model.SourceType.XTREAM -> xtreamClient.accountExpiryMs(s)?.let {
+                java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(it))
+            }
+            tv.own.owntv.core.model.SourceType.STALKER ->
+                s.mac?.let { tv.own.owntv.core.stalker.StalkerClient.canonicalizeMac(it) }?.let { mac ->
+                    val creds = tv.own.owntv.core.stalker.StalkerCredentials(s.id, s.url, mac, s.userAgent)
+                    stalkerAuth.withAuthRetry(creds) { session ->
+                        val info = runCatching {
+                            stalkerClient.getAccountInfo(session.apiBase, mac, session.token, creds.userAgent)
+                        }.getOrDefault(emptyMap())
+                        stalkerExpiryOf(info) ?: stalkerExpiryOf(session.profile)
+                    }
+                }
+            else -> null
+        }
+    }.getOrNull()
 
     /** How many of the active profile's channels advertise catch-up — for the Catch-up settings note. */
     val catchupChannelCount: StateFlow<Int> = sources
@@ -304,6 +354,54 @@ class SettingsViewModel(
     val customAccent: StateFlow<String> = settings.customAccent.stateIn(viewModelScope, SharingStarted.Eagerly, "")
     fun setCustomAccent(hex: String) { viewModelScope.launch { settings.setCustomAccent(hex) } }
 
+    // --- Nav menu customization (v4.3.0) ---
+    /** STATIC (default): user picks which icons to hide. DYNAMIC: icons adapt to the active playlist. */
+    val navMenuMode: StateFlow<tv.own.owntv.features.settings.data.SettingsRepository.NavMenuMode> =
+        settings.navMenuMode.stateIn(viewModelScope, SharingStarted.Eagerly, tv.own.owntv.features.settings.data.SettingsRepository.NavMenuMode.STATIC)
+    fun setNavMenuMode(mode: tv.own.owntv.features.settings.data.SettingsRepository.NavMenuMode) {
+        viewModelScope.launch { settings.setNavMenuMode(mode) }
+    }
+
+    /** Browse sections the user has hidden (STATIC mode only). */
+    val navMenuHidden: StateFlow<Set<tv.own.owntv.features.shell.MainSection>> = settings.navMenuHidden
+        .map { raw -> raw.mapNotNull { name -> runCatching { tv.own.owntv.features.shell.MainSection.valueOf(name) }.getOrNull() }.toSet() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+    fun setNavSectionHidden(section: tv.own.owntv.features.shell.MainSection, hidden: Boolean) {
+        viewModelScope.launch {
+            val current = navMenuHidden.first()
+            val next = if (hidden) current + section else current - section
+            settings.setNavMenuHidden(next.map { it.name }.toSet())
+        }
+    }
+
+    /**
+     * The DYNAMIC-mode icon set the active playlist *would* show (v4.3.0). Mirrors [ShellViewModel]'s rail
+     * computation so the Nav menu settings screen's read-only DYNAMIC rows report the same state the rail
+     * reflects. Re-emits automatically as content arrives (Room invalidates the count flows on every write).
+     */
+    val dynamicCaps: StateFlow<Set<tv.own.owntv.features.shell.MainSection>> = settings.activeProfileId
+        .flatMapLatest { pid ->
+            if (pid < 0) flowOf(tv.own.owntv.features.shell.MainSection.allBrowse)
+            else sourceRepository.observeSources(pid)
+                .flatMapLatest { sources -> settings.defaultSourceId.flatMapLatest { defaultId -> capsFlow(sources, defaultId) } }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.features.shell.MainSection.allBrowse)
+
+    private fun capsFlow(
+        sources: List<SourceEntity>,
+        defaultId: Long,
+    ): kotlinx.coroutines.flow.Flow<Set<tv.own.owntv.features.shell.MainSection>> {
+        val ids = if (defaultId > 0) sources.filter { it.id == defaultId }.map { it.id } else sources.map { it.id }
+        if (ids.isEmpty()) return flowOf(setOf(tv.own.owntv.features.shell.MainSection.HOME))
+        return combine(
+            channelDao.countAll(ids),
+            movieDao.countAll(ids),
+            seriesDao.countAll(ids),
+        ) { channels, movies, series ->
+            tv.own.owntv.features.shell.MainSection.dynamicVisible(hasLive = channels > 0, hasMovies = movies > 0, hasSeries = series > 0)
+        }
+    }
+
     val uiZoomPercent: StateFlow<Int> = settings.uiZoomPercent.stateIn(viewModelScope, SharingStarted.Eagerly, UiZoom.DEFAULT)
     fun setUiZoom(percent: Int) { viewModelScope.launch { settings.setUiZoomPercent(UiZoom.clamp(percent)) } }
 
@@ -339,15 +437,20 @@ class SettingsViewModel(
     }
 
     /** Edit an existing source's settings (no re-import unless the user re-syncs). */
-    fun updateSource(id: Long, name: String, urlOrServer: String, user: String, pass: String, userAgent: String, epgUrl: String, autoRefresh: PlaylistAutoRefresh, isDefault: Boolean = false) {
+    fun updateSource(id: Long, name: String, urlOrServer: String, user: String, pass: String, userAgent: String, epgUrl: String, autoRefresh: PlaylistAutoRefresh, isDefault: Boolean = false, mac: String = "") {
         viewModelScope.launch {
             val existing = sourceDao.getById(id) ?: return@launch
+            // A Stalker edit re-canonicalizes the MAC; a garbled edit keeps the stored one. On
+            // MAC/URL change the cached portal session is stale — drop it so the next call re-handshakes.
+            val newMac = tv.own.owntv.core.stalker.StalkerClient.canonicalizeMac(mac) ?: existing.mac
+            if (existing.type == tv.own.owntv.core.model.SourceType.STALKER) stalkerAuth.invalidate(id)
             sourceRepository.updateSource(
                 existing.copy(
                     name = name.ifBlank { existing.name },
                     url = urlOrServer.trim().ifBlank { existing.url },
                     username = user.trim().takeIf { it.isNotBlank() } ?: existing.username,
                     password = pass.takeIf { it.isNotBlank() } ?: existing.password,
+                    mac = newMac,
                     userAgent = userAgent.trim().takeIf { it.isNotBlank() },
                     epgUrl = epgUrl.trim().takeIf { it.isNotBlank() },
                 ),
@@ -396,6 +499,113 @@ class SettingsViewModel(
                 epgUrl.trim().takeIf { it.isNotBlank() },
             )
         }
+    }
+
+    // ---- Stalker portal (plan Phase B) ----
+
+    sealed interface StalkerTestState {
+        data object Idle : StalkerTestState
+        data object Testing : StalkerTestState
+        data class Ok(val summary: String) : StalkerTestState
+        data class Failed(val message: String) : StalkerTestState
+    }
+
+    private val _stalkerTest = MutableStateFlow<StalkerTestState>(StalkerTestState.Idle)
+    val stalkerTest: StateFlow<StalkerTestState> = _stalkerTest.asStateFlow()
+
+    fun resetStalkerTest() {
+        _stalkerTest.value = StalkerTestState.Idle
+    }
+
+    /** "Test connection": portal handshake + get_profile with the form's values, no source saved. */
+    fun testStalker(portalUrl: String, mac: String, userAgent: String = "") {
+        val canonicalMac = tv.own.owntv.core.stalker.StalkerClient.canonicalizeMac(mac)
+        if (canonicalMac == null) {
+            _stalkerTest.value = StalkerTestState.Failed("Invalid MAC address — use AA:BB:CC:DD:EE:FF")
+            return
+        }
+        viewModelScope.launch {
+            _stalkerTest.value = StalkerTestState.Testing
+            _stalkerTest.value = try {
+                if (!connectivity.isOnlineNow()) {
+                    StalkerTestState.Failed(friendlySyncError(null, online = false))
+                } else {
+                    val session = stalkerAuth.testConnection(
+                        tv.own.owntv.core.stalker.StalkerCredentials(
+                            sourceId = STALKER_TEST_SOURCE_ID,
+                            portalUrl = portalUrl.trim(),
+                            mac = canonicalMac,
+                            userAgent = userAgent.trim().takeIf { it.isNotBlank() },
+                        ),
+                    )
+                    val endpoint = session.apiBase.substringAfter("://").substringAfter('/', "portal")
+                    // Subscription expiry line (Phase F, §1.2): optional account_info call. Portals
+                    // surface expiry under varying keys (sometimes even `phone`) — best effort only.
+                    val expiry = runCatching {
+                        val info = stalkerClient.getAccountInfo(
+                            session.apiBase, canonicalMac, session.token,
+                            userAgent.trim().takeIf { it.isNotBlank() },
+                        )
+                        stalkerExpiryOf(info) ?: stalkerExpiryOf(session.profile)
+                    }.getOrNull()
+                    val expiryLine = expiry?.let { " · expires $it" } ?: ""
+                    StalkerTestState.Ok("Connected via $endpoint (${session.profile.size} profile fields)$expiryLine")
+                }
+            } catch (c: CancellationException) {
+                throw c
+            } catch (e: Exception) {
+                StalkerTestState.Failed(stalkerErrorMessage(e))
+            }
+        }
+    }
+
+    /**
+     * Save a Stalker source. Verifies the portal handshake first (same as Test connection) so a
+     * typo'd portal/MAC fails with a clear error instead of saving a dead source; the full catalog
+     * sync (live + VOD + series) then runs like any other source.
+     */
+    fun addStalker(name: String, portalUrl: String, mac: String, userAgent: String = "", autoRefresh: PlaylistAutoRefresh = PlaylistAutoRefresh.OFF, isDefault: Boolean = false) {
+        val canonicalMac = tv.own.owntv.core.stalker.StalkerClient.canonicalizeMac(mac)
+        if (canonicalMac == null) {
+            _importState.value = ImportState.Failed("Invalid MAC address — use AA:BB:CC:DD:EE:FF")
+            return
+        }
+        runImport(autoRefresh, requiresNetwork = true, makeDefault = isDefault) { pid ->
+            stalkerAuth.testConnection(
+                tv.own.owntv.core.stalker.StalkerCredentials(
+                    sourceId = STALKER_TEST_SOURCE_ID,
+                    portalUrl = portalUrl.trim(),
+                    mac = canonicalMac,
+                    userAgent = userAgent.trim().takeIf { it.isNotBlank() },
+                ),
+            )
+            sourceRepository.addStalkerSource(
+                pid, name.ifBlank { "My Portal" }, portalUrl.trim(), canonicalMac,
+                userAgent.trim().takeIf { it.isNotBlank() },
+            )
+        }
+    }
+
+    /**
+     * Pull a subscription end date out of a Stalker `account_info`/`get_profile` map. Portals are
+     * inconsistent: proper `end_date`/`exp_date` keys, or a date-looking string stuffed into `phone`
+     * (§1.2). Values like "0000-00-00", "null" or empty are ignored.
+     */
+    private fun stalkerExpiryOf(fields: Map<String, String>): String? {
+        val direct = listOf("end_date", "exp_date", "expire_date", "expire_billing_date", "tariff_expired_date")
+            .firstNotNullOfOrNull { key -> fields[key]?.trim()?.takeIf { it.looksLikeExpiryValue() } }
+        if (direct != null) return direct
+        // Some portals put the expiry text in `phone` — accept it only when it actually contains a date.
+        return fields["phone"]?.trim()?.takeIf { it.looksLikeExpiryValue() && it.contains(Regex("\\d{4}|\\d{1,2}[./-]\\d{1,2}")) }
+    }
+
+    private fun String.looksLikeExpiryValue(): Boolean =
+        isNotEmpty() && !equals("null", true) && !startsWith("0000") && this != "0"
+
+    private fun stalkerErrorMessage(e: Exception): String = when {
+        e is tv.own.owntv.core.stalker.StalkerClient.StalkerAuthException ->
+            "Portal refused the login — check the MAC address (and the TV's date & time)."
+        else -> friendlySyncError(e.message, connectivity.isOnlineNow())
     }
 
     fun addM3u(name: String, url: String, userAgent: String = "", epgUrl: String = "", autoRefresh: PlaylistAutoRefresh = PlaylistAutoRefresh.OFF, isDefault: Boolean = false) = runImport(
@@ -497,13 +707,29 @@ class SettingsViewModel(
         catalogSyncScheduler.cancelSync(source.id)
     }
 
+    // Deleting a huge source (hundreds of thousands of cascaded rows) takes a while — surface it
+    // per-row so the user can see the removal is in progress instead of a silently frozen list.
+    private val _deletingSourceIds = MutableStateFlow<Set<Long>>(emptySet())
+    val deletingSourceIds: StateFlow<Set<Long>> = _deletingSourceIds.asStateFlow()
+
     fun delete(source: SourceEntity) {
+        if (source.id in _deletingSourceIds.value) return
         viewModelScope.launch {
             Log.d(TAG, "delete sourceId=${source.id}")
-            catalogSyncScheduler.cancelSync(source.id)
-            sourceRepository.deleteSource(source)
-            if (defaultSourceId.value == source.id) settings.setDefaultSource(-1L)
-            refreshActiveTvHome(allowBrowsableRequest = true)
+            _deletingSourceIds.value = _deletingSourceIds.value + source.id
+            try {
+                catalogSyncScheduler.cancelSync(source.id)
+                stalkerAuth.invalidate(source.id)
+                // NonCancellable: once confirmed, finish the cascade even if the user leaves the
+                // screen mid-delete — an interrupted half-deleted source is worse than a short wait.
+                withContext(NonCancellable) {
+                    sourceRepository.deleteSource(source)
+                    if (defaultSourceId.value == source.id) settings.setDefaultSource(-1L)
+                    refreshActiveTvHome(allowBrowsableRequest = true)
+                }
+            } finally {
+                _deletingSourceIds.value = _deletingSourceIds.value - source.id
+            }
         }
     }
 

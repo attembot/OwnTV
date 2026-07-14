@@ -47,6 +47,7 @@ class SetupViewModel(
     private val epgSourceStore: tv.own.owntv.core.epg.EpgSourceStore,
     private val launcherIntegrationRepository: LauncherIntegrationRepository,
     private val catalogSyncScheduler: CatalogSyncScheduler,
+    private val stalkerAuth: tv.own.owntv.core.stalker.StalkerAuthManager,
 ) : ViewModel() {
 
     // Semi-auto EPG: after the first playlist imports, offer a one-tap guide sync (with a live count) if it
@@ -125,6 +126,31 @@ class SetupViewModel(
                 password = password,
                 userAgent = userAgent.trim().takeIf { it.isNotBlank() },
                 epgUrl = epgUrl.trim().takeIf { it.isNotBlank() },
+            )
+        }
+    }
+
+    /** Stalker/MAC portal onboarding — mirrors SettingsViewModel.addStalker: the handshake is verified
+     *  BEFORE the source is saved, so a typo'd portal/MAC fails with a clear error instead of leaving a
+     *  dead source on the brand-new profile. */
+    fun startStalker(name: String, portalUrl: String, mac: String, userAgent: String = "", autoRefresh: PlaylistAutoRefresh = PlaylistAutoRefresh.OFF) {
+        val canonicalMac = tv.own.owntv.core.stalker.StalkerClient.canonicalizeMac(mac)
+        if (canonicalMac == null) {
+            _state.value = ImportState.Failed("Invalid MAC address — use AA:BB:CC:DD:EE:FF")
+            return
+        }
+        runImport(autoRefresh, requiresNetwork = true) { profileId ->
+            stalkerAuth.testConnection(
+                tv.own.owntv.core.stalker.StalkerCredentials(
+                    sourceId = STALKER_TEST_SOURCE_ID,
+                    portalUrl = portalUrl.trim(),
+                    mac = canonicalMac,
+                    userAgent = userAgent.trim().takeIf { it.isNotBlank() },
+                ),
+            )
+            sourceRepository.addStalkerSource(
+                profileId, name.ifBlank { "My Portal" }, portalUrl.trim(), canonicalMac,
+                userAgent.trim().takeIf { it.isNotBlank() },
             )
         }
     }
@@ -338,4 +364,9 @@ class SetupViewModel(
 
     private fun String.withWarnings(result: SyncResult.Success): String =
         result.warningSummary()?.let { "$this\n$it" } ?: this
+
+    private companion object {
+        /** Sentinel sourceId for the pre-save Stalker handshake (same as SettingsViewModel's). */
+        const val STALKER_TEST_SOURCE_ID = -1L
+    }
 }

@@ -75,6 +75,7 @@ class SearchViewModel(
     private val favoriteDao: FavoriteDao,
     val player: OwnTVPlayer,
     private val externalPlayerLauncher: tv.own.owntv.core.player.ExternalPlayerLauncher,
+    private val streamUrlResolver: tv.own.owntv.core.stalker.StreamUrlResolver,
 ) : ViewModel() {
 
     /** Global "External player" toggle — the screen must NOT open the fullscreen in-app player when on. */
@@ -234,8 +235,16 @@ class SearchViewModel(
 
     fun playChannel(channel: ChannelEntity) {
         viewModelScope.launch {
-            val sourceUa = sourceDao.getById(channel.sourceId)?.userAgent
-            player.play(channel.streamUrl, title = channel.name, logoUrl = channel.logoUrl, isLive = true, userAgent = sourceUa)
+            val source = sourceDao.getById(channel.sourceId)
+            // Stalker stores the portal cmd, not a playable URL — mint one (create_link) before playing.
+            val url = if (streamUrlResolver.needsResolve(source)) {
+                runCatching { streamUrlResolver.resolve(source!!, channel.streamUrl) }
+                    .onFailure { Log.w(TAG, "stalker resolve failed channelId=${channel.id}", it) }
+                    .getOrNull() ?: return@launch
+            } else {
+                channel.streamUrl
+            }
+            player.play(url, title = channel.name, logoUrl = channel.logoUrl, isLive = true, userAgent = source?.userAgent)
         }
         record(MediaType.LIVE, channel.id)
         rememberCurrentQuery()
@@ -243,13 +252,22 @@ class SearchViewModel(
 
     fun playMovie(movie: MovieEntity) {
         viewModelScope.launch {
+            val source = sourceDao.getById(movie.sourceId)
+            // Stalker: resolve the stored cmd before EITHER branch — the external player must never
+            // receive a raw portal cmd (plan §7), and neither should the in-app engines.
+            val url = if (streamUrlResolver.needsResolve(source)) {
+                runCatching { streamUrlResolver.resolve(source!!, movie.streamUrl, vod = true) }
+                    .onFailure { Log.w(TAG, "stalker resolve failed movieId=${movie.id}", it) }
+                    .getOrNull() ?: return@launch
+            } else {
+                movie.streamUrl
+            }
             // Global external-player toggle: same chokepoint behavior as MovieViewModel.play().
             if (settings.externalPlayer.first()) {
-                externalPlayerLauncher.launch(movie.streamUrl, movie.name)
+                externalPlayerLauncher.launch(url, movie.name)
                 return@launch
             }
-            val sourceUa = sourceDao.getById(movie.sourceId)?.userAgent
-            player.play(movie.streamUrl, title = movie.name, year = movie.year?.toString(), isLive = false, userAgent = sourceUa)
+            player.play(url, title = movie.name, year = movie.year?.toString(), isLive = false, userAgent = source?.userAgent)
         }
         record(MediaType.MOVIE, movie.id)
         rememberCurrentQuery()

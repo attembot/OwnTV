@@ -142,6 +142,8 @@ internal fun ProgrammeDetailDialog(
     programme: EpgProgrammeEntity,
     loadDescription: suspend (Long) -> String?,
     canCatchup: Boolean,
+    isFavorite: Boolean,
+    onToggleFavorite: () -> Unit,
     onWatch: () -> Unit,
     onPlayCatchup: () -> Unit,
     onDismiss: () -> Unit,
@@ -175,6 +177,13 @@ internal fun ProgrammeDetailDialog(
                 Spacer(Modifier.height(24.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OwnTVButton("Close", onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY)
+                    // Favourite the channel without leaving the guide; the label flips in place.
+                    OwnTVButton(
+                        if (isFavorite) "Unfavourite" else "Favourite",
+                        onClick = onToggleFavorite,
+                        style = OwnTVButtonStyle.SECONDARY,
+                        icon = OwnTVIcon.FAVORITE,
+                    )
                     Spacer(Modifier.weight(1f))
                     // Catch-up channels: replay this programme from its start (seekable archive playback).
                     if (canCatchup) {

@@ -29,6 +29,41 @@ obvious at first glance — once you know them, the app is a lot faster to live 
 
 ---
 
+## 📡 Stalker / Ministra portal
+
+Some IPTV providers use the Stalker (MAG portal) protocol — you add them with a **Portal URL**
+and a **MAC address** (no username/password). Once added, a Stalker portal behaves like any other
+playlist: Live TV, Movies, Series, downloads, TMDB metadata, backup, and the playlist switcher all
+work the same.
+
+### Add a Stalker source
+1. **Settings → Manage sources → Add source → Stalker (MAC)** (also available in the first‑run
+   setup wizard).
+2. Enter the **Portal URL** (e.g. `http://host:port/c/`) and the **MAC address** your provider
+   gave you (e.g. `00:1A:79:AA:BB:CC`).
+3. (Optional) Pick a **Device model preset** for the User-Agent if your portal is picky about the
+   MAG box model (MAG250/254/270/420). The default works on most portals.
+4. Tap **Test connection** — it verifies the handshake before saving. A "Connected" message means
+   the portal accepted the MAC (if the portal reports a subscription end date, it's shown too).
+5. **Start Import** — Live channels, Movies, and Series all populate, just like an Xtream source.
+
+### Notes & troubleshooting
+- **Series episodes** load when you open a show (episode names show as "Episode 1, 2, …" —
+  Stalker portals don't provide per-episode titles).
+- **EPG**: now/next on the channel preview comes straight from the portal. For the full TV Guide,
+  OwnTV uses the portal's XMLTV feed if it advertises one — otherwise paste an XMLTV URL in
+  **Settings → EPG**.
+- **Catch-up**: channels whose portal keeps an archive get the usual catch-up features (Guide
+  "Watch from start", the Live TV catch-up picker, live rewind).
+- **"Portal refused the login"** — check the MAC address (copy it exactly), and check the TV's
+  **date & time** (Stalker validates request timestamps; a clock more than a few minutes off
+  fails the handshake).
+- **Stream drops after a long watch** — Stalker links expire after a few hours; OwnTV re-fetches
+  a fresh link automatically (a brief re-buffer, then playback continues). Long downloads survive
+  this the same way: the download resumes from where it stopped with a fresh link.
+
+---
+
 ## 🗂️ Multiple playlists — switch & set a default
 
 Have more than one playlist (e.g. a main one and a backup)? OwnTV can show them **all merged together**,
@@ -71,6 +106,11 @@ or **narrow the whole app to just one**.
   between **Cards** and **On Now** — an inline mini‑guide showing what's airing now with a progress bar and
   the next hours (Up/Down picks a channel, Left/Right scrolls the timeline, OK tunes). The **Android TV
   home** toggle also lives on this page. Your layout is saved per profile and included in backups.
+- 🧭 **Trim the side menu to your playlist (Settings → Sidebar Menu Customization):** a VOD‑only playlist
+  no longer shows Live TV / Guide, and a Live‑only playlist hides Movies / Series / Downloads. Switch
+  **Behavior** to **Dynamic** and the six side‑menu icons auto‑adapt to what the active playlist actually
+  contains (Home & Settings always show; counts refresh after every sync), or keep **Static** (the default)
+  and manually toggle any icon on or off. Your choice is included in backups.
 
 ---
 
@@ -123,8 +163,14 @@ or **narrow the whole app to just one**.
   without opening it. Press **OK** to open the full details.
 - **EPG is opt‑in**: add guide feeds in **Settings → EPG Sources**. After importing a playlist you'll be
   offered a one‑tap **sync now** (with a live programme count), or you can sync later from Settings.
+- ⭐ **Favourites from the Guide**: **long‑press a channel label** to add/remove it from Favourites
+  (the same menu also holds the EPG match options), or use the **Favourite** button inside a
+  programme's details. Stars apply everywhere — Live TV, Search, and the Home Favourites rail.
 - **Auto‑match EPG**: the guide can smart‑match your channels to guide data; you can also fix one channel
-  manually via the long‑press **Match EPG** menu.
+  manually via the long‑press channel menu.
+- 🙈 **Hidden categories stay hidden**: categories you hide via long‑press → Customize are excluded
+  from the Guide too — the "Category" dropdown and the guide rows both respect them (category
+  renames and manual order carry over from Live TV as well).
 - 🔄 **Auto refresh (per source)**: each **playlist** (Settings → Manage sources) and each **EPG feed**
   (Settings → EPG sources) has an **Auto refresh** dropdown — **Off** (default), **Refresh at startup**,
   or an interval (playlists 6–48h, EPG 1–48h). Intervals refresh only when the source is actually stale,

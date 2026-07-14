@@ -78,6 +78,7 @@ class MovieViewModel(
     private val contentOrderDao: ContentOrderDao,
     private val metadata: tv.own.owntv.core.metadata.MetadataRepository,
     private val externalPlayerLauncher: tv.own.owntv.core.player.ExternalPlayerLauncher,
+    private val streamUrlResolver: tv.own.owntv.core.stalker.StreamUrlResolver,
 ) : ViewModel() {
 
     data class MovieMoveState(val items: List<MovieEntity>, val activeIndex: Int, val contextKey: String)
@@ -342,12 +343,26 @@ class MovieViewModel(
     val externalPlayerOn: StateFlow<Boolean> = settings.externalPlayer
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    /** Stalker movies resolve to a real URL at play time; anything else returns streamUrl as-is.
+     *  Null = resolve failed (portal/auth error) — the caller should not start playback. */
+    private suspend fun resolvedUrlOrNull(movie: MovieEntity): String? {
+        val source = sourceDao.getById(movie.sourceId)
+        if (!streamUrlResolver.needsResolve(source)) return movie.streamUrl
+        return try {
+            streamUrlResolver.resolve(source!!, movie.streamUrl, vod = true)
+        } catch (e: Exception) {
+            Log.w(TAG, "stalker resolve failed movieId=${movie.id}", e)
+            null
+        }
+    }
+
     /** Phase B: long-press "Play with external player" — always external, regardless of the global toggle. */
     fun playExternal(movie: MovieEntity) {
         viewModelScope.launch {
             val pid = currentProfileId()
             Log.d(TAG, "playExternal movieId=${movie.id}")
-            externalPlayerLauncher.launch(movie.streamUrl, movie.name)
+            val url = resolvedUrlOrNull(movie) ?: return@launch
+            externalPlayerLauncher.launch(url, movie.name)
             if (pid != null) {
                 runCatching {
                     historyDao.record(WatchHistoryEntity(profileId = pid, mediaType = MediaType.MOVIE, itemId = movie.id))
@@ -365,7 +380,8 @@ class MovieViewModel(
             // playback and OwnTV can't observe it.
             if (settings.externalPlayer.first()) {
                 Log.d(TAG, "play movieId=${movie.id} -> external player")
-                externalPlayerLauncher.launch(movie.streamUrl, movie.name)
+                val url = resolvedUrlOrNull(movie) ?: return@launch
+                externalPlayerLauncher.launch(url, movie.name)
                 if (pid != null) {
                     runCatching {
                         historyDao.record(WatchHistoryEntity(profileId = pid, mediaType = MediaType.MOVIE, itemId = movie.id))
@@ -373,10 +389,23 @@ class MovieViewModel(
                 }
                 return@launch
             }
-            val sourceUa = sourceDao.getById(movie.sourceId)?.userAgent
+            val source = sourceDao.getById(movie.sourceId)
+            val sourceUa = source?.userAgent
+            // Stalker: mint the playable URL right before playback (create_link, type=vod). The stored
+            // streamUrl stays the cmd — it's the item's identity (engine pins, downloads, history).
+            val playUrl = if (streamUrlResolver.needsResolve(source)) {
+                try {
+                    streamUrlResolver.resolve(source!!, movie.streamUrl, vod = true)
+                } catch (e: Exception) {
+                    Log.w(TAG, "stalker resolve failed movieId=${movie.id}", e)
+                    return@launch
+                }
+            } else {
+                movie.streamUrl
+            }
             Log.d(TAG, "play movieId=${movie.id} profile=$pid startPositionMs=$startPositionMs")
             player.play(
-                movie.streamUrl,
+                playUrl,
                 title = movie.name,
                 year = movie.year?.toString(),
                 isLive = false,
