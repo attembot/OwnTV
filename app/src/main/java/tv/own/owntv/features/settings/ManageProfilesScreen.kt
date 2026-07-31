@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -23,6 +23,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,11 +59,45 @@ fun ManageProfilesScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     var creating by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf<ProfileEntity?>(null) }
     val addFocus = remember { FocusRequester() }
+
+    // Per-row focus restore (mirrors ManageSourcesScreen / MoviesScreen): after create/edit/delete
+    // closes, focus lands back INSIDE the list — on the acted-on row if it survived, else the nearest
+    // neighbour, else the first row, else "Add Profile" (empty list). The previous version always
+    // refocused "Add Profile", which threw focus out of the menu.
+    var contextId by remember { mutableStateOf<Long?>(null) }
+    var contextIndex by remember { mutableStateOf(-1) }
+    val contextFocus = remember { FocusRequester() }
+    val firstRowFocus = remember { FocusRequester() }
+
     LaunchedEffect(editing, creating, confirmDelete) {
-        if (editing == null && !creating && confirmDelete == null) {
-            kotlinx.coroutines.delay(50) // let the screen lay out after the tab swap before grabbing focus
+        if (editing != null || creating || confirmDelete != null) return@LaunchedEffect
+        kotlinx.coroutines.delay(50) // let the screen lay out after the tab swap before grabbing focus
+        val targetId = contextId
+        if (targetId != null && profiles.any { it.id == targetId }) {
+            runCatching { contextFocus.requestFocus() }
+        } else if (profiles.isNotEmpty()) {
+            runCatching { firstRowFocus.requestFocus() }
+        } else {
             runCatching { addFocus.requestFocus() }
         }
+    }
+
+    // When a deleted profile vanishes from `profiles`, move focus to the nearest surviving neighbour
+    // (same slot, else last row) instead of escaping the list.
+    LaunchedEffect(profiles) {
+        val targetId = contextId ?: return@LaunchedEffect
+        if (profiles.any { it.id == targetId }) return@LaunchedEffect
+        withFrameNanos { }
+        if (profiles.isEmpty()) {
+            contextId = null; contextIndex = -1
+            runCatching { addFocus.requestFocus() }
+            return@LaunchedEffect
+        }
+        val neighbor = profiles.getOrNull(contextIndex.coerceAtLeast(0)) ?: profiles.last()
+        contextId = neighbor.id
+        contextIndex = profiles.indexOfFirst { it.id == neighbor.id }
+        withFrameNanos { }
+        runCatching { contextFocus.requestFocus() }
     }
 
     BackHandler { onBack() }
@@ -71,9 +106,18 @@ fun ManageProfilesScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         modifier = modifier
             .fillMaxSize()
             .roundedPanel()
-            // Spatial D-pad entry from the sidebar would land mid-list — route it to "Add Profile".
-            // onEnter fires only for directional entry from outside (internal moves don't re-trigger it).
-            .focusProperties { onEnter = { runCatching { addFocus.requestFocus() } } }
+            // D-pad entry from outside should fall INSIDE the menu — last-acted row, else first row,
+            // else "Add Profile" (only when the list is empty).
+            .focusProperties {
+                onEnter = {
+                    val tid = contextId
+                    when {
+                        tid != null && profiles.any { it.id == tid } -> runCatching { contextFocus.requestFocus() }
+                        profiles.isNotEmpty() -> runCatching { firstRowFocus.requestFocus() }
+                        else -> runCatching { addFocus.requestFocus() }
+                    }
+                }
+            }
             .focusGroup()
             .padding(horizontal = 40.dp, vertical = 28.dp),
     ) {
@@ -85,12 +129,17 @@ fun ManageProfilesScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         Spacer(Modifier.height(20.dp))
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            items(profiles, key = { it.id }) { p ->
+            itemsIndexed(profiles, key = { _, it -> it.id }) { index, p ->
                 ProfileRow(
                     profile = p,
                     canDelete = profiles.size > 1,
-                    onEdit = { editing = p },
-                    onDelete = { confirmDelete = p },
+                    rowModifier = when {
+                        p.id == contextId -> Modifier.focusRequester(contextFocus)
+                        index == 0 -> Modifier.focusRequester(firstRowFocus)
+                        else -> Modifier
+                    },
+                    onEdit = { contextId = p.id; contextIndex = index; editing = p },
+                    onDelete = { contextId = p.id; contextIndex = index; confirmDelete = p },
                 )
             }
         }
@@ -101,6 +150,8 @@ fun ManageProfilesScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             initial = null,
             onConfirm = { name, avatarId, isKids, pin -> vm.create(name, avatarId, isKids, pin); creating = false },
             onDismiss = { creating = false },
+            // Names must stay unique (backup restore matches profiles by name).
+            takenNames = profiles.map { it.name.trim().lowercase() }.toSet(),
         )
     }
     editing?.let { p ->
@@ -108,6 +159,7 @@ fun ManageProfilesScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             initial = p,
             onConfirm = { name, avatarId, isKids, pin -> vm.edit(p, name, avatarId, isKids, pin); editing = null },
             onDismiss = { editing = null },
+            takenNames = profiles.filter { it.id != p.id }.map { it.name.trim().lowercase() }.toSet(),
         )
     }
     confirmDelete?.let { p ->
@@ -121,10 +173,10 @@ fun ManageProfilesScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun ProfileRow(profile: ProfileEntity, canDelete: Boolean, onEdit: () -> Unit, onDelete: () -> Unit) {
+private fun ProfileRow(profile: ProfileEntity, canDelete: Boolean, rowModifier: Modifier, onEdit: () -> Unit, onDelete: () -> Unit) {
     val colors = OwnTVTheme.colors
     Row(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(colors.surfaceContainerHigh).padding(14.dp),
+        modifier = rowModifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(colors.surfaceContainerHigh).padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         OwnTVAvatar(avatarId = profile.avatarId, modifier = Modifier.size(48.dp))

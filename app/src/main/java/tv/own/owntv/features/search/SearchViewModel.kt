@@ -2,6 +2,7 @@
 
 package tv.own.owntv.features.search
 
+import tv.own.owntv.core.epg.displayLogoUrl
 import android.util.Log
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
@@ -79,16 +80,24 @@ class SearchViewModel(
 ) : ViewModel() {
 
     /** Global "External player" toggle — the screen must NOT open the fullscreen in-app player when on. */
-    val externalPlayerOn: kotlinx.coroutines.flow.StateFlow<Boolean> = settings.externalPlayer
+    val externalPlayerOn: kotlinx.coroutines.flow.StateFlow<Boolean> = settings.externalPlayerMovies
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
-    private data class Ctx(val profileId: Long, val sourceIds: List<Long>)
+    private data class Ctx(
+        val profileId: Long,
+        val liveSourceIds: List<Long>,
+        val movieSourceIds: List<Long>,
+        val seriesSourceIds: List<Long>,
+    ) {
+        val hasAny: Boolean get() = liveSourceIds.isNotEmpty() || movieSourceIds.isNotEmpty() || seriesSourceIds.isNotEmpty()
+    }
     // Observe the active profile's sources reactively so adding/removing a playlist refreshes Search
     // immediately (was read once at startup, so a new playlist showed nothing until app restart).
+    // Per-section Off flags split the id sets so an Off section never surfaces in results.
     private val ctx: StateFlow<Ctx> = activeProfileSources(settings, sourceDao)
-        .map { aps -> Ctx(aps.profileId, aps.sourceIds) }
+        .map { aps -> Ctx(aps.profileId, aps.liveSourceIds, aps.movieSourceIds, aps.seriesSourceIds) }
         .distinctUntilChanged()
-        .stateIn(viewModelScope, SharingStarted.Eagerly, Ctx(-1L, emptyList()))
+        .stateIn(viewModelScope, SharingStarted.Eagerly, Ctx(-1L, emptyList(), emptyList(), emptyList()))
 
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query.asStateFlow()
@@ -133,23 +142,32 @@ class SearchViewModel(
     /** Curated results for the active empty-state intent (bounded; reuses favourites/history queries). */
     val curatedResults: StateFlow<SearchResults> = combine(_intent, ctx) { i, c -> i to c }
         .flatMapLatest { (i, c) ->
-            if (i == null || c.profileId < 0 || c.sourceIds.isEmpty()) flowOf(SearchResults())
-            else flowOf(loadIntent(i, c.profileId, c.sourceIds))
+            if (i == null || c.profileId < 0 || !c.hasAny) flowOf(SearchResults())
+            else flowOf(loadIntent(i, c))
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SearchResults())
 
-    private suspend fun loadIntent(intent: SearchIntent, pid: Long, ids: List<Long>): SearchResults = when (intent) {
+    private suspend fun loadIntent(intent: SearchIntent, c: Ctx): SearchResults = when (intent) {
         SearchIntent.CONTINUE -> SearchResults(
-            channels = channelDao.recentlyWatched(pid, LIMIT).first().map { ChannelSearchResult(it, null) },
-            movies = movieDao.recentlyWatchedSnapshot(pid, ids, LIMIT),
-            series = seriesDao.recentlyWatchedSnapshot(pid, ids, LIMIT),
+            channels = channelDao.recentlyWatched(c.profileId, LIMIT).first()
+                .filter { it.sourceId in c.liveSourceIds }
+                .map { ChannelSearchResult(it, null) },
+            movies = if (c.movieSourceIds.isEmpty()) emptyList()
+            else movieDao.recentlyWatchedSnapshot(c.profileId, c.movieSourceIds, LIMIT),
+            series = if (c.seriesSourceIds.isEmpty()) emptyList()
+            else seriesDao.recentlyWatchedSnapshot(c.profileId, c.seriesSourceIds, LIMIT),
         )
         SearchIntent.UNWATCHED -> SearchResults(
-            movies = movieDao.unwatchedFavorites(pid, ids, LIMIT),
-            series = seriesDao.unwatchedFavorites(pid, ids, LIMIT),
+            movies = if (c.movieSourceIds.isEmpty()) emptyList()
+            else movieDao.unwatchedFavorites(c.profileId, c.movieSourceIds, LIMIT),
+            series = if (c.seriesSourceIds.isEmpty()) emptyList()
+            else seriesDao.unwatchedFavorites(c.profileId, c.seriesSourceIds, LIMIT),
         )
         SearchIntent.CHANNELS -> SearchResults(
-            channels = channelDao.favoritesListAlpha(pid).first().take(LIMIT).map { ChannelSearchResult(it, null) },
+            channels = channelDao.favoritesListAlpha(c.profileId).first()
+                .filter { it.sourceId in c.liveSourceIds }
+                .take(LIMIT)
+                .map { ChannelSearchResult(it, null) },
         )
     }
 
@@ -171,29 +189,33 @@ class SearchViewModel(
 
     private suspend fun search(q: String): SearchResults {
         val pid = currentProfileId() ?: return SearchResults()
-        val ids = ctx.value.sourceIds.ifEmpty { return SearchResults() }
+        val c = ctx.value
+        if (!c.hasAny) return SearchResults()
         val fts = ftsQueryFor(q)
         // Respect this profile's customizations: hidden items and hidden categories never surface,
         // renames are shown (channels only — movies/series have no per-item rename).
         val custLive = customize.observe(pid, MediaType.LIVE).first()
         val custMovie = customize.observe(pid, MediaType.MOVIE).first()
         val custSeries = customize.observe(pid, MediaType.SERIES).first()
-        val hiddenLiveCats = hiddenCategoryIds(ids, MediaType.LIVE, custLive)
-        val hiddenMovieCats = hiddenCategoryIds(ids, MediaType.MOVIE, custMovie)
-        val hiddenSeriesCats = hiddenCategoryIds(ids, MediaType.SERIES, custSeries)
+        val hiddenLiveCats = hiddenCategoryIds(c.liveSourceIds, MediaType.LIVE, custLive)
+        val hiddenMovieCats = hiddenCategoryIds(c.movieSourceIds, MediaType.MOVIE, custMovie)
+        val hiddenSeriesCats = hiddenCategoryIds(c.seriesSourceIds, MediaType.SERIES, custSeries)
         return SearchResults(
-            channels = (if (fts != null) channelDao.searchListDetailedFts(fts, ids, LIMIT) else channelDao.searchListDetailed(q, ids, LIMIT))
+            channels = if (c.liveSourceIds.isEmpty()) emptyList()
+            else (if (fts != null) channelDao.searchListDetailedFts(fts, c.liveSourceIds, LIMIT) else channelDao.searchListDetailed(q, c.liveSourceIds, LIMIT))
                 .filter {
                     CustomizeKeys.channel(it.channel) !in custLive.hiddenItems &&
                         (it.channel.categoryId == null || it.channel.categoryId !in hiddenLiveCats)
                 }
                 .map { row -> custLive.itemNames[CustomizeKeys.channel(row.channel)]?.let { row.copy(channel = row.channel.copy(name = it)) } ?: row },
-            movies = (if (fts != null) movieDao.searchListFts(fts, ids, LIMIT) else movieDao.searchList(q, ids, LIMIT))
+            movies = if (c.movieSourceIds.isEmpty()) emptyList()
+            else (if (fts != null) movieDao.searchListFts(fts, c.movieSourceIds, LIMIT) else movieDao.searchList(q, c.movieSourceIds, LIMIT))
                 .filter {
                     CustomizeKeys.movie(it) !in custMovie.hiddenItems &&
                         (it.categoryId == null || it.categoryId !in hiddenMovieCats)
                 },
-            series = (if (fts != null) seriesDao.searchListFts(fts, ids, LIMIT) else seriesDao.searchList(q, ids, LIMIT))
+            series = if (c.seriesSourceIds.isEmpty()) emptyList()
+            else (if (fts != null) seriesDao.searchListFts(fts, c.seriesSourceIds, LIMIT) else seriesDao.searchList(q, c.seriesSourceIds, LIMIT))
                 .filter {
                     CustomizeKeys.series(it) !in custSeries.hiddenItems &&
                         (it.categoryId == null || it.categoryId !in hiddenSeriesCats)
@@ -244,7 +266,7 @@ class SearchViewModel(
             } else {
                 channel.streamUrl
             }
-            player.play(url, title = channel.name, logoUrl = channel.logoUrl, isLive = true, userAgent = source?.userAgent)
+            player.play(url, title = channel.name, logoUrl = channel.displayLogoUrl, isLive = true, userAgent = source?.userAgent)
         }
         record(MediaType.LIVE, channel.id)
         rememberCurrentQuery()
@@ -263,11 +285,17 @@ class SearchViewModel(
                 movie.streamUrl
             }
             // Global external-player toggle: same chokepoint behavior as MovieViewModel.play().
-            if (settings.externalPlayer.first()) {
+            if (settings.externalPlayerMovies.first()) {
                 externalPlayerLauncher.launch(url, movie.name)
                 return@launch
             }
-            player.play(url, title = movie.name, year = movie.year?.toString(), isLive = false, userAgent = source?.userAgent)
+            player.play(
+                url, title = movie.name, year = movie.year?.toString(), isLive = false,
+                userAgent = source?.userAgent,
+                // P6 — same stable engine-pin identity MovieViewModel uses, so a pin made in one
+                // screen applies in the other.
+                contentKey = tv.own.owntv.core.player.enginePinKey(movie.sourceId, "MOVIE", movie.remoteId),
+            )
         }
         record(MediaType.MOVIE, movie.id)
         rememberCurrentQuery()

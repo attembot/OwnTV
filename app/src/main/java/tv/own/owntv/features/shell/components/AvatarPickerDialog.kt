@@ -34,6 +34,7 @@ import tv.own.owntv.ui.components.ProfileIcon
 import tv.own.owntv.ui.components.OwnTVAvatars
 import tv.own.owntv.ui.components.longPressMenuGuard
 import tv.own.owntv.ui.components.trapAllFocusExit
+import tv.own.owntv.ui.theme.GlassSurface
 import tv.own.owntv.ui.theme.OwnTVTheme
 
 /** Full-screen avatar picker: a grid of the preset cartoon avatars. Picking one applies & closes. */
@@ -91,6 +92,7 @@ fun AvatarPickerDialog(
                     unfocusedContainerColor = colors.surfaceContainer,
                     selectedContainerColor = colors.primaryContainer,
                     contentAlignment = Alignment.Center,
+                    surface = GlassSurface.DIALOGS,
                 ) { _ ->
                     ProfileIcon(color = OwnTVTheme.colors.primary, modifier = Modifier.size(40.dp))
                 }
@@ -113,6 +115,7 @@ fun AvatarPickerDialog(
                             unfocusedContainerColor = colors.surfaceContainer,
                             selectedContainerColor = colors.primaryContainer,
                             contentAlignment = Alignment.Center,
+                            surface = GlassSurface.DIALOGS,
                         ) { _ ->
                             OwnTVAvatar(avatarId = id, modifier = Modifier.size(64.dp))
                         }

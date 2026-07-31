@@ -3,7 +3,7 @@ package tv.own.owntv.features.shell.components
 import android.text.format.DateFormat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -23,6 +23,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -38,9 +39,22 @@ import kotlinx.coroutines.delay
 import tv.own.owntv.core.weather.WeatherInfo
 import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.OwnTVIcon
+import tv.own.owntv.ui.theme.GlassSurface
+import tv.own.owntv.ui.theme.LocalGlass
 import tv.own.owntv.ui.theme.OwnTVTheme
+import tv.own.owntv.ui.theme.glass
 import tv.own.owntv.ui.theme.ownTvTween
 import java.util.Date
+
+// Top-bar chips: corner matches the nav buttons (14dp, not full-pill) and a lighter frost than the
+// big panels so the small chrome reads as glass without being heavy.
+private val TopBarChipCorner = 14.dp
+private const val TopBarFrost = 0.45f
+
+/** Always-on faint white glass edge for the display-only chips, only while the top bar is glassy. */
+@Composable
+private fun Modifier.topBarGlassRim(shape: Shape): Modifier =
+    if (LocalGlass.current.isGlassy(GlassSurface.TOPBAR)) border(1.dp, Color.White.copy(alpha = 0.18f), shape) else this
 
 @Composable
 fun TopBar(
@@ -56,11 +70,16 @@ fun TopBar(
     continueLabel: String? = null,
     continueIcon: OwnTVIcon = OwnTVIcon.PLAY,
     onContinueClick: () -> Unit = {},
+    // Audio Mode (plan §8): the now-playing bar, shown left of the weather chip while PlayerMode.AUDIO
+    // is active. Null = not in Audio Mode.
+    audioBar: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val colors = OwnTVTheme.colors
     Row(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
+        // Left padding = 0 so the section chip's left edge lines up with panel-1 (the category
+        // column) directly below it; keep the right inset for the weather/clock/playlist chips.
+        modifier = modifier.fillMaxWidth().padding(start = 0.dp, end = 20.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -74,6 +93,7 @@ fun TopBar(
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            audioBar?.invoke()
             if (weatherInfo != null) WeatherChip(info = weatherInfo, fahrenheit = weatherFahrenheit)
             ClockChip()
             if (playlistName.isNotBlank()) {
@@ -86,7 +106,9 @@ fun TopBar(
 @Composable
 private fun SectionChip(label: String) {
     val colors = OwnTVTheme.colors
-    Box(Modifier.clip(RoundedCornerShape(999.dp)).background(colors.primaryContainer).padding(horizontal = 14.dp, vertical = 7.dp)) {
+    // Keeps its accent tint (marks the current section) but frosts in glass mode like the other chips.
+    val shape = RoundedCornerShape(TopBarChipCorner)
+    Box(Modifier.clip(shape).glass(GlassSurface.TOPBAR, colors.primaryContainer, shape, frostScale = TopBarFrost).topBarGlassRim(shape).padding(horizontal = 14.dp, vertical = 7.dp)) {
         Text(label, style = MaterialTheme.typography.labelLarge, color = colors.onPrimaryContainer, fontWeight = FontWeight.Bold)
     }
 }
@@ -102,14 +124,19 @@ private fun SearchPill(onClick: () -> Unit, visible: Boolean) {
         modifier = Modifier
             .graphicsLayer { this.alpha = alpha }
             .focusProperties { canFocus = visible },
-        shape = RoundedCornerShape(999.dp),
-        focusedContainerColor = colors.surfaceContainerHigh,
+        shape = RoundedCornerShape(TopBarChipCorner),
+        surface = GlassSurface.TOPBAR,
+        glassFrostScale = TopBarFrost,
+        glassIdleRimAlpha = 0.18f,
+        // Neutral when idle; accent fill only when focused (matches the playlist selector).
+        focusedContainerColor = colors.primaryContainer,
         unfocusedContainerColor = colors.surfaceContainer.copy(alpha = 0.6f),
         contentAlignment = Alignment.Center,
-    ) { _ ->
+    ) { focused ->
+        val fg = if (focused) colors.onPrimaryContainer else colors.onSurfaceVariant
         Row(Modifier.padding(horizontal = 14.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OwnTVIcon(icon = OwnTVIcon.SEARCH, tint = colors.onSurfaceVariant, modifier = Modifier.size(16.dp))
-            Text("Search", style = MaterialTheme.typography.labelLarge, color = colors.onSurfaceVariant)
+            OwnTVIcon(icon = OwnTVIcon.SEARCH, tint = fg, modifier = Modifier.size(16.dp))
+            Text("Search", style = MaterialTheme.typography.labelLarge, color = fg)
         }
     }
 }
@@ -123,7 +150,10 @@ private fun ContinueChip(label: String, icon: OwnTVIcon, onClick: () -> Unit, vi
         modifier = Modifier
             .graphicsLayer { this.alpha = alpha }
             .focusProperties { canFocus = visible },
-        shape = RoundedCornerShape(999.dp),
+        shape = RoundedCornerShape(TopBarChipCorner),
+        surface = GlassSurface.TOPBAR,
+        glassFrostScale = TopBarFrost,
+        glassIdleRimAlpha = 0.18f,
         focusedContainerColor = colors.primary,
         unfocusedContainerColor = colors.primaryContainer.copy(alpha = 0.6f),
         contentAlignment = Alignment.Center,
@@ -147,7 +177,10 @@ private fun ClockChip() {
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) { while (true) { delay(15_000); now = System.currentTimeMillis() } }
     val formatted = remember(now) { DateFormat.getTimeFormat(context).format(Date(now)) }
-    Box(Modifier.clip(RoundedCornerShape(999.dp)).background(colors.surfaceContainer.copy(alpha = 0.6f)).padding(horizontal = 14.dp, vertical = 7.dp)) {
+    // Display-only (non-focusable) and neutral (no accent), matching the weather chip. Frosts in
+    // glass mode (TOPBAR surface) so it reads as glass like the focusable chips.
+    val shape = RoundedCornerShape(TopBarChipCorner)
+    Box(Modifier.clip(shape).glass(GlassSurface.TOPBAR, colors.surfaceContainer.copy(alpha = 0.6f), shape, frostScale = TopBarFrost).topBarGlassRim(shape).padding(horizontal = 14.dp, vertical = 7.dp)) {
         Text(formatted, style = MaterialTheme.typography.labelLarge, color = colors.onSurfaceVariant)
     }
 }
@@ -158,25 +191,32 @@ private fun PlaylistChip(label: String, interactive: Boolean = false, onClick: (
     // Static badge when there's only one playlist (nothing to switch); a focusable button with a chevron
     // when there are 2+, opening the playlist quick-switcher.
     if (!interactive) {
-        Box(Modifier.clip(RoundedCornerShape(999.dp)).background(colors.primaryContainer.copy(alpha = 0.5f)).padding(horizontal = 14.dp, vertical = 7.dp)) {
-            Text(label, style = MaterialTheme.typography.labelLarge, color = colors.onPrimaryContainer, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        // Neutral display-only badge (no always-on accent), frosts in glass mode like the other chips.
+        val shape = RoundedCornerShape(TopBarChipCorner)
+        Box(Modifier.clip(shape).glass(GlassSurface.TOPBAR, colors.surfaceContainer.copy(alpha = 0.6f), shape, frostScale = TopBarFrost).topBarGlassRim(shape).padding(horizontal = 14.dp, vertical = 7.dp)) {
+            Text(label, style = MaterialTheme.typography.labelLarge, color = colors.onSurfaceVariant, fontWeight = FontWeight.SemiBold, maxLines = 1)
         }
         return
     }
     FocusableSurface(
         onClick = onClick,
-        shape = RoundedCornerShape(999.dp),
+        shape = RoundedCornerShape(TopBarChipCorner),
+        surface = GlassSurface.TOPBAR,
+        glassFrostScale = TopBarFrost,
+        glassIdleRimAlpha = 0.18f,
+        // Neutral when idle; accent fill only when focused (no always-on accent).
         focusedContainerColor = colors.primaryContainer,
-        unfocusedContainerColor = colors.primaryContainer.copy(alpha = 0.5f),
+        unfocusedContainerColor = colors.surfaceContainer.copy(alpha = 0.6f),
         contentAlignment = Alignment.Center,
-    ) { _ ->
+    ) { focused ->
+        val fg = if (focused) colors.onPrimaryContainer else colors.onSurfaceVariant
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text(label, style = MaterialTheme.typography.labelLarge, color = colors.onPrimaryContainer, fontWeight = FontWeight.SemiBold, maxLines = 1)
-            OwnTVIcon(icon = OwnTVIcon.CHEVRON, tint = colors.onPrimaryContainer, modifier = Modifier.size(16.dp))
+            Text(label, style = MaterialTheme.typography.labelLarge, color = fg, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            OwnTVIcon(icon = OwnTVIcon.CHEVRON, tint = fg, modifier = Modifier.size(16.dp))
         }
     }
 }
@@ -186,10 +226,11 @@ private fun WeatherChip(info: WeatherInfo, fahrenheit: Boolean) {
     val colors = OwnTVTheme.colors
     val temp = if (fahrenheit) "${(info.temperatureC * 9 / 5 + 32).toInt()}°F" else "${info.temperatureC.toInt()}°C"
     val location = if (info.city.isNotBlank()) " · ${info.city}" else ""
-    Box(Modifier.clip(RoundedCornerShape(999.dp)).background(colors.primaryContainer.copy(alpha = 0.4f)).padding(horizontal = 14.dp, vertical = 7.dp)) {
+    val shape = RoundedCornerShape(TopBarChipCorner)
+    Box(Modifier.clip(shape).glass(GlassSurface.TOPBAR, colors.surfaceContainer.copy(alpha = 0.6f), shape, frostScale = TopBarFrost).topBarGlassRim(shape).padding(horizontal = 14.dp, vertical = 7.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             WeatherConditionIcon(info = info, Modifier.size(16.dp))
-            Text("$temp$location", style = MaterialTheme.typography.labelLarge, color = colors.onPrimaryContainer, fontWeight = FontWeight.Bold, maxLines = 1)
+            Text("$temp$location", style = MaterialTheme.typography.labelLarge, color = colors.onSurfaceVariant, fontWeight = FontWeight.Bold, maxLines = 1)
         }
     }
 }

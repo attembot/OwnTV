@@ -33,6 +33,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import tv.own.owntv.core.database.entity.SourceEntity
 import tv.own.owntv.ui.components.FocusableSurface
+import tv.own.owntv.ui.theme.GlassSurface
 import tv.own.owntv.ui.theme.OwnTVTheme
 
 /**
@@ -53,14 +54,15 @@ fun PlaylistPickerDialog(
     LaunchedEffect(Unit) { runCatching { selectedFocus.requestFocus() } }
     BackHandler { onDismiss() }
 
+    tv.own.owntv.ui.theme.PopupFontTheme {
     Box(
         Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.75f)).focusGroup(),
         contentAlignment = Alignment.Center,
     ) {
         Column(
-            Modifier.width(460.dp).clip(RoundedCornerShape(20.dp)).background(colors.surfaceContainerHigh).padding(24.dp),
+            Modifier.width(280.dp).clip(RoundedCornerShape(16.dp)).background(colors.surfaceContainerHigh).padding(14.dp),
         ) {
-            Text("Show playlist", style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
+            Text("Show playlist", style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
             Spacer(Modifier.height(4.dp))
             Text(
                 "Choose which playlist to browse. This applies everywhere and is remembered.",
@@ -90,13 +92,14 @@ fun PlaylistPickerDialog(
             }
         }
     }
+    }
 }
 
 /** Caps the list height so a long playlist set scrolls inside the dialog instead of overflowing it —
  *  relative to the screen so the dialog never clips on small/low-res displays. */
 @Composable
 private fun Modifier.heightScrollCap(): Modifier {
-    val max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp - 180.dp).coerceIn(160.dp, 340.dp)
+    val max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp - 180.dp).coerceIn(140.dp, 240.dp)
     return this.heightIn(max = max)
 }
 
@@ -117,6 +120,7 @@ private fun PlaylistRow(
         unfocusedContainerColor = colors.surfaceContainer,
         selectedContainerColor = colors.secondaryContainer,
         contentAlignment = Alignment.CenterStart,
+        surface = GlassSurface.DIALOGS,
     ) { focused ->
         val content = when {
             selected -> colors.onSecondaryContainer
@@ -124,13 +128,13 @@ private fun PlaylistRow(
             else -> colors.onSurfaceVariant
         }
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
                 label,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.bodyMedium,
                 color = content,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                 maxLines = 1,

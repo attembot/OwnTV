@@ -41,6 +41,7 @@ import tv.own.owntv.ui.components.NavDuotoneIcon
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.roundedPanel
 import tv.own.owntv.ui.theme.Dimens
+import tv.own.owntv.ui.theme.GlassSurface
 import tv.own.owntv.ui.theme.OwnTVTheme
 
 /**
@@ -144,6 +145,7 @@ private fun NavMenuRow(
         onClick = onToggle,
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
+        surface = GlassSurface.CARDS,
         contentAlignment = Alignment.CenterStart,
     ) { _ ->
         Row(

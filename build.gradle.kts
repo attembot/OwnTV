@@ -5,4 +5,7 @@ plugins {
     // version; KSP 2.3.6+ supports built-in Kotlin, so no kotlin-android plugin is needed.
     alias(libs.plugins.compose.compiler) apply false
     alias(libs.plugins.ksp) apply false
+    // Baseline profiles (audit ST1) — applied by :app and :baselineprofile.
+    alias(libs.plugins.android.test) apply false
+    alias(libs.plugins.baselineprofile) apply false
 }

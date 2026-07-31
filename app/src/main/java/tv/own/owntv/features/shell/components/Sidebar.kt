@@ -47,7 +47,10 @@ import tv.own.owntv.ui.components.OwnTVAvatar
 import tv.own.owntv.ui.components.NavDuotoneIcon
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.theme.Dimens
+import tv.own.owntv.ui.theme.GlassSurface
+import tv.own.owntv.ui.theme.LocalGlass
 import tv.own.owntv.ui.theme.OwnTVTheme
+import tv.own.owntv.ui.theme.glass
 
 /**
  * Layer 1 — the MD3 navigation panel. A FIXED icon rail: brand logo at the top (Phase 2), the nav items
@@ -70,6 +73,10 @@ fun Sidebar(
     modifier: Modifier = Modifier,
 ) {
     val colors = OwnTVTheme.colors
+    // Liquid Glass: when the SIDEBAR surface is glassy, the rail stays fully transparent so the
+    // background (photo or base colour) shows straight through and the rail blends into it instead of
+    // reading as a separate filled panel. Solid colors.background when glass is off.
+    val sidebarGlassy = LocalGlass.current.isGlassy(GlassSurface.SIDEBAR)
     var hasFocus by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     // Phase 2 — the nav is a FIXED icon rail: it never expands or collapses, so the layout never jumps on
@@ -102,7 +109,9 @@ fun Sidebar(
             }
             .focusGroup()
             .width(Dimens.SidebarWidthCollapsed)
-            .background(colors.background) // Phase 6 — unified panel surface
+            // Phase 6 — unified panel surface (solid). Transparent when glass is on so the rail melts
+            // into the background instead of appearing as a separate panel (see sidebarGlassy above).
+            .then(if (sidebarGlassy) Modifier else Modifier.background(colors.background))
             // Side inset (6.dp). Combined with the content area's start=0, this leaves a ~6.dp gap
             // between the nav pills and panel 1. Symmetric, so logo/profile stay centered.
             .padding(horizontal = 6.dp, vertical = 24.dp),
@@ -259,6 +268,7 @@ private fun ProfileCard(
                 focusedContainerColor = colors.surfaceContainerHigh,
                 unfocusedContainerColor = colors.surfaceContainer,
                 contentAlignment = Alignment.Center,
+                surface = GlassSurface.SIDEBAR,
             ) { focused ->
                 val c = if (focused) colors.onSurface else colors.onSurfaceVariant
                 Row(
@@ -286,6 +296,7 @@ private fun AvatarButton(avatarId: Int, sizeDp: Int, onClick: () -> Unit, onLong
         unfocusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
         selectedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
         contentAlignment = Alignment.Center,
+        surface = GlassSurface.SIDEBAR,
     ) { _ ->
         OwnTVAvatar(avatarId = avatarId, modifier = Modifier.size((sizeDp - 4).dp))
     }
@@ -312,9 +323,11 @@ private fun NavItem(
     modifier: Modifier = Modifier,
 ) {
     val colors = OwnTVTheme.colors
-    // Box-style corners (17.dp) so every focus/selection box in the app reads as the same "box", close
-    // to the live-TV channel list item, not an over-rounded pill.
-    val shape = RoundedCornerShape(17.dp)
+    // A wide, short horizontal "button" (14.dp corners) — reads as a proper button, not a square box.
+    val shape = RoundedCornerShape(14.dp)
+    // Liquid Glass: when the SIDEBAR surface is glassy the focused/active highlight renders as a
+    // frosted glass slice (via Modifier.glass) with a bright rim, instead of the flat tonal fill.
+    val sidebarGlassy = LocalGlass.current.isGlassy(GlassSurface.SIDEBAR)
     // The nav surface itself is transparent + borderless; the shared 4-state nav ladder (NavLadder.kt)
     // paints the fill, content tint, focus outline and the persistent left accent bar, so the sidebar
     // and the folder CategoryRail read identically (#47). FocusableSurface still provides the focus
@@ -331,22 +344,29 @@ private fun NavItem(
         contentAlignment = Alignment.Center,
     ) { focused ->
         val ladder = rememberNavLadderColors(selected = active, focused = focused)
+        val highlighted = focused || active
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(shape)
-                .background(ladder.container)
+                // Frosted glass fill when the rail is glassy (idle items have a transparent fill,
+                // which glass() skips); plain tonal fill otherwise.
+                .glass(surface = GlassSurface.SIDEBAR, baseFill = ladder.container, shape = shape, cornerRadius = 14.dp)
                 .then(
-                    if (ladder.focusBorder != null) Modifier.border(Dimens.FocusBorderWidth, ladder.focusBorder, shape)
-                    else Modifier
+                    when {
+                        sidebarGlassy && highlighted -> Modifier.border(1.dp, Color.White.copy(alpha = 0.35f), shape)
+                        ladder.focusBorder != null -> Modifier.border(Dimens.FocusBorderWidth, ladder.focusBorder, shape)
+                        else -> Modifier
+                    }
                 ),
         ) {
-            // Persistent left accent bar marking the active section, regardless of focus.
-            NavAccentBar(visible = ladder.showAccentBar, height = 26.dp)
+            // Persistent left accent bar marking the active section, regardless of focus. Hidden in
+            // glass mode — the frosted highlight already marks the active item, and the red bar clashes.
+            NavAccentBar(visible = ladder.showAccentBar && !sidebarGlassy, height = 26.dp)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .padding(horizontal = 12.dp, vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = if (expanded) Arrangement.spacedBy(16.dp, Alignment.Start) else Arrangement.Center,
             ) {
@@ -355,7 +375,7 @@ private fun NavItem(
                 NavDuotoneIcon(
                     section = section,
                     color = ladder.icon,
-                    modifier = Modifier.size(28.dp),
+                    modifier = Modifier.size(24.dp),
                 )
                 if (expanded) {
                     Text(

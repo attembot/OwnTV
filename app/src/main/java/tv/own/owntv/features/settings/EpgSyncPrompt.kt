@@ -52,12 +52,19 @@ sealed interface EpgSyncUi {
  * playlist import — then a brief "Done", and closes itself.
  */
 @Composable
-fun EpgSyncDialog(state: EpgSyncUi, onSync: () -> Unit, onDismiss: () -> Unit) {
+fun EpgSyncDialog(
+    state: EpgSyncUi,
+    onSync: () -> Unit,
+    onDismiss: () -> Unit,
+    // When non-null, the "Syncing" step offers "Run in background": enter the app now while the guide
+    // keeps downloading (the sync runs in the activity-scoped ViewModel, so it survives). Null hides it.
+    onBackground: (() -> Unit)? = null,
+) {
     if (state is EpgSyncUi.Hidden) return
     val colors = OwnTVTheme.colors
     val focus = remember { FocusRequester() }
     LaunchedEffect(state::class) {
-        if (state !is EpgSyncUi.Syncing) {
+        if (state !is EpgSyncUi.Syncing || onBackground != null) {
             delay(50)
             runCatching { focus.requestFocus() }
         }
@@ -96,6 +103,16 @@ fun EpgSyncDialog(state: EpgSyncUi, onSync: () -> Unit, onDismiss: () -> Unit) {
                         if (state.count > 0) formatCount(state.count) else "Connecting…",
                         style = MaterialTheme.typography.headlineLarge, color = colors.primary,
                     )
+                    if (onBackground != null) {
+                        Spacer(Modifier.height(22.dp))
+                        OwnTVButton(
+                            "Run in background",
+                            onClick = onBackground,
+                            style = OwnTVButtonStyle.SECONDARY,
+                            icon = OwnTVIcon.PLAY,
+                            modifier = Modifier.focusRequester(focus),
+                        )
+                    }
                 }
                 is EpgSyncUi.Done -> {
                     OwnTVIcon(OwnTVIcon.EPG, tint = colors.primary, modifier = Modifier.size(40.dp))

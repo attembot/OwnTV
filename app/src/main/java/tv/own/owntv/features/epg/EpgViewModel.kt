@@ -2,6 +2,7 @@
 
 package tv.own.owntv.features.epg
 
+import tv.own.owntv.core.epg.displayLogoUrl
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.FlowPreview
@@ -90,6 +91,7 @@ class EpgViewModel(
     private val favoriteDao: tv.own.owntv.core.database.dao.FavoriteDao,
     private val categoryDao: tv.own.owntv.core.database.dao.CategoryDao,
     private val streamUrlResolver: tv.own.owntv.core.stalker.StreamUrlResolver,
+    private val externalPlayerLauncher: tv.own.owntv.core.player.ExternalPlayerLauncher,
 ) : ViewModel() {
 
     /** Guide category filter: null = all channels, otherwise only that category's channels (#8). */
@@ -103,7 +105,7 @@ class EpgViewModel(
         activeProfileSources(settings, sourceDao)
             .flatMapLatest { aps ->
                 if (aps.sources.isEmpty()) flowOf(emptyList())
-                else combine(categoryDao.observe(aps.sourceIds, MediaType.LIVE), settings.sortLive, custom) { cats, sort, cust ->
+                else combine(categoryDao.observe(aps.liveSourceIds, MediaType.LIVE), settings.sortLive, custom) { cats, sort, cust ->
                     // Mirror Live TV: hidden filtered + renames + pinned order; A–Z sorts the rest.
                     cats.applyCustomizations(cust, alphaRest = sort == SettingsRepository.SortMode.ALPHA)
                         .map { (cat, name) -> if (name == cat.name) cat else cat.copy(name = name) }
@@ -256,7 +258,7 @@ class EpgViewModel(
             } else {
                 channel.streamUrl
             }
-            player.play(url, title = channel.name, logoUrl = channel.logoUrl, isLive = true, userAgent = source?.userAgent)
+            player.play(url, title = channel.name, logoUrl = channel.displayLogoUrl, isLive = true, userAgent = source?.userAgent)
             val pid = currentProfileId() ?: return@launch
             runCatching {
                 historyDao.record(WatchHistoryEntity(profileId = pid, mediaType = MediaType.LIVE, itemId = channel.id))
@@ -282,7 +284,23 @@ class EpgViewModel(
             _canZap.value = false // archive playback isn't part of the live zap list
             // isLive = false → the archive plays back seekable, with a normal progress bar.
             // preferSoftware → tolerate mid-GOP archive segments the hardware decoder can't (blank/crash).
-            player.play(url, title = channel.name, subtitle = programme.title, logoUrl = channel.logoUrl, isLive = false, preferSoftware = true, userAgent = sourceUa)
+            player.play(url, title = channel.name, subtitle = programme.title, logoUrl = channel.displayLogoUrl, isLive = false, preferSoftware = true, userAgent = sourceUa)
+        }
+    }
+
+    /** Which player takes a catch-up archive — read by the Guide's programme dialog to route itself. */
+    val catchupPlayer: StateFlow<SettingsRepository.CatchupPlayer> = settings.catchupPlayer
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.CatchupPlayer.INTERNAL)
+
+    /** Hand an archive programme to an external app (VLC, MX Player) instead of the in-app player. */
+    fun playCatchupExternal(channel: ChannelEntity, programme: EpgProgrammeEntity) {
+        viewModelScope.launch {
+            val url = withContext(kotlinx.coroutines.Dispatchers.IO) { catchupUrlFor(channel, programme) }
+            if (url == null) {
+                _matchSummary.value = "Catch-up isn't available for this channel."
+                return@launch
+            }
+            externalPlayerLauncher.launch(url, "${channel.name} · ${programme.title}")
         }
     }
 
@@ -352,10 +370,21 @@ class EpgViewModel(
         viewModelScope.launch {
             val ids = epgIds.map { it.trim().lowercase() }.filterTo(HashSet()) { it.isNotBlank() }
             if (ids.isEmpty()) return@launch
-            // One cache pass for the whole set; only re-sync over the network if the cache is gone/stale.
+            // One cache pass for the whole set; only re-sync over the network if the cache is gone/stale
+            // (returns false when it held none of the matched channels' programmes).
             val handled = runCatching { epgRepository.storeProgrammesForIdsFromCache(ids) }.getOrDefault(false)
             if (!handled) runCatching { refreshAllEpgFromNetwork() }
             load()
+            // Single-channel match (manual pick / review Accept / single auto-match): if the feed has no
+            // current-or-upcoming programmes for it, its guide row will be empty even though the match
+            // succeeded — say so, instead of leaving the user staring at a blank row (the provider simply
+            // hasn't published a current schedule for that channel).
+            if (ids.size == 1) {
+                val upcoming = runCatching { epgDao.countUpcomingForChannel(ids.first(), System.currentTimeMillis()) }.getOrDefault(1)
+                if (upcoming == 0) {
+                    _matchSummary.value = "Matched — but this guide channel has no current programmes in the EPG feed yet."
+                }
+            }
         }
     }
 
@@ -539,7 +568,7 @@ class EpgViewModel(
                 )
                 return@launch
             }
-            val playlistIds = activeSourceIds(settings, sourceDao, pid)
+            val playlistIds = activeSourceIds(settings, sourceDao, pid, MediaType.LIVE)
             val epgIds = epgSourceStore.getAll().map { it.id }
             // Channels come from the playlists; guide data is matched from BOTH the playlists' own EPG
             // (kept for compatibility) and the standalone EPG sources — by epgChannelId across all ids.
@@ -592,7 +621,7 @@ class EpgViewModel(
                 val liveOrdered = when (sortLiveMode) {
                     SettingsRepository.SortMode.ALPHA -> matched.sortedWith(byAlpha)
                     // Live/EPG have no rating; RATING can't be selected there, so treat it as provider order.
-                    SettingsRepository.SortMode.PLAYLIST, SettingsRepository.SortMode.RATING -> matched.sortedWith(byProvider)
+                    SettingsRepository.SortMode.PLAYLIST, SettingsRepository.SortMode.RATING, SettingsRepository.SortMode.DATE_ADDED -> matched.sortedWith(byProvider)
                 }
                 when (sortGuideMode) {
                     SettingsRepository.GuideSort.ALPHA -> matched.sortedWith(byAlpha)
@@ -707,13 +736,19 @@ class EpgViewModel(
         return overridden
     }
 
-    /** Distinct EPG channels for the manual "Match EPG" picker (across the profile's feeds). */
-    suspend fun availableEpgChannels(query: String): List<tv.own.owntv.core.database.entity.EpgChannelEntity> {
+    /** Distinct EPG channels for the manual "Match EPG" picker (across the profile's feeds),
+     *  ranked so guide channels resembling [channelName] come first instead of a plain A-Z list. */
+    suspend fun availableEpgChannels(channelName: String, query: String): List<tv.own.owntv.core.database.entity.EpgChannelEntity> {
         val pid = currentProfileId() ?: return emptyList()
         val playlistIds = sourceRepository.observeSources(pid).first().map { it.id }
         val ids = playlistIds + epgSourceStore.getAll().map { it.id }
         if (ids.isEmpty()) return emptyList()
-        return epgDao.listEpgChannels(ids, query.trim().lowercase(), 300)
+        // Fetch the whole (filtered) candidate set, not just the first 300 alphabetically — the best
+        // name match may sit far down the alphabet. Rank off-main, then cap for the dialog list.
+        val all = epgDao.listEpgChannels(ids, query.trim().lowercase(), MAX_EPG_CANDIDATES)
+        return withContext(kotlinx.coroutines.Dispatchers.Default) {
+            tv.own.owntv.core.epg.EpgMatcher.rankForPicker(channelName, all, { it.displayName }, { it.epgChannelId }).take(EPG_PICKER_RESULT_LIMIT)
+        }
     }
 
     private suspend fun currentProfileId(): Long? {
@@ -731,6 +766,7 @@ class EpgViewModel(
         private const val MAX_CHANNELS = 20_000
         // Cap the candidate set the bulk matcher scans against (keeps the O(channels×candidates) scan bounded).
         private const val MAX_EPG_CANDIDATES = 20_000
+        private const val EPG_PICKER_RESULT_LIMIT = 300
         // Rows per guide-window page — bounded so a page always fits a single ~2 MB CursorWindow.
         private const val EPG_WINDOW_PAGE = 1_000
     }

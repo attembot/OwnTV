@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import tv.own.owntv.ui.components.ChannelGenre
 import tv.own.owntv.ui.components.NavAccentBar
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.rememberNavLadderColors
@@ -54,14 +55,24 @@ import tv.own.owntv.ui.components.trapVerticalFocusExit
 import tv.own.owntv.ui.components.RailPanelFill
 import tv.own.owntv.ui.components.roundedPanel
 import tv.own.owntv.ui.theme.Dimens
+import tv.own.owntv.ui.theme.GlassSurface
+import tv.own.owntv.ui.theme.LocalGlass
 import tv.own.owntv.ui.theme.OwnTVTheme
+import tv.own.owntv.ui.theme.glass
 
 /**
- * A category as shown in the rail: a 2–3 char abbreviation plus its full name. Special rails
- * (Favorites / History) render an [icon] instead of the abbreviation.
+ * A category as shown in the rail: just its full name, optionally prefixed with an [icon] (the
+ * Favorites / History special rails). Category folders render the name alone — no abbreviation
+ * badge (#75).
  */
 @Immutable
-data class RailCategory(val abbr: String, val fullName: String, val icon: OwnTVIcon? = null)
+data class RailCategory(
+    val fullName: String,
+    val icon: OwnTVIcon? = null,
+    // Whether to show the genre hint dot. False for synthetic aggregates ("All Channels/Movies/Series")
+    // that combine every provider category — those aren't a real provider genre, so no dot.
+    val showGenreDot: Boolean = true,
+)
 
 /**
  * Layer 2 — the vertical folder rail. Collapsed (focus elsewhere) it shows compact abbreviation
@@ -80,6 +91,9 @@ fun CategoryRail(
     onSelect: (Int) -> Unit,
     onFocused: () -> Unit = {},
     modifier: Modifier = Modifier,
+    // Caller-supplied list state. Defaulted so existing callers are unchanged, but Live/Movies/Series
+    // pass their own so CH+- key paging can drive the rail's scroll position from the screen.
+    listState: androidx.compose.foundation.lazy.LazyListState = rememberLazyListState(),
 ) {
     val colors = OwnTVTheme.colors
     var hasFocus by remember { mutableStateOf(false) }
@@ -96,15 +110,17 @@ fun CategoryRail(
     // reflows the layout on the D-pad. Always "expanded" = full category names.
     val expanded = true
 
-    val listState = rememberLazyListState()
     val selectedFocus = remember { FocusRequester() }
     val searchFocus = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
-    // Keep the selected category in view when the selection changes while the rail isn't focused
-    // (initial load, restored state). While the user D-pads inside, focus handles scrolling.
+    // Keep the selected category in view when the selection changes — both for the initial load /
+    // restored state (rail not yet focused) AND when CH+- paging selects a far-away category while the
+    // rail IS focused. While the user D-pads inside, focus handles scrolling for adjacent moves; this
+    // covers the case where a CH key changes selectedIndex by a large jump.
     LaunchedEffect(selectedIndex, categories.size) {
-        if (!hasFocus && selectedIndex in categories.indices) {
+        if (selectedIndex in categories.indices) {
             runCatching { listState.scrollToItem(selectedIndex) }
+            if (hasFocus) runCatching { selectedFocus.requestFocus() }
         }
     }
 
@@ -206,17 +222,26 @@ private fun RailPill(
     val ladder = rememberNavLadderColors(selected = selected, focused = focused)
     val activeSelected = selected && focused
 
-    // Box-style corners (14.dp), close to the live-TV channel list item, not an over-rounded pill.
-    val shape = if (expanded) RoundedCornerShape(14.dp) else CircleShape
+    // Box-style corners (8.dp), close to the live-TV channel list item, not an over-rounded pill.
+    val shape = if (expanded) RoundedCornerShape(8.dp) else CircleShape
+    // Liquid Glass: when the PANELS surface is glassy, the focused/active highlight renders as a
+    // frosted glass slice (via Modifier.glass) with a bright white rim, matching the sidebar.
+    val panelsGlassy = LocalGlass.current.isGlassy(GlassSurface.PANELS)
+    val highlighted = focused || selected
 
     Box(
         modifier = modifier
             .then(if (expanded) Modifier.fillMaxWidth() else Modifier.size(Dimens.RailPillSize))
             .clip(shape)
-            .background(ladder.container)
+            // Frosted glass fill when the panel is glassy (idle pills have a transparent ladder fill,
+            // which glass() skips); plain tonal fill otherwise.
+            .glass(surface = GlassSurface.PANELS, baseFill = ladder.container, shape = shape)
             .then(
-                if (ladder.focusBorder != null) Modifier.border(Dimens.FocusBorderWidth, ladder.focusBorder, shape)
-                else Modifier
+                when {
+                    panelsGlassy && highlighted -> Modifier.border(Dimens.FocusBorderWidth, Color.White.copy(alpha = 0.35f), shape)
+                    ladder.focusBorder != null -> Modifier.border(Dimens.FocusBorderWidth, ladder.focusBorder, shape)
+                    else -> Modifier
+                }
             )
             .selectable(
                 selected = selected,
@@ -226,8 +251,9 @@ private fun RailPill(
             ),
     ) {
         // Persistent left accent bar marking the active category (only in the expanded full-label rail —
-        // a vertical bar on a compact circle pill would look wrong).
-        NavAccentBar(visible = ladder.showAccentBar && expanded)
+        // a vertical bar on a compact circle pill would look wrong). Hidden in glass mode: the frosted
+        // highlight already marks the active pill and the accent bar clashes (matches the sidebar).
+        NavAccentBar(visible = ladder.showAccentBar && expanded && !panelsGlassy)
 
         Row(
             modifier = Modifier
@@ -236,24 +262,19 @@ private fun RailPill(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = if (expanded) Arrangement.Start else Arrangement.Center,
         ) {
-            // The compact badge (icon or abbreviation) — the row's anchor in both states.
-            Box(
-                modifier = Modifier.size(if (expanded) 36.dp else Dimens.RailPillSize),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (category.icon != null) {
-                    OwnTVIcon(icon = category.icon, tint = ladder.icon, filled = activeSelected, modifier = Modifier.size(if (expanded) 20.dp else Dimens.RailPillSize / 2))
-                } else {
-                    Text(
-                        text = category.abbr,
-                        color = ladder.content,
-                        style = if (expanded) MaterialTheme.typography.labelMedium else MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
+            // Favorites / History carry an [icon] inline before the name; category folders show the
+            // name alone with no abbreviation badge (#75).
+            if (category.icon != null) {
+                OwnTVIcon(icon = category.icon, tint = ladder.icon, filled = activeSelected, modifier = Modifier.size(if (expanded) 20.dp else Dimens.RailPillSize / 2))
+                if (expanded) Spacer(Modifier.width(8.dp))
+            } else if (expanded && category.showGenreDot) {
+                // Genre hint dot (Sport/News/Movies/Action/…); unknown categories show the grey
+                // "Other" dot rather than an empty slot, so every row has a consistent marker.
+                val genreDot = ChannelGenre.fromCategory(category.fullName).dot
+                Box(Modifier.size(8.dp).clip(CircleShape).background(genreDot))
+                Spacer(Modifier.width(10.dp))
             }
             if (expanded) {
-                Spacer(Modifier.width(8.dp))
                 Text(
                     text = category.fullName,
                     color = ladder.content,

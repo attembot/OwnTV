@@ -12,6 +12,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 import tv.own.owntv.core.database.dao.ChannelDao
 import tv.own.owntv.core.database.dao.ContentOrderDao
+import tv.own.owntv.core.database.dao.ContentOrderExportRow
+import tv.own.owntv.core.database.dao.SeriesSortOrderDao
+import tv.own.owntv.core.database.dao.SeriesSortOrderExportRow
 import tv.own.owntv.core.database.dao.FavoriteDao
 import tv.own.owntv.core.database.dao.HistoryDao
 import tv.own.owntv.core.database.dao.MovieDao
@@ -47,11 +50,12 @@ class UserDataResolver(
     private val historyDao: HistoryDao,
     private val progressDao: ProgressDao,
     private val contentOrderDao: ContentOrderDao,
+    private val seriesSortOrderDao: SeriesSortOrderDao,
     private val db: tv.own.owntv.core.database.OwnTVDatabase,
 ) {
 
-    /** Exports the chosen kinds ("fav" / "his" / "prog" / "order") as stable-key records for the backup file. */
-    suspend fun exportAll(kinds: Set<String> = setOf("fav", "his", "prog", "order")): JSONArray {
+    /** Exports the chosen kinds ("fav" / "his" / "prog" / "order" / "sort") as stable-key records for the backup file. */
+    suspend fun exportAll(kinds: Set<String> = setOf("fav", "his", "prog", "order", "sort")): JSONArray {
         val out = JSONArray()
         if ("fav" in kinds) favoriteDao.getAllOnce().forEach { f ->
             describe(f.mediaType, f.itemId)?.let { out.put(it.put("p", f.profileId).put("kind", "fav").put("at", f.addedAt)) }
@@ -69,16 +73,45 @@ class UserDataResolver(
                 out.put(it.put("p", o.profileId).put("kind", "order").put("ctx", o.contextKey).put("pos", o.position))
             }
         }
+        // Per-series season/episode order. Always MediaType.SERIES, so it re-resolves through the
+        // ordinary SERIES branch of [resolveAndInsert].
+        if ("sort" in kinds) seriesSortOrderDao.getAllOnce().forEach { o ->
+            describe(MediaType.SERIES, o.seriesId)?.let {
+                out.put(it.put("p", o.profileId).put("kind", "sort").put("sdesc", o.seasonsDescending).put("edesc", o.episodesDescending))
+            }
+        }
         return out
     }
 
-    /** Exports only the rows attached to [sourceId], so a single-source re-sync starts promptly. */
-    suspend fun exportForSource(sourceId: Long, kinds: Set<String> = setOf("fav", "his", "prog")): JSONArray {
+    /**
+     * Exports only the rows attached to [sourceId], so a single-source re-sync starts promptly.
+     *
+     * "order" is in the default set (B1): manual Move positions orphan on a resync exactly like
+     * favorites do — content is clear-then-insert, so every itemId in `content_order` goes stale —
+     * and leaving them out of the snapshot silently threw away the user's hand-arranged folders.
+     */
+    suspend fun exportForSource(sourceId: Long, kinds: Set<String> = setOf("fav", "his", "prog", "order", "sort")): JSONArray {
         val out = JSONArray()
         if ("fav" in kinds) favoriteDao.exportRowsForSource(sourceId).forEach { row -> row.toJson("fav")?.let { out.put(it) } }
         if ("his" in kinds) historyDao.exportRowsForSource(sourceId).forEach { row -> row.toJson("his")?.let { out.put(it) } }
         if ("prog" in kinds) progressDao.exportRowsForSource(sourceId).forEach { row -> row.toJson("prog")?.let { out.put(it) } }
+        if ("order" in kinds) contentOrderDao.exportRowsForSource(sourceId).forEach { row -> row.toJson()?.let { out.put(it) } }
+        if ("sort" in kinds) seriesSortOrderDao.exportRowsForSource(sourceId).forEach { row -> row.toJson()?.let { out.put(it) } }
         return out
+    }
+
+    private fun ContentOrderExportRow.toJson(): JSONObject? {
+        val itemName = name ?: return null
+        return JSONObject().put("t", mediaType.name).put("src", sourceId).putOpt("rid", remoteId).put("name", itemName)
+            .put("p", profileId).put("kind", "order").put("ctx", contextKey).put("pos", position)
+            .put("oid", itemId)
+    }
+
+    private fun SeriesSortOrderExportRow.toJson(): JSONObject? {
+        val itemName = name ?: return null
+        return JSONObject().put("t", MediaType.SERIES.name).put("src", sourceId).putOpt("rid", remoteId).put("name", itemName)
+            .put("p", profileId).put("kind", "sort").put("sdesc", seasonsDescending).put("edesc", episodesDescending)
+            .put("oid", seriesId)
     }
 
     private fun UserDataExportRow.toJson(kind: String): JSONObject? {
@@ -140,6 +173,8 @@ class UserDataResolver(
                 "fav" -> favoriteDao.purgeSnapshotOrphan(profileId, type, itemId)
                 "his" -> historyDao.purgeSnapshotOrphan(profileId, type, itemId)
                 "prog" -> progressDao.purgeSnapshotOrphan(profileId, type, itemId)
+                "order" -> contentOrderDao.purgeSnapshotOrphan(profileId, type, itemId)
+                "sort" -> seriesSortOrderDao.purgeSnapshotOrphan(profileId, itemId)
             }
         }
     }
@@ -158,12 +193,10 @@ class UserDataResolver(
         }
     }
 
-    /** Replaces the pending set with a backup's records (empty/absent clears), then tries resolving. */
+    /** Merge-restore (backup): appends the backup's records to the pending set (deduplicated) and
+     *  tries resolving — never drops records already pending for profiles not in the backup. */
     suspend fun importAll(entries: JSONArray?) {
-        context.pendingStore.edit { prefs ->
-            if (entries == null || entries.length() == 0) prefs.remove(PENDING_KEY)
-            else prefs[PENDING_KEY] = entries.toString()
-        }
+        if (entries != null && entries.length() > 0) addPending(entries)
         resolvePending()
     }
 
@@ -261,6 +294,10 @@ class UserDataResolver(
                 )
                 "order" -> contentOrderDao.insertAll(
                     listOf(ContentOrderEntity(profileId = pid, mediaType = type, contextKey = e.getString("ctx"), itemId = itemId, position = e.getInt("pos"))),
+                )
+                "sort" -> seriesSortOrderDao.setOrder(
+                    profileId = pid, seriesId = itemId,
+                    seasonsDescending = e.optBoolean("sdesc", false), episodesDescending = e.optBoolean("edesc", false),
                 )
             }
             true

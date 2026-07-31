@@ -3,6 +3,9 @@ name: Release notes from CHANGELOG_APP
 # When a release is published, set its body to that version's section from CHANGELOG_APP.md
 # (the minimal, bullet-only changelog). The in-app updater reads the latest release body, so a
 # user updating from ANY older version sees exactly this version's short notes.
+#
+# Tag builds already set the same body in android.yml — a release published by GITHUB_TOKEN does
+# not trigger this workflow. This job covers releases published by hand from the GitHub UI.
 
 on:
   release:
@@ -31,9 +34,10 @@ jobs:
             exit 0
           fi
 
-          # Pull lines from "## <TAG> " up to (but not including) the next "## v" header.
+          # Pull lines from "## <TAG>" up to (but not including) the next "## v" header. The header
+          # may carry a date tail or none at all, so match the version as a whole word.
           awk -v ver="$TAG" '
-            $0 ~ ("^## " ver " ") { flag=1; next }
+            $0 ~ ("^## " ver "([ \t]|$)") { flag=1; next }
             /^## v/ && flag { flag=0 }
             flag { print }
           ' CHANGELOG_APP.md > section.md || true

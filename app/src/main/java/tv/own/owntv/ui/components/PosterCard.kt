@@ -26,6 +26,7 @@ import coil3.compose.AsyncImage
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import tv.own.owntv.ui.theme.Dimens
+import tv.own.owntv.ui.theme.GlassSurface
 import tv.own.owntv.ui.theme.OwnTVTheme
 
 /** A focusable poster tile for the Movies/Series grids: poster, title, rating, resume bar, fav star. */
@@ -50,6 +51,7 @@ fun PosterCard(
         modifier = modifier.onFocusChanged { if (it.hasFocus) onFocus() },
         selected = selected,
         shape = RoundedCornerShape(Dimens.PosterCardCorner),
+        surface = GlassSurface.CARDS,
         focusedScale = 1.06f,
         glowElevation = 14,
         focusedContainerColor = colors.surfaceContainerHigh,
@@ -110,7 +112,7 @@ fun PosterCard(
 
                 if (isFavorite) {
                     OwnTVIcon(
-                        OwnTVIcon.STAR,
+                        OwnTVIcon.FAVORITE,
                         tint = colors.favorite,
                         filled = true,
                         modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).size(18.dp),

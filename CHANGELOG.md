@@ -1,5 +1,1024 @@
 # Changelog
 
+## v4.1.5 — 2026-07-31
+
+### 💬 Subtitle appearance — size, colour, position and background, each optional (#96)
+
+- **Settings → Video Player → Subtitle appearance** is now a menu rather than a single row: a live
+  preview of how subtitles will look, a **Customize subtitles** master switch, and — once it's on —
+  **Size**, **Text color**, **Position** and **Background transparency**, each opening its own popup.
+- **Every option starts at "Default", and Default means "don't touch it".** Turning the master switch
+  on changes nothing by itself. Set only the background transparency and only the background changes;
+  everything else keeps the look the stream or the renderer gives it, including the styling
+  broadcasters embed in Live TV captions and the fonts and colours authored into ASS subtitles.
+- **Background transparency** answers the original request: a ±10% stepper from **None** (fully
+  transparent) to **Solid**, so subtitles over a bright scene can get a readable backdrop without
+  blacking out a strip of the picture.
+- **Text color** offers quick presets, a full colour picker and a hex code.
+- **Position** is six fixed anchors — top/bottom × left/center/right — drawn as miniature screens so
+  you can see where the text lands before choosing. Useful when a channel burns a ticker or a logo
+  into the exact spot subtitles normally sit.
+- **Size** moved here from its own settings row, and now sits under the master switch alongside the
+  rest. If you had already changed subtitle size, the switch is turned on for you at upgrade so your
+  size is preserved.
+- The look is applied by **all three subtitle renderers** — mpv's own, the Compose overlay used for
+  mpv direct rendering, and the Media3 view used for Live TV and image subtitles — so it doesn't
+  change depending on which engine happens to be playing. Image subtitles (PGS/VOBSUB/DVB) are picture
+  data and are drawn as authored.
+- Settings are per profile and travel in backups.
+
+### 🆕 Date added — sort Movies and Series by what arrived most recently
+
+- **"Date added" is a new sort mode for Movies and Series**, alongside Playlist order, A–Z and Rating.
+  Press the sort button on the Movies or Series list to cycle to it. Newest titles come first, so a
+  provider that keeps adding films puts the new ones where you'll actually see them.
+- The date comes from your provider. **Xtream playlists** carry a real added/last-modified date for
+  every movie and show, and that is what's used. **Stalker portals** carry one too, and OwnTV now reads
+  it — though on a freshly built portal it is often the date the reseller bulk-imported the catalog
+  rather than a real release date.
+- **M3U playlists have no date to give** — the `#EXTINF` format simply has no such field. Rather than
+  inventing one, "Date added" falls back to **reverse playlist order** for them: the titles at the
+  bottom of your playlist, which is where providers append new ones, come first.
+- Titles with no date always sort last, so a mixed catalog puts everything OwnTV knows a date for
+  ahead of everything it doesn't, instead of scattering them.
+- The sort is index-backed, so it stays instant on very large catalogs.
+- Your choice is remembered per section and travels in backups, exactly like the other sort modes.
+
+### ↕️ Series sorting — season and episode order, set per show
+
+- The series episode view has a **"Sorting" button** that opens a small popup with two independent
+  choices: **Seasons** and **Episodes**, each **Oldest first** or **Newest first**.
+- **It's set per show, not globally.** A long-running series you're catching up on can stay oldest-first
+  while a weekly show you follow shows the newest episode at the top — and neither affects the other.
+- The two are genuinely independent: newest seasons first with oldest episodes first is a valid
+  combination, and OwnTV keeps it.
+- Changes apply the moment you pick them; **Back** closes the popup. Both default to **Oldest first**.
+- **Playback order is never affected.** Autoplay still runs episodes in their natural order whatever
+  you choose here — this only changes what you see.
+- Opening a part-watched show still lands you on the last episode you watched, in either order.
+- Your per-show choices are kept per profile and are included in backups with the manual-ordering
+  section, so they come back on the right shows after a restore.
+
+### 📺 Channel numbers — type a number on the remote to tune
+
+- **Type a channel number while watching Live TV full screen** and OwnTV tunes straight to it, the way a
+  set-top box does — no list, no guide, no holding CH+ through fifty channels. Works with the **number
+  row and the numpad** on your remote.
+- The number appears top-left as you type, with a **bar that drains over the two seconds** before it
+  submits, so you always know how long you have to add another digit. Press **OK** to tune immediately,
+  or **Back** to cancel. Five digits submit on their own.
+- Once it resolves, the same card becomes the **channel OSD** — logo, name and number — and stays up
+  until the new channel is actually on screen. If nothing matches you get **"Channel not found"** on that
+  card with the number you entered.
+- The number searched is your provider's own channel number, **from the playlist you're currently
+  watching**. Only if that playlist has no channel with the number do your other active Live playlists
+  get searched, so a number in your current playlist is never hijacked by another one.
+- **Hidden channels and hidden categories are skipped**, and renamed channels show your name. If a
+  playlist genuinely uses one number for several visible channels, the one from the list you opened wins;
+  if that's still not decisive you get **"Multiple channels"** rather than a guess.
+- **CH+/− keeps working right after a numeric jump**, even when you land far outside the list you opened.
+- Channel numbers are now shown wherever you'd look for one, so you can learn the ones you use: the
+  **Live TV channel list** and the **channel-list overlay** show the number in a fixed-width column ahead
+  of the name — so every name still lines up whether the number is 7 or 101, and channels without a
+  number keep their place in the column — the **full-screen top bar** shows it before the channel name,
+  and the player's channel card shows **#number** under the name.
+- Numeric tuning is only active on a live channel in full screen — during **catch-up or timeshift** the
+  number keys are left alone.
+- All of it is governed by one setting, **"Channel numbers"** (on by default) — in **Settings → Video
+  Player → Live TV**, as a **quick-toggle chip** at the top of Settings, and in settings search. Off hides
+  every number and ignores the number keys during playback; your playlist's numbers are untouched, so
+  turning it back on restores them immediately.
+
+### 📶 Prefer HLS for Live TV — per source, with format auto-detection (community PR #97 by @codeVerine)
+
+- **Xtream sources have a new "Prefer HLS for Live TV" option.** Xtream panels can serve a live channel
+  two ways: as a raw MPEG-TS stream, or as an HLS playlist. OwnTV asked for MPEG-TS; some panels are
+  markedly more stable over HLS, and on those the choice is now yours.
+- The option is on the **Add source** screen and in **Edit source**, so you can flip it on an existing
+  playlist without re-adding it, and it is stored **per source** — a setup with two providers can prefer
+  HLS on the one that needs it and leave the other alone.
+- **Nothing changes unless you turn it on.** MPEG-TS stays the default, which is what the great majority
+  of panels serve best.
+- **The ⓘ stream info overlay now shows a `Format` row** — *HLS* or *MPEG-TS* — so you can confirm what
+  you're actually receiving rather than guessing from behaviour.
+- **Catch-up and timeshift follow the source's setting** too, rather than being pinned to one format.
+- The setting is part of the source record, so it survives backup and restore and is applied in remote
+  mode as well.
+
+### 💾 A proper backup file — `.own`, with your wallpaper inside and real encryption
+
+- Backups are now written as **`owntv-backup.own`** instead of a plain `owntv-backup.json`. It is one
+  container holding the backup itself plus any files that belong with it.
+- **Your background image travels with the backup.** The Liquid Glass wallpaper lives in OwnTV's own
+  storage, and a backup only ever carried its file *path* — which means nothing on another TV, so the
+  background silently came back blank after a restore. The picture's actual data now rides inside the
+  `.own` file and is put back in place on restore. It's included whenever the **App settings** section
+  is ticked.
+- **A backup password now encrypts the whole file, not just the passwords in it.** Before, only the
+  saved secrets (source & proxy passwords, TMDB key, OpenSubtitles login) were encrypted — your
+  playlist URLs, usernames, profile names and watch history sat next to them in readable text that
+  anyone opening the file could see. With a password, nothing in the file is readable without it, not
+  even the list of what's inside.
+  - Keep that password safe: **a `.own` backup encrypted with a password you've lost cannot be opened
+    at all.** Without a password the file isn't encrypted and saved secrets are left out, exactly as
+    before.
+  - Because a protected backup can't be read until it's unlocked, restoring one asks for the password
+    **first** and then shows what it contains. There is no "Skip" for these — there is nothing to
+    restore without the password. Older encrypted `.json` backups are unchanged: sections first,
+    password after, and Skip still restores everything except the saved passwords.
+- **Old backups still restore, and always will.** Restore accepts both `.own` and any `owntv-backup.json`
+  from an earlier version. The file is identified by its contents rather than its name, so a renamed
+  file works too. Restoring an old `.json` no longer leaves a dead background-image path behind.
+- Sending a backup between TVs over Wi‑Fi works exactly as before and transfers `.own` files, in both
+  directions.
+- Note for anyone downgrading: an older OwnTV build cannot read a `.own` file. Keep a `.json` backup if
+  you plan to go back to an older version.
+
+### 🗂️ Browsing & lists — decide what Live TV, Movies and Series come back to
+
+- A new **Settings → Browsing & lists** popup with **six toggles**, two for each of Live TV, Movies and
+  Series:
+  - **Remember last category** *(on)* — reopening the section lands on the category you left instead of
+    jumping back to *All*. Live TV has always worked this way; **Movies and Series now do too**.
+  - **Remember last item** *(off)* — each category keeps **its own** scroll position instead of starting
+    at the top. The Live TV toggle also restores the last focused channel when you re-enter Live TV.
+- **Fixed: switching category kept the previous category's scroll position.** Picking a new category in
+  Live TV, Movies or Series left the list wherever the last one had been scrolled to, so a fresh
+  category could open halfway down. Every category now starts at the top by default, and only keeps its
+  place if you turn "Remember last item" on for that section.
+- The separate **App startup → Last channel** setting is untouched and independent of all six toggles.
+  All six are included in backups.
+
+### 🌍 Metadata language — descriptions and posters in your language
+
+- **Settings → Metadata (TMDB) → Language** picks the language TMDB descriptions, titles and artwork
+  come back in: **Default (English)**, **Device language**, or one of 40 languages (Greek, Arabic,
+  Spanish, French, German, Hindi, Portuguese (BR/PT), Spanish (MX), Turkish, Vietnamese and more). The
+  list is searchable.
+- Changing the language **clears the cached metadata** so existing movies and series are re-fetched in
+  the new language on next view. Title→TMDB matches are kept (they don't depend on language), so nothing
+  has to be re-matched.
+- Logo/artwork selection prefers your language, then English, then language-neutral art.
+- Default is unchanged (English), so upgrading changes nothing until you pick a language.
+
+### 🎞️ Auto frame rate — match the TV's refresh rate to the video
+
+- **Settings → Video player → Auto frame rate** *(on)*: in full screen, OwnTV now asks the TV to switch
+  to a refresh rate matching the video (24 / 25 / 30 / 50 / 60 fps) and hands the display back when you
+  exit — so 24fps films and 25/50fps broadcasts stop juddering on a fixed 60Hz panel.
+- **Fixed: auto frame rate did nothing on Android 10 and older devices** — including Fire TV Stick 4K /
+  4K Max on Fire OS 7. OwnTV only used `Surface.setFrameRate()`, which doesn't exist before Android 11,
+  so on those boxes there was no frame-rate matching at all, in **Live TV or VOD**. It now also requests
+  the display mode at the window level, which works from Android 6 up.
+- Applies to **both playback engines** (ExoPlayer and mpv) and to Live TV as well as movies and series.
+  Only the full-screen player switches the display — the mini-player and the Live preview pane never do.
+- Resolution is never changed: only the refresh rate varies, so a 4K output stays 4K. If the TV has no
+  matching mode, or ignores the request, playback is unaffected.
+- Turn it off if your TV or AV receiver re-handshakes HDMI noisily on every channel change.
+
+### 🖼️ Guide channel logos — take logos from your XMLTV feed
+
+- **Settings → EPG Sources → Add / Edit an EPG source → "Use this guide's channel logos"** *(off)*: that
+  feed's own `<icon>` logos replace the ones your playlist supplies, in Live TV, the channel lists, the
+  Guide, Search, Home and the player.
+- It is set **per EPG source**, not app-wide, so one feed can supply logos while another only supplies
+  programmes.
+- Channels the feed has no logo for keep their playlist logo, so a partial guide never leaves blank tiles.
+- Your provider's logos are never overwritten in the database — this is a display override. Turn it off
+  and the playlist logos come straight back, and a catalog re-sync can't undo your choice.
+- Logos are stored when the feed is parsed, so **re-sync the EPG source once** after switching it on.
+- The setting is included in backups, alongside that source's Auto refresh choice.
+
+### ↕️ Span move — reorder a whole block of categories at once
+
+- **Settings → Customize Categories & Items** already let you long-press **Hide** to select a *span* of
+  categories and hide them all together. The same span selection now works on the four **move** buttons
+  (**⤒ ↑ ↓ ⤓**), so a block of categories can be reordered in one go instead of one row at a time.
+- **How it works**: long-press any arrow on the first category to anchor the span, then press an arrow on
+  the last category — every category in between moves as one block, keeping its internal order: **↑ / ↓**
+  step it one place, **⤒ / ⤓** send it straight to the top or bottom of the list.
+- The block **stays selected after the move**, so the arrows can be pressed repeatedly to walk it further
+  up or down. **Back**, the banner's **Cancel**, or switching section clears the selection.
+- Every category in the selected block is **tinted**, not just the anchor, so the span is visible at a
+  glance; the banner shows how many categories are selected and what the arrows will do.
+- A move that would run off either end is ignored, and while a *move* span is active the **Hide** button
+  goes back to a plain single toggle — the two span modes never fight over the same press.
+- Single-row **⤒ ↑ ↓ ⤓** behaviour is unchanged; internally a single move is now just a block of one.
+
+### 📺 Live TV full screen — redesigned top bar, and a History channel list
+
+- **The top bar is now one strip**: back · channel logo · quality/audio chips · channel name ·
+  **Now / Next guide**. The floating channel card that repeated the channel name and the tall guide
+  card pinned to the right edge are both gone, so the picture is far less covered.
+- The **Now** line shows a thin accent progress bar and how many minutes are left, and refreshes on its
+  own while you watch; **Next** sits beside it, dimmed.
+- **Fixed: the ◀ channel list showed the wrong channels.** Pressing Left in full screen listed whatever
+  rail you happened to launch from (History, or *All channels*), not the channel's own category. It now
+  always lists the playing channel's category — with its name as the heading — no matter how you got
+  there. Uncategorised channels fall back to *All Channels*.
+- **New: press ▶ in full screen for a History channel list** — the last 30 channels you watched, with
+  what's on now, so you can hop back to a recent channel without leaving full screen. Press ▶ again, or
+  Back, to close it. Both lists respect hidden channels, hidden categories, renames and manual order.
+- **Player controls tidied**: the redundant *exit full screen* button is gone (Back already does it),
+  **stream info** moved to the far right with a clearer ⓘ icon, and the speed button shows just `1.0x`
+  without the extra `»` glyph.
+- The top and bottom control bars now sit on a **soft dark gradient**, so white icons and text stay
+  readable over a bright scene.
+- **Favorites now use a heart everywhere** — Live TV, Movies, Series, Search, posters and the player —
+  instead of a star, which on a poster reads as a rating. The star is still used for ratings and for
+  selection ticks.
+
+### 🗂️ Category browser in the player — switch Live TV category without leaving full screen
+
+- **Press ◀ a second time** inside the full-screen channel list and a **category browser** slides in over
+  the picture, listing every Live TV category. Pick one with **OK** and the channel list reloads with that
+  category's channels — the stream you're watching keeps playing throughout.
+- The category you're currently in is **highlighted and focused first**, so a second Left followed by OK
+  puts you back where you were. **Back** or **◀** returns to the channel list without changing anything.
+- The list respects your customizations: **hidden categories are left out, renames are shown, and your
+  manual order is kept** — the same categories you see in the Live TV rail.
+- After you switch, **CH+/− follows the new category**, so channel surfing continues in whatever you just
+  browsed to.
+- Community contribution — PR #95 by @cotol1985.
+
+### 📼 Catch-up from Live TV, and catch-up in the player of your choice
+
+- **The Live TV catch-up picker now opens the same programme popup the Guide does.** Long-pressing a
+  catch-up channel and picking a past programme used to start it immediately. It now opens the
+  programme details — description, times, and the choice of **Watch from start**, **Watch channel**,
+  favourite the channel, or close — exactly as the Guide has always done. The popup is drawn compact
+  here, since it sits on top of the channel picker.
+- **New: play a catch-up recording in an external player.** Archive recordings are the hardest streams
+  for any in-app engine (providers serve them mid-GOP), so VLC or MX Player is now an option for them.
+- **Settings → Playback → Catch-up** (renamed from *Catch-up time*) gained **Play catch-up in**:
+  - **OwnTV player** *(default — unchanged behaviour)*
+  - **External player** — every recording goes straight to VLC/MX Player
+  - **Always ask** — pressing *Watch from start* asks which player to use, each time
+- Sent to an external player, a recording loses the OwnTV HUD, resume position and the engine toggle.
+- The timezone/offset controls are unchanged and still live in the same popup. The new setting is
+  included in backups.
+
+### ▶️ External player — Live TV support, and a default per section
+
+- **Live TV can now be played in an external player.** Long-press any channel → **Play in external
+  player**. It is always offered, whatever your default is, as the escape hatch for a channel neither
+  in-app engine can open.
+- **The single external-player switch is now three.** *Settings → Video Player Settings → External
+  player* opens a popup with an independent **On/Off for Live TV, Movies and Series**, so you can send
+  live channels to VLC while keeping movies in OwnTV (or the other way around). Downloads follow the
+  Movies or Series setting depending on what was downloaded.
+- Your existing setting is carried over to **Movies and Series**; **Live TV starts off**, so upgrading
+  never silently starts throwing channels at another app. All three are included in backups.
+- **Fixed: "no external player found" for live channels.** Live streams ending in `.ts` or `.m3u8` were
+  offered to other apps under a MIME type VLC and MX Player don't advertise, so nothing matched even
+  with both installed. OwnTV now widens the type until a player accepts it.
+
+### 🛡️ Your library can no longer be wiped by a database problem
+
+- **A schema problem no longer deletes everything.** OwnTV used to be built to drop every table and
+  start empty if the database didn't look the way it expected — the failure mode behind the 4.1.0
+  upgrade reports. That is gone. The database is now opened on a background thread before the UI, and
+  if it can't be opened you get a **recovery screen** with **Try again** and a **Reset app data**
+  button behind a second confirmation. Nothing is erased unless you ask for it.
+- **A half-finished sync can no longer delete your catalog.** If a provider returns a short or broken
+  response, OwnTV now refuses to remove titles when that would delete more than half of a source, and
+  Stalker cross-checks the channel dump against the portal's own item count before removing anything.
+- **Xtream panels that are too big to answer in one request** ("response too large") fall back to
+  per-category loading, and now clean up correctly — only inside the categories that actually
+  answered, so uncategorised titles are never dropped.
+- **Provider reorders no longer rewrite your whole catalog.** A changed sort order is now detected on
+  its own, so a 170,000-item library updates the rows that moved instead of all of them.
+- **Backups are written safely.** A backup is written to a temporary file, flushed, and only then
+  swapped in — with the previous copy kept as a fallback that is used automatically if the newest file
+  is unreadable. An interrupted restore is no longer silent: OwnTV notices on the next start and tells
+  you.
+- **Manual ordering survives a re-sync.** Items you moved by hand in folders and Favorites are now
+  included in the pre-sync snapshot, like favorites, history and resume positions already were.
+- **A backup containing a source type this build doesn't know is skipped and reported**, instead of
+  being silently imported as an M3U playlist.
+
+### 📡 Live TV that recovers instead of giving up
+
+- **A single hiccup no longer kills a live channel.** The "stop immediately" shortcut meant for VOD was
+  firing on live streams too; live now goes through the full retry ladder.
+- **Reconnect keeps trying.** The retry ladder is 1.5 / 3 / 6 / 10 / 15 s and then holds at 15 s
+  instead of giving up after roughly half a minute, and it only resets once playback has actually held
+  for a minute.
+- **Outages recover by themselves.** If the network drops long enough for the channel to stop, OwnTV
+  now resumes it as soon as the connection is back — no matter how long it was gone.
+- **The error log stopped clearing itself** after an internal player reset, so playback problems can
+  actually be diagnosed.
+- **Raw MPEG-TS channels no longer drop the connection every 10–15 seconds.** A live MPEG-TS channel is
+  one long-lived HTTP response, so it is the *gap* between reads that matters, not how much video is
+  buffered — and OwnTV's buffer settings left that socket idle long enough for providers and middleboxes
+  to cut it, producing a glitch every few seconds on channels that stream fine elsewhere. The live buffer
+  now keeps the connection being read often enough to stay open, without holding more memory. HLS
+  channels were never affected, because each segment is its own request.
+
+### 🎬 Playback fixes
+
+- **Audio-only content no longer shows a playback error.** Radio stations filed under Movies, music
+  videos and audio-only catch-up used to fail after 8 seconds with a "video could not be rendered"
+  message. Content that really does declare video and fails to show it still reports the error.
+- **"Compatibility mode" and the player-engine choice now stick on Stalker portals.** Those pins were
+  stored against the stream link, and Stalker issues a brand-new link every time you press play, so
+  the pin never matched again. They are now stored against the item itself. Existing pins on
+  Xtream/M3U are carried over automatically.
+- **Short clips no longer count as "watched" at position 0**, and content with an unknown length is
+  never marked finished.
+- **4K playback surface handling** and the mpv→ExoPlayer handoff now follow the same timing rules as
+  every other engine switch, which removes a class of black-screen-after-switch cases on Realtek boxes.
+- **4K channels no longer fall back to "compatibility mode" when you tune from one to the next.** Moving
+  between 4K live channels dropped the second one to mpv with a decoder error, even though the very same
+  channel played perfectly on ExoPlayer if you pressed the engine toggle. Some TV chipsets — Realtek
+  boxes in particular — accept only **one** 4K decoder per video surface: releasing the first channel's
+  decoder leaves the surface unusable, so the next channel's decoder starts and then dies about a second
+  later. Toggling to mpv and back happened to rebuild the surface, which is why that always "fixed" it.
+  Leaving a 4K channel now rebuilds the surface along with the decoder, so the next 4K channel gets a
+  clean one and plays on ExoPlayer directly. Waiting longer between channels never helped and this is not
+  a delay — a failing tune and a working one were within 30 ms of each other. Channels below 4K are
+  untouched and zap exactly as before.
+- **Subtitle timing offset no longer freezes the UI** — the shifted subtitle file is generated in the
+  background and cached.
+- **Switching engine during a catch-up recording no longer jumps to the live programme.** The player
+  now knows an archive recording is playing and reloads the same recording at the same position,
+  instead of re-tuning the channel and dropping you onto whatever is on air now.
+- **Fewer "failed on both engines" errors.** When mpv had to be torn down and playback handed to
+  ExoPlayer, the handoff could grab a video surface that was already being replaced and die instantly
+  on an item that played fine on the next try. The handoff now waits for the new surface.
+- **The resolution badge no longer under-reports wide-format streams.** The stream-info overlay worked out
+  the quality label from the picture **height** alone, so a channel broadcasting a wide 1920×800 picture was
+  labelled from its short edge and read **720p** even though it's a 1080p-class stream. A cinema-format
+  picture is only cropped top and bottom, so the **width** survives it: the label is now taken from whichever
+  of the width and the height implies the higher class, and cinema-format and letterboxed channels report the
+  quality they actually deliver. Both playback engines use the same rule, so a channel can no longer show one
+  quality full screen and another in the preview pane, and anything below 480p still reports its **true**
+  height rather than being rounded up.
+
+### 📺 Live TV
+
+- **Choosing ExoPlayer for a channel that had fallen back to mpv now sticks.** When a channel dropped to
+  mpv automatically, pressing the player's engine toggle to go back to ExoPlayer re-started it on
+  ExoPlayer — and the fallback watchdog, armed again by that restart, immediately sent it back to mpv, so
+  the button looked like it did nothing. Picking ExoPlayer is now treated as a deliberate override: the
+  automatic fallback stays out of the way for that channel until you tune elsewhere. If ExoPlayer really
+  can't play it you stay there and can press the toggle again for mpv. Automatic tunes are unchanged —
+  ExoPlayer first, mpv if it fails.
+- **Live preview no longer plays sound on surround channels when preview audio is off.** Channels with
+  5.1 audio (Dolby Digital / DTS) kept playing sound while browsing even with **Settings → Live TV →
+  Preview audio** turned off. The preview was muted by volume alone, which has no effect on a surround
+  bitstream passed straight through to the TV over HDMI — the TV received it at full level. The preview
+  now switches the audio track off entirely while muted, so every channel stays quiet. Radio and other
+  audio-only channels are unaffected and still play.
+- **The Preview audio setting now applies to a preview that's already playing.** Turning it on or off
+  took effect only on the next channel; it now changes the current preview immediately.
+- **A live channel opened from the Guide now appears in History.** Tuning a channel from the guide grid
+  (or *Watch channel* in a programme popup) is recorded straight away, rather than going through the
+  delay that exists to keep rapid channel-surfing out of your history.
+- **CH+ and D-pad Up now go to the next channel in full screen, not the previous one (#84).** Channel
+  surfing ran backwards: CH+ moved *down* the list and CH− moved up, so on the first channel CH+ jumped
+  to the very last one instead of to channel 2. Every surfing key now points the same way — **CH+,
+  D-pad Up and Next all go to the next channel; CH−, D-pad Down and Previous go to the previous one** —
+  matching how a set-top box and every other TV app behave. Wrapping around is unchanged and still
+  intended: going down from the first channel lands on the last, and up from the last returns to the
+  first.
+
+### 📅 Guide & series
+
+- **New episodes now appear in a series you already opened.** Episodes were cached once and never
+  refreshed, so a show you had opened before would never gain a new episode. They now refresh every
+  6 hours and after a sync — and merging keeps your watch progress and resume positions on the right
+  episodes. A failed or empty fetch never empties a show that already has episodes.
+- **A truncated guide download is no longer trusted for 24 hours.** The downloaded guide is only
+  promoted to the cache once it has been fully parsed.
+- **Channels added while a guide sync was running now get their programmes**, instead of staying empty
+  until the next full guide download.
+- **Guides emptied by the 4.1.x upgrade refill themselves** once, automatically, on the next start.
+- **"Resync now" vs "Resync and remove missing titles"** — refreshing a source now asks which you want,
+  so removing titles a provider has dropped is a deliberate choice. Neither option deletes your data.
+- **The sync status pill** shows one line per running sync with real per-type counts, instead of
+  collapsing everything into a single line.
+
+### ⬇️ Downloads that survive the background
+
+- **Downloads keep running when you leave the app.** Transfers moved to a proper foreground background
+  worker with a notification, so Android no longer kills them the moment OwnTV goes to the background.
+- **Pause and resume no longer re-download what you already had** — the real file length is saved when
+  you pause, and a download interrupted by the app being killed resumes rather than restarting.
+- **Pulling out the USB/SD card mid-download fails the download** instead of quietly continuing into
+  internal storage.
+
+### 🚀 Startup & speed
+
+- **A branded splash instead of a blank window** on cold start, held until OwnTV actually knows which
+  screen to show (with a 4 s safety limit).
+- **Roughly 3× faster to a usable screen** on the developer's TV with a full catalog: shell 1879 →
+  557 ms, Home data 3171 → 1096 ms, guide preload 3072 → 1782 ms.
+- **A fresh install is no longer slow for the first few days.** Android normally leaves most of an
+  app's code in a slow form and only speeds it up gradually as it learns what you use — which hits
+  sideloaded apps like OwnTV hardest, since every new release starts that over. The APK now ships a
+  recorded startup profile so the code that runs at launch is compiled ahead of time, from the very
+  first launch after installing.
+- **The database is no longer repaired on every single open** — it is checked first and only repaired
+  when something is actually missing.
+- **Settings reads no longer wake every screen** on each preference write, and around 95 background
+  data streams now stop when nothing is watching them.
+- **The image cache is sized to the free space available** (up to 250 MB, 5% of free space, never below
+  32 MB) instead of a fixed guess.
+- **Browsing storage folders and importing a background image no longer block the UI.**
+
+### 🛠️ Setup & appearance
+
+- **Fixed: Stalker portals with a "virtual" MAC were rejected at setup.** Some panels hand out MACs
+  containing letters past F (for example `…:PQ`), which the app refused with *"Enter 12 hex digits"* —
+  locking those users out entirely. The portal only ever echoes the MAC back to itself, so there was no
+  protocol reason to insist on hexadecimal. Any 12 letters/digits are now accepted, in any of the usual
+  separator styles, which still catches typos and truncated pastes.
+- **Fixed: picking a new background image did nothing until the app was restarted.** In Liquid Glass
+  mode, choosing a second image of the same file type reused the same filename, so nothing detected a
+  change and the previous picture stayed on screen. Each pick now lands under its own name and appears
+  immediately; the old file is still cleaned up, so only one background is ever kept.
+- **Fixed: the + / − buttons became unreachable once a setting hit its maximum (#88).** In **Mini-player →
+  Size**, setting the size to its 50% maximum left the picker with nothing selectable on the next visit —
+  the D-pad did nothing and only Back got you out, so the size could never be turned back down with the
+  remote. The dialog always tried to select the **+** button, which is disabled at the top of the range
+  and so cannot be selected, and focus is deliberately kept inside the dialog. It now selects whichever
+  button is usable, and hands over to the other one if the one you are on runs out of range mid-adjust.
+  The same dialog is used by **A/V sync** and the **custom live buffer**, which were stuck the same way at
+  their maximums.
+
+### Internal
+
+- **The bundled baseline profile was rebuilt from obfuscated names and did nothing.** Every release
+  build reshuffles those names, so ~98% of the 7,238 recorded entries matched nothing in the shipped
+  app — and `assembleStandardRelease` printed ~7,100 *"Startup class not found"* warnings because of it.
+  The dead recording is removed. The baseline profiles that come from Compose, coroutines, lifecycle and
+  Room are unaffected and still ship, so startup speed is unchanged. Recording our own again is blocked
+  on an upstream fix; see `future-plan/baseline-profile-agp9-plan.md`.
+- **Tests and lint now gate CI.** Pull requests run unit tests and Android Lint before anything is
+  built, lint fails the build on an error (0 errors, from 122), and reports are uploaded on failure.
+  APKs are still only built for `main` and tags.
+- **New tests** for the database migration chain (every exported schema version migrates to the current
+  one; the repair path restores every guaranteed index and search table), for backup merge/restore id
+  remapping, and for the re-linking that keeps favorites, history and resume positions attached across
+  a sync.
+- **Release notes now come from `CHANGELOG_APP.md`, not `CHANGELOG.md`.** The tag build in
+  `android.yml` was publishing the newest **full** `CHANGELOG.md` section as the GitHub release body —
+  and GitHub's auto-generated commit list on top of it — which is what the in-app update dialog shows.
+  It now extracts that tag's short, bullet-only section from `CHANGELOG_APP.md` and no longer appends
+  the generated notes. `CHANGELOG.md` stays what it was meant to be: the detailed changelog developers
+  and contributors read on GitHub by hand.
+- `release-notes.yml` did already do this, but never ran for tag builds: a release published with
+  `GITHUB_TOKEN` doesn't trigger other workflows. It remains as the fallback for releases published by
+  hand from the GitHub UI. Both jobs now match the version header as a whole word, so a header without
+  a trailing date (`## v4.1.5`) is found too.
+
+## v4.1.4 — 2026-07-24
+
+### 🧊 Liquid Glass — frosted translucent interface over your own background photo
+
+- An opt-in **glass look**: content panels, sidebar, preview panes, dialogs, top bar, cards and the
+  mini-player turn **translucent with a real frosted-blur backdrop** over an optional **background
+  photo** — glassmorphism on TV. Everything lives in one **Settings → Glass Effect**
+  dialog: Liquid glass On/Off, the background image, a **Transparency** stepper (20–95%), a
+  **Blur / Frost** stepper (0–100%), a **Surfaces** sub-menu, and **Reset**.
+- **Background image — Local or Remote.** **Local** picks a photo from USB/device storage (copied into
+  app-private storage so unplugging the stick can't blank it). **Remote** sends one from your phone:
+  the TV shows a **PIN + QR** (the same companion pairing as Remote Backup & Restore), the phone opens
+  the page on the same Wi-Fi and uploads a JPG/PNG/WebP/BMP, and it applies instantly.
+- **Per-surface control.** The **Surfaces** menu toggles glass individually for content panels,
+  sidebar, preview panes, dialogs & popups, top bar, cards and the mini-player — or all at once with
+  one master row. Turning every surface off turns glass off.
+- The frost is a real blurred slice of the photo aligned behind each panel, pre-processed with a
+  matching brightness scrim and a slight saturation lift so the glass blends with the scene instead of
+  reading backlit. It is computed once per image at a downscaled size, so it stays cheap on low-end
+  boxes. Backdrop blur needs Android 12+; older devices fall back to translucency without frost.
+  All glass settings persist per install and are included in backups.
+- **Every focused/selected control now frosts, not just the big panels.** The glass highlight was
+  extended to the focus rim itself: cards, list rows and chips on every content screen, every row and
+  list item inside popups/dialogs (pickers, storage browser, avatar/subtitle/backup/profile lists,
+  EPG match review), the sidebar's profile/avatar buttons, the action pill buttons (Save / Cancel /
+  Add / Edit / Delete / Done), and every search bar (category rail, Live/Movies/Series/Search/EPG
+  panels, and the in‑popup search fields) — so a pill or search field inside a dialog frosts with the
+  dialog and one on a panel frosts with the panel. The fullscreen player stays solid by design. Four
+  dialogs that previously kept a flat fill (Video Player pickers, EPG "Fill from playlist", Live
+  catch‑up, the Guide programme popup) now frost with the rest.
+- **The player's Subtitles & Audio pickers are now glass too.** Their track rows and the A/V-sync
+  buttons frost like the rest of the interface (they previously stayed flat inside the glass panel),
+  and the popups were tightened to the compact style used by the storage picker — a narrower box with
+  a smaller font.
+
+### ⭐ Favorite from the player — add to Favorites without leaving the stream
+
+- A **star button** in the fullscreen player's control bar favorites (or un-favorites) what you're
+  watching **without backing out** to the list — a live channel, a movie, or a series (an episode
+  favorites its parent show). The star fills when the item is already a favorite and updates
+  instantly, and it survives channel zapping. (community suggestion)
+
+### 🗂️ Per-section sync scope — choose Now / Later / Off for each section (#74)
+
+- Every source now controls **Live**, **Movies** and **Series** independently with a **Now / Later /
+  Off** scope instead of the old on/off sync toggles. Set a section to **Off** and it is never
+  synced or shown (the long-requested "don't load VOD" — turn Movies off and the huge movie catalog
+  is skipped entirely), **Later** keeps it available to sync on demand without running now, and
+  **Now** syncs it with the rest. Editable per source in **Setup** and **Settings → Manage sources**,
+  and from the LAN **companion** page (Now/Later/Off dropdowns replace the old checkboxes).
+- A source with **every** section Off does no sync work at all. Changing a section's scope resyncs
+  just that source. Backups carry the per-section scope forward, and upgrading preserves your existing
+  behaviour (all sections default to **Now**). (community PR #78)
+
+### 🎨 Accent color — full HSV picker with a live preview
+
+- The accent dialog is rebuilt around a proper **color picker**: a **hue bar** and a large
+  **saturation / brightness square**, each a D-pad "enter-to-edit" control — focus it, press **OK** to
+  step inside (it glows amber), move with the D-pad, **OK/Back** to step out — plus a **live preview**
+  circle and a trimmed set of **6 quick presets**. Type an exact **hex code** at the top and **Apply**,
+  or dial one in and **Use this color**.
+- **Custom hex accents now render exactly.** Entering a hex code used to pin its lightness and show a
+  nearby shade; the seed color is now used verbatim as the accent (only the contrast roles are
+  derived). The dialog uses the shared Lora popup styling.
+
+### 🎧 Audio Mode — listen with the screen free
+
+- A new third player mode, alongside fullscreen and the docked mini-player: **switch the current
+  stream to audio-only** and keep browsing. Video decoding is stopped entirely (true audio-only, not a
+  hidden video), and a compact **now-playing bar** appears in the top bar — an animated equaliser,
+  the title, and transport controls (play/pause, previous, next, volume, fullscreen, close). The
+  equaliser dances while sound plays and freezes flat when paused. Live shows a pulsing **LIVE**
+  badge; movies/episodes show a slim progress line with remaining time.
+- **Enter it** from the **headphones button** on the fullscreen player controls or on the docked
+  mini-player. **Two-stage D-pad focus:** move onto the bar and it highlights as one target; press
+  **OK** to step inside, where Left/Right move between the buttons and OK runs the focused one; focus
+  stays locked in the bar and **Back** is the way out. **Fullscreen** returns to full video, **close**
+  stops playback. Works for Live TV (both engines), movies and series.
+
+### 📤 Remote Backup & Restore — move a backup between TVs over Wi-Fi
+
+- **Remote restore.** **Settings → Backup & Restore → Restore from another device**, and the same
+  option in the first-run / add-profile **setup wizard**, open the LAN companion server in
+  backup-upload mode and show a **PIN, a QR code, and the URL**. A phone or laptop on the same Wi-Fi
+  opens the page and uploads an OwnTV backup JSON straight to the TV; when it arrives it flows into
+  the normal restore path (section picker, backup-password prompt). No cloud, no USB stick, no file
+  browser on the TV.
+- **Remote export.** **Settings → Backup & Restore → Send to another device** serves the exported
+  backup from the TV so a remote device on the same Wi-Fi can **download** it — the mirror of remote
+  restore for getting a backup *off* the TV.
+- Both reuse the existing companion **PIN + QR pairing**, the profile / section pickers and the same
+  encryption as local backups; the listener stops automatically when you leave the screen. Local
+  backup/restore (USB, on-device file) is unchanged.
+
+### 📡 Live TV latency control (#72)
+
+- **Settings → Video Player → Live latency** trades how close to the live edge you play against
+  stability: **Low latency**, **Balanced** (default), **Stable**, or a **Custom** buffer in seconds.
+  It applies on the next channel open, to live streams only (VOD is never affected).
+- Works on **both engines** — ExoPlayer live uses it as the HLS live-edge target offset, mpv live as
+  the demuxer read-ahead. **Balanced applies no override at all**, so it can never regress a stream
+  that already plays well. Picking **Low latency** (or a below-Balanced custom value) shows a quick
+  heads-up that a smaller buffer can stutter on weaker connections.
+
+### 🪟 Configurable mini-player
+
+- The docked mini-player (live PiP) now has an adjustable **size** (percentage of screen width) and
+  **screen position** (six docking spots — the four corners plus top/bottom centre), set in
+  **Settings → Playback → Mini-player** and also changeable **on the fly** from the mini-player's own
+  resize / move controls. The window is laid out proportionally (`fillMaxWidth% × 16:9`), so it scales
+  consistently across TV sizes and the UI zoom instead of the old fixed box.
+
+### 🖼️ Live TV preview pane — info-only, genre dots, EPG coverage
+
+- **The preview pane is now informational only — the action buttons are gone.** Favorite / Rename /
+  Hide / Match EPG / Catch-up all moved to the long-press channel menu (where Move and Remove-from-History
+  already lived), so nothing in the pane is selectable or focusable any more. **Right-arrow no longer
+  enters the pane** — D-pad focus stays in the channel list — which fixes the common complaint that a
+  stray right press dropped you onto the buttons by accident. The pane instead shows a short note
+  ("Press OK to watch fullscreen · Long-press for options").
+- **Channel metadata row.** Under the channel name, a compact row of chips shows the channel's **real
+  category** (resolved from its `categoryId`, so it's correct even when you're browsing via Favorites /
+  History / All — never the browse context), its inferred **genre** with a colour dot, **catch-up**
+  availability (with days, e.g. "Catch-up · 7d"), and **EPG coverage** ("EPG · Nd" from the stored guide
+  span, or plain "EPG" / "No EPG"). Every channel gets a genre marker — unmatched categories fall back to
+  a neutral grey **Other** dot rather than none.
+- **Shared genre colour system.** The Guide's category→colour inference and the preview's genre dot now
+  use one shared `ChannelGenre` helper (sport→green, news→red, movies→violet, kids→amber, music→blue,
+  documentary→teal, other→grey), so the two surfaces agree. The chips use the Lora serif font and a
+  uniform fixed height so long category names never make one chip taller than the others.
+
+### 🔄 Sync reliability — completion notices, restore visibility, concurrent sync
+
+- **Sync completion pill.** When a catalog sync finishes — success, failure, or cancel — the global
+  status pill now shows the result for a few seconds ("Sync complete · Playlist · 3 categories added")
+  instead of silently disappearing. Multiple back-to-back completions queue and display one after
+  another. (community PR #73 by @pt5pnzghm6-sys)
+- **Restoring a backup no longer hides all your channels.** A restored source starts with empty
+  catalog tables, but its saved `lastSyncAt` timestamp made the first post-restore sync behave like a
+  *re-sync* — and with "hide new categories on resync" on, every category looked "new" and got hidden,
+  leaving the screen empty. Restored sources now take the fresh-install sync path, so your restored
+  show/hide preferences are honored exactly as they were. (community PR #73)
+- **Concurrent playlist syncs no longer corrupt each other — and still run in parallel.** Syncing
+  two or more playlists at once (manual resync, startup auto-refresh) used to race on the shared
+  SQLite tables: one source's index/FTS-trigger drop-and-restore cycled against another's concurrent
+  writes, throwing `SQLiteDatabaseLockedException`s that truncated the second source's movies and
+  skipped its series entirely — silently reported as success. PR #73 added a per-table index lock
+  that fixed the "trigger already exists" crash; this release closes the remaining race at its
+  source: a second sync arriving on a table in bulk-insert mode now *joins* that mode (writer-counted)
+  instead of bypassing the lock, and the index restore waits for the last writer. Sources download,
+  parse and insert fully in parallel — no app-wide queueing — with every playlist syncing to
+  completion regardless of how many run at once. (community PR #73 by @pt5pnzghm6-sys)
+- **Incremental M3U resync — no more clear-and-reimport.** M3U playlists used to be wiped and fully
+  reinserted on every resync (playlists carry no provider item ids), which was slow on big playlists,
+  briefly emptied the grids mid-sync, and re-created every row so favorites/history/manual order
+  pointed at dead entries. Each M3U item now gets a stable synthesized key (name + group), and
+  resyncs run the same hash-diffed upsert as Xtream/Stalker: unchanged items are skipped, changed
+  items (including reordered playlists and series that gained/lost episodes) update in place keeping
+  their identity, and removed items are pruned. **Favorites, watch history, playback progress and
+  manual ordering on M3U content now survive resyncs.** The first resync after this update migrates
+  old rows to stable keys once (that one resync still relinks like before; per-item hide/rename
+  customizations on M3U sources reset once); every resync after that is incremental. A failed
+  download or a playlist missing a content type still never wipes existing rows.
+
+### 🐛 Fixes
+
+- **Settings → About shows the updated Telegram group QR code.**
+- **Editing a source no longer shows the other source types.** The Edit-source screen listed all the
+  type chips (Xtream / M3U / Stalker) even though the type can't change while editing. It now shows
+  only the chip matching the source you're editing.
+- **Accent hex code field is no longer hidden behind the keyboard.** The hex input sits above the
+  color picker so the on-screen keyboard can't cover it while you type a code.
+- **Latency warning popup: focus returns to the Live latency row.** After picking **Low latency** (or
+  a below-Balanced custom value) and dismissing the heads-up with "I understand", focus used to jump
+  to the first row of Video Player settings ("Hardware decoding") instead of the row you were on. The
+  picker→popup transition was clearing the pending return-focus target; it is now preserved through
+  the popup so focus lands back on the Live latency row.
+- **Live preview off: audio no longer keeps playing after you leave a channel.** With the in-pane
+  Live preview turned off in Settings, exiting a full-screen live channel left the ExoPlayer engine
+  decoding the stream's audio in the background (nothing re-took the engine to silence it, unlike when
+  preview is on). Leaving full-screen now stops that engine when the preview is disabled.
+- **4K live channels no longer lag/judder on mpv when a provider sends broken timestamps.** Some IPTV
+  4K feeds send non-increasing / duplicate presentation timestamps; mpv is strict about PTS and was
+  dropping nearly every frame (render output collapsing to ~8–12 of 30 fps) while decode itself was
+  fine — so the channel looked laggy on mpv even though ExoPlayer played it cleanly. Live playback on
+  mpv now derives timing from the container FPS (`correct-pts=no`), stops chasing the audio clock
+  (`video-sync=desync`), and no longer drops frames (`framedrop=no`) — all **live-only**, so VOD keeps
+  accurate PTS/seeking and normal frame-dropping. Confirmed on Realtek 4K hardware across 24/30/50/60 fps
+  channels with zero frame drops.
+- **Playlists & EPG Sources menus: focus now stays inside the list.** Entering either sub-menu used to
+  land focus on the "Add" button instead of the list; after editing, re-syncing, or deleting a source,
+  focus escaped the menu to the "Add" button. Both screens now track the row you acted on (per-row
+  `FocusRequester`) and restore focus to that same row on edit/re-sync, move it to the nearest surviving
+  neighbour on delete, and fall inside the list on entry.
+- **Settings dialogs no longer let D-pad escape behind the scrim.** Every scrim dialog in Settings
+  (Zoom, Accent, Theme, About, Playback error log, Clear history, Catch-up time, plus the Backup,
+  Video Player picker/stepper, Customize and shared Number/Picker dialogs) was missing the focus trap,
+  so a D-pad press toward the edge could land on the settings rows behind the dialog. All now use
+  `trapAllFocusExit` like the rest of the app.
+- **No more "scroll animates from the top" when closing a Settings / Video Player dialog.** Opening a
+  scrim dialog over a scrollable settings list reset the list's scroll to the top, so closing it made
+  the list visibly scroll back down to the row you came from. The scroll position is now snapshotted
+  when you tap a row and restored instantly on dialog close, so the list stays exactly where it was.
+- **Settings dialog-close focus return hardened.** The `dialogReturn` target (which row to refocus when
+  a dialog closes) was being cleared in the wrong place, so it leaked and could misroute the next
+  directional entry; it is now cleared in the restore effect itself. The entry fallback is also
+  search-aware (uses the always-bound search field while searching, instead of an unbound row).
+- **OpenSubtitles, Network & Metadata settings: focus no longer escapes on entry / state changes.**
+  These three screens had no focus-group safety net, so entry focus could fall to the sidebar. The
+  OpenSubtitles screen also stole focus back to the first row on every server state change (e.g. after
+  pressing Refresh) and never restored focus when returning from the Delete-subtitles screen with no
+  state change — all fixed.
+- **Profiles, Mini-player, Customize, CH+- paging, Weather: focus returns to the row that opened a
+  dialog.** Closing a dialog in these sub-menus used to send focus to the screen's first row. Each now
+  tracks its opener row and restores focus there; the CH+ / CH− skip rows also got their own
+  `FocusRequester`s (they had none).
+- **Long-press context menus in Movies / Series / Live / Guide no longer let D-pad escape behind them.**
+  The long-press menus used the OK-key guard but not the focus trap; D-pad could now escape behind the
+  scrim. All now trap focus inside.
+- **Downloads: focus moves to the next download when you delete one.** Deleting a download used to let
+  focus escape to the sidebar; it now moves to the nearest surviving download row (same slot, else the
+  last row).
+- **Home & Customize category lists trap vertical focus.** A held D-pad Up/Down that outran the lazy
+  composition could escape the list to the sidebar; both now use `trapVerticalFocusExit` like every
+  other browse list.
+- **Category rail: abbreviation badges removed.** Next to each category name the rail showed a short
+  2–3 letter code derived from the name (e.g. `UPR` beside "UK PRIME RAW") in a fixed-width column.
+  This was left over from the old compact-pill rail and read as clutter on what was otherwise a
+  full-label column. Category folders now show just the name; **Favorites** and **History** keep their
+  star / clock icons inline before the name. The content-pane subtitle also shows the full category
+  name instead of the abbreviation. (#75)
+- **Subtitle search overlay: sign-in moved to Settings only, local-file button removed.** Opening
+  **Search OpenSubtitles** while signed out (or after the session expired) used to offer three buttons
+  — add account / select local file / skip — plus an in-place username+password sign-in popup. Sign-in
+  now lives only in **Settings → Video Player → Subtitles → OpenSubtitles** (which already had it):
+  the signed-out overlay shows a clear note pointing there with just a **Close** button, and the
+  in-overlay sign-in and sign-in-failed dialogs are gone. The overlay's **Select local file** button
+  was removed too — the dedicated **Select local subtitle file** row in the Subtitles menu (right
+  below **Search OpenSubtitles**) already covers local subs.
+- **Catch-up dialog: D-pad focus no longer escapes the popup.** Opening the catch-up programme picker
+  (long-press a channel → Catch-up) left the dialog without a hard focus boundary, so a stray D-pad
+  press — or the Live screen's own focus restoration — could drop focus onto the channel grid behind
+  the scrim. The dialog now wraps in `Popup(focusable = true)` and traps focus exit, matching the other
+  scrim dialogs. It also picks up the standard popup-menu styling: the **Lora** serif font at 75% scale
+  and a denser box, so it reads like the EPG-match and other popups.
+- **Category rail highlight: sharper corners.** The focused / selected box on the category rail (used
+  by Live TV, Series and Movies — one shared component) had a soft `14dp` corner radius that read as
+  nearly pill-like; it's now `8dp`, crisper and closer to the channel-list item style next to it.
+
+## v4.1.3 — 2026-07-19
+
+### 💬 External subtitles — OpenSubtitles search & local subtitle files
+
+- **Search OpenSubtitles from the player.** For any movie or series episode, open **Subtitles →
+  ADD SUBTITLES → Search OpenSubtitles**. The search is pre-filled from the item's identity (TMDB id
+  when available, else title/year and season/episode), shows language, release name, Trusted/SDH/AI
+  tags and download counts, and supports **Edit search** and **All languages**. Picking a result
+  downloads the subtitle, attaches it live without interrupting playback, and remembers it for that
+  profile and title. Never automatic: OwnTV only searches or downloads when you ask.
+- **OpenSubtitles account, per profile.** Sign in from **Settings → Video Player → Subtitles →
+  OpenSubtitles** (free account at opensubtitles.com), with an optional **Stay signed in**.
+  Each OwnTV profile connects its own account; the allowance display shows the provider's own
+  remaining-downloads and reset values. Credentials sit in Android-Keystore-sealed storage, are wiped
+  on sign-out/profile deletion, and are never logged. They enter a backup only when you set a backup
+  password — encrypted per profile, and omitted entirely from a password-less backup. If you pick Search OpenSubtitles
+  while signed out, a friendly dialog lets you **add the account right there** (or jump to a local
+  file instead).
+- **Local subtitle files — no account, no internet.** **ADD SUBTITLES → Select local subtitle file**
+  opens OwnTV's TV-safe file browser for `.srt` / `.ass` / `.ssa` / `.vtt` / `.webvtt` files (USB or
+  internal storage). Non-UTF-8 files (Windows-1256 Arabic, Windows-1252, ISO-8859…) are detected and
+  converted automatically so they render correctly, and OwnTV keeps a managed copy so the subtitle
+  keeps working after the USB stick is gone.
+- **Subtitle timing.** **Subtitles → ADJUST → Subtitle timing** nudges the active subtitle in
+  ±0.1 s / ±0.5 s steps while the video keeps playing, with plain-language direction (earlier/later).
+  The offset is remembered per profile, per title, **per exact subtitle release** — a WEB-DL sub and
+  a Blu-ray sub keep separate offsets, and switching subs never inherits another's offset.
+- **Smart caching, quota-friendly.** Downloads are cached on the device and deduped: re-picking a
+  subtitle any profile already downloaded re-uses the file and **spends no download quota**. On
+  replay, a title's previously downloaded subtitles are re-listed in the Subtitles menu ready to pick.
+  Everything works across both playback engines, including the in-player MPV/EXO toggle, and for
+  **OwnTV Downloads** — offline, with the OpenSubtitles moviehash silently sharpening online matches
+  for downloaded files.
+- **Manage & delete.** **Settings → OpenSubtitles → Delete subtitles** lists every downloaded
+  subtitle by Movies/Series with per-item and bulk delete; long-press a movie or episode for
+  **Delete OpenSub subtitles**. Deletion is per profile — a subtitle another profile also downloaded
+  stays available for them.
+- *Privacy:* the OpenSubtitles API key lives only in an OwnTV-run Cloudflare Worker (like the TMDB
+  proxy) — never in the app; only subtitle-search data is ever sent (no stream URLs or IPTV
+  credentials). This product uses the OpenSubtitles API but is not endorsed or certified by
+  OpenSubtitles.
+
+### 👥 Profile-based backups (merge restore, PIN-protected)
+
+- **Backup export now starts with a profile picker.** Every backup is per-profile: choose which
+  profiles ride in the file (none pre-ticked — you decide), then pick the data sections as before
+  (the old "Profiles & sources" section is now just "Sources"). Only the selected profiles' data —
+  favorites, history, resume positions, customizations, startup modes, Customize PINs — and only the
+  sources they actually use are written.
+- **Locked profiles need their PIN.** Ticking a PIN-locked profile that isn't the one you're signed
+  into prompts for that profile's PIN; a wrong PIN shows "PIN incorrect" and the profile stays out of
+  the backup. Your current profile never re-asks (you already passed its gate). Profile PINs
+  themselves are stored in the file only as salted hashes, never as the actual PIN.
+- **Restore now MERGES — it never deletes existing profiles or sources.** Profiles are matched by
+  name: a profile already on the device is updated from the backup, and profiles only in the backup
+  are added — your other profiles are left completely untouched. Sources match by address, so a
+  shared playlist isn't duplicated. (Previously a restore replaced everything.)
+- **Profile names are now unique.** Creating or renaming a profile to a name that already exists is
+  blocked with "This name is already taken" — names are how restore recognises the same profile.
+- **OpenSubtitles logins now ride in encrypted backups.** With a backup password, each ticked
+  profile's OpenSubtitles sign-in (username + password/token) is included, sealed with your passphrase,
+  and restored to the matching profile on the target device. Without a backup password it's omitted,
+  exactly like source passwords, the Stalker MAC and the proxy/TMDB secrets.
+
+### 📱 Add a playlist from your phone (Remote setup)
+
+- **"Add source" now starts with a Remote / Manual choice.** Pick **Manual** to type Xtream / M3U /
+  Stalker details with the remote as before, or **Remote** to fill everything on your phone. Both the
+  first-run setup wizard and Settings → Manage sources offer the choice.
+- **Remote setup shows a QR code, a URL, and a one-time PIN.** Open the server on the TV, then on a
+  phone or laptop on the same Wi-Fi scan the QR (or type the URL). The page first asks for the 6-digit
+  PIN shown on the TV, then shows an **OwnTV-styled form** with Xtream / M3U / Stalker tabs. Fill it,
+  tap **Send to TV**, and the details appear in the Add Source screen on the TV — you press **Start
+  Import** with the remote (the phone never starts the import itself).
+- **Secure by design.** The QR carries only the URL, never the PIN; every submission must carry the
+  PIN or it's rejected (401). A fresh PIN is generated each time the server opens, passwords/MAC are
+  never logged, and the listener stops automatically when you leave the screen.
+- *Core idea from **@zarga03** (PR #66)* — reimplemented and hardened for OwnTV: added M3U support and
+  the phone-side type picker, the one-time PIN gate, the QR onboarding, an app-matching web form, and
+  "fill the form, you press Start Import" semantics.
+
+### ⏱️ EPG sync: Run in background (onboarding)
+
+- **The "Sync the TV guide now?" step during first-run setup can now Run in background.** Once the
+  guide starts downloading you no longer have to wait on the sync screen — press **Run in background**
+  to enter the app while the guide keeps downloading (matching the playlist import's own background
+  option).
+
+### 🗂️ Categories grouped by provider + new-category control
+
+- **Multi-provider category lists no longer interleave.** When you view **All playlists** (or a profile
+  with two or more linked sources), the category lists across Live/Movies/Series browse, Customize, EPG,
+  Search and Home now stay **grouped by provider** (in the order you added them) instead of mixing two
+  providers' categories together. A single selected playlist looks exactly as before.
+- **Provider name on Customize rows.** When more than one source is in scope, each Customize category row
+  shows which provider it belongs to, so bulk-hiding across providers is easier to follow.
+- **"New category behavior" (Show / Hide) — per profile.** A new setting at the top of **Settings →
+  Customize** decides what happens to a category the provider adds on a later re-sync: **Show** (default,
+  the old behavior) or **Hide** it automatically. Useful if you keep only a few categories visible and
+  don't want new ones appearing. It rides in the Customize backup/restore like other per-profile settings.
+- **Re-sync tells you the category churn.** The sync-complete message now shows "N categories added,
+  M removed" when a re-sync changes them — so you still know new categories exist even when you hide them
+  by default. (Never shown on a source's first sync, where everything is new.)
+- *Community PR #70 by **@pt5pnzghm6-sys** (related to issue #60).*
+
+### 🎨 Smaller tweaks
+
+- **Default UI zoom is now 90%** (was 100%) so more of each screen fits on smaller TVs out of the box;
+  adjustable any time in Settings.
+- **The Player settings "OpenSubtitles account" row is now just "OpenSubtitles"** — it holds sign-in
+  *and* the downloaded-subtitle manager, so the shorter name fits what's inside.
+
+### 📺 Live TV — current programme in the channel list
+
+- **Now-playing subtitle on every channel row.** The Live TV channel list now shows the programme
+  currently airing under each channel name (a small second line), sourced from your guide data. The
+  channel-list column is also **a little wider** so the longer rows breathe, and the preview pane a
+  little narrower to match. Channels without guide data look exactly as before — single line.
+- **Same in the in-player channel overlay.** Pressing **Left** (while the player controls are hidden)
+  to open the side channel list now shows the same current-programme subtitle under each channel, so
+  you can see what's on without leaving fullscreen.
+- *Detail:* the list uses the stored bulk guide only (one batched query, refreshed every 60 s); the
+  focused-channel preview pane keeps its full provider short-EPG fallback. No per-row network calls.
+
+### 🔄 EPG / Guide sync status pill
+
+- **Updating the guide now shows the status pill too.** The small semi-transparent pill that already
+  reports background playlist syncs now also reflects **EPG/Guide downloads** — manual resyncs from
+  Settings → EPG Sources and the automatic startup/staleness refreshes. It reads "Updating guide ·
+  *source* · N programmes" and disappears when the sync finishes. Catalog syncs keep priority; if both
+  run at once the pill notes "· EPG too".
+
+### 🎯 Smarter EPG matching
+
+- **Match EPG picker suggests related channels first.** Long-press a channel → **Match EPG** (Live TV
+  or Guide) no longer opens on a plain A-Z list: guide channels **similar to the channel's name float
+  to the top**, best match first (e.g. opening it on "MTV FR" shows the MTV entries immediately). The
+  ranking also applies while you type a search. The picker now scans the *whole* guide-channel set
+  instead of only the first 300 alphabetical entries.
+- **The name matcher itself is more robust** (used by the picker ranking, the Guide's **Auto-match
+  all**, and single-channel auto-match):
+  - Spelled-out **country names** match their codes — "MTV France" ↔ "FR| MTV" is now an exact match
+    (guarded so channels like **France 24 / France 2** keep their name).
+  - **Number words** — "BBC One" ↔ "BBC 1" now match.
+  - **Word-order tolerance** — "France MTV" ↔ "MTV France" score highly via token overlap.
+  - **Channel-number guard** — "Sky Sports 2" can no longer match "Sky Sports 3" (never even offered),
+    and "MTV" vs "MTV 2" is capped below auto-apply so it goes to review instead of silently applying.
+- **Dialog ergonomics on TV remotes.** In the Match EPG picker and the Auto-match **review** popup,
+  the action buttons (**Close / Clear match**, **Accept all / Skip all / Done**) moved to a **right-hand
+  column** — press **Right** from any list row to reach them, no more scrolling to the bottom of a long
+  list. Focus is also **contained inside the popup** now (a stray D-pad press can no longer drop focus
+  onto the screen behind it).
+
+### 🎬 Better TMDB title cleaning
+
+- The movie/series **title normalizer** (what builds the TMDB search query) strips more provider noise
+  while keeping real titles intact: audio/language tags (**VOSTFR, VF, SUBBED/DUBBED, DUBLADO/LEGENDADO,
+  TRUEFRENCH, LAT**), release markers (**HDCAM, CAMRIP, HDTC, HDLight, 10bit, 60fps, AAC/AC3/DTS, 5.1/7.1**),
+  trailing **season/episode tails** on series names ("Show S05", "Loki Season 2", "Dark Staffel 1",
+  "Temporada 3", "S02E04"), and trailing uppercase language codes ("Movie FR"). Guarded so titles like
+  *Ocean's 8*, *Se7en*, *Area 51* and *Sub Rosa* are never touched.
+
+### 🗂️ Storage access that works on more TVs
+
+- **One-click "Grant full storage access."** The file/folder picker (download folder, local M3U
+  import, backup) now has a single grant action that opens **OwnTV's own app-settings page**, where
+  you enable **Allow management of all files** yourself. This fixes OEM TVs (e.g. TCL Android 12)
+  whose system "All files access" screen is hijacked or missing, which previously left no working
+  way to grant storage from inside the app. On Android 10 and below the standard permission dialog
+  appears instead (it grants full access there). A media-only grant is no longer treated as storage
+  access — it hid `.m3u`/backup files behind scoped storage.
+- **The picker is a real dialog window now.** D-pad focus physically can't escape onto the screen
+  behind it anymore, and access is re-checked when you come back from system settings, so the grant
+  row disappears immediately after granting.
+
+### 🎨 Compact popup menus in a new serif font
+
+- **Popup menus are ~40% smaller and render in Lora** (a free, open-licensed serif; only popups —
+  the rest of the app keeps its sans-serif): the player's **subtitle/audio/track menus**, Settings
+  **option pickers** and **+/− steppers**, the **playlist switcher**, and the **storage/file
+  picker** (now 300 dp with restacked footer buttons).
+- **Match EPG picker** (Live TV & Guide long-press) shrank 40%, the Guide's **Review EPG matches**
+  popup 20%, and the **Customize screen's PIN dialogs** got a compact variant — all in the Lora
+  serif. The profile "Who's watching?" PIN dialog is unchanged.
+
+### 🔀 CH+- key paging for browse panels
+
+- **Page the category & item lists with the remote's CH+ / CH− keys.** In Live TV, Movies and Series,
+  the CH+ / CH− keys now page whichever panel currently has focus — the category rail or the item
+  list/grid. Short press jumps a configurable number of items (clamped at the ends, so a short list
+  reaches the end in one press for free); long-press CH+ jumps straight to the **first** item and
+  long-press CH− to the **last**. A lifesaver for big libraries (e.g. 50k live channels, 500+
+  categories) where scrolling top-to-bottom was impractical.
+- **Per-direction skip counts, typed or stepped.** New **Settings → Content → CH+- Key Paging**: a
+  master on/off, plus a separate skip count for CH+ and CH− that you can type directly or nudge with
+  − / +. The dialog warns (advisory, never blocking) when a count exceeds 50, since large skips
+  overshoot short lists and may feel jumpy on low-end TVs; a hard cap of 1000 guards against typos.
+- **Apply to the focused panel only.** The keys never fire when focus is elsewhere (e.g. the top bar),
+  and a master toggle lets users whose remotes map CH keys to something else opt out entirely. The
+  category rail moves focus only — selection still happens on OK, so a stray CH press never reloads
+  a category's channels. All jumps use instant `scrollToItem` (no animation) to avoid jank on slow
+  TVs over big distances. Defaults: enabled, skip 10 each direction.
+- **Long-press is disabled on the "All" list.** On the built-in All channels / All movies / All series
+  list a long-press jump to the very last item (e.g. the 170,000th movie) is pointless and janks, so
+  long-press does nothing there — short-press skipping still works normally. Real categories and
+  folders keep long-press jump-to-first/last. (This checks the built-in All key, not the name, so a
+  provider category literally called "All Hindi" is unaffected.)
+- **Also pages the Customize category list.** The same CH+ / CH− paging now works in **Settings →
+  Customize Categories & Items**, where the list is just the raw provider folders (no "All"). Handy
+  with big provider category lists; long-press jumps to the first/last folder. The keys move focus
+  within the list only — they can never push focus out of it — and the CH+- Key Paging settings screen
+  notes this coverage.
+
+### 🐛 Fixes
+
+- **"Grant full storage access" no longer dead-ends on OEM TVs.** On TCL Android 12 the old grant
+  button opened the OEM "Permission Shield" screen, which has no storage entry at all; the picker
+  also showed a "grant" option that could only ever yield a useless media-only permission. Both
+  replaced by the app-settings route above.
+- **Storage picker focus could escape the popup.** Moving focus (especially after returning from
+  the permission screen) could land on the screen behind the picker; it's now hosted in its own
+  window so that can't happen.
+- **Deleting an EPG source now shows a "Deleting…" status and can't leave orphaned guide data.**
+  Removing an EPG source with a large guide (100k+ programmes) took a while to clear from the
+  database, but the row vanished instantly with no indication, and leaving the screen mid-delete
+  could orphan those programmes with no source left to clean them up. The row now stays with a
+  **Deleting…** badge (its actions hidden) until the delete finishes, the guide rows are removed
+  **before** the source leaves the list, and the delete completes even if you navigate away.
+- **EPG match now falls back to a network re-sync when the cache has no data for it.** After
+  matching a channel, OwnTV fills its programmes from the cached XMLTV without a network call — but
+  that step reported success even when the cache held none of the matched channel's programmes, so
+  the network fallback never ran. It now re-syncs (with the just-saved match included in the sync
+  filter) whenever the cache yields nothing for the matched channel. And when a matched channel
+  genuinely has no current/upcoming programmes in the feed, the Guide now says so ("Matched — but
+  this guide channel has no current programmes in the EPG feed yet") instead of leaving a silently
+  empty row.
+- **Match EPG from Live TV now takes effect immediately.** Matching a channel's EPG from the Live TV
+  list used to leave the details/preview pane without guide data until an app restart (the row's
+  now-playing line updated, the pane didn't). The match now also tops up the matched guide channel's
+  programmes from the cached EPG and refreshes the pane right away.
+- **Focus returns to the channel after Match EPG.** Closing the Match EPG dialog (pick, clear or
+  back) lands D-pad focus back on the channel row it was opened for, instead of falling to the nav panel.
+- **Customize screen showed categories from every playlist.** When you'd picked one playlist (e.g.
+  playlist A) via the top-bar switcher, **Settings → Customize Categories & Items** still listed
+  categories from *all* playlists. It now respects the selected playlist — same as the Live TV / Movies
+  / Series rails. ("All playlists" still shows the merged set.) Existing reorders/hides are preserved.
+- **Customize screen renamed** to **"Customize Categories & Items"** (was "Customize & Hidden Items")
+  for clarity — it's where you hide/unhide items, rename, and reorder categories.
+- **Live TV "Now" no longer shows a future programme** (#68). For channels without a configured guide,
+  OwnTV falls back to the provider's short-EPG. When that data had a gap around the current moment, the
+  "Now" slot could pick the next upcoming programme and mislabel it as live. It now correctly leaves
+  "Now" blank on a genuine gap; the upcoming programme still shows under "Next". EPG display only — no
+  playback impact.
+- **CH+- skip dialog alignment.** In the CH+- Key Paging skip-count popup, the − / + buttons no longer
+  sit above the number field — they now line up with it (the field's label was pushing them up).
+
+### 🔒 Security (community PR #65)
+
+- **Customize PIN no longer stored in plaintext** (community PR #65 by @aravindtri). The screen lock
+  PIN is now stored as a salted SHA-256 hash, matching how profile PINs are already handled. Existing
+  installs and imported backups with old plaintext PINs still verify correctly and migrate on use.
+- **Hero preview URLs are redacted in error logs.** A failed Home hero-preview playback no longer logs
+  the raw stream URL (which can carry credentials); it's scrubbed via the existing `redactUrl` helper.
+
+### 📊 Player diagnostics — measured fps/bitrate & top-bar bitrate chip (community PR #67)
+
+- **ExoPlayer now shows real fps, bitrate and dropped-frame stats** (community PR #67 by
+  @pt5pnzghm6-sys). Raw MPEG-TS streams (most Xtream live TV) don't declare `frameRate` or `bitrate`,
+  so ExoPlayer's **Stream Info overlay** and the preview's top-left chips used to be blank where mpv
+  showed live values. This measures them on the fly — **fps** from decoder-rendered frame timing
+  (snapped to a standard rate so a brief stall doesn't give a stray reading), **bitrate** from actual
+  network bytes, and **dropped frames since the start of playback** — all with negligible CPU impact,
+  and only computed while the info overlay is open. It also fixes a couple of mpv↔ExoPlayer handoff
+  bugs that were blocking correct resolution/fps display for VOD on Exo.
+- **Bitrate now appears in the player top-bar chips** for all playback — Live TV (preview & full),
+  movies and series, on both engines. The chip uses the stream's declared bitrate (free to read), so
+  it adds no measurement overhead; raw live MPEG-TS streams that don't declare one stay blank in the
+  chip (the overlay still shows the live measurement when opened).
+- **New "Measured stream stats" toggle** (**Settings → Video Player → Diagnostics**, on by default) —
+  a one-switch escape hatch. On, the Stream Info overlay measures fps/bitrate/dropped frames as above.
+  Off, no live measuring runs at all (declared values only), for the rare low-end TV where the
+  measuring is ever suspected of causing stutter. It only gates the diagnostic numbers — never the
+  actual video pipeline or the mpv↔ExoPlayer handoff.
+
+### 📦 Packaging
+
+- **Smaller downloads — split ABI builds.** Releases now ship a single **arm APK** (`OwnTV.apk` /
+  `OwnTV-vX.X.X.apk`, `arm64-v8a` + `armeabi-v7a` — for all real Fire TV / Android TV devices, and what
+  the Downloader code fetches) plus a separate **`OwnTV-x86_64-vX.X.X.apk`** (for emulators / rare Intel
+  boxes). The main download roughly **halves in size** (~104 MB → ~49 MB), which fixes the "parse error
+  on install" reports caused by truncated large downloads on Fire TV's Downloader app. `x86` (32-bit
+  Intel) is dropped — even emulators use x86_64.
+- **In-app updater picks the APK matching your device.** With releases now carrying one APK per ABI,
+  the updater selects the asset matching the device's ABI (arm on real TVs, x86_64 on emulators)
+  instead of blindly taking the first APK — so an arm TV can never download the emulator build, and
+  in-app updates now also work on an x86_64 emulator. Older single-APK releases still update fine.
+
 ## v4.1.2 — 2026-07-14
 
 ### ⚡ Background catalog sync

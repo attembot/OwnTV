@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
@@ -55,6 +56,8 @@ import tv.own.owntv.core.model.MediaType
 import tv.own.owntv.core.util.throttleLatest
 import tv.own.owntv.features.live.LiveRailItem
 import tv.own.owntv.features.live.LiveKey
+import tv.own.owntv.features.live.parseLiveKey
+import tv.own.owntv.features.live.serialize
 import tv.own.owntv.core.download.DownloadManager
 import tv.own.owntv.core.storage.StorageAccess
 import tv.own.owntv.core.repository.activeProfileSources
@@ -79,6 +82,7 @@ class MovieViewModel(
     private val metadata: tv.own.owntv.core.metadata.MetadataRepository,
     private val externalPlayerLauncher: tv.own.owntv.core.player.ExternalPlayerLauncher,
     private val streamUrlResolver: tv.own.owntv.core.stalker.StreamUrlResolver,
+    private val subtitleController: tv.own.owntv.core.subtitles.SubtitleController,
 ) : ViewModel() {
 
     data class MovieMoveState(val items: List<MovieEntity>, val activeIndex: Int, val contextKey: String)
@@ -89,7 +93,7 @@ class MovieViewModel(
     // Observe the active profile's sources reactively so adding/removing a playlist refreshes Movies
     // immediately (was read once at startup, so a new playlist showed nothing until app restart).
     private val ctx: StateFlow<Ctx> = activeProfileSources(settings, sourceDao)
-        .map { aps -> Ctx(aps.profileId, aps.sourceIds) }
+        .map { aps -> Ctx(aps.profileId, aps.movieSourceIds) }
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.Eagerly, Ctx(-1L, emptyList()))
 
@@ -134,12 +138,12 @@ class MovieViewModel(
                 }
             }
         }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
     /** Customizations + resolved hidden-category ids, bundled so the list pipeline takes one flow. */
     private data class CustState(val cust: SectionCustomizations, val hiddenCats: Set<Long>)
     private val custResolved: StateFlow<CustState> = combine(custom, hiddenCategoryIds) { c, h -> CustState(c, h) }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, CustState(SectionCustomizations(), emptySet()))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CustState(SectionCustomizations(), emptySet()))
 
     /** List ordering for this section (Provider order vs A–Z), persisted in DataStore. */
     val sortMode: StateFlow<SettingsRepository.SortMode> = settings.sortMovies
@@ -152,7 +156,8 @@ class MovieViewModel(
                 when (sortMode.value) {
                     SettingsRepository.SortMode.PLAYLIST -> SettingsRepository.SortMode.ALPHA
                     SettingsRepository.SortMode.ALPHA -> SettingsRepository.SortMode.RATING
-                    SettingsRepository.SortMode.RATING -> SettingsRepository.SortMode.PLAYLIST
+                    SettingsRepository.SortMode.RATING -> SettingsRepository.SortMode.DATE_ADDED
+                    SettingsRepository.SortMode.DATE_ADDED -> SettingsRepository.SortMode.PLAYLIST
                 },
             )
         }
@@ -202,7 +207,7 @@ class MovieViewModel(
             if (m == null) null
             else MovieMeta(m.id, runCatching { metadata.resolveMovie(m) }.getOrNull())
         }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** TMDB metadata tagged with the movie id it was resolved for, so the UI never shows stale meta on a
      *  different card during the debounce window. [cache] is null while resolving or on no match. */
@@ -210,9 +215,11 @@ class MovieViewModel(
 
     /** Source mode (plan §4.1) — the detail pane uses it to flip provider/TMDB field precedence. */
     val metadataMode: StateFlow<tv.own.owntv.core.metadata.MetadataMode> = settings.metadataMode
-        .stateIn(viewModelScope, SharingStarted.Eagerly, tv.own.owntv.core.metadata.MetadataMode.PROVIDER_PLUS_TMDB)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.core.metadata.MetadataMode.PROVIDER_PLUS_TMDB)
 
-    private var playingMovie: MovieEntity? = null
+    // Observable so the player HUD's favorite toggle can reflect/act on the movie being played.
+    private val _playingMovie = MutableStateFlow<MovieEntity?>(null)
+    val playingMovie: StateFlow<MovieEntity?> = _playingMovie.asStateFlow()
 
     init {
         // Periodically persist resume position for the movie currently playing.
@@ -235,11 +242,11 @@ class MovieViewModel(
                 // A–Z also sorts the category folders; manually moved categories stay pinned first.
                 val folders = cats.applyCustomizations(cust, alphaRest = sort == SettingsRepository.SortMode.ALPHA)
                 defaultRail + folders.map { (cat, name) ->
-                    LiveRailItem(LiveKey.Folder(cat.id), name.take(3).uppercase(), name)
+                    LiveRailItem(LiveKey.Folder(cat.id), name)
                 }
             }
         }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, defaultRail)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), defaultRail)
 
     val movies: Flow<PagingData<MovieEntity>> = combine(
         _selected, ctx, _search.map { it.trim() }.debounce(300).distinctUntilChanged(), sortMode, _listRefresh,
@@ -267,7 +274,7 @@ class MovieViewModel(
 
     val count: StateFlow<Int> = combine(_selected, ctx, hiddenCategoryIds) { key, c, hidden -> Triple(key, c, hidden) }
         .flatMapLatest { (key, c, hidden) -> countFlow(key, c, hidden).throttleLatest() } // C2: cap live COUNT re-runs during bulk sync
-        .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
     val favoriteIds: StateFlow<Set<Long>> = ctx
         .flatMapLatest { favoriteDao.observeFavoriteIds(it.profileId, MediaType.MOVIE) }
@@ -279,13 +286,13 @@ class MovieViewModel(
     val movieProgress: StateFlow<Map<Long, PlaybackProgressEntity>> = ctx
         .flatMapLatest { c -> if (c.profileId < 0) flowOf(emptyList()) else progressDao.observeMovieProgress(c.profileId) }
         .map { list -> list.associateBy { it.itemId } }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     val selectedProgress: StateFlow<PlaybackProgressEntity?> = combine(_selectedMovie, ctx) { m, c -> m to c }
         .flatMapLatest { (m, c) ->
             if (m == null) flowOf(null) else progressDao.observe(c.profileId, MediaType.MOVIE, m.id)
         }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     fun select(key: LiveKey) { _selected.value = key }
     fun setSearchQuery(query: String) { _search.value = query }
@@ -332,7 +339,7 @@ class MovieViewModel(
 
     /** The user's resume preference (Always / Ask / Never) — the screen drives the prompt. */
     val resumeMode: StateFlow<SettingsRepository.ResumeMode> = settings.resumeMode
-        .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.ResumeMode.ASK)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsRepository.ResumeMode.ASK)
 
     /** Saved resume position for [movie] (0 when none) — used by the screen to decide the prompt. */
     suspend fun savedPositionMs(movie: MovieEntity): Long =
@@ -340,7 +347,7 @@ class MovieViewModel(
 
     /** Global "External player" toggle — screens must NOT open the fullscreen in-app player when on
      *  (mounting it spins up an mpv instance even though play() branched to the external app). */
-    val externalPlayerOn: StateFlow<Boolean> = settings.externalPlayer
+    val externalPlayerOn: StateFlow<Boolean> = settings.externalPlayerMovies
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     /** Stalker movies resolve to a real URL at play time; anything else returns streamUrl as-is.
@@ -378,7 +385,7 @@ class MovieViewModel(
             // in-app engine entirely. History is still recorded (recently-watched); resume position
             // and the playing-movie HUD/progress tick are intentionally not — the external app owns
             // playback and OwnTV can't observe it.
-            if (settings.externalPlayer.first()) {
+            if (settings.externalPlayerMovies.first()) {
                 Log.d(TAG, "play movieId=${movie.id} -> external player")
                 val url = resolvedUrlOrNull(movie) ?: return@launch
                 externalPlayerLauncher.launch(url, movie.name)
@@ -411,8 +418,16 @@ class MovieViewModel(
                 isLive = false,
                 startPositionMs = startPositionMs,
                 userAgent = sourceUa,
+                // P6 — engine pins key on this, not on playUrl (a Stalker playUrl is minted per play).
+                contentKey = tv.own.owntv.core.player.enginePinKey(movie.sourceId, "MOVIE", movie.remoteId),
             )
-            playingMovie = movie
+            _playingMovie.value = movie
+            // Enable the player's OpenSubtitles search for this movie (subtitle plan §4). tmdbId is
+            // resolved from the metadata cache when available (review R7) for a stronger match.
+            if (pid != null) {
+                val tmdbId = runCatching { metadata.resolveMovie(movie)?.tmdbId?.toLong() }.getOrNull()
+                subtitleController.setMovie(pid, movie, tmdbId)
+            }
             if (pid != null) {
                 runCatching {
                     historyDao.record(WatchHistoryEntity(profileId = pid, mediaType = MediaType.MOVIE, itemId = movie.id))
@@ -440,7 +455,7 @@ class MovieViewModel(
     val downloadStates: StateFlow<Map<Long, DownloadEntity>> = ctx
         .flatMapLatest { c -> if (c.profileId < 0) flowOf(emptyList()) else downloadManager.observe(c.profileId) }
         .map { list -> list.filter { it.mediaType == MediaType.MOVIE }.associateBy { it.itemId } }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     fun download(movie: MovieEntity) {
         viewModelScope.launch {
@@ -456,6 +471,14 @@ class MovieViewModel(
                 fileName = "${StorageAccess.sanitize(movie.name)}.${movie.containerExt ?: StorageAccess.extOf(movie.streamUrl)}",
             )
         }
+    }
+
+    /** Downloaded OpenSubtitles subtitles for this movie (long-press "Delete subtitles" popup, §11). */
+    suspend fun downloadedSubtitles(movie: MovieEntity): List<tv.own.owntv.core.database.dao.LinkedSubtitle> =
+        subtitleController.downloadsForMovie(movie)
+
+    fun deleteSubtitle(cacheId: Long) {
+        viewModelScope.launch { subtitleController.deleteCached(cacheId) }
     }
 
     fun toggleFavorite(movie: MovieEntity) {
@@ -492,7 +515,7 @@ class MovieViewModel(
 
     /** Persist the resume position if the player is actually playing the tracked movie. */
     fun saveProgressNow() {
-        val m = playingMovie ?: return
+        val m = _playingMovie.value ?: return
         if (player.currentMediaUrl != m.streamUrl || !player.isPlaying.value) return
         val pos = player.position.value
         val dur = player.duration.value
@@ -528,7 +551,7 @@ class MovieViewModel(
             val items = when (key) {
                 is LiveKey.Folder -> movieDao.snapshotByCategoryManual(key.id, pid, contextKey, 5000)
                 LiveKey.Favorites -> movieDao.snapshotFavoritesManual(pid, contextKey, ctx.value.sourceIds.ifEmpty { listOf(-1L) }, 5000)
-                else -> return@launch
+                LiveKey.History, LiveKey.All -> return@launch
             }
             val idx = items.indexOfFirst { it.id == movie.id }
             if (idx < 0) return@launch
@@ -595,10 +618,12 @@ class MovieViewModel(
         val ids = c.sourceIds.ifEmpty { listOf(-1L) }
         val playlist = sort == SettingsRepository.SortMode.PLAYLIST
         val rating = sort == SettingsRepository.SortMode.RATING
+        val dateAdded = sort == SettingsRepository.SortMode.DATE_ADDED
         return if (query.isBlank()) when (key) {
             LiveKey.All -> when {
                 rating -> movieDao.pagingAllRating(ids)
                 playlist -> movieDao.pagingAllOriginal(ids)
+                dateAdded -> movieDao.pagingAllDateAdded(ids)
                 else -> movieDao.pagingAll(ids)
             }
             LiveKey.Favorites -> movieDao.pagingFavoritesManual(c.profileId, ContentOrderEntity.FAV_CONTEXT, ids)
@@ -607,6 +632,7 @@ class MovieViewModel(
                 val ctxKey = folderContextKeys.value[key.id] ?: ""
                 when {
                     rating -> movieDao.pagingByCategoryRating(key.id)
+                    dateAdded -> movieDao.pagingByCategoryDateAdded(key.id)
                     // C3 fast path: no manual order in this folder → the plain indexed query has
                     // the identical (sortOrder, name) order without the join-sort.
                     ctxKey !in orderedContexts.value -> movieDao.pagingByCategory(key.id)
@@ -614,10 +640,14 @@ class MovieViewModel(
                 }
             }
         } else when (key) {
-            LiveKey.All -> movieDao.searchAll(query, ids)
+            LiveKey.All ->
+                if (dateAdded) movieDao.searchAllDateAdded(query, ids)
+                else movieDao.searchAll(query, ids)
             LiveKey.Favorites -> movieDao.searchFavorites(query, c.profileId, ids)
             LiveKey.History -> movieDao.searchHistory(query, c.profileId, ids)
-            is LiveKey.Folder -> movieDao.searchInCategory(query, key.id)
+            is LiveKey.Folder ->
+                if (dateAdded) movieDao.searchInCategoryDateAdded(query, key.id)
+                else movieDao.searchInCategory(query, key.id)
         }
     }
 
@@ -633,12 +663,37 @@ class MovieViewModel(
         }
     }
 
+    // Remember the last selected category (Settings → Browsing & lists → "Remember last category —
+    // Movies", on by default). Declared LAST in the class so railItems below/above is already assigned
+    // when this init runs. Mirrors LiveViewModel's identical block.
+    init {
+        // Persist on change, debounced — the rail fires select() on focus as you scroll it.
+        viewModelScope.launch {
+            _selected.drop(1).debounce(800).distinctUntilChanged()
+                .collect { settings.setLastMoviesCategory(it.serialize()) }
+        }
+        // Restore once at startup, and only while still on the default (never yank a user who already
+        // navigated). A saved folder is honoured only once it exists in this profile's rail.
+        viewModelScope.launch {
+            if (!settings.rememberCategoryMovies.first()) return@launch
+            val saved = parseLiveKey(settings.lastMoviesCategory.first()) ?: return@launch
+            if (saved is LiveKey.Folder) {
+                val ok = kotlinx.coroutines.withTimeoutOrNull(5_000) {
+                    railItems.first { list -> list.any { it.key == saved } }
+                } != null
+                if (ok && _selected.value == LiveKey.All) _selected.value = saved
+            } else if (_selected.value == LiveKey.All) {
+                _selected.value = saved
+            }
+        }
+    }
+
     private companion object {
         const val TAG = "OwnTVHome"
         val defaultRail = listOf(
-            LiveRailItem(LiveKey.Favorites, "FAV", "Favorites", OwnTVIcon.STAR),
-            LiveRailItem(LiveKey.History, "HIS", "History", OwnTVIcon.HISTORY),
-            LiveRailItem(LiveKey.All, "ALL", "All Movies"),
+            LiveRailItem(LiveKey.Favorites, "Favorites", OwnTVIcon.FAVORITE),
+            LiveRailItem(LiveKey.History, "History", OwnTVIcon.HISTORY),
+            LiveRailItem(LiveKey.All, "All Movies"),
         )
     }
 }

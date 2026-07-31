@@ -15,9 +15,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
@@ -27,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -72,11 +75,13 @@ import tv.own.owntv.ui.components.PosterCard
 import tv.own.owntv.ui.components.ResumeDialog
 import tv.own.owntv.ui.components.SetTmdbNameDialog
 import tv.own.owntv.ui.components.TrailerPlayerScreen
+import tv.own.owntv.ui.components.chNavPaging
 import tv.own.owntv.ui.components.longPressMenuGuard
 import tv.own.owntv.ui.components.dialogPanel
 import tv.own.owntv.ui.components.gridFocusTarget
 import androidx.compose.foundation.layout.width
 import tv.own.owntv.ui.components.SearchBar
+import tv.own.owntv.ui.components.trapAllFocusExit
 import tv.own.owntv.ui.components.trapVerticalFocusExit
 import tv.own.owntv.ui.components.SortChip
 import tv.own.owntv.ui.components.formatCount
@@ -84,6 +89,7 @@ import tv.own.owntv.ui.components.ContentPanelFill
 import tv.own.owntv.ui.components.PreviewPanelFill
 import tv.own.owntv.ui.components.roundedPanel
 import tv.own.owntv.ui.theme.Dimens
+import tv.own.owntv.ui.theme.GlassSurface
 import tv.own.owntv.ui.theme.OwnTVTheme
 
 @Composable
@@ -113,6 +119,10 @@ fun MoviesScreen(
     var setTmdbNameMovie by remember { mutableStateOf<MovieEntity?>(null) }
     // In-app trailer playback (§7.3 U4); non-null = fullscreen player open with this YouTube key.
     var trailerVideoKey by remember { mutableStateOf<String?>(null) }
+    // Downloaded subtitles for the movie whose context menu is open (subtitle plan §11); drives the
+    // "Delete subtitles" action + its popup. Reloaded on menu open and after each delete.
+    var contextMovieSubs by remember { mutableStateOf<List<tv.own.owntv.core.database.dao.LinkedSubtitle>>(emptyList()) }
+    var showDeleteSubs by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val toast = rememberInAppToast()
     // Id + list position of the movie the context menu was opened on. The id re-focuses the same item
@@ -153,13 +163,37 @@ fun MoviesScreen(
     val listState = rememberLazyListState()
     val selFocus = remember { FocusRequester() }
     val firstItemFocus = remember { FocusRequester() }
+
+    // CH+- key paging: shared settings + hoisted rail state. gridPaneFocused/railPaneFocused let
+    // chNavPaging consume the keys only for whichever pane is focused.
+    val settingsVm: tv.own.owntv.features.settings.SettingsViewModel = koinViewModel()
+    val chNavEnabled by settingsVm.chNavEnabled.collectAsStateWithLifecycle()
+    val chNavUpSkip by settingsVm.chNavUpSkip.collectAsStateWithLifecycle()
+    val chNavDownSkip by settingsVm.chNavDownSkip.collectAsStateWithLifecycle()
+    val rememberMovies by settingsVm.rememberLastMovies.collectAsStateWithLifecycle()
+
+    // "Remember last item per category": ON → each category keeps its own scroll position (per-category
+    // grid + list states, so view-mode toggles also keep their offsets). OFF → reset the shared grid/list
+    // states to the top whenever the category changes (fixes the cross-category scroll-leak bug).
+    val perCategoryGrid = remember { mutableStateMapOf<LiveKey, LazyGridState>() }
+    val perCategoryList = remember { mutableStateMapOf<LiveKey, LazyListState>() }
+    // NOTE: plain constructors, not remember*State() — these are created lazily inside getOrPut, so a
+    // @Composable/rememberSaveable call here would register slots conditionally and corrupt the slot table.
+    val effectiveGridState = if (rememberMovies) perCategoryGrid.getOrPut(selectedKey) { LazyGridState() } else gridState
+    val effectiveListState = if (rememberMovies) perCategoryList.getOrPut(selectedKey) { LazyListState() } else listState
+    LaunchedEffect(selectedKey, rememberMovies) {
+        if (!rememberMovies) { runCatching { gridState.scrollToItem(0) }; runCatching { listState.scrollToItem(0) } }
+    }
+    val catListState = rememberLazyListState()
+    var gridPaneFocused by remember { mutableStateOf(false) }
+    var railPaneFocused by remember { mutableStateOf(false) }
     // Returning from the player: scroll to and focus the movie you just played (waits for the grid to load).
     LaunchedEffect(restoreFocus, movies.itemCount) {
         if (!restoreFocus || movies.itemCount == 0) return@LaunchedEffect
         val sel = selectedMovie
         val idx = if (sel != null) movies.itemSnapshotList.items.indexOfFirst { it.id == sel.id } else -1
         if (idx >= 0) {
-            runCatching { gridState.scrollToItem(idx) }
+            runCatching { effectiveGridState.scrollToItem(idx) }
             delay(60)
             runCatching { selFocus.requestFocus() }
         }
@@ -181,12 +215,12 @@ fun MoviesScreen(
         val targetId = contextMovieId
         if (targetId == null) { contextMovieIndex = -1; return@LaunchedEffect }
         val items = movies.itemSnapshotList.items
-        val idx = items.indexOfFirst { it?.id == targetId }
+        val idx = items.indexOfFirst { it.id == targetId }
         if (idx >= 0) {
             // Item survived — re-focus it directly.
             runCatching {
-                if (viewMode == SettingsRepository.VodViewMode.LIST) listState.scrollToItem(idx)
-                else gridState.scrollToItem(idx)
+                if (viewMode == SettingsRepository.VodViewMode.LIST) effectiveListState.scrollToItem(idx)
+                else effectiveGridState.scrollToItem(idx)
             }
             withFrameNanos { }
             runCatching { contextFocus.requestFocus() }
@@ -198,10 +232,10 @@ fun MoviesScreen(
                 runCatching { firstItemFocus.requestFocus() } // nothing left; firstItemFocus attaches to the next item that loads
             } else {
                 val neighbor = settled.getOrNull(contextMovieIndex.coerceAtLeast(0)) ?: settled.last()
-                val neighborIdx = items.indexOfFirst { it?.id == neighbor.id }.coerceAtLeast(0)
+                val neighborIdx = items.indexOfFirst { it.id == neighbor.id }.coerceAtLeast(0)
                 runCatching {
-                    if (viewMode == SettingsRepository.VodViewMode.LIST) listState.scrollToItem(neighborIdx)
-                    else gridState.scrollToItem(neighborIdx)
+                    if (viewMode == SettingsRepository.VodViewMode.LIST) effectiveListState.scrollToItem(neighborIdx)
+                    else effectiveGridState.scrollToItem(neighborIdx)
                 }
                 // selFocus is bound to selectedMovie; reuse the generic firstItemFocus path only if that
                 // fails. Here we re-purpose contextFocus by re-binding it: re-request after a frame so the
@@ -216,9 +250,21 @@ fun MoviesScreen(
 
     Row(modifier = modifier.fillMaxSize().onFocusChanged { if (it.hasFocus) onChildFocused() }, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         CategoryRail(
-            categories = railItems.map { RailCategory(it.abbr, it.title, it.icon) },
+            categories = railItems.map { RailCategory(it.title, it.icon, showGenreDot = it.key is LiveKey.Folder) },
             selectedIndex = selectedIndex,
             onSelect = { idx -> railItems.getOrNull(idx)?.let { vm.select(it.key) } },
+            listState = catListState,
+            modifier = Modifier
+                .onFocusChanged { railPaneFocused = it.hasFocus }
+                .chNavPaging(
+                    enabled = chNavEnabled,
+                    upSkip = chNavUpSkip,
+                    downSkip = chNavDownSkip,
+                    isFocused = { railPaneFocused },
+                    lastIndex = { railItems.size - 1 },
+                    currentTargetIndex = { selectedIndex },
+                    onJumpToIndex = { idx -> railItems.getOrNull(idx)?.let { vm.select(it.key) } },
+                ),
         )
 
         Column(
@@ -226,6 +272,51 @@ fun MoviesScreen(
                 .weight(1.8f)
                 .fillMaxSize()
                 .roundedPanel(fillColor = ContentPanelFill)
+                .onFocusChanged { gridPaneFocused = it.hasFocus }
+                // CH+- key paging for this movies list/grid. currentTargetIndex falls back to the
+                // visible top when the selected movie isn't in the loaded window (paged data).
+                .chNavPaging(
+                    enabled = chNavEnabled,
+                    upSkip = chNavUpSkip,
+                    downSkip = chNavDownSkip,
+                    isFocused = { gridPaneFocused },
+                    // On the "All" list (every movie) a long-press jump to the very last item is
+                    // pointless and janks, so disable long-press there — short-press skipping stays.
+                    longPressEnabled = { selectedKey != LiveKey.All },
+                    lastIndex = { movies.itemCount - 1 },
+                    currentTargetIndex = {
+                        val sel = selectedMovie
+                        if (sel != null) {
+                            val idx = movies.itemSnapshotList.items.indexOfFirst { it.id == sel.id }
+                            if (idx >= 0) idx
+                            else if (viewMode == SettingsRepository.VodViewMode.GRID) effectiveGridState.firstVisibleItemIndex
+                            else effectiveListState.firstVisibleItemIndex
+                        } else {
+                            if (viewMode == SettingsRepository.VodViewMode.GRID) effectiveGridState.firstVisibleItemIndex
+                            else effectiveListState.firstVisibleItemIndex
+                        }
+                    },
+                    onJumpToIndex = { idx ->
+                        // Scroll the target into view (grid or list), then set it as the selected
+                        // movie so selFocus binds to it (gridFocusTarget keys on selectedMovie.id),
+                        // and request focus after one frame.
+                        scope.launch {
+                            val item = movies.itemSnapshotList.items.getOrNull(idx)
+                            if (viewMode == SettingsRepository.VodViewMode.GRID) {
+                                runCatching { effectiveGridState.scrollToItem(idx) }
+                            } else {
+                                runCatching { effectiveListState.scrollToItem(idx) }
+                            }
+                            withFrameNanos { }
+                            if (item != null) {
+                                vm.onMovieFocused(item)
+                                runCatching { selFocus.requestFocus() }
+                            } else {
+                                runCatching { firstItemFocus.requestFocus() }
+                            }
+                        }
+                    },
+                )
                 // Entering this pane must land on a poster, never the search bar: prefer the
                 // last-focused movie, else the first one. onEnter fires only for directional entry
                 // from outside (internal moves don't re-trigger it).
@@ -245,7 +336,7 @@ fun MoviesScreen(
             Text("Movies / ${selectedItem?.title ?: "All"}", style = MaterialTheme.typography.headlineLarge, color = OwnTVTheme.colors.onSurface)
             Spacer(Modifier.height(4.dp))
             Text(
-                "${selectedItem?.abbr ?: "ALL"} (${formatCount(count)} movies)",
+                "${selectedItem?.title ?: "All"} (${formatCount(count)} movies)",
                 style = MaterialTheme.typography.titleMedium,
                 color = OwnTVTheme.colors.primary,
                 fontWeight = FontWeight.Bold,
@@ -280,7 +371,7 @@ fun MoviesScreen(
                 }
             } else if (viewMode == SettingsRepository.VodViewMode.LIST) {
                 LazyColumn(
-                    state = listState,
+                    state = effectiveListState,
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(
@@ -310,7 +401,7 @@ fun MoviesScreen(
                 }
             } else {
                 LazyVerticalGrid(
-                    state = gridState,
+                    state = effectiveGridState,
                     columns = GridCells.Adaptive(minSize = 130.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -368,6 +459,11 @@ fun MoviesScreen(
         )
     }
 
+    // Load the opened movie's downloaded subtitles so the menu can show "Delete subtitles" (§11).
+    LaunchedEffect(contextMovie?.id) {
+        contextMovieSubs = contextMovie?.let { runCatching { vm.downloadedSubtitles(it) }.getOrDefault(emptyList()) } ?: emptyList()
+    }
+
     // Long-press a movie → context menu.
     contextMovie?.let { m ->
         val alreadyDownloaded = downloadStates[m.id] != null
@@ -407,8 +503,30 @@ fun MoviesScreen(
             },
             onSetTmdbName = { contextMovie = null; setTmdbNameMovie = m },
             onPlayTrailer = { key -> contextMovie = null; trailerVideoKey = key },
+            onDeleteSubtitles = if (contextMovieSubs.isNotEmpty()) ({ showDeleteSubs = true }) else null,
             onDismiss = { contextMovie = null },
         )
+    }
+
+    // Per-item "Delete subtitles" popup (§11) — individual deletion; closes when none remain.
+    if (showDeleteSubs) {
+        val m = contextMovie
+        if (m == null || contextMovieSubs.isEmpty()) {
+            showDeleteSubs = false
+        } else {
+            tv.own.owntv.features.subtitles.SubtitleDeletePopup(
+                contentTitle = m.name,
+                items = contextMovieSubs,
+                onDelete = { sub ->
+                    vm.deleteSubtitle(sub.cacheId)
+                    contextMovieSubs = contextMovieSubs.filterNot { it.cacheId == sub.cacheId }
+                    // Last one deleted → close the popup AND the context menu so focus returns to the
+                    // movie tile (the menu's Delete action is gone anyway).
+                    if (contextMovieSubs.isEmpty()) { showDeleteSubs = false; contextMovie = null }
+                },
+                onDismiss = { showDeleteSubs = false },
+            )
+        }
     }
 
     // When the TMDB Details window closes, return focus to the movie it was opened from (the window
@@ -507,6 +625,8 @@ private fun MovieContextMenu(
     onRefetch: () -> Unit,
     onSetTmdbName: () -> Unit,
     onPlayTrailer: (String) -> Unit,
+    // Non-null only when this movie has downloaded OpenSubtitles subtitles (subtitle plan §11).
+    onDeleteSubtitles: (() -> Unit)? = null,
     onDismiss: () -> Unit,
 ) {
     val colors = OwnTVTheme.colors
@@ -515,6 +635,7 @@ private fun MovieContextMenu(
     androidx.activity.compose.BackHandler { onDismiss() }
     Box(
         modifier = Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.7f))
+            .trapAllFocusExit().focusGroup()
             .longPressMenuGuard(),
         contentAlignment = Alignment.Center,
     ) {
@@ -526,7 +647,7 @@ private fun MovieContextMenu(
             Spacer(Modifier.height(4.dp))
             OwnTVButton(
                 if (isFavorite) "Remove from Favourites" else "Add to Favourites",
-                onClick = onToggleFavorite, style = OwnTVButtonStyle.SECONDARY, icon = OwnTVIcon.STAR,
+                onClick = onToggleFavorite, style = OwnTVButtonStyle.SECONDARY, icon = OwnTVIcon.FAVORITE,
                 modifier = Modifier.fillMaxWidth().focusRequester(focus),
             )
             OwnTVButton(
@@ -538,6 +659,10 @@ private fun MovieContextMenu(
             if (isHistory) OwnTVButton("Remove from History", onClick = onRemoveFromHistory, style = OwnTVButtonStyle.SECONDARY, modifier = Modifier.fillMaxWidth())
             OwnTVButton("Hide", onClick = onHide, style = OwnTVButtonStyle.SECONDARY, modifier = Modifier.fillMaxWidth())
             OwnTVButton("Download", onClick = onDownload, style = OwnTVButtonStyle.SECONDARY, icon = OwnTVIcon.DOWNLOADS, modifier = Modifier.fillMaxWidth())
+            // Delete subtitles — only when this movie has downloaded OpenSubtitles subs (§11).
+            onDeleteSubtitles?.let {
+                OwnTVButton("Delete OpenSub subtitles", onClick = it, style = OwnTVButtonStyle.SECONDARY, icon = OwnTVIcon.SUBTITLE, modifier = Modifier.fillMaxWidth())
+            }
             // Phase B: one-off external playback, independent of the global "External player" toggle.
             OwnTVButton("Play with external player", onClick = onPlayExternal, style = OwnTVButtonStyle.SECONDARY, icon = OwnTVIcon.PLAY, modifier = Modifier.fillMaxWidth())
             // TMDB Details — only when a confident match resolved (§11.1).
@@ -723,6 +848,7 @@ private fun MovieListRow(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         contentAlignment = Alignment.CenterStart,
+        surface = GlassSurface.CARDS,
     ) { focused ->
         LaunchedEffect(focused) { if (focused) onFocus() }
         Row(
@@ -766,7 +892,7 @@ private fun MovieListRow(
                 }
             }
             if (isFavorite) {
-                OwnTVIcon(OwnTVIcon.STAR, tint = colors.primary, modifier = Modifier.size(18.dp))
+                OwnTVIcon(OwnTVIcon.FAVORITE, tint = colors.primary, modifier = Modifier.size(18.dp))
             }
         }
     }

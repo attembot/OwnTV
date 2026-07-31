@@ -22,6 +22,7 @@ import tv.own.owntv.core.repository.SourceRepository
 import tv.own.owntv.core.sync.ImportStage
 import tv.own.owntv.core.sync.SyncContentTypes
 import tv.own.owntv.core.sync.SyncResult
+import tv.own.owntv.core.sync.SyncScopeChoice
 import tv.own.owntv.core.sync.withRemainderNote
 import tv.own.owntv.core.sync.work.CatalogSyncScheduler
 import tv.own.owntv.core.util.Pin
@@ -49,7 +50,29 @@ class SetupViewModel(
     private val launcherIntegrationRepository: LauncherIntegrationRepository,
     private val catalogSyncScheduler: CatalogSyncScheduler,
     private val stalkerAuth: tv.own.owntv.core.stalker.StalkerAuthManager,
+    private val companion: tv.own.owntv.core.companion.CompanionController,
 ) : ViewModel() {
+
+    // ---- Remote (companion) add-source: a LAN web form fills the Add Source screen from a phone. ----
+    /** Server lifecycle (Idle / Starting / Listening with PIN+QR / Failed) for the Remote screen. */
+    val remoteState get() = companion.state
+
+    /** Live submission stream — the Remote screen collects it to hand off to the Manual form. */
+    val remotePayloads get() = companion.payloads
+
+    /** Retained last submission, so the Manual form pre-fills even after the Remote screen left. */
+    val remotePayload get() = companion.lastPayload
+
+    fun startRemoteListener(port: Int) = companion.start(port)
+    fun stopRemoteListener() = companion.stop()
+    fun consumeRemotePayload() = companion.consumePayload()
+
+    // ---- Remote restore: a phone uploads a backup JSON to the TV over the LAN companion server. ----
+    /** Uploaded backup files — the remote-restore screen collects this and hands each to [importBackup]. */
+    val remoteBackups get() = companion.backups
+
+    fun startRemoteRestore(port: Int) = companion.startForBackupRestore(port)
+    fun stopRemoteRestore() = companion.stop()
 
     // Semi-auto EPG: after the first playlist imports, offer a one-tap guide sync (with a live count) if it
     // has a guide feed.
@@ -70,14 +93,27 @@ class SetupViewModel(
 
     fun dismissPendingEpg() { pendingEpgSource = null; _epgSync.value = tv.own.owntv.features.settings.EpgSyncUi.Hidden }
 
+    /**
+     * "Run in background" for the semi-auto EPG sync: enter the app now while the guide keeps
+     * downloading. The sync launched by [syncPendingEpg] runs in this activity-scoped [viewModelScope],
+     * so it survives leaving the wizard — exactly like the playlist [continueInBackground]. We only
+     * finish onboarding; the in-flight job is deliberately not cancelled.
+     */
+    fun syncEpgInBackground(onDone: () -> Unit = {}) {
+        pendingEpgSource = null
+        finish(onDone)
+    }
+
     sealed interface ImportState {
         data object Idle : ImportState
         data object Running : ImportState
         /** Per-type breakdown (incl. EPG) shown on the onboarding "All set" screen. */
         data class Success(val summary: String) : ImportState
         data class Failed(val message: String) : ImportState
-        /** Encrypted backup needs the backup password before restoring; [retry] after a wrong attempt. */
-        data class NeedPassword(val file: File, val retry: Boolean = false) : ImportState
+        /** Encrypted backup needs the backup password before restoring; [retry] after a wrong attempt.
+         *  [sealed] marks a whole-file-encrypted `.own`, where the password is mandatory — there is
+         *  nothing to restore without it, so the wizard hides "Skip". */
+        data class NeedPassword(val file: File, val retry: Boolean = false, val sealed: Boolean = false) : ImportState
     }
 
     private val _state = MutableStateFlow<ImportState>(ImportState.Idle)
@@ -117,12 +153,14 @@ class SetupViewModel(
         userAgent: String = "",
         epgUrl: String = "",
         autoRefresh: PlaylistAutoRefresh = PlaylistAutoRefresh.OFF,
-        syncLive: Boolean = true,
-        syncMovies: Boolean = true,
-        syncSeries: Boolean = true,
+        live: SyncScopeChoice = SyncScopeChoice.Now,
+        movies: SyncScopeChoice = SyncScopeChoice.Now,
+        series: SyncScopeChoice = SyncScopeChoice.Now,
+        preferHls: Boolean = false,
     ) {
-        val priority = SyncContentTypes(syncLive, syncMovies, syncSeries)
-        runImport(autoRefresh, priority, enqueueRemainder = true, requiresNetwork = true) { profileId ->
+        val enabled = SyncContentTypes.fromChoices(live, movies, series)
+        val priority = SyncContentTypes.priorityFromChoices(live, movies, series)
+        runImport(autoRefresh, priority, enabledScope = enabled, enqueueRemainder = true, requiresNetwork = true) { profileId ->
             sourceRepository.addXtreamSource(
                 profileId = profileId,
                 name = name.ifBlank { "My IPTV" },
@@ -131,22 +169,34 @@ class SetupViewModel(
                 password = password,
                 userAgent = userAgent.trim().takeIf { it.isNotBlank() },
                 epgUrl = epgUrl.trim().takeIf { it.isNotBlank() },
+                syncLive = enabled.live, syncMovies = enabled.movies, syncSeries = enabled.series,
+                preferHls = preferHls,
             )
         }
     }
 
     /** Stalker/MAC portal onboarding — mirrors SettingsViewModel.addStalker: the handshake is verified
      *  BEFORE the source is saved, so a typo'd portal/MAC fails with a clear error instead of leaving a
-     *  dead source on the brand-new profile. Staged automatically (no toggles): live syncs in the
-     *  foreground (fast — one bulk get_all_channels), movies/series go to the background remainder
-     *  worker, because Stalker VOD has no bulk endpoint (~14 items/page → thousands of requests). */
-    fun startStalker(name: String, portalUrl: String, mac: String, userAgent: String = "", autoRefresh: PlaylistAutoRefresh = PlaylistAutoRefresh.OFF) {
+     *  dead source on the brand-new profile. Defaults: Live Now, Movies/Series Later (Stalker VOD has
+     *  no bulk endpoint). Off sections are never fetched or shown. */
+    fun startStalker(
+        name: String,
+        portalUrl: String,
+        mac: String,
+        userAgent: String = "",
+        autoRefresh: PlaylistAutoRefresh = PlaylistAutoRefresh.OFF,
+        live: SyncScopeChoice = SyncScopeChoice.Now,
+        movies: SyncScopeChoice = SyncScopeChoice.Later,
+        series: SyncScopeChoice = SyncScopeChoice.Later,
+    ) {
         val canonicalMac = tv.own.owntv.core.stalker.StalkerClient.canonicalizeMac(mac)
         if (canonicalMac == null) {
             _state.value = ImportState.Failed("Invalid MAC address — use AA:BB:CC:DD:EE:FF")
             return
         }
-        runImport(autoRefresh, contentTypes = STALKER_PRIORITY, enqueueRemainder = true, requiresNetwork = true) { profileId ->
+        val enabled = SyncContentTypes.fromChoices(live, movies, series)
+        val priority = SyncContentTypes.priorityFromChoices(live, movies, series)
+        runImport(autoRefresh, contentTypes = priority, enabledScope = enabled, enqueueRemainder = true, requiresNetwork = true) { profileId ->
             stalkerAuth.testConnection(
                 tv.own.owntv.core.stalker.StalkerCredentials(
                     sourceId = STALKER_TEST_SOURCE_ID,
@@ -158,6 +208,7 @@ class SetupViewModel(
             sourceRepository.addStalkerSource(
                 profileId, name.ifBlank { "My Portal" }, portalUrl.trim(), canonicalMac,
                 userAgent.trim().takeIf { it.isNotBlank() },
+                syncLive = enabled.live, syncMovies = enabled.movies, syncSeries = enabled.series,
             )
         }
     }
@@ -176,6 +227,7 @@ class SetupViewModel(
     private fun runImport(
         autoRefresh: PlaylistAutoRefresh = PlaylistAutoRefresh.OFF,
         contentTypes: SyncContentTypes = SyncContentTypes(),
+        enabledScope: SyncContentTypes = SyncContentTypes(),
         enqueueRemainder: Boolean = false,
         requiresNetwork: Boolean = true,
         addSource: suspend (Long) -> SourceEntity,
@@ -193,14 +245,18 @@ class SetupViewModel(
                 val profileId = createdProfileId.takeIf { it > 0 } ?: ensureFallbackProfile()
                 source = addSource(profileId)
                 val freshSync = source.lastSyncAt == null
-                val remainder = if (enqueueRemainder) SyncContentTypes().remainderAfter(contentTypes) else SyncContentTypes(live = false, movies = false, series = false)
+                val remainder = if (enqueueRemainder) {
+                    enabledScope.remainderAfter(contentTypes)
+                } else {
+                    SyncContentTypes(live = false, movies = false, series = false)
+                }
                 settings.setPlaylistAutoRefresh(source.id, autoRefresh)
                 when (val result = sourceRepository.sync(source, onProgress = { _progress.value = it }, contentTypes = contentTypes)) {
                     is SyncResult.Success -> {
                         // Just the playlist content — EPG is added separately (Settings → EPG sources).
                         val counts = importFinalizer.finalize(source, deferIndexes = freshSync)
                         val syncedSource = sourceDao.getById(source.id) ?: source
-                        if (enqueueRemainder) enqueueRemainderSync(source, contentTypes)
+                        if (enqueueRemainder) enqueueRemainderSync(source, contentTypes, enabledScope)
                         if (freshSync && !remainder.hasAny) catalogSyncScheduler.enqueueContentIndexBuild(reason = "fresh_add")
                         lastFailedSource = null
                         _state.value = ImportState.Success(
@@ -238,11 +294,9 @@ class SetupViewModel(
     private fun String.isLocalPlaylistPath(): Boolean =
         startsWith("/") || startsWith("file://") || startsWith("content://")
 
-    private fun enqueueRemainderSync(source: SourceEntity, priority: SyncContentTypes) {
-        val remainder = SyncContentTypes().remainderAfter(priority)
+    private fun enqueueRemainderSync(source: SourceEntity, priority: SyncContentTypes, enabledScope: SyncContentTypes) {
+        val remainder = enabledScope.remainderAfter(priority)
         if (remainder.hasAny) {
-            // The priority pass + this remainder cover all content types, so a successful remainder
-            // run must mark the source synced (SyncManager only does that for single full syncs).
             catalogSyncScheduler.enqueueSync(source.id, reason = "add_remainder", contentTypes = remainder, completesInitialSync = true)
         }
     }
@@ -306,6 +360,11 @@ class SetupViewModel(
     fun importBackup(file: File, onDone: () -> Unit) {
         viewModelScope.launch {
             _state.value = ImportState.Running
+            // A sealed .own reveals nothing before it is decrypted — ask for the password first.
+            if (backup.isSealed(file)) {
+                _state.value = ImportState.NeedPassword(file, sealed = true)
+                return@launch
+            }
             val inspection = backup.sectionsIn(file).getOrElse {
                 _state.value = ImportState.Failed(it.message ?: "Couldn't read the backup file")
                 return@launch
@@ -325,12 +384,17 @@ class SetupViewModel(
 
     private suspend fun doRestore(file: File, password: String?, onDone: () -> Unit) {
         backup.import(file, backupPassword = password).fold(
-            onSuccess = {
+            onSuccess = { summary ->
                 val note = if (password.isNullOrBlank()) " Re-enter any saved passwords afterwards." else ""
-                _state.value = ImportState.Success("Restored $it items. Re-sync your sources to load content.$note"); onDone()
+                _state.value = ImportState.Success(
+                    "Restored ${summary.items} items. Re-sync your sources to load content.$note${summary.skippedNote}",
+                )
+                onDone()
             },
             onFailure = {
-                if (it is BackupManager.WrongPasswordException) _state.value = ImportState.NeedPassword(file, retry = true)
+                if (it is BackupManager.WrongPasswordException) {
+                    _state.value = ImportState.NeedPassword(file, retry = true, sealed = backup.isSealed(file))
+                }
                 else _state.value = ImportState.Failed(it.message ?: "Restore failed")
             },
         )
@@ -394,13 +458,10 @@ class SetupViewModel(
     }
 
     private fun String.withWarnings(result: SyncResult.Success): String =
-        result.warningSummary()?.let { "$this\n$it" } ?: this
+        listOfNotNull(this, result.warningSummary()).joinToString("\n")
 
     private companion object {
         /** Sentinel sourceId for the pre-save Stalker handshake (same as SettingsViewModel's). */
         const val STALKER_TEST_SOURCE_ID = -1L
-
-        /** Stalker foreground pass: live only; movies/series are always the background remainder. */
-        val STALKER_PRIORITY = SyncContentTypes(live = true, movies = false, series = false)
     }
 }

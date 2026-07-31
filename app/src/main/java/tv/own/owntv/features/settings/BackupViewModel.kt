@@ -5,42 +5,111 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import tv.own.owntv.core.backup.BackupManager
 import java.io.File
 
 /** Phase 12 — drives Backup & Restore (selective export/import to a JSON file). */
-class BackupViewModel(private val backup: BackupManager) : ViewModel() {
+class BackupViewModel(
+    private val backup: BackupManager,
+    private val profileDao: tv.own.owntv.core.database.dao.ProfileDao,
+    private val settings: tv.own.owntv.features.settings.data.SettingsRepository,
+    private val companion: tv.own.owntv.core.companion.CompanionController,
+) : ViewModel() {
+
+    // ---- Remote restore: a phone uploads a backup JSON to the TV over the LAN companion server. ----
+    /** Server lifecycle (Idle / Starting / Listening with PIN+QR / Failed) for the remote-restore panel. */
+    val remoteState get() = companion.state
+
+    /** Uploaded backup files — the screen collects this and feeds each into [inspect]. */
+    val remoteBackups get() = companion.backups
+
+    fun startRemoteRestore(port: Int = tv.own.owntv.core.companion.CompanionLink.DEFAULT_PORT) =
+        companion.startForBackupRestore(port)
+
+    fun stopRemoteRestore() = companion.stop()
+
+    /** Exports to an app-internal cache file, then serves it over the companion server for a phone/laptop
+     *  to download. On failure the base screen shows the error; on success the remote panel shows PIN+QR. */
+    fun exportRemote(sections: Set<BackupManager.Section>, backupPassword: String?, profileIds: Set<Long>) {
+        viewModelScope.launch {
+            _state.value = State.Working
+            backup.export(companion.backupExportDir, sections, backupPassword, profileIds).fold(
+                onSuccess = { path ->
+                    companion.startForBackupDownload(tv.own.owntv.core.companion.CompanionLink.DEFAULT_PORT, File(path))
+                    _state.value = State.Idle
+                },
+                onFailure = { _state.value = State.Error(it.message ?: "Export failed") },
+            )
+        }
+    }
+
+    fun stopRemoteExport() = companion.stop()
+
+    /** All profiles + the active one, for the export flow's profile-picker step. */
+    data class ProfileChoices(val profiles: List<tv.own.owntv.core.database.entity.ProfileEntity>, val activeId: Long)
+
+    private val _profileChoices = MutableStateFlow<ProfileChoices?>(null)
+    val profileChoices: StateFlow<ProfileChoices?> = _profileChoices.asStateFlow()
+
+    fun loadProfiles() {
+        viewModelScope.launch {
+            _profileChoices.value = ProfileChoices(
+                profiles = profileDao.getAllOnce(),
+                activeId = settings.activeProfileId.first(),
+            )
+        }
+    }
+
+    /** PIN check for ticking a locked, non-active profile in the export picker. */
+    fun verifyPin(profile: tv.own.owntv.core.database.entity.ProfileEntity, pin: String): Boolean =
+        tv.own.owntv.core.util.Pin.verify(pin, profile.pinHash)
 
     sealed interface State {
         data object Idle : State
         data object Working : State
 
-        /** A restore file was picked & inspected: let the user choose which sections to apply. */
+        /** A restore file was picked & inspected: let the user choose which sections to apply.
+         *  [password] is non-null only for a sealed `.own` already unlocked in the step before —
+         *  it must ride through to the import, or the file would have to be decrypted twice. */
         data class ChooseRestore(
             val file: File,
             val available: Set<BackupManager.Section>,
             val encrypted: Boolean,
+            val password: String? = null,
         ) : State
         data class Done(val message: String) : State
         data class Error(val message: String) : State
 
-        /** Encrypted restore needs the backup password — [retry] is true after a wrong attempt. */
+        /**
+         * Encrypted restore needs the backup password — [retry] is true after a wrong attempt.
+         *
+         * [sections] is null for a **sealed** `.own` container, which is asked for the password
+         * BEFORE anything else: none of its contents — not even the section list — is readable until
+         * it is decrypted, so there is nothing to pick yet and nothing to gain by skipping.
+         * A non-null [sections] is the older field-encrypted flow: sections picked, password
+         * optional, skipping restores everything but the saved passwords.
+         */
         data class NeedPassword(
             val file: File,
-            val sections: Set<BackupManager.Section>,
+            val sections: Set<BackupManager.Section>?,
             val retry: Boolean = false,
-        ) : State
+        ) : State {
+            /** Whole-file encryption: the password is mandatory and there is nothing to skip to. */
+            val sealed: Boolean get() = sections == null
+        }
     }
 
     private val _state = MutableStateFlow<State>(State.Idle)
     val state: StateFlow<State> = _state.asStateFlow()
 
-    /** Export with an optional backup passphrase (blank/null = omit secret password fields). */
-    fun export(folder: File, sections: Set<BackupManager.Section>, backupPassword: String?) {
+    /** Export with an optional backup passphrase (blank/null = omit secret password fields).
+     *  [profileIds] are the PIN-authorized profiles from the picker step. */
+    fun export(folder: File, sections: Set<BackupManager.Section>, backupPassword: String?, profileIds: Set<Long>) {
         viewModelScope.launch {
             _state.value = State.Working
-            backup.export(folder, sections, backupPassword).fold(
+            backup.export(folder, sections, backupPassword, profileIds).fold(
                 onSuccess = {
                     val note = if (backupPassword.isNullOrBlank()) " (passwords were not included)" else ""
                     _state.value = State.Done("Saved to $it$note")
@@ -50,13 +119,39 @@ class BackupViewModel(private val backup: BackupManager) : ViewModel() {
         }
     }
 
-    /** Step 1 of restore: inspect the picked file so the section picker can show what's inside. */
+    /**
+     * Step 1 of restore: inspect the picked file so the section picker can show what's inside.
+     *
+     * A sealed `.own` can't be inspected at all yet — it asks for the password first and comes back
+     * through [unlock]. Everything else (plain `.own`, legacy `.json`) inspects immediately.
+     */
     fun inspect(file: File) {
         viewModelScope.launch {
             _state.value = State.Working
+            if (backup.isSealed(file)) {
+                _state.value = State.NeedPassword(file, sections = null)
+                return@launch
+            }
             backup.sectionsIn(file).fold(
                 onSuccess = { _state.value = State.ChooseRestore(file, it.sections, it.encrypted) },
                 onFailure = { _state.value = State.Error(it.message ?: "Couldn't read the backup file") },
+            )
+        }
+    }
+
+    /** Sealed-container step 1b: decrypt with [password], then show the section picker. */
+    fun unlock(file: File, password: String) {
+        viewModelScope.launch {
+            _state.value = State.Working
+            backup.sectionsIn(file, password).fold(
+                onSuccess = { _state.value = State.ChooseRestore(file, it.sections, it.encrypted, password) },
+                onFailure = {
+                    _state.value = if (it is BackupManager.WrongPasswordException) {
+                        State.NeedPassword(file, sections = null, retry = true)
+                    } else {
+                        State.Error(it.message ?: "Couldn't read the backup file")
+                    }
+                },
             )
         }
     }
@@ -66,9 +161,11 @@ class BackupViewModel(private val backup: BackupManager) : ViewModel() {
         viewModelScope.launch {
             _state.value = State.Working
             backup.import(file, sections, backupPassword).fold(
-                onSuccess = {
+                onSuccess = { summary ->
                     val note = if (backupPassword.isNullOrBlank()) " Re-enter any saved passwords in Sources/Proxy." else ""
-                    _state.value = State.Done("Restored $it items. Re-sync your sources to load content.$note")
+                    _state.value = State.Done(
+                        "Restored ${summary.items} items. Re-sync your sources to load content.$note${summary.skippedNote}",
+                    )
                 },
                 onFailure = {
                     if (it is BackupManager.WrongPasswordException) {
@@ -81,10 +178,19 @@ class BackupViewModel(private val backup: BackupManager) : ViewModel() {
         }
     }
 
-    /** Restore proceeds: either prompt for the password (encrypted) or import straight away. */
-    fun beginImport(file: File, sections: Set<BackupManager.Section>, encrypted: Boolean) {
-        if (encrypted) _state.value = State.NeedPassword(file, sections)
-        else import(file, sections, null)
+    /** Restore proceeds: import straight away when we already hold the password (sealed container,
+     *  unlocked in [unlock]) or nothing is encrypted; otherwise prompt for the optional passphrase. */
+    fun beginImport(
+        file: File,
+        sections: Set<BackupManager.Section>,
+        encrypted: Boolean,
+        password: String? = null,
+    ) {
+        when {
+            password != null -> import(file, sections, password)
+            encrypted -> _state.value = State.NeedPassword(file, sections)
+            else -> import(file, sections, null)
+        }
     }
 
     fun reset() { _state.value = State.Idle }

@@ -22,6 +22,14 @@ import tv.own.owntv.di.playerModule
 
 class OwnTVApp : Application(), SingletonImageLoader.Factory, androidx.work.Configuration.Provider {
 
+    companion object {
+        /** Upper bound for the image disk cache — the value it was fixed at before ST6. */
+        private const val MAX_IMAGE_CACHE_BYTES = 250L * 1024 * 1024
+
+        /** Lower bound: below this the cache thrashes and stops saving any downloads. */
+        private const val MIN_IMAGE_CACHE_BYTES = 32L * 1024 * 1024
+    }
+
     override val workManagerConfiguration: androidx.work.Configuration
         get() = androidx.work.Configuration.Builder()
             .setWorkerFactory(tv.own.owntv.core.sync.work.KoinWorkerFactory())
@@ -64,7 +72,7 @@ class OwnTVApp : Application(), SingletonImageLoader.Factory, androidx.work.Conf
             .diskCache {
                 coil3.disk.DiskCache.Builder()
                     .directory(cacheDir.resolve("image_cache").toOkioPath())
-                    .maxSizeBytes(250L * 1024 * 1024)
+                    .maxSizeBytes(imageDiskCacheBytes())
                     .build()
             }
             // Opaque poster art doesn't need an alpha channel; RGB_565 halves bitmap memory
@@ -74,11 +82,27 @@ class OwnTVApp : Application(), SingletonImageLoader.Factory, androidx.work.Conf
             .build()
 
     /**
+     * ST6 — size the poster/logo disk cache against the storage the box actually has: 5% of free
+     * space, capped at the previous fixed 250 MB and floored at 32 MB (below that the cache stops
+     * being worth having). A 220k-item catalog *will* reach whatever cap it is given, so on a nearly
+     * full 8 GB box the fixed number was competing with downloads and app updates for the last
+     * gigabyte. One `statfs` call at Application construction, never re-evaluated at runtime — the
+     * launch path stays free of directory walks.
+     */
+    private fun imageDiskCacheBytes(): Long {
+        val free = runCatching { cacheDir.usableSpace }.getOrDefault(0L).coerceAtLeast(0L)
+        return minOf(MAX_IMAGE_CACHE_BYTES, (free * 0.05).toLong()).coerceAtLeast(MIN_IMAGE_CACHE_BYTES)
+    }
+
+    /**
      * Memory-pressure airbag: when the OS warns we're a kill candidate, drop the image cache and
      * shrink the player's stream cache live instead of waiting for the low-memory killer.
      */
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
+        // TRIM_MEMORY_RUNNING_LOW is deprecated on API 34+ but still the only signal on TV devices
+        // running older Android, so keep honouring it.
+        @Suppress("DEPRECATION")
         if (level >= TRIM_MEMORY_RUNNING_LOW) {
             runCatching { SingletonImageLoader.get(this).memoryCache?.clear() }
             runCatching { GlobalContext.getOrNull()?.getOrNull<tv.own.owntv.player.OwnTVPlayer>()?.onTrimMemory() }

@@ -2,6 +2,7 @@ package tv.own.owntv.ui.components
 
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -70,10 +71,15 @@ fun MoveOrderOverlay(
 
     // Outer Box intercepts D-pad via onKeyEvent when any child has focus.
     // NOT focusable() itself — focus lives on the Save button so TV focus finds it.
+    // trapAllFocusExit cancels every directional exit so a stray Left/Right (not handled by
+    // onKeyEvent below, which only routes Up/Down/Back) can't escape the overlay onto the screen
+    // behind it.
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.88f))
+            .trapAllFocusExit()
+            .focusGroup()
             .onKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
                 when (event.key) {

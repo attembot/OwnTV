@@ -8,10 +8,22 @@
     <!-- In-app updates: hand the downloaded release APK to the system installer. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- Downloads keep transferring after the user leaves the app, as a foreground service with an
+         ongoing progress notification. POST_NOTIFICATIONS is only asked for by the system on API 33+;
+         if it is denied the service still runs, the notification is just not shown. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- Android TV provider writes for Watch Next cards. -->
     <uses-permission android:name="com.android.providers.tv.permission.WRITE_EPG_DATA" />
 
-    <!-- Downloads & backup to user-chosen folders (SAF's document picker is absent on most TVs). -->
+    <!-- Downloads & backup to user-chosen folders (SAF's document picker is absent on most TVs).
+         READ stays declared through API 32: dropping it left some OEM builds (TCL Android 12,
+         "Permission Shield") with NO grantable storage entry at all — MANAGE_EXTERNAL_STORAGE alone
+         is a special app access their settings never surface. With READ declared, requesting it on
+         API 30–32 opens the system "Files and media" screen, which also lists
+         "Allow management of all files" because MANAGE is declared. -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
@@ -64,12 +76,18 @@
                 tools:node="remove" />
         </provider>
 
+        <!-- WorkManager's foreground-service host, typed for the download worker's data sync. -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
+
         <activity
             android:name=".MainActivity"
             android:banner="@drawable/tv_banner"
             android:exported="true"
             android:launchMode="singleTop"
-            android:theme="@style/Theme.OwnTV">
+            android:theme="@style/Theme.OwnTV.Starting">
             <!-- LEANBACK_LAUNCHER shows it on TV launchers; LAUNCHER shows it on phone/tablet/box home
                  screens (so non-TV devices get an app icon, not just an install). -->
             <intent-filter>

@@ -16,7 +16,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -24,6 +27,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,10 +45,13 @@ import tv.own.owntv.features.settings.data.EpgAutoRefresh
 import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.OwnTVButton
 import tv.own.owntv.ui.components.OwnTVButtonStyle
+import tv.own.owntv.ui.components.dialogPanel
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.OwnTVSpinner
 import tv.own.owntv.ui.components.OwnTVTextField
 import tv.own.owntv.ui.components.roundedPanel
+import tv.own.owntv.ui.components.trapAllFocusExit
+import tv.own.owntv.ui.theme.GlassSurface
 import tv.own.owntv.ui.theme.OwnTVTheme
 import tv.own.owntv.core.sync.work.EpgSyncState
 
@@ -58,6 +65,8 @@ fun EpgSourcesScreen(onBack: () -> Unit, modifier: Modifier = Modifier, startOnA
     val vm: EpgSourcesViewModel = koinViewModel()
     val sources by vm.sources.collectAsStateWithLifecycle()
     val autoRefreshMap by vm.autoRefresh.collectAsStateWithLifecycle()
+    val useLogosIds by vm.useLogos.collectAsStateWithLifecycle()
+    val deletingIds by vm.deletingIds.collectAsStateWithLifecycle()
     val colors = OwnTVTheme.colors
 
     var editing by remember { mutableStateOf<EpgSource?>(null) }
@@ -65,14 +74,47 @@ fun EpgSourcesScreen(onBack: () -> Unit, modifier: Modifier = Modifier, startOnA
     var confirmDelete by remember { mutableStateOf<EpgSource?>(null) }
     val addFocus = remember { FocusRequester() }
 
+    // Per-row focus restore (mirrors ManageSourcesScreen / MoviesScreen): track the row the user is
+    // acting on so edit/re-sync/delete returns focus INSIDE the list — same row if it survived, else
+    // the nearest neighbour, else the first row, else "Add EPG". Without this the old code always
+    // refocused the "Add EPG" button, which is why focus escaped the menu.
+    var contextId by remember { mutableStateOf<Long?>(null) }
+    var contextIndex by remember { mutableStateOf(-1) }
+    val contextFocus = remember { FocusRequester() }
+    val firstRowFocus = remember { FocusRequester() }
+
     BackHandler { onBack() }
 
-    // Grab focus when the list view is showing (entry, and after returning from the form or a dialog).
-    // The Column's onEnter only fires on directional entry, not on this internal tab-swap.
+    // Grab focus inside the list (not on "Add EPG") whenever the list view is showing.
     LaunchedEffect(adding, editing, confirmDelete) {
-        if (!adding && editing == null && confirmDelete == null) {
-            kotlinx.coroutines.delay(80); runCatching { addFocus.requestFocus() }
+        if (adding || editing != null || confirmDelete != null) return@LaunchedEffect
+        kotlinx.coroutines.delay(80)
+        val targetId = contextId
+        if (targetId != null && sources.any { it.id == targetId }) {
+            runCatching { contextFocus.requestFocus() }
+        } else if (sources.isNotEmpty()) {
+            runCatching { firstRowFocus.requestFocus() }
+        } else {
+            runCatching { addFocus.requestFocus() }
         }
+    }
+
+    // When the deleted row vanishes from `sources`, move focus to the nearest surviving neighbour
+    // (same index slot, else new last row) instead of letting it escape the menu.
+    LaunchedEffect(sources) {
+        val targetId = contextId ?: return@LaunchedEffect
+        if (sources.any { it.id == targetId }) return@LaunchedEffect
+        withFrameNanos { }
+        if (sources.isEmpty()) {
+            contextId = null; contextIndex = -1
+            runCatching { addFocus.requestFocus() }
+            return@LaunchedEffect
+        }
+        val neighbor = sources.getOrNull(contextIndex.coerceAtLeast(0)) ?: sources.last()
+        contextId = neighbor.id
+        contextIndex = sources.indexOfFirst { it.id == neighbor.id }
+        withFrameNanos { }
+        runCatching { contextFocus.requestFocus() }
     }
 
     // Add / edit form.
@@ -80,11 +122,12 @@ fun EpgSourcesScreen(onBack: () -> Unit, modifier: Modifier = Modifier, startOnA
         EpgSourceForm(
             initial = editing,
             initialAutoRefresh = editing?.let { autoRefreshMap[it.id] } ?: EpgAutoRefresh.OFF,
+            initialUseLogos = editing?.let { it.id in useLogosIds } ?: false,
             loadPlaylistOptions = { vm.playlistEpgOptions() },
-            onSave = { name, url, ua, autoRefresh ->
+            onSave = { name, url, ua, autoRefresh, useLogos ->
                 val e = editing
-                if (e == null) vm.add(name, url, ua, autoRefresh)
-                else { vm.update(e, name, url, ua); vm.setAutoRefresh(e, autoRefresh) }
+                if (e == null) vm.add(name, url, ua, autoRefresh, useLogos)
+                else { vm.update(e, name, url, ua); vm.setAutoRefresh(e, autoRefresh); vm.setUseLogos(e, useLogos) }
                 adding = false; editing = null
             },
             onCancel = { adding = false; editing = null },
@@ -97,7 +140,18 @@ fun EpgSourcesScreen(onBack: () -> Unit, modifier: Modifier = Modifier, startOnA
         modifier = modifier
             .fillMaxSize()
             .roundedPanel()
-            .focusProperties { onEnter = { runCatching { addFocus.requestFocus() } } }
+            // D-pad entry from outside should fall INSIDE the menu — last-acted row, else first row,
+            // else "Add EPG" (only when the list is empty). Previously this always went to "Add EPG".
+            .focusProperties {
+                onEnter = {
+                    val tid = contextId
+                    when {
+                        tid != null && sources.any { it.id == tid } -> runCatching { contextFocus.requestFocus() }
+                        sources.isNotEmpty() -> runCatching { firstRowFocus.requestFocus() }
+                        else -> runCatching { addFocus.requestFocus() }
+                    }
+                }
+            }
             .focusGroup()
             .padding(horizontal = 40.dp, vertical = 28.dp),
     ) {
@@ -120,7 +174,7 @@ fun EpgSourcesScreen(onBack: () -> Unit, modifier: Modifier = Modifier, startOnA
             }
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(sources, key = { it.id }) { source ->
+                itemsIndexed(sources, key = { _, it -> it.id }) { index, source ->
                     val syncState by remember(source.id) { vm.observeSync(source.id) }
                         .collectAsStateWithLifecycle(EpgSyncState.Idle)
                     EpgRow(
@@ -128,10 +182,17 @@ fun EpgSourcesScreen(onBack: () -> Unit, modifier: Modifier = Modifier, startOnA
                         autoRefresh = autoRefreshMap[source.id] ?: EpgAutoRefresh.OFF,
                         counts = { vm.counts(source.id) },
                         syncState = syncState,
-                        onResync = { vm.resync(source) },
-                        onCancelSync = { vm.cancelSync(source) },
-                        onEdit = { editing = source },
-                        onDelete = { confirmDelete = source },
+                        deleting = source.id in deletingIds,
+                        // Bind contextFocus to the acted-on row (restore target), firstRowFocus to row 0.
+                        rowModifier = when {
+                            source.id == contextId -> Modifier.focusRequester(contextFocus)
+                            index == 0 -> Modifier.focusRequester(firstRowFocus)
+                            else -> Modifier
+                        },
+                        onResync = { contextId = source.id; contextIndex = index; vm.resync(source) },
+                        onCancelSync = { contextId = source.id; contextIndex = index; vm.cancelSync(source) },
+                        onEdit = { contextId = source.id; contextIndex = index; editing = source },
+                        onDelete = { contextId = source.id; contextIndex = index; confirmDelete = source },
                     )
                 }
             }
@@ -154,6 +215,8 @@ private fun EpgRow(
     autoRefresh: EpgAutoRefresh,
     counts: suspend () -> Triple<Int, Int, Int>,
     syncState: EpgSyncState,
+    deleting: Boolean,
+    rowModifier: Modifier,
     onResync: () -> Unit,
     onCancelSync: () -> Unit,
     onEdit: () -> Unit,
@@ -172,12 +235,22 @@ private fun EpgRow(
         }
     }
     Row(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(colors.surfaceContainerHigh).padding(16.dp),
+        modifier = rowModifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(colors.surfaceContainerHigh).padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(source.name, style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
+                if (deleting) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "Deleting…",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = colors.onPrimaryContainer,
+                        modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(colors.primaryContainer).padding(horizontal = 8.dp, vertical = 2.dp),
+                        maxLines = 1,
+                    )
+                }
                 if (activeSync != null) {
                     Spacer(Modifier.width(8.dp))
                     Text(
@@ -216,14 +289,20 @@ private fun EpgRow(
             Text(status, style = MaterialTheme.typography.labelMedium, color = if (source.lastError != null && activeSync == null) Color(0xFFEF4444) else colors.primary)
         }
         Spacer(Modifier.width(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (syncState.isActive) {
-                OwnTVButton("Cancel", onClick = onCancelSync, style = OwnTVButtonStyle.SECONDARY)
-            } else {
-                OwnTVButton("Re-sync", onClick = onResync, style = OwnTVButtonStyle.SECONDARY)
+        // While the guide data is being deleted, hide the actions — the row is on its way out and a
+        // large delete can take a moment.
+        if (!deleting) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // One stable button whose label/action flips with syncState — same composable stays in
+                // the tree across the swap, so focus survives instead of escaping the row.
+                OwnTVButton(
+                    label = if (syncState.isActive) "Cancel" else "Re-sync",
+                    onClick = if (syncState.isActive) onCancelSync else onResync,
+                    style = OwnTVButtonStyle.SECONDARY,
+                )
+                OwnTVButton("Edit", onClick = onEdit, style = OwnTVButtonStyle.SECONDARY)
+                OwnTVButton("Delete", onClick = onDelete, style = OwnTVButtonStyle.SECONDARY)
             }
-            OwnTVButton("Edit", onClick = onEdit, style = OwnTVButtonStyle.SECONDARY)
-            OwnTVButton("Delete", onClick = onDelete, style = OwnTVButtonStyle.SECONDARY)
         }
     }
 }
@@ -232,8 +311,9 @@ private fun EpgRow(
 internal fun EpgSourceForm(
     initial: EpgSource?,
     initialAutoRefresh: EpgAutoRefresh,
+    initialUseLogos: Boolean,
     loadPlaylistOptions: suspend () -> List<EpgSourcesViewModel.PlaylistEpg>,
-    onSave: (name: String, url: String, userAgent: String?, autoRefresh: EpgAutoRefresh) -> Unit,
+    onSave: (name: String, url: String, userAgent: String?, autoRefresh: EpgAutoRefresh, useLogos: Boolean) -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -242,6 +322,7 @@ internal fun EpgSourceForm(
     var url by remember { mutableStateOf(initial?.url ?: "") }
     var ua by remember { mutableStateOf(initial?.userAgent ?: "") }
     var autoRefresh by remember { mutableStateOf(initialAutoRefresh) }
+    var useLogos by remember { mutableStateOf(initialUseLogos) }
     var showPlaylistPicker by remember { mutableStateOf(false) }
     var showAutoRefreshPicker by remember { mutableStateOf(false) }
     val firstFocus = remember { FocusRequester() }
@@ -249,7 +330,9 @@ internal fun EpgSourceForm(
     BackHandler { onCancel() }
 
     Column(
-        modifier = modifier.fillMaxSize().roundedPanel().padding(horizontal = 40.dp, vertical = 28.dp),
+        modifier = modifier.fillMaxSize().roundedPanel()
+            .verticalScroll(rememberScrollState()) // scroll so lower fields/buttons stay reachable on small screens / large zoom
+            .padding(horizontal = 40.dp, vertical = 28.dp),
     ) {
         Text(if (initial == null) "Add EPG source" else "Edit EPG source", style = MaterialTheme.typography.headlineLarge, color = colors.onSurface)
         Spacer(Modifier.height(20.dp))
@@ -266,10 +349,14 @@ internal fun EpgSourceForm(
         // Auto-refresh dropdown — same Off/Startup/staleness-threshold semantics as playlist sources.
         EpgAutoRefreshRow(selected = autoRefresh) { showAutoRefreshPicker = true }
 
+        Spacer(Modifier.height(10.dp))
+        // Per-feed logo override: this guide's <icon src> replaces the playlist's channel logos.
+        EpgUseLogosRow(enabled = useLogos) { useLogos = !useLogos }
+
         Spacer(Modifier.height(24.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OwnTVButton("Cancel", onClick = onCancel, style = OwnTVButtonStyle.SECONDARY)
-            OwnTVButton(if (initial == null) "Add & sync" else "Save & sync", onClick = { onSave(name, url, ua, autoRefresh) }, enabled = url.isNotBlank())
+            OwnTVButton(if (initial == null) "Add & sync" else "Save & sync", onClick = { onSave(name, url, ua, autoRefresh, useLogos) }, enabled = url.isNotBlank())
         }
     }
 
@@ -294,6 +381,31 @@ internal fun EpgSourceForm(
     }
 }
 
+/** Per-EPG-source toggle: use this feed's own channel logos instead of the playlist's. */
+@Composable
+private fun EpgUseLogosRow(enabled: Boolean, onClick: () -> Unit) {
+    val colors = OwnTVTheme.colors
+    FocusableSurface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp),
+        shape = RoundedCornerShape(14.dp),
+        surface = GlassSurface.CARDS,
+        contentAlignment = Alignment.CenterStart,
+    ) { _ ->
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Use this guide's channel logos", style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
+                Text(
+                    "Show logos from this XMLTV feed instead of your playlist's. Channels this feed has no logo for keep the playlist one.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.onSurfaceVariant,
+                )
+            }
+            Text(if (enabled) "On" else "Off", style = MaterialTheme.typography.titleMedium, color = if (enabled) colors.primary else colors.onSurfaceVariant)
+        }
+    }
+}
+
 /** A focusable settings row showing the current EPG auto-refresh selection; opens a picker on click. */
 @Composable
 private fun EpgAutoRefreshRow(selected: EpgAutoRefresh, onClick: () -> Unit) {
@@ -302,6 +414,7 @@ private fun EpgAutoRefreshRow(selected: EpgAutoRefresh, onClick: () -> Unit) {
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().widthIn(max = 680.dp),
         shape = RoundedCornerShape(14.dp),
+        surface = GlassSurface.CARDS,
         contentAlignment = Alignment.CenterStart,
     ) { _ ->
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -334,8 +447,8 @@ private fun PlaylistEpgPicker(
     LaunchedEffect(options) { if (!options.isNullOrEmpty()) runCatching { firstFocus.requestFocus() } }
     BackHandler { onDismiss() }
 
-    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)).focusGroup(), contentAlignment = Alignment.Center) {
-        Column(Modifier.width(560.dp).clip(RoundedCornerShape(20.dp)).background(colors.surfaceContainerHigh).padding(24.dp)) {
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)).trapAllFocusExit().focusGroup(), contentAlignment = Alignment.Center) {
+        Column(Modifier.dialogPanel(width = 560.dp, corner = 20.dp, padding = 24.dp, scroll = false)) {
             Text("Fill from playlist", style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
             Spacer(Modifier.height(14.dp))
             val opts = options
@@ -349,6 +462,7 @@ private fun PlaylistEpgPicker(
                             modifier = if (opt == opts.first()) Modifier.fillMaxWidth().focusRequester(firstFocus) else Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
                             contentAlignment = Alignment.CenterStart,
+                            surface = GlassSurface.DIALOGS,
                         ) { _ ->
                             Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp)) {
                                 Text(opt.name, style = MaterialTheme.typography.titleMedium, color = colors.onSurface)

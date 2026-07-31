@@ -7,6 +7,7 @@ import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 import tv.own.owntv.core.database.entity.EpgHashProjection
 import tv.own.owntv.core.database.entity.EpgChannelEntity
+import tv.own.owntv.core.database.entity.EpgChannelIcon
 import tv.own.owntv.core.database.entity.EpgProgrammeEntity
 
 /** EPG storage + now/next lookups. Programmes are kept to a rolling window and pruned. */
@@ -58,6 +59,11 @@ interface EpgDao {
     /** Now + upcoming programmes for a channel (now/next and a short guide). */
     @Query("SELECT * FROM epg_programmes WHERE epgChannelId = :epgChannelId AND stopMs > :now ORDER BY startMs ASC LIMIT :limit")
     fun upcoming(epgChannelId: String, now: Long, limit: Int): Flow<List<EpgProgrammeEntity>>
+
+    /** Total guide coverage for a channel, in whole days (latest stop − earliest start). Null when there
+     *  is no stored guide for the channel. Used for the "EPG · Nd" hint in the Live preview metadata. */
+    @Query("SELECT (MAX(stopMs) - MIN(startMs)) / 86400000 FROM epg_programmes WHERE epgChannelId = :epgChannelId")
+    suspend fun coverageDays(epgChannelId: String): Int?
 
     /** Lightweight guide rows: the grid needs titles/times, not potentially huge XMLTV descriptions. */
     @Query(
@@ -112,6 +118,11 @@ interface EpgDao {
     @Query("SELECT COUNT(*) FROM epg_programmes WHERE sourceId IN (:sourceIds)")
     suspend fun countForSources(sourceIds: List<Long>): Int
 
+    /** Current/upcoming programmes for one (normalized) EPG channel id — 0 means the feed has nothing
+     *  scheduled from now on, so a freshly-matched channel would show an empty guide row. */
+    @Query("SELECT COUNT(*) FROM epg_programmes WHERE epgChannelId = :epgChannelId AND stopMs > :now")
+    suspend fun countUpcomingForChannel(epgChannelId: String, now: Long): Int
+
 
     /** Live programme count for one source — drives the EPG status shown on the source row. */
     @Query("SELECT COUNT(*) FROM epg_programmes WHERE sourceId = :sourceId")
@@ -128,6 +139,14 @@ interface EpgDao {
             "GROUP BY epgChannelId ORDER BY displayName ASC LIMIT :limit",
     )
     suspend fun listEpgChannels(sourceIds: List<Long>, query: String, limit: Int): List<EpgChannelEntity>
+
+    /**
+     * Channel `<icon src>` logos from the EPG sources the user enabled "Use this guide's logos" on.
+     * Only rows with an icon are returned, so a feed without icons costs nothing. Ids are already
+     * stored normalized (trim+lowercase), which is the key the override map is looked up by.
+     */
+    @Query("SELECT epgChannelId, iconUrl FROM epg_channels WHERE sourceId IN (:sourceIds) AND iconUrl IS NOT NULL AND iconUrl != ''")
+    fun observeChannelIcons(sourceIds: List<Long>): Flow<List<EpgChannelIcon>>
 
     @Query("SELECT epgChannelId FROM epg_channels WHERE sourceId = :sourceId")
     suspend fun epgChannelIdsForSource(sourceId: Long): List<String>

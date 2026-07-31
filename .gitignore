@@ -30,3 +30,8 @@ signing.properties
 # Internal planning documents — kept local, never committed
 future-plan/
 
+
+# JVM crash dumps from a Gradle daemon (never worth committing)
+hs_err_pid*.log
+replay_pid*.log
+

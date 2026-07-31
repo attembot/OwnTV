@@ -10,12 +10,14 @@ import tv.own.owntv.core.database.dao.CategoryDao
 import tv.own.owntv.core.database.dao.ChannelDao
 import tv.own.owntv.core.database.dao.MovieDao
 import tv.own.owntv.core.database.dao.SeriesDao
+import tv.own.owntv.core.customize.CustomizationStore
 import tv.own.owntv.core.database.dao.SourceDao
 import tv.own.owntv.core.database.entity.SourceEntity
 import tv.own.owntv.core.model.SourceType
 import tv.own.owntv.core.network.HttpClient
 import tv.own.owntv.core.parser.M3uParser
 import tv.own.owntv.core.parser.XtreamClient
+import tv.own.owntv.features.settings.data.SettingsRepository
 
 /**
  * Imports a source into the database — a thin dispatcher over the per-source-type syncers
@@ -39,60 +41,88 @@ class SyncManager(
     stalkerClient: tv.own.owntv.core.stalker.StalkerClient,
     stalkerAuth: tv.own.owntv.core.stalker.StalkerAuthManager,
     private val activityTracker: SyncActivityTracker,
+    customize: CustomizationStore,
+    settings: SettingsRepository,
 ) {
-    private val support = SyncSupport(categoryDao, channelDao, movieDao, seriesDao)
+    private val support = SyncSupport(categoryDao, channelDao, movieDao, seriesDao, sourceDao, customize, settings)
     private val xtreamSyncer = XtreamSyncer(xtream, bulkInsertHelper, support)
-    private val m3uSyncer = M3uSyncer(context, sourceDao, categoryDao, channelDao, movieDao, seriesDao, m3u, http, bulkInsertHelper)
+    private val m3uSyncer = M3uSyncer(context, sourceDao, categoryDao, channelDao, movieDao, seriesDao, m3u, http, bulkInsertHelper, support)
     private val stalkerSyncer = StalkerSyncer(stalkerClient, stalkerAuth, bulkInsertHelper, support, sourceDao)
 
     private val lastSyncStats = java.util.concurrent.ConcurrentHashMap<Long, SyncRunStats>()
 
     fun getLastSyncStats(sourceId: Long): SyncRunStats? = lastSyncStats[sourceId]
 
-    suspend fun sync(source: SourceEntity, onProgress: (ImportStage) -> Unit, contentTypes: SyncContentTypes = SyncContentTypes()): Pair<SyncResult, SyncRunStats> =
+    suspend fun sync(
+        source: SourceEntity,
+        onProgress: (ImportStage) -> Unit,
+        contentTypes: SyncContentTypes = SyncContentTypes(),
+        /**
+         * User-requested clean resync. Scoped to this one run — it is never persisted and never set
+         * by an automatic sync, so the catalog-shrink guard protects every other pass as before.
+         */
+        forcePrune: Boolean = false,
+    ): Pair<SyncResult, SyncRunStats> =
         withContext(Dispatchers.IO) {
             val syncStartedAt = SystemClock.elapsedRealtime()
-            val stats = SyncStatsCollector(source.id)
-            val trackedContentTypes = when (source.type) {
-                SourceType.XTREAM -> contentTypes
-                SourceType.M3U, SourceType.LOCAL_BACKUP -> SyncContentTypes(live = true, movies = false, series = false)
-                // Stalker: LIVE (Phase C-1) + VOD/series (Phase D-1) all sync via StalkerSyncer.
-                SourceType.STALKER -> contentTypes
-            }
+            val stats = SyncStatsCollector(source.id).apply { this.forcePrune = forcePrune }
+            // Single derivation: request ∩ enabledScope, then type-constrained (replaces the old
+            // trackedContentTypes source-type switch). A stale enqueue can't revive an Off section.
+            val effective = contentTypes.effectiveFor(source)
+            val target = SyncContentTypes.enabledFor(source)
             Log.i(
                 TAG,
                 "sync start sourceId=${source.id} name=${source.name} type=${source.type} " +
-                    "requestedContentTypes=$contentTypes trackedContentTypes=$trackedContentTypes",
+                    "requestedContentTypes=$contentTypes effective=$effective target=$target forcePrune=$forcePrune",
             )
             activityTracker.started(source.id, source.name)
-            val progress = SyncCounters(trackedContentTypes) { stage ->
+            val progress = SyncCounters(effective) { stage ->
                 activityTracker.progress(source.id, stage)
                 onProgress(stage)
             }
-            val result = try {
-                when (source.type) {
-                    SourceType.XTREAM -> xtreamSyncer.sync(source, progress, stats, contentTypes)
-                    SourceType.M3U -> m3uSyncer.sync(source, progress, stats)
-                    SourceType.LOCAL_BACKUP -> Unit
-                    SourceType.STALKER -> stalkerSyncer.sync(source, progress, stats, contentTypes)
+            var result: SyncResult = SyncResult.Cancelled
+            try {
+                if (!effective.hasAny) {
+                    // Empty effective (e.g. Movies-later remainder after Movies turned Off): clean
+                    // no-op — do not stamp lastSyncAt (scope edit enqueues a reconcile resync).
+                    Log.i(TAG, "sync no-op empty effective sourceId=${source.id}")
+                    progress.completeAll()
+                    result = SyncResult.Success()
+                } else {
+                    // Concurrent catalog syncs are safe without an app-wide lock: the only cross-source
+                    // race was BulkInsertHelper's pre-lock tableIsEmpty bypass (a second source writing
+                    // into a half-indexed table while the first restored it). That is now closed inside
+                    // BulkInsertHelper itself — a joining sync registers as a writer and index restore
+                    // waits for the last writer — so sources fetch/parse/insert fully in parallel here.
+                    when (source.type) {
+                        SourceType.XTREAM -> xtreamSyncer.sync(source, progress, stats, effective)
+                        SourceType.M3U -> m3uSyncer.sync(source, progress, stats)
+                        SourceType.LOCAL_BACKUP -> Unit
+                        SourceType.STALKER -> stalkerSyncer.sync(source, progress, stats, effective)
+                    }
+                    // Stamp lastSyncAt only when this pass covered every enabled+constrained section.
+                    // A staged partial pass leaves it null; the background remainder worker stamps via
+                    // completesInitialSync. Comparing against enabledFor (not enabledOf) keeps M3U
+                    // live-only passes from never marking synced.
+                    if (effective.isCompleteFor(target)) {
+                        val markStartedAt = SystemClock.elapsedRealtime()
+                        sourceDao.markSynced(source.id, System.currentTimeMillis())
+                        Log.d(TAG, "markSynced sourceId=${source.id} ms=${SystemClock.elapsedRealtime() - markStartedAt}")
+                    }
+                    progress.completeAll()
+                    result = SyncResult.Success(
+                        warnings = stats.warnings(),
+                        categoriesAdded = stats.processedCounts[SyncSupport.CATEGORIES_ADDED_KEY] ?: 0,
+                        categoriesRemoved = stats.processedCounts[SyncSupport.CATEGORIES_REMOVED_KEY] ?: 0,
+                    )
                 }
-                // Only a FULL pass may stamp lastSyncAt. A staged partial pass (Xtream priority
-                // toggles, Stalker live-first) leaves it null; the background remainder worker stamps
-                // it via completesInitialSync once every content type has synced. Stamping early would
-                // flip later passes onto the non-fresh (hash-diff + prune) path against half-empty tables.
-                if (contentTypes == SyncContentTypes()) {
-                    val markStartedAt = SystemClock.elapsedRealtime()
-                    sourceDao.markSynced(source.id, System.currentTimeMillis())
-                    Log.d(TAG, "markSynced sourceId=${source.id} ms=${SystemClock.elapsedRealtime() - markStartedAt}")
-                }
-                progress.completeAll()
-                SyncResult.Success(stats.warnings())
             } catch (c: CancellationException) {
+                result = SyncResult.Cancelled
                 throw c
             } catch (e: Exception) {
-                SyncResult.Failed(e.message ?: "Sync failed")
+                result = SyncResult.Failed(e.message ?: "Sync failed")
             } finally {
-                activityTracker.finished(source.id) // also on cancellation — never leave a stuck pill
+                activityTracker.finished(source.id, source.name, result) // also on cancellation — never leave a stuck pill
             }
             val runStats = stats.build(result)
             lastSyncStats[source.id] = runStats

@@ -8,6 +8,7 @@ import tv.own.owntv.core.backup.BackupManager
 import tv.own.owntv.core.database.BulkInsertHelper
 import tv.own.owntv.core.backup.UserDataResolver
 import tv.own.owntv.core.customize.CustomizationStore
+import tv.own.owntv.core.download.DownloadEngine
 import tv.own.owntv.core.download.DownloadManager
 import tv.own.owntv.core.network.ConnectivityObserver
 import tv.own.owntv.core.network.HttpClient
@@ -84,6 +85,15 @@ val dataModule = module {
     single { tv.own.owntv.core.metadata.MetadataRepository(get(), get(), get(), get()) }
     // Per-content TMDB name overrides (plan §11.2 U5b): DataStore side-store, no Room schema change.
     single { tv.own.owntv.core.metadata.MetadataOverrideStore(androidContext()) }
+    // OpenSubtitles (subtitle plan Phase 1): Worker-proxied REST client + Keystore-sealed
+    // per-profile sessions + the sign-in/out orchestrator with one-shot silent re-login.
+    single { tv.own.owntv.core.subtitles.OpenSubtitlesClient(get()) }
+    single { tv.own.owntv.core.subtitles.OpenSubtitlesAuthStore(androidContext()) }
+    single { tv.own.owntv.core.subtitles.OpenSubtitlesAccountManager(get(), get()) }
+    // context, client, accountManager, okHttpClient, subtitleDao — search/download/cache orchestration
+    single { tv.own.owntv.core.subtitles.SubtitleRepository(androidContext(), get(), get(), get(), get()) }
+    // repository, accountManager, settings, player — bridges the playing item to the OpenSubtitles search
+    single { tv.own.owntv.core.subtitles.SubtitleController(get(), get(), get(), get()) }
     single { WeatherRepository(get(), get()) }
     single { BulkInsertHelper(get()) }
     single {
@@ -97,7 +107,7 @@ val dataModule = module {
         )
     }
     // context, channelDao, movieDao, seriesDao, profileDao, favoriteDao, historyDao, progressDao, contentOrderDao, db
-    single { UserDataResolver(androidContext(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+    single { UserDataResolver(androidContext(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
     // sourceDao, syncManager, userDataResolver, channelDao, movieDao, seriesDao, categoryDao
     single { SourceRepository(get(), get(), get(), get(), get(), get(), get()) }
     single {
@@ -115,10 +125,15 @@ val dataModule = module {
             stalkerClient = get(),
             stalkerAuth = get(),
             activityTracker = get(),
+            customize = get(),
+            settings = get(),
         )
     }
     // App-wide "sync running" signal for the shell status pill (every sync funnels through SyncManager).
     single { tv.own.owntv.core.sync.SyncActivityTracker() }
+    // Same idea for EPG: EpgSyncWorker reports started/progress/finished here so the pill also reflects
+    // guide/EPG downloads (manual resync from Settings, auto startup refresh, …).
+    single { tv.own.owntv.core.sync.EpgActivityTracker() }
     // epgDao, httpClient, xtreamClient, channelDao, customize, settings, context, db, bulkInsertHelper
     single {
         EpgRepository(
@@ -143,12 +158,20 @@ val dataModule = module {
     single { TvHomeRepository(androidContext(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
     // planner, resolver, tvHomeRepository
     single { LauncherIntegrationRepository(get(), get(), get()) }
-    // context, downloadDao, okHttpClient, settings, sourceDao, movieDao, seriesDao, streamUrlResolver
+    // downloadDao, okHttpClient, sourceDao, movieDao, seriesDao, streamUrlResolver
     // (the last four are D-3: Stalker downloads resolve the stored cmd at download-start time)
-    single { DownloadManager(androidContext(), get(), get(), get(), get(), get(), get(), get()) }
+    single { DownloadEngine(get(), get(), get(), get(), get(), get()) }
+    // context, downloadDao, settings, engine
+    single { DownloadManager(androidContext(), get(), get(), get()) }
     // profileDao, sourceDao, settings, customizationStore, userDataResolver, epgSourceStore,
-    // launcherIntegrationRepository, forceMpvStore, vodEngineStore, db, metadataOverrideStore, metadataDao
-    single { BackupManager(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+    // forceMpvStore, vodEngineStore, db, metadataOverrideStore, metadataDao, openSubtitlesAuthStore,
+    // backgroundsDir (same folder ingestBackgroundImage writes to — the .own container carries the wallpaper)
+    single {
+        BackupManager(
+            get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(),
+            java.io.File(androidContext().filesDir, "backgrounds"),
+        )
+    }
     // context, okHttpClient — in-app updates from GitHub Releases
     single { UpdateManager(androidContext(), get()) }
     single { CatalogSyncScheduler(androidContext()) }

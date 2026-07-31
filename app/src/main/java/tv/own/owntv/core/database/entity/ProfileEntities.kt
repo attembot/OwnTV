@@ -40,6 +40,18 @@ data class SourceEntity(
     val userAgent: String? = null,
     /** XMLTV guide URL (M3U `url-tvg` or manually entered); Xtream EPG comes from the API. */
     val epgUrl: String? = null,
+    /**
+     * enabledScope (v17). `false` = never fetch AND never show this section for this source.
+     * Cache + user data are retained — Off is a sync/visibility scope, not a deletion.
+     */
+    val syncLive: Boolean = true,
+    val syncMovies: Boolean = true,
+    val syncSeries: Boolean = true,
+    /** Whether the provider explicitly lists m3u8 in user_info.allowed_output_formats (v23). Detection
+     *  hint only — it refines the Settings wording, it does NOT gate [preferHls]. */
+    val hlsSupported: Boolean = false,
+    /** User preference (v23): prioritize .m3u8 streams over .ts for Live TV and catch-up. */
+    val preferHls: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val lastSyncAt: Long? = null,
 )

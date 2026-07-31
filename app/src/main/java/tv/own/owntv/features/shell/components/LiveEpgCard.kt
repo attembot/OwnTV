@@ -2,76 +2,126 @@ package tv.own.owntv.features.shell.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import kotlinx.coroutines.delay
 import tv.own.owntv.core.parser.XtEpgEntry
 import tv.own.owntv.features.live.EpgNowNext
 import tv.own.owntv.ui.format.rememberSystemTimeFormatter
 import tv.own.owntv.ui.theme.OwnTVTheme
 
 /**
- * Guide card for the PLAYING live channel — Before / Now playing / Next — shown on the right edge
- * whenever the player controls are visible (part of the HUD, like the top-bar channel card; not
- * tied to the channel-list overlay). Informational only: never focusable, and renders NOTHING when
- * the channel has no guide data (a permanent "no info" card would just be noise on every unhide).
+ * Now / Next for the PLAYING live channel, laid out horizontally so it can live in the player's top
+ * bar beside the channel identity (the older vertical Before/Now/Next card sat on the right edge,
+ * where the history channel list now goes). Informational only: never focusable, and renders NOTHING
+ * when the channel has no guide data — a permanent "no info" block would be noise on every unhide.
  */
 @Composable
 fun LiveEpgCard(epg: EpgNowNext?, modifier: Modifier = Modifier) {
-    if (epg == null || (epg.now == null && epg.next == null && epg.previous == null)) return
+    if (epg == null || (epg.now == null && epg.next == null)) return
+    val colors = OwnTVTheme.colors
     val formatTime = rememberSystemTimeFormatter()
-    Column(
-        modifier = modifier
-            .width(340.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(Color.Black.copy(alpha = 0.62f))
-            .padding(horizontal = 18.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+    // Drives the "x min left" text and the progress bar; a slow tick is plenty for minute precision.
+    var nowMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) { while (true) { delay(20_000); nowMs = System.currentTimeMillis() } }
+
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        epg.previous?.let { EpgSlot("Before", it, formatTime, emphasized = false) }
-        epg.now?.let { EpgSlot("Now playing", it, formatTime, emphasized = true) }
-        epg.next?.let { EpgSlot("Next", it, formatTime, emphasized = false) }
+        epg.now?.let { entry ->
+            Column(Modifier.widthIn(max = 300.dp)) {
+                SlotLabel("Now", colors.primary)
+                Text(
+                    entry.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                val remaining = ((entry.stopMs - nowMs) / 60_000L).toInt()
+                Text(
+                    buildString {
+                        append("${formatTime(entry.startMs)} – ${formatTime(entry.stopMs)}")
+                        if (remaining in 1..600) append(" · $remaining min left")
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.5f),
+                    maxLines = 1,
+                )
+                val span = (entry.stopMs - entry.startMs).toFloat()
+                if (span > 0f) {
+                    val progress = ((nowMs - entry.startMs) / span).coerceIn(0f, 1f)
+                    Spacer(Modifier.height(5.dp))
+                    Box(
+                        Modifier.fillMaxWidth().height(2.dp).clip(RoundedCornerShape(1.dp))
+                            .background(Color.White.copy(alpha = 0.18f)),
+                    ) {
+                        Box(
+                            Modifier.fillMaxWidth(progress).height(2.dp)
+                                .clip(RoundedCornerShape(1.dp)).background(colors.primary),
+                        )
+                    }
+                }
+            }
+        }
+        // Hairline separator, only when both halves are present.
+        if (epg.now != null && epg.next != null) {
+            Box(Modifier.height(34.dp).widthIn(min = 1.dp, max = 1.dp).background(Color.White.copy(alpha = 0.18f)))
+        }
+        epg.next?.let { entry ->
+            Column(Modifier.widthIn(max = 240.dp)) {
+                SlotLabel("Next", Color.White.copy(alpha = 0.45f))
+                Text(
+                    entry.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.72f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "${formatTime(entry.startMs)} – ${formatTime(entry.stopMs)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.4f),
+                    maxLines = 1,
+                )
+            }
+        }
     }
 }
 
 @Composable
-private fun EpgSlot(
-    label: String,
-    entry: XtEpgEntry,
-    formatTime: (Long) -> String,
-    emphasized: Boolean,
-) {
-    val colors = OwnTVTheme.colors
-    Column {
-        Text(
-            "$label · ${formatTime(entry.startMs)} – ${formatTime(entry.stopMs)}",
-            style = MaterialTheme.typography.labelSmall,
-            color = if (emphasized) colors.primary else colors.onSurfaceVariant,
-        )
-        Text(
-            entry.title,
-            style = if (emphasized) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodySmall,
-            color = if (emphasized) Color.White else colors.onSurfaceVariant,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (emphasized && !entry.description.isNullOrBlank()) {
-            Text(
-                entry.description.orEmpty(),
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.onSurfaceVariant,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
+private fun SlotLabel(text: String, color: Color) {
+    Text(
+        text.uppercase(),
+        style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.2.sp),
+        color = color,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(bottom = 1.dp),
+    )
 }

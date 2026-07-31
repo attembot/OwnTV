@@ -37,6 +37,7 @@ import tv.own.owntv.ui.components.OwnTVButton
 import tv.own.owntv.ui.components.OwnTVButtonStyle
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.roundedPanel
+import tv.own.owntv.ui.components.trapVerticalFocusExit
 import tv.own.owntv.ui.theme.OwnTVTheme
 
 @Composable
@@ -76,7 +77,9 @@ fun HomeSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         Spacer(Modifier.height(16.dp))
 
         LazyColumn(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
+            // Pin vertical focus inside the section list — a held Up/Down that outruns composition
+            // would otherwise escape to the header / sidebar (every other browse list traps this).
+            modifier = Modifier.weight(1f).fillMaxWidth().trapVerticalFocusExit(),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             item {

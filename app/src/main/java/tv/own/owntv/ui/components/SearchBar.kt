@@ -31,6 +31,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -42,12 +43,22 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import tv.own.owntv.ui.theme.GlassSurface
+import tv.own.owntv.ui.theme.LocalGlass
 import tv.own.owntv.ui.theme.OwnTVTheme
+import tv.own.owntv.ui.theme.glass
 
 /**
  * Inline search field for a section, TV-style: the pill itself takes D-pad focus like any other
  * control — the keyboard only opens when the user presses OK on it (the inner text field is not
  * focusable until then), so focus can pass through / land on search without an IME popup.
+ *
+ * Liquid Glass: when [surface] is in scope the pill frosts (translucent fill + specular highlight)
+ * and the focus ring becomes a bright white glass rim; otherwise it keeps its solid tonal fill +
+ * accent/outline border. Defaults to [GlassSurface.CARDS] (most search bars live on a content panel);
+ * pass [GlassSurface.DIALOGS] for one inside a popup.
+ *
+ * @param surface glass surface to frost with, or null to stay flat.
  */
 @Composable
 fun SearchBar(
@@ -55,6 +66,7 @@ fun SearchBar(
     onQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier,
     placeholder: String = "Search…",
+    surface: GlassSurface? = GlassSurface.CARDS,
 ) {
     val colors = OwnTVTheme.colors
     val interaction = remember { MutableInteractionSource() }
@@ -65,6 +77,16 @@ fun SearchBar(
     val keyboard = LocalSoftwareKeyboardController.current
     val shape = RoundedCornerShape(50)
     val focused = pillFocused || editing
+    // Glassy only when a surface is given and it's in the active glass scope (matches FocusableSurface).
+    val glassy = surface != null && LocalGlass.current.isGlassy(surface)
+    // Liquid glass reads as glass because a bright hairline lenses the whole edge at all times, not
+    // just on focus. So when glassy: a faint white rim always, brightening on focus.
+    val borderColor = when {
+        glassy && focused -> Color.White.copy(alpha = 0.5f)
+        glassy -> Color.White.copy(alpha = 0.22f)
+        focused -> colors.primary
+        else -> colors.outlineVariant
+    }
 
     // Enter edit mode after recomposition has made the field focusable (canFocus = editing).
     LaunchedEffect(editing) {
@@ -78,10 +100,15 @@ fun SearchBar(
         modifier = modifier
             .height(48.dp)
             .clip(shape)
-            .background(colors.surfaceContainerHigh)
+            .then(
+                // Frosted glass pill when this surface is glassy; plain tonal fill otherwise. glass()
+                // early-returns on a transparent fill, but our fill is always opaque here.
+                if (surface != null) Modifier.glass(surface = surface, baseFill = colors.surfaceContainerHigh, shape = shape, frostScale = 0.6f)
+                else Modifier.background(colors.surfaceContainerHigh)
+            )
             .border(
                 width = if (focused) 2.dp else 1.dp,
-                color = if (focused) colors.primary else colors.outlineVariant,
+                color = borderColor,
                 shape = shape,
             )
             .focusRequester(pillFocus)

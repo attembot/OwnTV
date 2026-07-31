@@ -10,14 +10,16 @@ object Dimens {
     // Layer 1 — MD3 navigation panel. Expands to a drawer (labels) when focused,
     // collapses to an icon rail when focus moves into a submenu.
     val SidebarWidthExpanded = 272.dp
-    val SidebarWidthCollapsed = 96.dp
+    val SidebarWidthCollapsed = 88.dp
 
     // Layer 2 — category rail (expands to show full names when it holds focus)
     val RailWidth = 92.dp
     val RailWidthExpanded = 325.dp // expanded (focused overlay) width — fits long category names
-    val RailWidthFixed = 240.dp    // Phase 2: fixed full-label category column (names wrap to 2 lines)
+    val RailWidthFixed = 272.dp    // Phase 2: fixed full-label category column (names wrap to 2 lines)
     val RailPillSize = 56.dp
-    val ChannelListWidth = 400.dp  // Phase 2: fixed channel-list column (Live); preview/detail fills the rest
+    val ChannelListWidth = 460.dp  // Phase 2: fixed channel-list column (Live); preview/detail fills the rest.
+    // Widened from 400dp so each row can also show the current programme (EPG) on a second line — the
+    // preview pane (Modifier.weight(1f)) narrows in step, so no other layout value needs to change.
 
     // MD3 settings tonal icon tile
     val IconTileSize = 42.dp

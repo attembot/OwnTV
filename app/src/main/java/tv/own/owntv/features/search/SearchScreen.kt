@@ -1,5 +1,6 @@
 package tv.own.owntv.features.search
 
+import tv.own.owntv.core.epg.displayLogoUrl
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
@@ -46,6 +47,7 @@ import tv.own.owntv.ui.components.SearchBar
 import tv.own.owntv.ui.components.ContentPanelFill
 import tv.own.owntv.ui.components.roundedPanel
 import tv.own.owntv.ui.theme.Dimens
+import tv.own.owntv.ui.theme.GlassSurface
 import tv.own.owntv.ui.theme.OwnTVTheme
 
 /** One row in the flattened results list — drives both the list rows and the detail pane. */
@@ -224,7 +226,7 @@ private fun ResultsWithDetail(
                 when (item) {
                     is SearchItem.ChannelItem -> item(key = "c${item.row.channel.id}") {
                         ResultRow(
-                            thumbUrl = item.row.channel.logoUrl,
+                            thumbUrl = item.row.channel.displayLogoUrl,
                             fallbackIcon = OwnTVIcon.LIVE_TV,
                             title = item.row.channel.name,
                             subtitle = channelDetail(item.row),
@@ -297,7 +299,7 @@ private fun DetailPane(
     val action: () -> Unit
     when (item) {
         is SearchItem.ChannelItem -> {
-            posterUrl = item.row.channel.logoUrl; icon = OwnTVIcon.LIVE_TV
+            posterUrl = item.row.channel.displayLogoUrl; icon = OwnTVIcon.LIVE_TV
             title = item.row.channel.name; subtitle = channelDetail(item.row); plot = null
             actionLabel = "Watch live"; action = { onPlayChannel(item.row.channel) }
         }
@@ -343,6 +345,7 @@ private fun DetailPane(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             contentAlignment = Alignment.Center,
+            surface = GlassSurface.CARDS,
         ) { focused ->
             Row(
                 modifier = Modifier
@@ -387,6 +390,7 @@ private fun ResultRow(
             .onFocusChanged { if (it.isFocused) onFocused() },
         shape = RoundedCornerShape(12.dp),
         contentAlignment = Alignment.CenterStart,
+        surface = GlassSurface.CARDS,
     ) { focused ->
         Row(
             modifier = Modifier.fillMaxWidth().padding(10.dp),
@@ -415,7 +419,7 @@ private fun ResultRow(
                 }
             }
             if (isFavorite) {
-                OwnTVIcon(OwnTVIcon.STAR, tint = colors.primary, modifier = Modifier.size(18.dp))
+                OwnTVIcon(OwnTVIcon.FAVORITE, tint = colors.primary, modifier = Modifier.size(18.dp))
             }
         }
     }
@@ -433,6 +437,7 @@ private fun PillChip(
         onClick = onClick,
         shape = RoundedCornerShape(999.dp),
         contentAlignment = Alignment.Center,
+        surface = GlassSurface.CARDS,
     ) { focused ->
         val fg = when {
             focused -> colors.onPrimary

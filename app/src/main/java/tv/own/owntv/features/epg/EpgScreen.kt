@@ -55,11 +55,13 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.core.os.ConfigurationCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.koin.androidx.compose.koinViewModel
 import androidx.tv.material3.MaterialTheme
@@ -68,6 +70,7 @@ import tv.own.owntv.core.database.entity.ChannelEntity
 import tv.own.owntv.core.database.entity.EpgProgrammeEntity
 import tv.own.owntv.features.settings.data.SettingsRepository
 import tv.own.owntv.ui.components.longPressMenuGuard
+import tv.own.owntv.ui.components.ChannelGenre
 import tv.own.owntv.ui.components.ErrorState
 import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.OwnTVButton
@@ -77,6 +80,7 @@ import tv.own.owntv.ui.components.ContentPanelFill
 import tv.own.owntv.ui.components.roundedPanel
 import tv.own.owntv.ui.components.OwnTVSpinner
 import tv.own.owntv.ui.components.SearchBar
+import tv.own.owntv.ui.components.trapAllFocusExit
 import tv.own.owntv.ui.components.trapVerticalFocusExit
 import tv.own.owntv.ui.components.dialogPanel
 import tv.own.owntv.features.epg.GuideGridDefaults
@@ -84,6 +88,7 @@ import tv.own.owntv.features.epg.ProgrammeDetailDialog
 import tv.own.owntv.features.epg.ProgrammeStripCanvas
 import tv.own.owntv.ui.format.rememberSystemTimeFormatter
 import tv.own.owntv.ui.theme.Dimens
+import tv.own.owntv.ui.theme.GlassSurface
 import tv.own.owntv.ui.theme.OwnTVTheme
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -103,6 +108,10 @@ fun EpgScreen(
     restoreFocus: Boolean = false,
     onRestored: () -> Unit = {},
     onPlayChannel: ((channel: ChannelEntity, channels: List<ChannelEntity>) -> Unit)? = null,
+    /** "Watch from start" on a catch-up programme. The shell routes this through LiveViewModel so the
+     *  archive is tracked as catch-up playback (which decides what engine toggle the player HUD offers);
+     *  null falls back to EpgViewModel's own mpv-only path. */
+    onPlayCatchup: ((channel: ChannelEntity, programme: EpgProgrammeEntity) -> Unit)? = null,
 ) {
     val vm: EpgViewModel = koinViewModel()
     val state by vm.state.collectAsStateWithLifecycle()
@@ -114,6 +123,7 @@ fun EpgScreen(
     val categoryFilter by vm.categoryFilter.collectAsStateWithLifecycle()
     val guideCategories by vm.guideCategories.collectAsStateWithLifecycle()
     val favoriteIds by vm.favoriteChannelIds.collectAsStateWithLifecycle()
+    val catchupPlayer by vm.catchupPlayer.collectAsStateWithLifecycle()
     var showCategoryPicker by remember { mutableStateOf(false) }
     val colors = OwnTVTheme.colors
     val hScroll = rememberScrollState()
@@ -254,16 +264,20 @@ fun EpgScreen(
     ) {
         // Header: back + title + date + refresh
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            FocusableSurface(onClick = onBack, modifier = Modifier.size(44.dp), shape = RoundedCornerShape(14.dp), contentAlignment = Alignment.Center) { _ ->
+            FocusableSurface(onClick = onBack, modifier = Modifier.size(44.dp), shape = RoundedCornerShape(14.dp), contentAlignment = Alignment.Center, surface = GlassSurface.CARDS) { _ ->
                 OwnTVIcon(OwnTVIcon.BACK, tint = colors.onSurface, modifier = Modifier.size(20.dp))
             }
             Text("TV Guide", style = MaterialTheme.typography.headlineLarge, color = colors.onSurface)
+            val headerLocales = ConfigurationCompat.getLocales(LocalConfiguration.current)
+            val headerLocale = remember(headerLocales) { headerLocales.get(0) ?: Locale.getDefault() }
             if (state.now > 0) {
                 // The day being browsed: "now" on open; follows the cursor when D-padding left into
                 // the catch-up archive (windowStart would show the archive start — days in the past).
                 val headerDate = if (inCellMode && cursorTime > 0) cursorTime else state.now
                 Text(
-                    SimpleDateFormat("EEE d MMM", Locale.getDefault()).format(Date(headerDate)),
+                    // Locale read off the configuration, not Locale.getDefault(), so the header
+                    // recomposes if the TV's language changes while the guide is open.
+                    SimpleDateFormat("EEE d MMM", headerLocale).format(Date(headerDate)),
                     style = MaterialTheme.typography.titleMedium, color = colors.onSurfaceVariant,
                 )
             }
@@ -304,7 +318,7 @@ fun EpgScreen(
         matchSummary?.let { summary ->
             if (review.isEmpty()) {
                 Spacer(Modifier.height(6.dp))
-                FocusableSurface(onClick = vm::clearReview, shape = RoundedCornerShape(10.dp), unfocusedContainerColor = colors.surfaceContainerHigh, contentAlignment = Alignment.CenterStart) { _ ->
+                FocusableSurface(onClick = vm::clearReview, shape = RoundedCornerShape(10.dp), unfocusedContainerColor = colors.surfaceContainerHigh, contentAlignment = Alignment.CenterStart, surface = GlassSurface.CARDS) { _ ->
                     Text(summary, style = MaterialTheme.typography.labelLarge, color = colors.primary, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
                 }
             }
@@ -379,7 +393,7 @@ fun EpgScreen(
                             onExitToChannels = { inCellMode = false },
                             onMoveCursor = { cursorTime = it },
                             onStripFocused = { focusedChannel = channel },
-                            categoryColor = guideCategories.firstOrNull { it.id == channel.categoryId }?.name?.let { categoryColor(it) },
+                            categoryColor = guideCategories.firstOrNull { it.id == channel.categoryId }?.name?.let { ChannelGenre.dotFor(it) },
                         )
                     }
                 }
@@ -404,7 +418,16 @@ fun EpgScreen(
             isFavorite = channel.id in favoriteIds,
             onToggleFavorite = { vm.toggleFavoriteChannel(channel) },
             onWatch = { detail = null; vm.noteChannelTuned(channel); if (onPlayChannel != null) onPlayChannel(channel, state.channels) else { vm.play(channel); onFullscreen() } },
-            onPlayCatchup = { detail = null; vm.playCatchup(channel, p); onFullscreen() },
+            onPlayCatchup = {
+                detail = null
+                vm.noteChannelTuned(channel)
+                val viaShell = onPlayCatchup
+                if (viaShell != null) viaShell(channel, p) else { vm.playCatchup(channel, p); onFullscreen() }
+            },
+            // External play needs no shell involvement: nothing is mounted in-app, so it goes straight
+            // through the Guide's own VM (which owns the archive-URL builder) in both hosting modes.
+            onPlayCatchupExternal = { detail = null; vm.noteChannelTuned(channel); vm.playCatchupExternal(channel, p) },
+            catchupPlayer = catchupPlayer,
             onDismiss = { detail = null },
         )
     }
@@ -425,7 +448,7 @@ fun EpgScreen(
         tv.own.owntv.features.live.EpgMatchDialog(
             channelName = channel.name,
             currentMatch = vm.currentEpgMatch(channel),
-            loadChannels = { vm.availableEpgChannels(it) },
+            loadChannels = { vm.availableEpgChannels(channel.name, it) },
             onPick = { vm.setEpgMatch(channel, it); matchingChannel = null },
             onClear = { vm.setEpgMatch(channel, null); matchingChannel = null },
             onDismiss = { matchingChannel = null },
@@ -477,20 +500,24 @@ private fun EpgMatchReviewDialog(
     // Popup(focusable=true) creates a hard focus boundary — clicking Accept/Skip removes an item
     // from the LazyColumn, but focus stays inside instead of escaping to the main nav bar.
     Popup(onDismissRequest = onDone, properties = PopupProperties(focusable = true)) {
+    tv.own.owntv.ui.theme.PopupFontTheme(fontScale = 0.75f) {
     Box(
         Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)),
         contentAlignment = Alignment.Center,
     ) {
-        Column(Modifier.width(640.dp).clip(RoundedCornerShape(20.dp)).background(colors.surfaceContainerHigh).padding(24.dp)) {
-            Text("Review EPG matches", style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
+        Column(Modifier.dialogPanel(width = 576.dp, corner = 18.dp, padding = 18.dp)) {
+            Text("Review EPG matches", style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
             Spacer(Modifier.height(2.dp))
             Text(
                 "These channels were matched by name but weren't a confident fit. Accept the right ones; skip the rest.",
                 style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant,
             )
             Spacer(Modifier.height(12.dp))
-            // Cap to the screen (minus dialog chrome) so the footer buttons stay reachable on small screens.
-            val listHeight = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp - 200.dp).coerceIn(160.dp, 360.dp)
+            // Actions live in a right-hand column so a D-pad right from ANY suggestion row reaches
+            // Accept all/Skip all/Done directly — no scrolling to the bottom of a long list.
+            val listHeight = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp - 200.dp).coerceIn(160.dp, 300.dp)
+            Row(Modifier.fillMaxWidth()) {
+            Column(Modifier.weight(1f)) {
             LazyColumn(Modifier.fillMaxWidth().height(listHeight), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 itemsIndexed(suggestions, key = { _, s -> s.channel.id }) { index, s ->
                     Row(
@@ -499,7 +526,7 @@ private fun EpgMatchReviewDialog(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         Column(Modifier.weight(1f)) {
-                            Text(s.channel.name, style = MaterialTheme.typography.titleSmall, color = colors.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(s.channel.name, style = MaterialTheme.typography.bodyMedium, color = colors.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(
                                 "→ ${s.epgName ?: s.epgChannelId}  ·  ${(s.score * 100).toInt()}%",
                                 style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -511,28 +538,32 @@ private fun EpgMatchReviewDialog(
                             shape = RoundedCornerShape(10.dp),
                             unfocusedContainerColor = colors.primaryContainer,
                             contentAlignment = Alignment.Center,
+                            surface = GlassSurface.DIALOGS,
                         ) { _ -> Text("Accept", style = MaterialTheme.typography.labelLarge, color = colors.onPrimaryContainer, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) }
                         FocusableSurface(
                             onClick = { onSkip(s) },
                             shape = RoundedCornerShape(10.dp),
                             unfocusedContainerColor = colors.surfaceContainerHigh,
                             contentAlignment = Alignment.Center,
+                            surface = GlassSurface.DIALOGS,
                         ) { _ -> Text("Skip", style = MaterialTheme.typography.labelLarge, color = colors.onSurfaceVariant, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) }
                     }
                 }
             }
-            Spacer(Modifier.height(16.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.width(140.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 // Bulk actions only make sense for a multi-channel run; a single auto-match shows just accept/skip.
                 if (suggestions.size > 1) {
-                    OwnTVButton("Accept all", onClick = onAcceptAll, icon = OwnTVIcon.PLAY)
-                    OwnTVButton("Skip all", onClick = onSkipAll, style = OwnTVButtonStyle.SECONDARY)
+                    OwnTVButton("Accept all", onClick = onAcceptAll, icon = OwnTVIcon.PLAY, modifier = Modifier.fillMaxWidth())
+                    OwnTVButton("Skip all", onClick = onSkipAll, style = OwnTVButtonStyle.SECONDARY, modifier = Modifier.fillMaxWidth())
                 }
-                Spacer(Modifier.weight(1f))
-                OwnTVButton("Done", onClick = onDone, style = OwnTVButtonStyle.SECONDARY)
+                OwnTVButton("Done", onClick = onDone, style = OwnTVButtonStyle.SECONDARY, modifier = Modifier.fillMaxWidth())
+            }
             }
         }
     }
+    } // PopupFontTheme
     } // Popup
 }
 
@@ -555,7 +586,7 @@ private fun EpgMatchChooserDialog(
     LaunchedEffect(Unit) { kotlinx.coroutines.delay(60); runCatching { firstFocus.requestFocus() } }
 
     Box(
-        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)).focusGroup()
+        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)).trapAllFocusExit().focusGroup()
             .longPressMenuGuard(), // long-press OK is still held — don't auto-click the first option
         contentAlignment = Alignment.Center,
     ) {
@@ -634,6 +665,7 @@ private fun GuideChannelRow(
             shape = RoundedCornerShape(10.dp),
             unfocusedContainerColor = colors.surfaceContainerHigh,
             contentAlignment = Alignment.CenterStart,
+            surface = GlassSurface.CARDS,
         ) { focused ->
             Row(
                 modifier = Modifier.padding(horizontal = 12.dp),
@@ -726,22 +758,6 @@ private fun openAtCursor(progs: List<EpgProgrammeEntity>, cursorTime: Long, onOp
 private fun CenterBox(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, content = content)
-    }
-}
-
-/** Best-effort genre colour from a channel category's free-text name — sport→green, news→red, movie→violet,
- *  kid→gold, music→blue, docu→teal. Null when unmatched (no dot rather than a misleading colour). */
-private fun categoryColor(name: String?): Color? {
-    if (name.isNullOrBlank()) return null
-    val n = name.lowercase()
-    return when {
-        n.contains("sport") -> Color(0xFF4CAF50)
-        n.contains("news") -> Color(0xFFEF5350)
-        n.contains("movie") || n.contains("film") || n.contains("cinema") -> Color(0xFFAB47BC)
-        n.contains("kid") || n.contains("child") || n.contains("anim") -> Color(0xFFFFB300)
-        n.contains("music") -> Color(0xFF42A5F5)
-        n.contains("docu") -> Color(0xFF26A69A)
-        else -> null
     }
 }
 

@@ -38,7 +38,9 @@ This is an **open-source** project — the code is original (not derived from an
 targets **Android TV only** (leanback launcher, D-pad-first UI).
 
 > ### 📖 New here? Read the [**User Guide & Hidden Features →**](extras/USER_GUIDE.md)
-> Long‑press to favourite, **Left** for the channel list, the MPV/EXO toggle's **compatibility mode**,
+> Long‑press to favourite, **Left** for the channel list (**Left** again to browse categories) and
+> **Right** for recently watched, the
+> MPV/EXO toggle's **compatibility mode**,
 > catch‑up from the Guide, startup landing, A/V‑sync — all the remote shortcuts in one place.
 
 ---
@@ -58,71 +60,30 @@ Scan to join from your phone:
 ## ✨ Features
 
 ### 🎬 Playback
-- **Dual-engine design**
-  - **libmpv (FFmpeg)** — movies, series, and any stream ExoPlayer can't open; maximum codec/container compatibility, every audio/subtitle track
-  - **Media3 (ExoPlayer)** — Live TV default; near-instant HLS start, instant preview → fullscreen
-  - **Per-channel mpv toggle** — the MPV/EXO pill pins a problem channel to mpv (remembered per channel)
-  - **VOD engine fallback** — a movie/episode that terminally fails on one engine is retried on the
-    other automatically; a setting picks which plays first (mpv default, or ExoPlayer for devices
-    where mpv can't start VODs)
-- **Direct-to-display rendering** — zero-copy 4K HDR path, app-drawn subtitles, auto software-decode fallback
-- **Channel zapping** — D-pad/CH±/media keys, wraps around; **in-player channel list** (Left with controls hidden)
-- **Audio** — surround sound (opt-in, Dolby/DTS → multichannel LPCM, auto-stereo safety net); volume boost to 150%; A/V sync nudge
-- **Subtitles** — text (SRT/ASS) + image (PGS/VOBSUB/DVB on its own layer) + closed captions (CEA-608/708)
-- **Resume & auto-play** — per-title resume prompt, auto-play next episode (across seasons) with a next-episode countdown card, opens on last-watched episode, watched ✓ / progress indicators on movies and episodes
-- **Mini-player / PiP** — dock any stream and keep browsing
-- **Stream info overlay** — live codec · resolution · fps · HDR · bitrate · decoder readout
-- 📺 **[Complete player design & feature reference →](extras/player.html)**
+- **Dual engine** — libmpv (FFmpeg) for max compatibility + ExoPlayer for instant Live TV; per-channel toggle and automatic VOD fallback between them
+- Zero-copy **4K HDR** direct rendering · **auto frame rate** (24/25/50/60 fps display matching) · channel zapping (D-pad/CH±) · surround sound + 150% volume boost
+- **Subtitles** — text (SRT/ASS), image (PGS/VOBSUB/DVB), closed captions, plus OpenSubtitles search & local files with timing adjust; customisable size, colour, position and background transparency
+- Resume prompts, next-episode auto-play, mini-player/PiP, **audio-only mode**, and a live codec/resolution/HDR stream-info overlay
 
 ### 🧭 Browse
-- **Home screen** — Continue Watching hero carousel (partially-watched movies, episodes, recent channels) with dwell-to-expand previews that pull in **TMDB backdrops, title logos and plot**; fully customizable per profile (reorder/hide rows, hero filters, "On Now" inline mini-guide rows); feeds system Watch Next on stock Android TV
-- **Sections** — Live TV (preview + real stream resolution badge), Movies, Series, Downloads, EPG Guide
-- **Fixed layout** — stable icon nav · full-label category column · content · preview (never expands/collapses)
-- **Categories** — Favorites & History per section, full names, search box; customize (hide/rename/reorder, range-select); hide/unhide individual channels, movies & series; optional PIN lock; survives re-syncs
-- **Search** — inline per-folder + global; launcher home (Continue / Unwatched / Channels + recent searches); **list + detail pane** with a primary action per result; Back clears the query first; long-press to favorite
-- **Continue chip** — shared top-bar chip resumes your most-recent movie / episode / channel in one press, on every screen
-- **Multiple playlists** — merge them all, or narrow the whole app to one via the **top-bar playlist switcher** (or a per-playlist **Default** toggle in Settings); applies to Live/Movies/Series/EPG/Search/Home incl. Favorites & History, and persists across restarts
-- **Sort & view** — playlist order or A–Z; Movies & Series Grid/List toggle
-- **Per-profile startup** — Home, last channel, or Live TV on Favorites
-- **Built for scale** — ~50k channels / ~168k movies via Paging 3
-- **Fast syncing** — priority import (pick e.g. Live TV first, the rest finishes in the background — survives sleep/reboot); **Run in background** button during the first import with an unobtrusive status pill; incremental re-syncs only write what changed; auto-retrying downloads
-- **Typed M3U playlists** — `type=` / `tvg-type=` tags route entries to **Movies** or **Series** (per-episode `S01E05` lines are grouped into shows, seasons and episodes automatically)
-- 📡 **Stalker / Ministra portals** — add a source with just a **Portal URL + MAC address**; live TV imports in seconds and the movies/series catalog **syncs in the background automatically** (adaptive request speed, delta-checked re-syncs); Live TV, Movies & Series (lazy episode loading), downloads, EPG/catch-up and TMDB enrichment all work; play links are minted per-play and **auto-renewed when they expire** (long live sessions and long downloads survive token resets); MAG User-Agent presets for picky portals
-- 🎬 **TMDB metadata enrichment** — optional, on-demand posters, plots, cast, genres & ratings for Movies, Series and Episodes; **in-app trailers**; manual Refetch / "Set TMDB name" overrides; works with zero setup, your own TMDB key, or a self-hosted [caching proxy](worker/)
+- **Continue Watching** home with TMDB-enriched previews; Live / Movies / Series / Downloads / Guide sections
+- Per-profile customizable rows, Favorites & History, inline + global search, multi-playlist switcher
+- **TMDB** posters, plots, cast & trailers **in 40 languages**; scales to ~50k channels / ~168k movies with priority + incremental syncing
 
-### 🗓️ EPG / TV Guide
-- **Guide grid** — time × channel (XMLTV); now/next/later in preview; two-stage nav (Right selects row, OK browses)
-- **Catch-up TV** — watch aired programmes (up to 7 days back); seekable archive replay; catch-up time setting
-- **Live rewind** — timeshift on catch-up channels; scrubbable timeline + 30s steps + Live button
-- **EPG matching** — auto-match by name (ignoring HD/country tags); long-press for manual match; survives re-syncs
-- **Sort & filter** — A–Z / Provider / Live TV / Catch-up / Favorites; category filter with search
-- **Multiple sources** — add/edit/delete XMLTV feeds; merge into guide; opt-in (pre-fills playlist URL)
-- **Performance** — pre-loaded at startup; only your channels' programmes stored; malformed-tag tolerant
+### 📥 Sources & EPG
+- **Xtream**, **M3U** (typed playlists), and **Stalker/Ministra** MAC portals; add a source from your phone over LAN (QR + PIN)
+- XMLTV **TV Guide** grid, **Catch-up TV** (up to 7 days) + live rewind, auto EPG matching, multiple guide sources
+- Optional **guide channel logos** — per EPG source, use that feed's own logos instead of your playlist's
 
-### 👥 Profiles
-- Multiple profiles (own favorites/history/resume); PIN locks (salted hash); kids flag; "Who's watching?" gate; shared sources
+### 👥 Profiles & Downloads
+- Multiple profiles with own favorites/history/resume, PIN locks, kids flag, "Who's watching?" gate
+- Offline movies & episodes — pause/resume/retry, queue groups + storage bar, live poster status strip
 
-### ⬇️ Downloads
-- Offline movies & episodes (never Live TV); pause/resume/retry; user-chosen folder; **Active / Waiting / Completed / Failed** queue groups; **storage bar** with free space
-- **Poster status strip** — a download's live status (Downloading / Queued / Paused, with progress) shows on the movie / series / episode poster panel while it's in flight
+### 🎨 Settings & Robustness
+- Material 3 theming & accent, **Liquid Glass** frosted look over your own background photo, searchable settings, sidebar/category customization, external player, weather chip
+- **Backup & Restore** locally or over Wi-Fi — a single `.own` file carrying your background image, optionally encrypted end to end with your own password (older `.json` backups still restore); in-app updates; memory-safe buffers, no-ANR threading, auto-reconnect, resilient imports & offline detection
 
-### 🎨 Personalization & Settings
-- **Settings search & quick toggles** — filter Settings with a search box (results show their group, e.g. `Playback › HDR`); one-press quick toggles for the most-used options
-- **Appearance** — Material 3 (dark/light/system); any accent color (palette or hex); UI zoom; avatars; animations toggle
-- **Content** — clear watch history (all or per-type); per-source **Auto refresh** for playlists & EPG (Off by default, startup or 6–48h staleness intervals)
-- **Sidebar Menu Customization** — **Static** (manually hide any side icon) or **Dynamic** (icons auto-adapt to what the active playlist contains — a VOD-only playlist hides Live TV/Guide, a Live-only playlist hides Movies/Series/Downloads); included in backups
-- **Video Player** — hardware decoding, zoom, subtitle size/language, audio sync, surround sound, HDR, **external player** (VLC / MX Player for movies, series & downloads — global setting or per-item long-press)
-- **Weather** — top-bar weather chip: on/off, custom location (VPN-friendly), **°C / °F**
-- **Backup & Restore** — profiles, sources, customizations, favorites, history, resume, manual Move positions, settings, auto-refresh choices, default source, per-item engine/compatibility pins and custom TMDB names; choose what to include
-- **Updates** — in-app from GitHub Releases; auto-check (toggleable) + manual; installs APK on TV
-- **Android TV home** — feeds system Watch Next row; refresh button
-
-### 🛡️ Robustness
-- **Memory-safe** — device-scaled buffers; decode watchdog (4K/8K SW guard); background release; cache shedding
-- **No ANRs** — all player commands off the UI thread; coalesced preview-scroll loads
-- **Connection-friendly** — preview→fullscreen reuses stream; auto-reconnect on drops
-- **Resilient imports** — HTTP 512 / truncated list → per-category fallback; credentials never shown
-- **Offline detection** — banner + offline-aware error messages
+📖 Full details: **[player reference →](extras/player.html)** · **[user guide →](extras/USER_GUIDE.md)**
 
 ---
 
@@ -176,9 +137,10 @@ More in **[extras/screenshots/](extras/screenshots/)** — playlist management, 
 - **Parsing & sync** — M3U playlists are line-streamed and Xtream `player_api` JSON is read with
   `android.util.JsonReader`, so huge provider payloads are never fully buffered. `SyncManager` does a
   clear-then-insert refresh in ~500-row chunked transactions with Flow progress and cancellation.
-- **Storage** — a 19-entity Room schema: profiles & sources (`ProfileSourceCrossRef` for sharing),
+- **Storage** — a 27-entity Room schema: profiles & sources (`ProfileSourceCrossRef` for sharing),
   content (categories/channels/movies/series/seasons/episodes), per-profile favorites/history/progress/
-  downloads, EPG channels/programmes, and FTS4 search tables. Totals come from indexed `COUNT` queries.
+  downloads, EPG channels/programmes, external-subtitle cache/selection/timing/links, and FTS4 search
+  tables. Totals come from indexed `COUNT` queries.
 - **Lists** — Paging 3 with a bounded `maxSize` keeps memory flat across 50k+ item lists.
 - **EPG** — bulk XMLTV is stream-parsed (gzip-aware) into a rolling now→+48h window and pruned.
 - **Player** — two engines behind a small `PlaybackEngine` interface: **libmpv** (movies/series, and any
@@ -225,52 +187,33 @@ https://github.com/ahXN00/OwnTV/releases/latest/download/OwnTV.apk
 
 > Only install the APK from this repository's official Releases (or the `…/releases/latest/download/OwnTV.apk`
 > link above). It's the build signed by this project's CI — third-party re-hosts aren't endorsed.
+>
+> Releases ship **two APKs**: `OwnTV-vX.X.X.apk` / `OwnTV.apk` (arm: `arm64-v8a` + `armeabi-v7a` — for
+> all real Fire TV / Android TV devices, and what the Downloader code fetches), and
+> `OwnTV-x86_64-vX.X.X.apk` (for emulators / rare Intel boxes). Real devices always want the arm build.
 
 ## 🛠️ Building & running
 
-1. Open the project in **Android Studio** (a version matching AGP 9.x) and let Gradle sync.
-2. Run the `app` configuration on an **Android TV** emulator or device. The app declares a
-   `LEANBACK_LAUNCHER` **and** a regular `LAUNCHER` entry and marks the leanback feature **optional**, so
-   it shows in the **TV launcher** on Android TV and as a normal app icon on phones/tablets and non-TV
-   boxes too (minimum **Android 8.0 / API 26**).
-3. Or from the command line:
+> Only needed if you want to build from source. Most people can just **[install the ready-made APK](#-installing-fire-tv--android-tv)** instead — no build tools required.
 
-```bash
-./gradlew assembleDebug
-```
+**What you need first**
+- **[Android Studio](https://developer.android.com/studio)** (a recent version that supports AGP 9.x) — this bundles the JDK and Android SDK, so you don't install those separately.
+- A build target: either a real **Android TV / Fire TV** device (with USB or wireless debugging turned on), or an **Android TV emulator** created from Android Studio's Device Manager.
 
-On first launch you'll go through onboarding: accept the disclaimer, create a profile, then **add a
-source** (M3U, Xtream, or Stalker/MAC portal) — or import a backup. After it imports, browse from the sidebar and open the
-**Guide** for the EPG. Everything is managed under **Settings**.
+**Steps**
+1. **Get the code** — click the green **Code** button on GitHub → *Download ZIP* (and unzip it), or run `git clone https://github.com/ahXN00/OwnTV.git`.
+2. **Open it** — in Android Studio choose **Open**, pick the project folder, and wait for the first **Gradle sync** to finish (it downloads dependencies; give it a few minutes the first time).
+3. **Pick the right build variant** — open **Build Variants** (left sidebar) and choose the flavor that matches your target:
+   - **`standard`** — real TV/phone/Fire TV devices and arm emulators (`arm64-v8a` + `armeabi-v7a`)
+   - **`x86_64`** — x86_64 emulators only
+   - This matters: the native libmpv player only loads on a matching ABI, so the wrong choice = no playback.
+4. **Press Run** (▶) with your device/emulator selected. The app installs and launches. It shows up in the **TV launcher** on Android TV, and as a normal app icon on phones/tablets too (minimum **Android 8.0 / API 26**).
 
-**Tested on:** a real **TCL Google TV**, and the **Android Studio emulator** (both the Android TV and
-Google TV system images).
+**Prefer the command line?** From the project folder run `./gradlew assembleDebug` (use `gradlew.bat assembleDebug` on Windows). The APK lands in `app/build/outputs/apk/`.
 
-## 🤖 CI & releases
+**First launch** — you'll go through onboarding: accept the disclaimer, create a profile, then **add a source** (M3U, Xtream, or Stalker/MAC portal) — or import a backup. After it imports, browse from the sidebar and open the **Guide** for the EPG. Everything else is under **Settings**.
 
-GitHub Actions ([`.github/workflows/android.yml`](.github/workflows/android.yml)) builds the app in the
-cloud — no local build needed:
-
-- **Every push / PR** → builds a debug APK and uploads it as a workflow **artifact** named
-  `OwnTV-v<version>-<sha>.apk` (download it from the run's *Summary → Artifacts*).
-- **Push a `v*` tag** (e.g. `git tag v1.1.0 && git push origin v1.1.0`) → builds a **signed** APK and
-  publishes a **GitHub Release** with `OwnTV-v1.1.0.apk` attached. The release notes are taken from
-  the newest section of [`CHANGELOG.md`](CHANGELOG.md) (which the in-app updater shows as
-  "What's new"), plus GitHub's auto-generated commit list.
-
-**Versioning is automatic**: `versionName`/`versionCode` are derived from the tag (e.g. `v1.1.0` →
-`1.1.0` / `10100`) — no need to touch `build.gradle.kts`.
-
-**Signed release builds (optional, recommended for distribution).** Tag builds are debug-signed until you
-add a release keystore. Create one and add four repo **Secrets** to get properly signed releases:
-
-```bash
-keytool -genkey -v -keystore owntv.keystore -alias owntv -keyalg RSA -keysize 2048 -validity 10000
-base64 -w0 owntv.keystore   # copy the output into the KEYSTORE_BASE64 secret
-```
-
-Then add repo Secrets (*Settings → Secrets and variables → Actions*): `KEYSTORE_BASE64`,
-`KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`. Keep the keystore file private — it's never committed.
+**Tested on:** a real **TCL Google TV**, and the **Android Studio emulator** (both the Android TV and Google TV system images).
 
 ## 🤝 Contributing
 
@@ -294,12 +237,35 @@ Scan to donate from your phone:
 
 Thank you for using OwnTV! 🙏
 
-## 🎬 Credits — TMDB
+## 🙏 Credits
 
 <img src="extras/tmdb_logo.svg" alt="TMDB" width="200">
 
 Movie & series metadata and trailers are provided by [TMDB](https://www.themoviedb.org/).
 **This product uses the TMDB API but is not endorsed or certified by TMDB.**
+
+<img src="extras/opensubtitles_logo.svg" alt="OpenSubtitles" width="200">
+
+Subtitle search & download is powered by [OpenSubtitles.com](https://www.opensubtitles.com/).
+**This product uses the OpenSubtitles API but is not endorsed or certified by OpenSubtitles.** You sign
+in with your own OpenSubtitles account and are subject to their terms and download quotas.
+
+### ▶️ Playback engines
+
+- **[mpv](https://mpv.io/)** (via [libmpv](https://github.com/mpv-android/mpv-android), built on
+  [FFmpeg](https://ffmpeg.org/)) — the default engine, for the widest IPTV/codec, audio and HDR support.
+- **[Media3 / ExoPlayer](https://github.com/androidx/media)** — the fast-start engine for Live TV
+  preview and HLS.
+
+### 🧩 Built with
+
+[Jetpack Compose for TV](https://developer.android.com/jetpack/compose) ·
+[Room](https://developer.android.com/jetpack/androidx/releases/room) ·
+[Koin](https://insert-koin.io/) ·
+[OkHttp](https://square.github.io/okhttp/) ·
+[Coil](https://coil-kt.github.io/coil/) ·
+[ZXing](https://github.com/zxing/zxing) — and the wider Kotlin / AndroidX open-source ecosystem.
+Thank you to all their maintainers. See each project for its own license.
 
 ## ⚖️ Legal
 

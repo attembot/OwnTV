@@ -45,6 +45,8 @@ import tv.own.owntv.ui.components.OwnTVSpinner
 import tv.own.owntv.ui.components.OwnTVTextField
 import tv.own.owntv.ui.components.StorageBrowser
 import tv.own.owntv.ui.components.roundedPanel
+import tv.own.owntv.ui.components.trapAllFocusExit
+import tv.own.owntv.ui.theme.GlassSurface
 import tv.own.owntv.ui.theme.OwnTVTheme
 import java.io.File
 
@@ -75,11 +77,34 @@ fun BackupScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         }
     }
     var exportSections by remember { mutableStateOf(BackupManager.Section.entries.toSet()) }
+    // Export step 0: which profiles ride in the file (backup is profile-based). PIN-locked profiles
+    // other than the active one must be unlocked with their PIN to be ticked.
+    var showProfilePicker by remember { mutableStateOf(false) }
+    var exportProfiles by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    val profileChoices by vm.profileChoices.collectAsStateWithLifecycle()
     // After the folder is picked, hold it here to ask about password protection before exporting.
     var exportFolder by remember { mutableStateOf<File?>(null) }
     val firstFocus = remember { FocusRequester() }
     val restoreBtnFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { kotlinx.coroutines.delay(50); runCatching { firstFocus.requestFocus() } }
+
+    // Restore: first pick Remote (phone upload) or Local (file picker). Remote opens a full-screen
+    // companion panel; an uploaded file drops back into the same inspect → section-picker flow.
+    var showRestoreChooser by remember { mutableStateOf(false) }
+    var showRemoteRestore by remember { mutableStateOf(false) }
+    val remoteState by vm.remoteState.collectAsStateWithLifecycle()
+
+    // Export: Remote (serve the file for a phone/laptop to download) or Local (save to a folder).
+    var showExportChooser by remember { mutableStateOf(false) }
+    var exportToRemote by remember { mutableStateOf(false) }
+    var showRemoteExportPassword by remember { mutableStateOf(false) }
+    var showRemoteExport by remember { mutableStateOf(false) }
+    // If the remote export fails to prepare, drop the panel so the base screen shows the error.
+    LaunchedEffect(state) {
+        if (state is BackupViewModel.State.Error && showRemoteExport) {
+            vm.stopRemoteExport(); showRemoteExport = false
+        }
+    }
 
     BackHandler { onBack() }
 
@@ -87,7 +112,8 @@ fun BackupScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     // that opened it. The restore crosses INTO this group from the dialog, so onEnter intercepts
     // it — it consults dialogReturn first (and clears it) instead of hijacking.
     var dialogReturn by remember { mutableStateOf<FocusRequester?>(null) }
-    val anyDialogOpen = showBrowser || showExportPicker || pendingFolderBrowser || exportFolder != null ||
+    val anyDialogOpen = showBrowser || showExportPicker || showProfilePicker || pendingFolderBrowser || exportFolder != null ||
+        showRestoreChooser || showRemoteRestore || showExportChooser || showRemoteExportPassword || showRemoteExport ||
         state is BackupViewModel.State.ChooseRestore || state is BackupViewModel.State.NeedPassword
     LaunchedEffect(anyDialogOpen) {
         if (!anyDialogOpen) {
@@ -125,8 +151,8 @@ fun BackupScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         Spacer(Modifier.height(24.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OwnTVButton("Export backup", onClick = { dialogReturn = firstFocus; showExportPicker = true }, enabled = state != BackupViewModel.State.Working, modifier = Modifier.focusRequester(firstFocus))
-            OwnTVButton("Restore backup", onClick = { dialogReturn = restoreBtnFocus; browser = BrowseMode.FILE; showBrowser = true }, style = OwnTVButtonStyle.SECONDARY, enabled = state != BackupViewModel.State.Working, modifier = Modifier.focusRequester(restoreBtnFocus))
+            OwnTVButton("Export backup", onClick = { dialogReturn = firstFocus; showExportChooser = true }, enabled = state != BackupViewModel.State.Working, modifier = Modifier.focusRequester(firstFocus))
+            OwnTVButton("Restore backup", onClick = { dialogReturn = restoreBtnFocus; showRestoreChooser = true }, style = OwnTVButtonStyle.SECONDARY, enabled = state != BackupViewModel.State.Working, modifier = Modifier.focusRequester(restoreBtnFocus))
         }
         Spacer(Modifier.height(20.dp))
 
@@ -142,17 +168,35 @@ fun BackupScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         }
     }
 
-    // Export step 1: choose what to include, then pick the folder.
+    // Export step 0: pick the profiles to include (all unticked — the user chooses; locked
+    // non-active profiles need their PIN to be ticked).
+    if (showProfilePicker) {
+        profileChoices?.let { choices ->
+            ProfilePickerDialog(
+                profiles = choices.profiles,
+                activeId = choices.activeId,
+                verifyPin = vm::verifyPin,
+                onConfirm = { picked ->
+                    exportProfiles = picked
+                    showProfilePicker = false
+                    showExportPicker = true
+                },
+                onDismiss = { showProfilePicker = false },
+            )
+        }
+    }
+
+    // Export step 1: choose what to include, then pick the folder (local) or continue (remote).
     if (showExportPicker) {
         SectionPickerDialog(
             title = "What to back up",
             sections = BackupManager.Section.entries,
             initial = BackupManager.Section.entries.toSet(),
-            confirmLabel = "Choose folder",
+            confirmLabel = if (exportToRemote) "Continue" else "Choose folder",
             onConfirm = { chosen ->
                 exportSections = chosen
                 showExportPicker = false
-                pendingFolderBrowser = true
+                if (exportToRemote) showRemoteExportPassword = true else pendingFolderBrowser = true
             },
             onDismiss = { showExportPicker = false },
         )
@@ -165,7 +209,7 @@ fun BackupScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             sections = BackupManager.Section.entries.filter { it in choose.available },
             initial = choose.available,
             confirmLabel = "Restore",
-            onConfirm = { chosen -> vm.beginImport(choose.file, chosen, choose.encrypted) },
+            onConfirm = { chosen -> vm.beginImport(choose.file, chosen, choose.encrypted, choose.password) },
             onDismiss = { vm.reset() },
         )
     }
@@ -174,7 +218,8 @@ fun BackupScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         StorageBrowser(
             title = if (browser == BrowseMode.FOLDER) "Choose a folder to save the backup" else "Pick a backup file to restore",
             mode = browser,
-            fileExtensions = setOf("json"),
+            // `.own` is what we write now; `.json` stays so pre-4.2 backups keep restoring.
+            fileExtensions = BackupManager.RESTORE_EXTENSIONS,
             onPick = { file -> showBrowser = false; if (browser == BrowseMode.FOLDER) exportFolder = file else vm.inspect(file) },
             onDismiss = { showBrowser = false },
         )
@@ -183,33 +228,137 @@ fun BackupScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     // Export step 3: ask whether to protect passwords with a backup passphrase (or export without them).
     exportFolder?.let { folder ->
         BackupPasswordDialog(
-            title = "Protect passwords?",
-            message = "Source and proxy passwords can be encrypted with a backup password you choose. " +
-                "You'll need the same password to restore them on another device. Without one, passwords " +
-                "are left out of the file and must be re-entered after restoring.",
+            title = "Encrypt this backup?",
+            message = "With a backup password, the whole file is encrypted — playlists, profiles and saved " +
+                "passwords included — and nothing in it can be read without that password. Keep it safe: " +
+                "if you lose it, the backup cannot be opened at all. Without a password the file is not " +
+                "encrypted and saved passwords are left out of it.",
             confirmLabel = "Encrypt & export",
-            skipLabel = "Export without passwords",
-            onConfirm = { pass -> exportFolder = null; vm.export(folder, exportSections, pass) },
-            onSkip = { exportFolder = null; vm.export(folder, exportSections, null) },
+            skipLabel = "Export unencrypted",
+            onConfirm = { pass -> exportFolder = null; vm.export(folder, exportSections, pass, exportProfiles) },
+            onSkip = { exportFolder = null; vm.export(folder, exportSections, null, exportProfiles) },
             onDismiss = { exportFolder = null },
         )
     }
 
-    // Restore step 3 (encrypted only): prompt for the backup password, allow skipping or retrying.
+    // Restore password prompt. Two shapes, see BackupViewModel.State.NeedPassword:
+    //  - sealed .own  → asked FIRST, mandatory; unlocking then reveals the section picker.
+    //  - field-encrypted → asked after the section picker, optional (skip = no saved passwords).
     (state as? BackupViewModel.State.NeedPassword)?.let { need ->
         BackupPasswordDialog(
             title = if (need.retry) "Wrong backup password" else "Enter backup password",
-            message = if (need.retry)
-                "That password didn't match. Try again, or skip to restore everything except saved passwords."
-            else
-                "This backup's passwords are encrypted. Enter the backup password to restore them, or skip " +
-                    "to restore everything else and re-enter passwords later.",
-            confirmLabel = "Restore",
-            skipLabel = "Skip (no passwords)",
-            onConfirm = { pass -> vm.import(need.file, need.sections, pass) },
-            onSkip = { vm.import(need.file, need.sections, null) },
+            message = when {
+                need.retry && need.sealed -> "That password didn't match. This backup is encrypted — it can't be " +
+                    "opened without the password it was created with."
+                need.retry -> "That password didn't match. Try again, or skip to restore everything except saved passwords."
+                need.sealed -> "This backup is encrypted. Enter the backup password to open it and choose what to restore."
+                else -> "This backup's passwords are encrypted. Enter the backup password to restore them, or skip " +
+                    "to restore everything else and re-enter passwords later."
+            },
+            confirmLabel = if (need.sealed) "Unlock" else "Restore",
+            skipLabel = if (need.sealed) null else "Skip (no passwords)",
+            onConfirm = { pass ->
+                val sections = need.sections
+                if (sections == null) vm.unlock(need.file, pass) else vm.import(need.file, sections, pass)
+            },
+            onSkip = { need.sections?.let { vm.import(need.file, it, null) } },
             onDismiss = { vm.reset() },
         )
+    }
+
+    // Export step 0: Remote (serve for a phone/laptop to download) or Local (save to a folder).
+    if (showExportChooser) {
+        RemoteLocalChooserDialog(
+            title = "Export a backup",
+            message = "Send the backup to another device (phone or laptop) on the same Wi-Fi, or save it to a file on this device.",
+            onRemote = { showExportChooser = false; exportToRemote = true; vm.loadProfiles(); showProfilePicker = true },
+            onLocal = { showExportChooser = false; exportToRemote = false; vm.loadProfiles(); showProfilePicker = true },
+            onDismiss = { showExportChooser = false },
+        )
+    }
+
+    // Remote export step 2: password prompt, then export to cache + start serving the file.
+    if (showRemoteExportPassword) {
+        BackupPasswordDialog(
+            title = "Encrypt this backup?",
+            message = "With a backup password, the whole file is encrypted — playlists, profiles and saved " +
+                "passwords included — and nothing in it can be read without that password. Keep it safe: " +
+                "if you lose it, the backup cannot be opened at all. Without a password the file is not " +
+                "encrypted and saved passwords are left out of it.",
+            confirmLabel = "Encrypt & prepare",
+            skipLabel = "Prepare unencrypted",
+            onConfirm = { pass -> showRemoteExportPassword = false; showRemoteExport = true; vm.exportRemote(exportSections, pass, exportProfiles) },
+            onSkip = { showRemoteExportPassword = false; showRemoteExport = true; vm.exportRemote(exportSections, null, exportProfiles) },
+            onDismiss = { showRemoteExportPassword = false },
+        )
+    }
+
+    // Remote export: full-screen panel with PIN + QR while the file is served for download.
+    if (showRemoteExport) {
+        Box(Modifier.fillMaxSize().background(colors.background)) {
+            RemoteBackupExportScreen(
+                state = remoteState,
+                preparing = state == BackupViewModel.State.Working,
+                onStop = { vm.stopRemoteExport() },
+                onBack = { vm.stopRemoteExport(); showRemoteExport = false },
+            )
+        }
+    }
+
+    // Restore step 0: Remote (send the backup from a phone) or Local (pick a file on this device).
+    if (showRestoreChooser) {
+        RemoteLocalChooserDialog(
+            title = "Restore a backup",
+            message = "Send the backup from another device (phone or laptop) on the same Wi-Fi, or pick a backup file already on this device.",
+            onRemote = { showRestoreChooser = false; showRemoteRestore = true },
+            onLocal = { showRestoreChooser = false; browser = BrowseMode.FILE; showBrowser = true },
+            onDismiss = { showRestoreChooser = false },
+        )
+    }
+
+    // Remote restore: full-screen companion panel (PIN + QR). An uploaded file feeds the normal
+    // inspect → section-picker flow; the panel closes itself when a file arrives.
+    if (showRemoteRestore) {
+        Box(Modifier.fillMaxSize().background(colors.background)) {
+            RemoteBackupRestoreScreen(
+                state = remoteState,
+                backups = vm.remoteBackups,
+                onStart = { port -> vm.startRemoteRestore(port) },
+                onStop = { vm.stopRemoteRestore() },
+                onBackupReceived = { file -> showRemoteRestore = false; vm.inspect(file) },
+                onBack = { vm.stopRemoteRestore(); showRemoteRestore = false },
+            )
+        }
+    }
+}
+
+/** Two-way chooser: send/receive over the LAN companion server, or use a local file. */
+@Composable
+private fun RemoteLocalChooserDialog(
+    title: String,
+    message: String,
+    onRemote: () -> Unit,
+    onLocal: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val colors = OwnTVTheme.colors
+    val firstFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
+    BackHandler { onDismiss() }
+
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)).trapAllFocusExit().focusGroup(), contentAlignment = Alignment.Center) {
+        Column(Modifier.dialogPanel(width = 560.dp, padding = 28.dp)) {
+            Text(title, style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
+            Spacer(Modifier.height(8.dp))
+            Text(message, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+            Spacer(Modifier.height(20.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OwnTVButton("Cancel", onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY)
+                Spacer(Modifier.weight(1f))
+                OwnTVButton("Local file", onClick = onLocal, style = OwnTVButtonStyle.SECONDARY)
+                OwnTVButton("Remote", onClick = onRemote, modifier = Modifier.focusRequester(firstFocus))
+            }
+        }
     }
 }
 
@@ -219,7 +368,8 @@ private fun BackupPasswordDialog(
     title: String,
     message: String,
     confirmLabel: String,
-    skipLabel: String,
+    /** Null hides the skip button entirely — a sealed `.own` has nothing to fall back to. */
+    skipLabel: String?,
     onConfirm: (String) -> Unit,
     onSkip: () -> Unit,
     onDismiss: () -> Unit,
@@ -230,7 +380,7 @@ private fun BackupPasswordDialog(
     LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
     BackHandler { onDismiss() }
 
-    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)).focusGroup(), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)).trapAllFocusExit().focusGroup(), contentAlignment = Alignment.Center) {
         Column(Modifier.dialogPanel(width = 560.dp, padding = 28.dp)) {
             Text(title, style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
             Spacer(Modifier.height(12.dp))
@@ -247,8 +397,127 @@ private fun BackupPasswordDialog(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OwnTVButton("Cancel", onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY)
                 Spacer(Modifier.weight(1f))
-                OwnTVButton(skipLabel, onClick = onSkip, style = OwnTVButtonStyle.SECONDARY)
+                if (skipLabel != null) OwnTVButton(skipLabel, onClick = onSkip, style = OwnTVButtonStyle.SECONDARY)
                 OwnTVButton(confirmLabel, onClick = { onConfirm(password) }, enabled = password.isNotBlank())
+            }
+        }
+    }
+}
+
+/**
+ * Export step 0: choose which profiles the backup contains. All start UNTICKED (the user chooses
+ * explicitly). Ticking the active profile or an unlocked one is immediate; ticking another
+ * profile with a PIN prompts for it — wrong PIN shows "PIN incorrect" and leaves it unticked.
+ */
+@Composable
+private fun ProfilePickerDialog(
+    profiles: List<tv.own.owntv.core.database.entity.ProfileEntity>,
+    activeId: Long,
+    verifyPin: (tv.own.owntv.core.database.entity.ProfileEntity, String) -> Boolean,
+    onConfirm: (Set<Long>) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val colors = OwnTVTheme.colors
+    var ticked by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var pinFor by remember { mutableStateOf<tv.own.owntv.core.database.entity.ProfileEntity?>(null) }
+    val firstFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
+    BackHandler { if (pinFor != null) pinFor = null else onDismiss() }
+
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)).trapAllFocusExit().focusGroup(), contentAlignment = Alignment.Center) {
+        Column(Modifier.dialogPanel(width = 560.dp, padding = 28.dp)) {
+            Text("Which profiles to back up", style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "The backup will contain only the selected profiles and their data. Locked profiles " +
+                    "need their PIN.",
+                style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(16.dp))
+            profiles.forEachIndexed { i, p ->
+                val locked = p.pinHash != null && p.id != activeId
+                CheckRow(
+                    label = p.name + (if (p.id == activeId) "  ·  current" else ""),
+                    desc = when {
+                        locked -> "PIN locked"
+                        p.isKids -> "Kids profile"
+                        else -> null
+                    },
+                    checked = p.id in ticked,
+                    onToggle = {
+                        when {
+                            p.id in ticked -> ticked = ticked - p.id
+                            locked -> pinFor = p
+                            else -> ticked = ticked + p.id
+                        }
+                    },
+                    modifier = if (i == 0) Modifier.focusRequester(firstFocus) else Modifier,
+                )
+            }
+            Spacer(Modifier.height(20.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OwnTVButton("Cancel", onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY)
+                Spacer(Modifier.weight(1f))
+                OwnTVButton("Continue", onClick = { onConfirm(ticked) }, enabled = ticked.isNotEmpty())
+            }
+        }
+    }
+
+    pinFor?.let { profile ->
+        ProfilePinDialog(
+            profileName = profile.name,
+            verify = { pin -> verifyPin(profile, pin) },
+            onUnlocked = { ticked = ticked + profile.id; pinFor = null },
+            onDismiss = { pinFor = null },
+        )
+    }
+}
+
+/** PIN prompt for including a locked, non-active profile in the backup. */
+@Composable
+private fun ProfilePinDialog(
+    profileName: String,
+    verify: (String) -> Boolean,
+    onUnlocked: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val colors = OwnTVTheme.colors
+    var pin by remember { mutableStateOf("") }
+    var wrong by remember { mutableStateOf(false) }
+    val fieldFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { fieldFocus.requestFocus() } }
+    BackHandler { onDismiss() }
+
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)).trapAllFocusExit().focusGroup(), contentAlignment = Alignment.Center) {
+        Column(Modifier.dialogPanel(width = 480.dp, padding = 28.dp)) {
+            Text("“$profileName” is locked", style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "This isn't your current profile. Enter its PIN to include it in the backup — " +
+                    "without the PIN, its data won't be backed up.",
+                style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(16.dp))
+            OwnTVTextField(
+                value = pin,
+                onValueChange = { pin = it; wrong = false },
+                label = "Profile PIN",
+                isPassword = true,
+                focusRequester = fieldFocus,
+            )
+            if (wrong) {
+                Spacer(Modifier.height(8.dp))
+                Text("PIN incorrect.", style = MaterialTheme.typography.bodyMedium, color = Color(0xFFEF4444))
+            }
+            Spacer(Modifier.height(20.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OwnTVButton("Cancel", onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY)
+                Spacer(Modifier.weight(1f))
+                OwnTVButton(
+                    "Unlock",
+                    onClick = { if (verify(pin)) onUnlocked() else { wrong = true; pin = "" } },
+                    enabled = pin.isNotBlank(),
+                )
             }
         }
     }
@@ -270,7 +539,7 @@ private fun SectionPickerDialog(
     LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
     BackHandler { onDismiss() }
 
-    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)).focusGroup(), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)).trapAllFocusExit().focusGroup(), contentAlignment = Alignment.Center) {
         Column(Modifier.dialogPanel(width = 560.dp, padding = 28.dp)) {
             Text(title, style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
             Spacer(Modifier.height(16.dp))
@@ -316,6 +585,7 @@ private fun CheckRow(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         contentAlignment = Alignment.CenterStart,
+        surface = GlassSurface.DIALOGS,
     ) { _ ->
         Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(

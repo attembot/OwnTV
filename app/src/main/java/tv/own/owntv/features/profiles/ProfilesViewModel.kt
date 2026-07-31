@@ -24,10 +24,14 @@ class ProfilesViewModel(
     private val sourceDao: SourceDao,
     private val settings: SettingsRepository,
     private val launcherIntegrationRepository: LauncherIntegrationRepository,
+    private val openSubtitlesAccounts: tv.own.owntv.core.subtitles.OpenSubtitlesAccountManager,
 ) : ViewModel() {
 
+    // Eagerly on purpose: MainActivity's splash gate blocks the first frame on this list, so the
+    // query has to start when the ViewModel is built, not on first collection inside composition.
+    // Measured: WhileSubscribed here cost ~1.3s of cold start.
     val profiles: StateFlow<List<ProfileEntity>> = profileDao.observeAll()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     /** Make [profile] active (routes the app into the shell) once the preference write commits. */
     fun switchTo(profile: ProfileEntity, onSwitched: () -> Unit = {}) {
@@ -91,6 +95,8 @@ class ProfilesViewModel(
             val activeProfileId = settings.activeProfileId.first()
             val remainingProfileId = profileDao.getAllOnce().firstOrNull { it.id != profile.id }?.id
             runCatching { launcherIntegrationRepository.clearProfile(profile.id) }
+            // Deleting a profile permanently erases its stored OpenSubtitles login (subtitle plan §5.5).
+            openSubtitlesAccounts.eraseFor(profile.id)
             profileDao.delete(profile)
             if (activeProfileId == profile.id) {
                 settings.setActiveProfile(remainingProfileId ?: -1L)

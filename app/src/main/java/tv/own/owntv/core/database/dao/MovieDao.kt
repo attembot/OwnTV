@@ -40,11 +40,15 @@ interface MovieDao {
     @Query("SELECT remoteId FROM movies WHERE sourceId = :sourceId AND remoteId IS NOT NULL")
     suspend fun remoteIdsForSource(sourceId: Long): List<String>
 
-    @Query("SELECT remoteId, id, contentHash FROM movies WHERE sourceId = :sourceId AND remoteId IS NOT NULL")
+    @Query("SELECT remoteId, id, contentHash, sortOrder FROM movies WHERE sourceId = :sourceId AND remoteId IS NOT NULL")
     suspend fun contentHashesForSource(sourceId: Long): List<ContentHashProjection>
 
     @Query("DELETE FROM movies WHERE sourceId = :sourceId AND remoteId IN (:remoteIds)")
     suspend fun deleteByRemoteIds(sourceId: Long, remoteIds: List<String>)
+
+    /** One-time cleanup of pre-stable-key M3U rows (remoteId was always NULL under clear-then-insert). */
+    @Query("DELETE FROM movies WHERE sourceId = :sourceId AND remoteId IS NULL")
+    suspend fun deleteNullRemoteIds(sourceId: Long)
 
     // --- Re-sync delta check (Stalker paged catalogs): skip categories whose item count is unchanged ---
     @Query("SELECT categoryId, COUNT(*) AS itemCount FROM movies WHERE sourceId = :sourceId AND categoryId IS NOT NULL GROUP BY categoryId")
@@ -52,6 +56,12 @@ interface MovieDao {
 
     @Query("SELECT remoteId FROM movies WHERE sourceId = :sourceId AND categoryId = :categoryId AND remoteId IS NOT NULL")
     suspend fun remoteIdsForCategory(sourceId: Long, categoryId: Long): List<String>
+
+    /** Prune scope for the per-category sync fallback: rows in the categories that were fetched
+     *  successfully. Rows with no category are never returned by a per-category request, so they
+     *  must stay out of scope or a fallback pass would delete them all. */
+    @Query("SELECT remoteId FROM movies WHERE sourceId = :sourceId AND categoryId IN (:categoryIds) AND remoteId IS NOT NULL")
+    suspend fun remoteIdsInCategories(sourceId: Long, categoryIds: List<Long>): List<String>
 
     @Query("SELECT * FROM movies WHERE sourceId = :sourceId AND name = :name LIMIT 1")
     suspend fun findByName(sourceId: Long, name: String): MovieEntity?
@@ -75,6 +85,20 @@ interface MovieDao {
 
     @Query("SELECT * FROM movies WHERE categoryId = :categoryId ORDER BY rating DESC, name ASC")
     fun pagingByCategoryRating(categoryId: Long): PagingSource<Int, MovieEntity>
+
+    // Date added / last modification (newest first). NULLs sort lowest in SQLite, so unknown
+    // dates land last and fall through to sortOrder DESC (reverse playlist order).
+    @Query("SELECT * FROM movies WHERE sourceId IN (:sourceIds) ORDER BY addedAt DESC, sortOrder DESC, id DESC")
+    fun pagingAllDateAdded(sourceIds: List<Long>): PagingSource<Int, MovieEntity>
+
+    @Query("SELECT * FROM movies WHERE categoryId = :categoryId ORDER BY addedAt DESC, sortOrder DESC, id DESC")
+    fun pagingByCategoryDateAdded(categoryId: Long): PagingSource<Int, MovieEntity>
+
+    @Query("SELECT * FROM movies WHERE sourceId IN (:sourceIds) AND name LIKE '%' || :query || '%' ORDER BY addedAt DESC, sortOrder DESC, id DESC")
+    fun searchAllDateAdded(query: String, sourceIds: List<Long>): PagingSource<Int, MovieEntity>
+
+    @Query("SELECT * FROM movies WHERE categoryId = :categoryId AND name LIKE '%' || :query || '%' ORDER BY addedAt DESC, sortOrder DESC, id DESC")
+    fun searchInCategoryDateAdded(query: String, categoryId: Long): PagingSource<Int, MovieEntity>
 
     // --- Manual order (Move) — see ChannelDao for the join shape. ---
     @Query(

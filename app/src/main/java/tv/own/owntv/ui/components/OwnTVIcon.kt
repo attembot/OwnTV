@@ -24,6 +24,8 @@ enum class OwnTVIcon {
     PAUSE, REWIND, FORWARD, AUDIO, SUBTITLE, SKIP_NEXT, SKIP_PREVIOUS,
     BACK, VOLUME_HIGH, VOLUME_LOW, VOLUME_MUTE, ASPECT, FULLSCREEN, FULLSCREEN_EXIT, PIP, CLOSE,
     SORT, SWAP, MOVE, MINUS,
+    HEADPHONES, EXPAND,
+    IMAGE, INFO,
 }
 
 @Composable
@@ -99,16 +101,48 @@ fun OwnTVIcon(
                 if (filled) drawPath(star, tint, style = Fill) else drawPath(star, tint, style = stroke)
             }
             OwnTVIcon.FAVORITE -> {
-                // bookmark
-                val bm = Path().apply {
-                    moveTo(p(7f, 4f).x, p(7f, 4f).y)
-                    lineTo(p(17f, 4f).x, p(17f, 4f).y)
-                    lineTo(p(17f, 20f).x, p(17f, 20f).y)
-                    lineTo(p(12f, 16f).x, p(12f, 16f).y)
-                    lineTo(p(7f, 20f).x, p(7f, 20f).y)
+                // Heart — the app-wide favourite mark (a star reads as a *rating* on posters, which is
+                // exactly what PosterCard's rating badge uses STAR for).
+                val heart = Path().apply {
+                    moveTo(p(12f, 20.5f).x, p(12f, 20.5f).y)
+                    cubicTo(
+                        p(6.5f, 16.2f).x, p(6.5f, 16.2f).y,
+                        p(3f, 12.8f).x, p(3f, 12.8f).y,
+                        p(3f, 9f).x, p(3f, 9f).y,
+                    )
+                    cubicTo(
+                        p(3f, 6f).x, p(3f, 6f).y,
+                        p(5.3f, 3.8f).x, p(5.3f, 3.8f).y,
+                        p(8f, 3.8f).x, p(8f, 3.8f).y,
+                    )
+                    cubicTo(
+                        p(10f, 3.8f).x, p(10f, 3.8f).y,
+                        p(11.4f, 5f).x, p(11.4f, 5f).y,
+                        p(12f, 6.3f).x, p(12f, 6.3f).y,
+                    )
+                    cubicTo(
+                        p(12.6f, 5f).x, p(12.6f, 5f).y,
+                        p(14f, 3.8f).x, p(14f, 3.8f).y,
+                        p(16f, 3.8f).x, p(16f, 3.8f).y,
+                    )
+                    cubicTo(
+                        p(18.7f, 3.8f).x, p(18.7f, 3.8f).y,
+                        p(21f, 6f).x, p(21f, 6f).y,
+                        p(21f, 9f).x, p(21f, 9f).y,
+                    )
+                    cubicTo(
+                        p(21f, 12.8f).x, p(21f, 12.8f).y,
+                        p(17.5f, 16.2f).x, p(17.5f, 16.2f).y,
+                        p(12f, 20.5f).x, p(12f, 20.5f).y,
+                    )
                     close()
                 }
-                if (filled) drawPath(bm, tint, style = Fill) else drawPath(bm, tint, style = stroke)
+                if (filled) drawPath(heart, tint, style = Fill) else drawPath(heart, tint, style = stroke)
+            }
+            OwnTVIcon.INFO -> {
+                drawCircleStroke(p(12f, 12f), 9f * s, tint, stroke)
+                drawCircle(tint, 1.2f * s, p(12f, 7.6f), style = Fill)
+                drawLineStroke(p(12f, 11f), p(12f, 16.5f), tint, stroke)
             }
             OwnTVIcon.PLAY -> {
                 val tri = Path().apply {
@@ -250,6 +284,14 @@ fun OwnTVIcon(
                 drawLineStroke(p(11.5f, 5f), p(16.5f, 7f), tint, stroke)      // upper flag
                 drawLineStroke(p(11.5f, 8.5f), p(16.5f, 10.5f), tint, stroke) // lower flag
             }
+            OwnTVIcon.HEADPHONES -> {
+                // Over-ear headphones: headband arc + two filled earcups.
+                drawArc(tint, 180f, 180f, false, topLeft = p(4f, 5f), size = Size(16f * s, 16f * s), style = stroke)
+                drawRoundRectStroke(p(4f, 13f), p(8f, 20f), 2f * s, tint, stroke)
+                drawRect(tint, topLeft = p(4.5f, 13.5f), size = Size(3f * s, 6f * s))
+                drawRoundRectStroke(p(16f, 13f), p(20f, 20f), 2f * s, tint, stroke)
+                drawRect(tint, topLeft = p(16.5f, 13.5f), size = Size(3f * s, 6f * s))
+            }
             OwnTVIcon.SUBTITLE -> {
                 drawRoundRectStroke(p(3f, 5f), p(21f, 19f), 2.5f * s, tint, stroke)
                 drawLineStroke(p(6f, 14f), p(11f, 14f), tint, stroke)
@@ -286,6 +328,22 @@ fun OwnTVIcon(
                 drawLineStroke(p(20f, 9f), p(20f, 4f), tint, stroke); drawLineStroke(p(20f, 4f), p(15f, 4f), tint, stroke)
                 drawLineStroke(p(4f, 15f), p(4f, 20f), tint, stroke); drawLineStroke(p(4f, 20f), p(9f, 20f), tint, stroke)
                 drawLineStroke(p(20f, 15f), p(20f, 20f), tint, stroke); drawLineStroke(p(20f, 20f), p(15f, 20f), tint, stroke)
+            }
+            OwnTVIcon.EXPAND -> { // ⤢ open-in-full: diagonal with arrowheads at both ends
+                drawLineStroke(p(6f, 18f), p(18f, 6f), tint, stroke)
+                drawLineStroke(p(18f, 6f), p(12.5f, 6f), tint, stroke)
+                drawLineStroke(p(18f, 6f), p(18f, 11.5f), tint, stroke)
+                drawLineStroke(p(6f, 18f), p(11.5f, 18f), tint, stroke)
+                drawLineStroke(p(6f, 18f), p(6f, 12.5f), tint, stroke)
+            }
+            OwnTVIcon.IMAGE -> { // photo/picture frame: rounded rect + sun + mountain
+                drawRoundRectStroke(p(3f, 5f), p(21f, 19f), 2f * s, tint, stroke)
+                drawCircle(tint, 1.2f * s, p(8f, 10f), style = Fill) // sun
+                // two-peak mountain ridge filling the lower frame
+                drawLineStroke(p(4.5f, 18f), p(9.5f, 12f), tint, stroke)
+                drawLineStroke(p(9.5f, 12f), p(13f, 15f), tint, stroke)
+                drawLineStroke(p(13f, 15f), p(16f, 11f), tint, stroke)
+                drawLineStroke(p(16f, 11f), p(19.5f, 18f), tint, stroke)
             }
             OwnTVIcon.FULLSCREEN_EXIT -> {
                 drawLineStroke(p(9f, 4f), p(9f, 9f), tint, stroke); drawLineStroke(p(9f, 9f), p(4f, 9f), tint, stroke)

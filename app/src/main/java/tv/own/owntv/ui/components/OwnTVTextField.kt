@@ -29,6 +29,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -43,7 +44,10 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import tv.own.owntv.ui.theme.GlassSurface
+import tv.own.owntv.ui.theme.LocalGlass
 import tv.own.owntv.ui.theme.OwnTVTheme
+import tv.own.owntv.ui.theme.glass
 
 /**
  * A remote-friendly single-line text field, TV-style and two-stage: D-pad focus only *highlights*
@@ -54,6 +58,12 @@ import tv.own.owntv.ui.theme.OwnTVTheme
  *
  * When [isPassword] is true, a show/hide eye button appears on the right of the field and is
  * independently D-pad focusable so the user can reveal the password without a keyboard.
+ *
+ * Liquid Glass: when [surface] is in scope the field frosts and gains a white glass rim on focus;
+ * otherwise it keeps its solid tonal fill + accent/outline border. Defaults to [GlassSurface.CARDS]
+ * (most fields live on a panel); pass [GlassSurface.DIALOGS] for a field inside a popup/dialog.
+ *
+ * @param surface glass surface to frost with, or null to stay flat.
  */
 @Composable
 fun OwnTVTextField(
@@ -65,6 +75,7 @@ fun OwnTVTextField(
     keyboardType: KeyboardType = KeyboardType.Text,
     isPassword: Boolean = false,
     focusRequester: FocusRequester? = null,
+    surface: GlassSurface? = GlassSurface.CARDS,
 ) {
     val colors = OwnTVTheme.colors
     val interaction = remember { MutableInteractionSource() }
@@ -75,10 +86,19 @@ fun OwnTVTextField(
     val keyboard = LocalSoftwareKeyboardController.current
     val shape = RoundedCornerShape(12.dp)
     val focused = fieldFocused || editing
-
     var showPassword by remember { mutableStateOf(false) }
     val eyeInteraction = remember { MutableInteractionSource() }
     val eyeFocused by eyeInteraction.collectIsFocusedAsState()
+
+    // Glassy only when a surface is given and it's in the active glass scope (matches FocusableSurface).
+    val glassy = surface != null && LocalGlass.current.isGlassy(surface)
+    // Glass edge: a faint white rim lenses the whole edge at all times, brightening on focus.
+    val borderColor = when {
+        glassy && (focused || eyeFocused) -> Color.White.copy(alpha = 0.5f)
+        glassy -> Color.White.copy(alpha = 0.22f)
+        focused || eyeFocused -> colors.primary
+        else -> colors.outlineVariant
+    }
 
     LaunchedEffect(editing) {
         if (editing) runCatching { innerFocus.requestFocus(); keyboard?.show() }
@@ -93,10 +113,13 @@ fun OwnTVTextField(
                 .fillMaxWidth()
                 .height(52.dp)
                 .clip(shape)
-                .background(colors.surfaceContainerHigh)
+                .then(
+                    if (surface != null) Modifier.glass(surface = surface, baseFill = colors.surfaceContainerHigh, shape = shape, frostScale = 0.6f)
+                    else Modifier.background(colors.surfaceContainerHigh)
+                )
                 .border(
                     width = if (focused || eyeFocused) 2.5.dp else 1.dp,
-                    color = if (focused || eyeFocused) colors.primary else colors.outlineVariant,
+                    color = borderColor,
                     shape = shape,
                 ),
         ) {

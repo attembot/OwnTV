@@ -220,7 +220,7 @@ class HomeViewModel(
 
     val isPreviewActive: StateFlow<Boolean> = combine(_heroFocused, _previewEnabled, _uiState) { focused, enabled, state ->
         focused && enabled && state.heroItems.isNotEmpty()
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     fun setPreviewEnabled(enabled: Boolean) {
         _previewEnabled.value = enabled
@@ -275,34 +275,42 @@ class HomeViewModel(
         val previous = _uiState.value
         val state = withContext(Dispatchers.IO) {
             val config = settings.homeConfig(profileId).first()
-            // Active-playlist filter: when a "Default" playlist is chosen, the home rails narrow to it too
-            // (Continue Watching / Recent / Favorites). No default → activeIds == all profile ids → no-op.
-            val activeIds = activeSourceIds(settings, sourceDao, profileId).toSet()
+            // Active-playlist filter + per-section enabledScope: Home rails never show Off sections.
+            val liveIds = activeSourceIds(settings, sourceDao, profileId, MediaType.LIVE).toSet()
+            val movieIds = activeSourceIds(settings, sourceDao, profileId, MediaType.MOVIE).toSet()
+            val seriesIds = activeSourceIds(settings, sourceDao, profileId, MediaType.SERIES).toSet()
             val allIds = sourceDao.sourceIdsForProfile(profileId).toSet()
-            val filtering = activeIds != allIds
 
             // Hidden items / hidden categories (per profile) never surface on Home either.
             val hidden = hiddenState(profileId, allIds.toList())
 
             val allItems = planner.buildContinuationItems(profileId)
-            val items = (if (!filtering) allItems else allItems.filter { continuationSourceId(it) in activeIds })
+            val items = allItems
+                .filter { item ->
+                    val sid = continuationSourceId(item) ?: return@filter false
+                    when (item.kind) {
+                        LauncherContinuationKind.MOVIE -> sid in movieIds
+                        LauncherContinuationKind.EPISODE -> sid in seriesIds
+                        LauncherContinuationKind.LIVE -> sid in liveIds
+                    }
+                }
                 .filterNot { isContinuationHidden(it, hidden) }
             val movies = items.filter { it.kind == LauncherContinuationKind.MOVIE }
             val series = items.filter { it.kind == LauncherContinuationKind.EPISODE }
-            val liveWithTs = recentlyWatchedLive(profileId, activeIds, filtering, RECENT_LIVE_ROW_LIMIT)
+            val liveWithTs = recentlyWatchedLive(profileId, liveIds, filtering = true, RECENT_LIVE_ROW_LIMIT)
                 .filterNot { isChannelHidden(it.channel, hidden) }
             val live = liveWithTs.map { it.channel }
             val favLive = channelDao.favoritesListAlpha(profileId).first()
-                .let { if (!filtering) it else it.filter { c -> c.sourceId in activeIds } }
+                .filter { c -> c.sourceId in liveIds }
                 .filterNot { isChannelHidden(it, hidden) }
             val heroItems = buildHeroItems(items, liveWithTs, config)
             val recentGuide = if (HomeRow.RECENT_CHANNELS in config.visibleOrder && config.recentLiveMode == HomeLiveRowMode.ON_NOW) {
-                buildLiveGuide(profileId, activeIds, live)
+                buildLiveGuide(profileId, liveIds, live)
             } else {
                 GuideSliceState()
             }
             val favoriteGuide = if (HomeRow.FAVORITE_CHANNELS in config.visibleOrder && config.favoriteLiveMode == HomeLiveRowMode.ON_NOW) {
-                buildLiveGuide(profileId, activeIds, favLive)
+                buildLiveGuide(profileId, liveIds, favLive)
             } else {
                 GuideSliceState()
             }

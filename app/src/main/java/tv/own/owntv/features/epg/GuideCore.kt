@@ -3,6 +3,7 @@ package tv.own.owntv.features.epg
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,8 +20,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,14 +47,20 @@ import androidx.tv.material3.Text
 import tv.own.owntv.core.database.entity.EpgProgrammeEntity
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import tv.own.owntv.features.settings.data.SettingsRepository
 import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.OwnTVButton
+import tv.own.owntv.ui.components.dialogPanel
+import tv.own.owntv.ui.components.trapAllFocusExit
 import tv.own.owntv.ui.components.OwnTVButtonStyle
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.longPressMenuGuard
 import tv.own.owntv.ui.format.rememberSystemTimeFormatter
 import tv.own.owntv.ui.theme.Dimens
+import tv.own.owntv.ui.theme.GlassSurface
 import tv.own.owntv.ui.theme.OwnTVTheme
+import tv.own.owntv.ui.theme.PopupFontTheme
+import tv.own.owntv.ui.theme.glass
 
 internal object GuideGridDefaults {
     val ChannelCol = 176.dp
@@ -151,6 +160,13 @@ internal fun ProgrammeDetailDialog(
     onWatch: () -> Unit,
     onPlayCatchup: () -> Unit,
     onDismiss: () -> Unit,
+    // Where "Watch from start" sends the archive. ASK shows a chooser popup on top of this dialog;
+    // INTERNAL/EXTERNAL go straight there. Defaulted so non-catch-up callers can ignore it.
+    catchupPlayer: SettingsRepository.CatchupPlayer = SettingsRepository.CatchupPlayer.INTERNAL,
+    onPlayCatchupExternal: () -> Unit = {},
+    // Denser variant for the Live TV catch-up picker, which opens this on top of an already-small
+    // popup chain — full-size chrome dwarfed the picker it came from. Guide keeps the roomy layout.
+    compact: Boolean = false,
 ) {
     val colors = OwnTVTheme.colors
     val formatTime = rememberSystemTimeFormatter()
@@ -161,8 +177,18 @@ internal fun ProgrammeDetailDialog(
     }
     val fr = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
+    // "Always ask" → a second, small popup asking which player takes the archive.
+    var showPlayerChooser by remember { mutableStateOf(false) }
+    if (showPlayerChooser) {
+        CatchupPlayerChooser(
+            onInternal = { showPlayerChooser = false; onPlayCatchup() },
+            onExternal = { showPlayerChooser = false; onPlayCatchupExternal() },
+            onDismiss = { showPlayerChooser = false },
+        )
+    }
     Popup(onDismissRequest = onDismiss, properties = PopupProperties(focusable = true)) {
         BackHandler { onDismiss() }
+      CompactPopupFont(compact) {
         Box(
             // The dialog can be opened by a long-press on the programme cell; the OK key is often still
             // held when it appears, which would instantly fire the focused action. Swallow OK until it's
@@ -170,35 +196,46 @@ internal fun ProgrammeDetailDialog(
             Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.75f)).longPressMenuGuard(),
             contentAlignment = Alignment.Center,
         ) {
-            // Scrollable: long XMLTV descriptions can exceed a small screen's height.
+            // Scrollable: long XMLTV descriptions can exceed a small screen's height. widthIn (not a
+            // fixed width) keeps it responsive on narrow screens, so this uses .glass() directly rather
+            // than dialogPanel (which sets a fixed width) — same DIALOGS surface + fill hook.
+            val corner = if (compact) 16.dp else 20.dp
             Column(
-                Modifier.widthIn(max = 560.dp).clip(RoundedCornerShape(20.dp)).background(colors.surfaceContainerHigh)
-                    .verticalScroll(rememberScrollState()).padding(28.dp),
+                Modifier.widthIn(max = if (compact) 400.dp else 560.dp).clip(RoundedCornerShape(corner))
+                    .glass(surface = GlassSurface.DIALOGS, baseFill = colors.surfaceContainerHigh, shape = RoundedCornerShape(corner), cornerRadius = corner)
+                    .verticalScroll(rememberScrollState()).padding(if (compact) 18.dp else 28.dp),
             ) {
                 Text(channelName.uppercase(), style = MaterialTheme.typography.labelMedium, color = colors.primary, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(6.dp))
-                Text(programme.title, style = MaterialTheme.typography.headlineSmall, color = colors.onSurface)
-                Spacer(Modifier.height(8.dp))
-                Text("${formatTime(programme.startMs)} – ${formatTime(programme.stopMs)}", style = MaterialTheme.typography.titleMedium, color = colors.onSurfaceVariant)
+                Text(programme.title, style = if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.headlineSmall, color = colors.onSurface)
+                Spacer(Modifier.height(if (compact) 4.dp else 8.dp))
+                Text("${formatTime(programme.startMs)} – ${formatTime(programme.stopMs)}", style = if (compact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleMedium, color = colors.onSurfaceVariant)
                 if (!description.isNullOrBlank()) {
-                    Spacer(Modifier.height(14.dp))
-                    Text(description.orEmpty(), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+                    Spacer(Modifier.height(if (compact) 10.dp else 14.dp))
+                    Text(description.orEmpty(), style = if (compact) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
                 }
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(if (compact) 16.dp else 24.dp))
                 // FlowRow so the actions wrap to a second line on narrower screens instead of the last
                 // button being clipped off the dialog edge (4 buttons don't fit one row when catch-up adds
                 // "Watch from start" + "Watch channel").
                 FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp),
                 ) {
                     // Catch-up channels: replay this programme from its start (seekable archive playback).
                     if (canCatchup) {
-                        OwnTVButton("Watch from start", onClick = onPlayCatchup, icon = OwnTVIcon.PLAY, modifier = Modifier.focusRequester(fr))
-                        OwnTVButton("Watch channel", onClick = onWatch, style = OwnTVButtonStyle.SECONDARY)
+                        val startCatchup = {
+                            when (catchupPlayer) {
+                                SettingsRepository.CatchupPlayer.ASK -> showPlayerChooser = true
+                                SettingsRepository.CatchupPlayer.INTERNAL -> onPlayCatchup()
+                                SettingsRepository.CatchupPlayer.EXTERNAL -> onPlayCatchupExternal()
+                            }
+                        }
+                        OwnTVButton("Watch from start", onClick = startCatchup, icon = OwnTVIcon.PLAY, compact = compact, modifier = Modifier.focusRequester(fr))
+                        OwnTVButton("Watch channel", onClick = onWatch, style = OwnTVButtonStyle.SECONDARY, compact = compact)
                     } else {
-                        OwnTVButton("Watch channel", onClick = onWatch, icon = OwnTVIcon.PLAY, modifier = Modifier.focusRequester(fr))
+                        OwnTVButton("Watch channel", onClick = onWatch, icon = OwnTVIcon.PLAY, compact = compact, modifier = Modifier.focusRequester(fr))
                     }
                     // Favourite the channel without leaving the guide; the label flips in place.
                     OwnTVButton(
@@ -206,10 +243,57 @@ internal fun ProgrammeDetailDialog(
                         onClick = onToggleFavorite,
                         style = OwnTVButtonStyle.SECONDARY,
                         icon = OwnTVIcon.FAVORITE,
+                        compact = compact,
                     )
-                    OwnTVButton("Close", onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY)
+                    OwnTVButton("Close", onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY, compact = compact)
+                }
+            }
+        }
+      }
+    }
+}
+
+/** The "Always ask" chooser: which player takes this catch-up archive. Deliberately tiny — it sits on
+ *  top of the programme dialog, so it only asks the one question and gets out of the way. */
+@Composable
+private fun CatchupPlayerChooser(
+    onInternal: () -> Unit,
+    onExternal: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val colors = OwnTVTheme.colors
+    val fr = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
+    Popup(onDismissRequest = onDismiss, properties = PopupProperties(focusable = true)) {
+        BackHandler { onDismiss() }
+        PopupFontTheme(fontScale = 0.7f) {
+            Box(
+                Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.75f))
+                    .trapAllFocusExit().focusGroup(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(Modifier.dialogPanel(width = 340.dp, corner = 16.dp, padding = 18.dp, scroll = false)) {
+                    Text("Play catch-up in", style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Set a permanent choice in Settings › Catch-up.",
+                        style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    OwnTVButton("OwnTV player", onClick = onInternal, icon = OwnTVIcon.PLAY, compact = true, modifier = Modifier.fillMaxWidth().focusRequester(fr))
+                    Spacer(Modifier.height(8.dp))
+                    OwnTVButton("External player", onClick = onExternal, style = OwnTVButtonStyle.SECONDARY, compact = true, modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(8.dp))
+                    OwnTVButton("Cancel", onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY, compact = true, modifier = Modifier.fillMaxWidth())
                 }
             }
         }
     }
+}
+
+/** Applies the shared popup type ramp at a reduced scale only when [compact]; otherwise leaves the
+ *  caller's typography untouched, so the Guide's own dialog keeps its existing look. */
+@Composable
+private fun CompactPopupFont(compact: Boolean, content: @Composable () -> Unit) {
+    if (compact) PopupFontTheme(fontScale = 0.7f, content = content) else content()
 }

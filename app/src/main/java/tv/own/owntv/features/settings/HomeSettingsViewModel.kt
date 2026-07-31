@@ -22,7 +22,7 @@ class HomeSettingsViewModel(
 ) : ViewModel() {
     val config: StateFlow<HomeConfig> = settings.activeProfileId
         .flatMapLatest { pid -> if (pid < 0) flowOf(HomeConfig()) else settings.homeConfig(pid) }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, HomeConfig())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeConfig())
 
     fun setRowHidden(row: HomeRow, hidden: Boolean) {
         updateConfig { config -> config.copy(hidden = if (hidden) config.hidden + row else config.hidden - row) }

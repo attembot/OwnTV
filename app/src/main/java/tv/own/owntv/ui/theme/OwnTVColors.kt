@@ -84,21 +84,30 @@ private fun Color.withLightness(l: Float): Color {
     return Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
 }
 
-/** Generate tonal primary roles from an arbitrary seed color (the custom hex accent). */
-private fun rolesFrom(seed: Color, isDark: Boolean): AccentRoles = if (isDark) {
-    AccentRoles(
-        primary = seed.withLightness(0.70f),
-        onPrimary = seed.withLightness(0.13f),
-        primaryContainer = seed.withLightness(0.26f),
-        onPrimaryContainer = seed.withLightness(0.90f),
-    )
-} else {
-    AccentRoles(
-        primary = seed.withLightness(0.36f),
-        onPrimary = Color.White,
-        primaryContainer = seed.withLightness(0.88f),
-        onPrimaryContainer = seed.withLightness(0.10f),
-    )
+/**
+ * Generate tonal primary roles from an arbitrary seed color (the custom hex accent).
+ * The seed is used EXACTLY as [primary] so the user's hex renders true; only the supporting
+ * contrast roles (onPrimary / containers) are derived by nudging the seed's lightness.
+ */
+private fun rolesFrom(seed: Color, isDark: Boolean): AccentRoles {
+    // Choose a readable foreground for text/icons drawn on top of the exact seed color.
+    val onPrimary = if (androidx.core.graphics.ColorUtils.calculateLuminance(seed.toArgb()) > 0.5)
+        Color.Black else Color.White
+    return if (isDark) {
+        AccentRoles(
+            primary = seed,
+            onPrimary = onPrimary,
+            primaryContainer = seed.withLightness(0.26f),
+            onPrimaryContainer = seed.withLightness(0.90f),
+        )
+    } else {
+        AccentRoles(
+            primary = seed,
+            onPrimary = onPrimary,
+            primaryContainer = seed.withLightness(0.88f),
+            onPrimaryContainer = seed.withLightness(0.10f),
+        )
+    }
 }
 
 /**

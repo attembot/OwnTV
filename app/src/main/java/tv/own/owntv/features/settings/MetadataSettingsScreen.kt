@@ -1,6 +1,7 @@
 package tv.own.owntv.features.settings
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -33,6 +35,62 @@ import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.OwnTVTextField
 import tv.own.owntv.ui.components.roundedPanel
 import tv.own.owntv.ui.theme.OwnTVTheme
+
+/**
+ * TMDB content languages (ISO 639-1, region-qualified where TMDB's coverage is meaningfully better for
+ * one — e.g. pt-BR). "" keeps TMDB's own default (en-US), which is what installs used before this setting
+ * existed, so an upgrade never silently changes anyone's metadata.
+ *
+ * Distinct from VideoPlayerSettingsScreen's LANGUAGES list, which uses 3-letter codes for audio/subtitle
+ * track matching — TMDB only accepts 2-letter tags.
+ */
+private val TMDB_LANGUAGES = listOf(
+    "" to "Default (English)",
+    MetadataConfig.LANGUAGE_AUTO to "Device language",
+    "ar" to "Arabic",
+    "bg" to "Bulgarian",
+    "zh" to "Chinese",
+    "hr" to "Croatian",
+    "cs" to "Czech",
+    "da" to "Danish",
+    "nl" to "Dutch",
+    "en" to "English",
+    "et" to "Estonian",
+    "fi" to "Finnish",
+    "fr" to "French",
+    "de" to "German",
+    "el" to "Greek",
+    "he" to "Hebrew",
+    "hi" to "Hindi",
+    "hu" to "Hungarian",
+    "id" to "Indonesian",
+    "it" to "Italian",
+    "ja" to "Japanese",
+    "ko" to "Korean",
+    "lv" to "Latvian",
+    "lt" to "Lithuanian",
+    "ms" to "Malay",
+    "no" to "Norwegian",
+    "fa" to "Persian",
+    "pl" to "Polish",
+    "pt-BR" to "Portuguese (Brazil)",
+    "pt-PT" to "Portuguese (Portugal)",
+    "ro" to "Romanian",
+    "ru" to "Russian",
+    "sr" to "Serbian",
+    "sk" to "Slovak",
+    "sl" to "Slovenian",
+    "es" to "Spanish",
+    "es-MX" to "Spanish (Latin America)",
+    "sv" to "Swedish",
+    "th" to "Thai",
+    "tr" to "Turkish",
+    "uk" to "Ukrainian",
+    "vi" to "Vietnamese",
+)
+
+private fun tmdbLangName(code: String) =
+    TMDB_LANGUAGES.firstOrNull { it.first == code }?.second ?: code.ifBlank { "Default (English)" }
 
 /**
  * Settings → Metadata (TMDB). Phase M1 of the enrichment plan: the master toggle and the two advanced
@@ -50,6 +108,11 @@ fun MetadataSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val storedUrl by vm.metadataServerUrl.collectAsStateWithLifecycle()
     val tier by vm.metadataTier.collectAsStateWithLifecycle()
     val testState by vm.metadataTest.collectAsStateWithLifecycle()
+    val language by vm.metadataLanguage.collectAsStateWithLifecycle()
+
+    var showLangPicker by remember { mutableStateOf(false) }
+    var langPickerWasOpen by remember { mutableStateOf(false) }
+    val langRowFocus = remember { FocusRequester() }
 
     // Seed the editable fields once; local edit → Save persists (same pattern as NetworkSettingsScreen).
     var seeded by remember { mutableStateOf(false) }
@@ -75,6 +138,13 @@ fun MetadataSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         modifier = modifier
             .fillMaxSize()
             .roundedPanel()
+            // onEnter + focusGroup: a safety net for two dispose-on-collapse paths — (1) toggling
+            // "Advanced options" off while focus is on a field inside it, and (2) switching Metadata
+            // mode to PROVIDER (mode.enrich=false), which disposes the whole advanced block + the row
+            // the user clicked. Either path leaves focus dangling; onEnter recaptures it onto the
+            // always-composed first mode row whenever directional focus re-enters the group.
+            .focusProperties { onEnter = { runCatching { firstFocus.requestFocus() } } }
+            .focusGroup()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 40.dp, vertical = 28.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -112,6 +182,17 @@ fun MetadataSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             "Active TMDB source: ${tier.label}",
             style = MaterialTheme.typography.bodyMedium,
             color = colors.primary,
+        )
+
+        Spacer(Modifier.height(16.dp))
+        Row2(
+            icon = OwnTVIcon.SUBTITLE,
+            title = "Metadata language",
+            desc = "Language for plots, genres & titles from TMDB. Fields TMDB hasn't translated stay " +
+                "in English. Changing this clears the cached details so they refetch.",
+            chip = tmdbLangName(language), chevron = true,
+            modifier = Modifier.focusRequester(langRowFocus),
+            onClick = { showLangPicker = true },
         )
 
         Spacer(Modifier.height(16.dp))
@@ -187,6 +268,33 @@ fun MetadataSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.bodySmall,
             color = colors.onSurfaceVariant,
         )
+    }
+
+    if (showLangPicker) {
+        // searchable: the list is long enough that D-pad scrolling to e.g. Ukrainian is tedious.
+        PickerDialog(
+            title = "Metadata language",
+            options = TMDB_LANGUAGES,
+            selected = language,
+            searchable = true,
+            onSelect = {
+                if (it != language) vm.setMetadataLanguage(it)
+                showLangPicker = false
+            },
+            onDismiss = { showLangPicker = false },
+        )
+    }
+    // Return focus to the language row after the dialog closes, rather than letting it fall to the
+    // screen's first mode row (same pattern as WeatherSettingsScreen's location dialog). Gated on
+    // langPickerWasOpen so this doesn't fire on first composition and steal focus from firstFocus.
+    LaunchedEffect(showLangPicker) {
+        if (showLangPicker) {
+            langPickerWasOpen = true
+        } else if (langPickerWasOpen) {
+            langPickerWasOpen = false
+            kotlinx.coroutines.delay(80)
+            runCatching { langRowFocus.requestFocus() }
+        }
     }
 }
 

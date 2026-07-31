@@ -1,5 +1,6 @@
 package tv.own.owntv.features.shell.components
 
+import tv.own.owntv.core.epg.displayLogoUrl
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -40,9 +41,11 @@ import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.theme.OwnTVTheme
 
 /**
- * A channel list that slides in over the playing video (opened with Left while the player controls are
- * hidden). Browse with the D-pad, OK switches channel, Back / Left again closes it — all without leaving
- * full-screen. The currently-playing channel is highlighted and focused first.
+ * A channel list that slides in over the playing video. Two instances exist in the player: Left opens
+ * the playing channel's own provider category (anchored left), Right opens the profile's watch history
+ * (anchored right). Browse with the D-pad, OK switches channel, Back — or pushing outwards past the
+ * list edge — closes it, all without leaving full-screen. The current channel is highlighted and
+ * focused first; for the history list nothing may be current, so the newest row takes focus.
  */
 @Composable
 fun ChannelListOverlay(
@@ -50,9 +53,16 @@ fun ChannelListOverlay(
     currentId: Long?,
     onSelect: (ChannelEntity) -> Unit,
     onDismiss: () -> Unit,
+    nowPlaying: Map<Long, String> = emptyMap(),
+    title: String = "Channels",
+    alignEnd: Boolean = false,
+    showNumbers: Boolean = true,
+    onOpenCategories: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val colors = OwnTVTheme.colors
+    // Pushing further outwards at the edge closes the panel: Left for the left panel, Right for the right.
+    val dismissKey = if (alignEnd) Key.DirectionRight else Key.DirectionLeft
     val currentIndex = remember(channels, currentId) {
         channels.indexOfFirst { it.id == currentId }.coerceAtLeast(0)
     }
@@ -67,17 +77,22 @@ fun ChannelListOverlay(
     Box(modifier = modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
+                .align(if (alignEnd) Alignment.CenterEnd else Alignment.CenterStart)
                 .fillMaxHeight()
                 .width(380.dp)
                 .background(Color.Black.copy(alpha = 0.82f))
-                // Pressing Left again at the list edge closes the overlay (it's anchored on the left).
                 .onPreviewKeyEvent { e ->
-                    if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionLeft) { onDismiss(); true } else false
+                    if (e.type == KeyEventType.KeyDown && e.key == dismissKey) {
+                        // Left on the channel panel opens the category browser when one is wired up,
+                        // instead of closing. Back (BackHandler) always closes.
+                        if (!alignEnd && onOpenCategories != null) onOpenCategories() else onDismiss()
+                        true
+                    } else false
                 }
                 .padding(vertical = 18.dp),
         ) {
             Text(
-                "Channels",
+                title,
                 style = MaterialTheme.typography.titleMedium,
                 color = colors.primary,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
@@ -93,6 +108,8 @@ fun ChannelListOverlay(
                     ChannelRow(
                         channel = ch,
                         isCurrent = isCurrent,
+                        nowTitle = nowPlaying[ch.id],
+                        showNumber = showNumbers,
                         onClick = { onSelect(ch) },
                         modifier = if (ch.id == channels.getOrNull(currentIndex)?.id) Modifier.focusRequester(focusCurrent) else Modifier,
                     )
@@ -107,6 +124,8 @@ private fun ChannelRow(
     channel: ChannelEntity,
     isCurrent: Boolean,
     onClick: () -> Unit,
+    nowTitle: String? = null,
+    showNumber: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val colors = OwnTVTheme.colors
@@ -124,23 +143,42 @@ private fun ChannelRow(
                 modifier = Modifier.size(40.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)).background(colors.surfaceContainerLowest),
                 contentAlignment = Alignment.Center,
             ) {
-                if (!channel.logoUrl.isNullOrBlank()) {
-                    AsyncImage(model = channel.logoUrl, contentDescription = null, modifier = Modifier.fillMaxSize())
+                if (!channel.displayLogoUrl.isNullOrBlank()) {
+                    AsyncImage(model = channel.displayLogoUrl, contentDescription = null, modifier = Modifier.fillMaxSize())
                 } else {
                     OwnTVIcon(OwnTVIcon.LIVE_TV, tint = colors.onSurfaceVariant, modifier = Modifier.size(20.dp))
                 }
             }
-            Text(
-                channel.name,
-                style = MaterialTheme.typography.bodyMedium,
-                color = when {
-                    isCurrent -> colors.primary
-                    focused -> colors.onSurface
-                    else -> colors.onSurfaceVariant
-                },
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            // Fixed-width number strip, so names stay aligned whatever the digit count (see LiveScreen).
+            if (showNumber) {
+                tv.own.owntv.ui.components.ChannelNumberColumn(
+                    number = channel.number,
+                    color = colors.onSurfaceVariant,
+                )
+            }
+            // Name + (optional) current programme subtitle, shown only when guide data exists.
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    channel.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = when {
+                        isCurrent -> colors.primary
+                        focused -> colors.onSurface
+                        else -> colors.onSurfaceVariant
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (nowTitle != null) {
+                    Text(
+                        nowTitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
         }
     }
 }

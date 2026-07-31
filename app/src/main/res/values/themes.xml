@@ -10,4 +10,15 @@
         <item name="android:navigationBarColor">@color/owntv_window_bg</item>
         <item name="android:windowNoTitle">true</item>
     </style>
+
+    <!--
+      Launch theme (audit ST3). The activity starts in this theme so the cold start shows the cyan
+      play-mark on the same window background as Theme.OwnTV — no colour flash at handoff — and
+      MainActivity switches to Theme.OwnTV via postSplashScreenTheme once a real destination is ready.
+    -->
+    <style name="Theme.OwnTV.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/owntv_window_bg</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_mark</item>
+        <item name="postSplashScreenTheme">@style/Theme.OwnTV</item>
+    </style>
 </resources>

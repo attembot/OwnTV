@@ -40,9 +40,14 @@ fun WeatherSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     var showLocation by remember { mutableStateOf(false) }
     val firstFocus = remember { FocusRequester() }
     val locationRowFocus = remember { FocusRequester() }
+    // The opener row for the location dialog, captured when the dialog opens and consumed when it
+    // closes — so focus returns to the "Custom location" row, not the "Show weather" first row.
     var dialogReturn by remember { mutableStateOf<FocusRequester?>(null) }
     LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
     LaunchedEffect(showLocation) {
+        // Single owner of dialogReturn: set it when opening, consume it (with a clear) when closing.
+        // Previously onEnter also read+cleared it, racing this effect — whoever fired first won and
+        // the other no-op'd, so the restore sometimes landed on the wrong row.
         if (showLocation) {
             dialogReturn = locationRowFocus
         } else {
@@ -50,6 +55,7 @@ fun WeatherSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 kotlinx.coroutines.delay(80)
                 runCatching { row.requestFocus() }
             }
+            dialogReturn = null
         }
     }
     BackHandler { onBack() }
@@ -58,15 +64,10 @@ fun WeatherSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         modifier = modifier
             .fillMaxSize()
             .roundedPanel()
-            // onEnter fires for any entry from outside the group — including the dialog-close
-            // restore (the dialog lives outside it) — so it must prefer the pending return row.
-            .focusProperties {
-                onEnter = {
-                    val target = dialogReturn ?: firstFocus
-                    dialogReturn = null
-                    runCatching { target.requestFocus() }
-                }
-            }
+            // onEnter handles ONLY genuine external (directional) entry — it targets the first row.
+            // Programmatic dialog-close restore is owned by the LaunchedEffect above (onEnter does not
+            // fire for programmatic requestFocus), so it must not consult dialogReturn.
+            .focusProperties { onEnter = { runCatching { firstFocus.requestFocus() } } }
             .focusGroup()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 40.dp, vertical = 28.dp),

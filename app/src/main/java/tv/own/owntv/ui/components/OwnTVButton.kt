@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import tv.own.owntv.ui.theme.LocalActionSurface
 import tv.own.owntv.ui.theme.OwnTVTheme
 
 /** Visual emphasis for [OwnTVButton]. */
@@ -29,11 +30,17 @@ fun OwnTVButton(
     icon: OwnTVIcon? = null,
     enabled: Boolean = true,
     onLongClick: (() -> Unit)? = null,
+    // Denser pill (tighter padding + smaller icon) for space-constrained popups like the storage picker.
+    compact: Boolean = false,
 ) {
     val colors = OwnTVTheme.colors
     val shape = RoundedCornerShape(50) // M3 full/pill button
 
     val primary = style == OwnTVButtonStyle.PRIMARY
+    // Frost with whatever surface the host renders on (DIALOGS inside a popup, CARDS on a panel),
+    // read from LocalActionSurface. Null → flat (e.g. the fullscreen player over opaque video).
+    // Pills are small chrome, so use a lighter frost than the big panels (cf. top-bar chips 0.45).
+    val surface = LocalActionSurface.current
 
     FocusableSurface(
         onClick = onClick,
@@ -47,6 +54,10 @@ fun OwnTVButton(
         unfocusedContainerColor = if (primary) colors.primary else colors.card,
         focusedContainerColor = if (primary) colors.primary else colors.primaryContainer,
         selectedContainerColor = if (primary) colors.primary else colors.card,
+        surface = surface,
+        glassFrostScale = 0.9f,
+        // Always-on glass edge so the pill reads as liquid glass even when unfocused.
+        glassIdleRimAlpha = 0.18f,
     ) { focused ->
         val contentColor = when {
             primary -> colors.onPrimary
@@ -55,16 +66,19 @@ fun OwnTVButton(
         }
 
         Row(
-            modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp),
+            modifier = Modifier.padding(
+                horizontal = if (compact) 13.dp else 22.dp,
+                vertical = if (compact) 6.dp else 12.dp,
+            ),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 10.dp),
         ) {
             if (icon != null) {
-                OwnTVIcon(icon = icon, tint = contentColor, filled = true, modifier = Modifier.size(20.dp))
+                OwnTVIcon(icon = icon, tint = contentColor, filled = true, modifier = Modifier.size(if (compact) 14.dp else 20.dp))
             }
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelLarge,
+                style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
                 color = contentColor,
                 maxLines = 1,
                 softWrap = false,

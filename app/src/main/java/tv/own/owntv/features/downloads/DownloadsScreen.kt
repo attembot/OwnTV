@@ -23,6 +23,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,6 +76,35 @@ fun DownloadsScreen(
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     val selFocus = remember { androidx.compose.ui.focus.FocusRequester() }
     val firstFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+
+    // Per-row focus restore after a delete (mirrors Movies/Series context-menu restore). Track the
+    // download the user acted on; if it's removed from the list, move focus to the nearest surviving
+    // download row instead of letting it escape to the sidebar.
+    var contextId by remember { mutableStateOf<Long?>(null) }
+    var contextIndex by remember { mutableStateOf(-1) }
+    val contextFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+    LaunchedEffect(rows) {
+        val targetId = contextId ?: return@LaunchedEffect
+        // The acted-on row's index inside `rows` (headers included). If it's still there, the row's
+        // focusRequester keeps focus on it — nothing to do. Only act when it has vanished.
+        val stillPresent = rows.any { it is DownloadListRow.Item && it.download.id == targetId }
+        if (stillPresent) return@LaunchedEffect
+        withFrameNanos { }
+        // Find the nearest surviving ITEM row at/after the remembered slot, else the last item.
+        val items = rows.filterIsInstance<DownloadListRow.Item>()
+        if (items.isEmpty()) {
+            contextId = null; contextIndex = -1
+            runCatching { firstFocus.requestFocus() }
+            return@LaunchedEffect
+        }
+        val neighbor = items.getOrNull(contextIndex.coerceAtLeast(0)) ?: items.last()
+        contextId = neighbor.download.id
+        val neighborIdx = rows.indexOfFirst { it is DownloadListRow.Item && it.download.id == neighbor.download.id }
+        contextIndex = neighborIdx
+        runCatching { listState.scrollToItem(neighborIdx.coerceAtLeast(0)) }
+        withFrameNanos { }
+        runCatching { contextFocus.requestFocus() }
+    }
     // Returning from the player: scroll to and focus the download you just played (index within the
     // grouped rows, so headers don't throw the target off).
     LaunchedEffect(restoreFocus, rows.size) {
@@ -117,7 +147,7 @@ fun DownloadsScreen(
             }
         } else {
             LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.focusGroup()) {
-                itemsIndexed(rows, key = { _, r -> r.key }) { _, r ->
+                itemsIndexed(rows, key = { _, r -> r.key }) { index, r ->
                     when (r) {
                         is DownloadListRow.Header -> SectionHeader(r.label, r.count)
                         is DownloadListRow.Item -> {
@@ -125,6 +155,7 @@ fun DownloadsScreen(
                             DownloadRow(
                                 download = d,
                                 focusModifier = when {
+                                    d.id == contextId -> Modifier.focusRequester(contextFocus)
                                     d.id == lastPlayedId -> Modifier.focusRequester(selFocus)
                                     d.id == firstItemId -> Modifier.focusRequester(firstFocus)
                                     else -> Modifier
@@ -134,7 +165,9 @@ fun DownloadsScreen(
                                 onRetry = { vm.retry(d) },
                                 onPause = { vm.pause(d) },
                                 onResume = { vm.resume(d) },
-                                onDelete = { vm.delete(d) },
+                                // Capture the row's identity BEFORE the delete so the LaunchedEffect(rows)
+                                // above can move focus to the nearest surviving neighbour.
+                                onDelete = { contextId = d.id; contextIndex = index; vm.delete(d) },
                             )
                         }
                     }

@@ -8,9 +8,6 @@ import kotlinx.coroutines.ensureActive
 import org.xmlpull.v1.XmlPullParser
 import java.io.InputStream
 import java.io.PushbackInputStream
-import java.text.SimpleDateFormat
-import java.util.Locale
-import java.util.TimeZone
 import java.util.zip.GZIPInputStream
 
 /**
@@ -23,14 +20,15 @@ object XmltvParser {
     private const val STREAM_LOG_ITEM_STEP = 10_000
 
     /**
-     * Parse an XMLTV stream. [onChannel] gets (id, displayName); [onProgramme] gets
+     * Parse an XMLTV stream. [onChannel] gets (id, displayName, iconUrl — the feed's `<icon src>`
+     * channel logo, null when absent or not an http(s) URL); [onProgramme] gets
      * (channelId, startMs, stopMs, title, description). If [channelFilter] is present, programmes
      * whose normalized channel id is not in the set are skipped before child parsing. Gzip is
      * detected from the magic bytes.
      */
     suspend fun parse(
         input: InputStream,
-        onChannel: suspend (id: String, displayName: String?) -> Unit,
+        onChannel: suspend (id: String, displayName: String?, iconUrl: String?) -> Unit,
         onProgramme: suspend (channelId: String, startMs: Long, stopMs: Long, title: String, description: String?) -> Unit,
         channelFilter: Set<String>? = null,
     ) {
@@ -122,7 +120,7 @@ object XmltvParser {
 
     private suspend fun readChannel(
         parser: XmlPullParser,
-        onChannel: suspend (String, String?) -> Unit,
+        onChannel: suspend (String, String?, String?) -> Unit,
         metrics: ParseMetrics,
         channelFilter: Set<String>?,
         seenChannelIds: MutableSet<String>,
@@ -140,6 +138,9 @@ object XmltvParser {
             return false
         }
         var displayName: String? = null
+        // XMLTV `<icon src="…"/>` — the feed's own channel logo. Kept only when it looks like an http(s)
+        // URL: some feeds put local paths or junk here, and a non-loadable value would blank the logo.
+        var iconUrl: String? = null
         try {
             while (true) {
                 ctx.ensureActive()
@@ -147,6 +148,9 @@ object XmltvParser {
                     XmlPullParser.START_TAG -> {
                         if (parser.name == "display-name" && displayName == null) {
                             displayName = readText(parser).trim().takeIf { it.isNotBlank() }
+                        } else if (parser.name == "icon" && iconUrl == null) {
+                            iconUrl = parser.getAttributeValue(null, "src")?.trim()
+                                ?.takeIf { it.startsWith("http://", true) || it.startsWith("https://", true) }
                         }
                     }
                     XmlPullParser.END_TAG -> if (parser.name == "channel") break
@@ -173,7 +177,7 @@ object XmltvParser {
             }
             val callbackStart = SystemClock.elapsedRealtime()
             try {
-                onChannel(id, displayName)
+                onChannel(id, displayName, iconUrl)
             } finally {
                 metrics.callbackMs += SystemClock.elapsedRealtime() - callbackStart
             }
@@ -282,22 +286,12 @@ object XmltvParser {
         }
     }
 
-    /** XMLTV time is `yyyyMMddHHmmss` optionally followed by a ` +0000` style offset. */
-    private fun parseTime(raw: String?): Long {
-        val t = raw?.trim()?.replace(" ", "") ?: return 0
-        if (t.length < 14) return 0
-        return try {
-            if (t.length >= 15 && (t[14] == '+' || t[14] == '-')) {
-                SimpleDateFormat("yyyyMMddHHmmssZ", Locale.US).parse(t)?.time ?: 0
-            } else {
-                SimpleDateFormat("yyyyMMddHHmmss", Locale.US)
-                    .apply { timeZone = TimeZone.getTimeZone("UTC") }
-                    .parse(t.take(14))?.time ?: 0
-            }
-        } catch (e: Exception) {
-            0
-        }
-    }
+    /**
+     * XMLTV time is `yyyyMMddHHmmss` optionally followed by a ` +0000` style offset.
+     * See [parseXmltvTime] — this used to build a `SimpleDateFormat` per timestamp, which is two
+     * per programme and ~200,000 on a large guide (E2).
+     */
+    private fun parseTime(raw: String?): Long = parseXmltvTime(raw)
 
     private fun maybeGunzip(input: InputStream): InputStream {
         val pb = PushbackInputStream(input, 2)

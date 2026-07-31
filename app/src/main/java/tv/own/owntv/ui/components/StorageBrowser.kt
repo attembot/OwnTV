@@ -19,10 +19,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -34,13 +36,26 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.tv.material3.MaterialTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.tv.material3.Text
 import tv.own.owntv.core.storage.StorageAccess
+import tv.own.owntv.ui.theme.GlassSurface
 import tv.own.owntv.ui.theme.OwnTVTheme
 import java.io.File
 
 enum class BrowseMode { FOLDER, FILE }
+
+/** One directory's contents, already split and sorted off the main thread (audit U2). */
+private data class Listing(val folders: List<File>, val files: List<File>) {
+    companion object { val EMPTY = Listing(emptyList(), emptyList()) }
+}
 
 /**
  * An in-app file/folder picker (the TV-safe replacement for SAF). In [BrowseMode.FOLDER] the user
@@ -55,14 +70,45 @@ fun StorageBrowser(
     onDismiss: () -> Unit,
     fileExtensions: Set<String>? = null,
 ) {
+    // Hosted in a real window: D-pad focus physically cannot escape to the screen behind. An
+    // inline overlay loses focus containment when rows are added/removed (the grant-access row
+    // after returning from system settings) and Compose reassigns focus outside the trap.
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = false),
+    ) {
+        tv.own.owntv.ui.theme.PopupFontTheme(fontScale = 0.72f) {
+            StorageBrowserContent(title, mode, onPick, onDismiss, fileExtensions)
+        }
+    }
+}
+
+@Composable
+private fun StorageBrowserContent(
+    title: String,
+    mode: BrowseMode,
+    onPick: (File) -> Unit,
+    onDismiss: () -> Unit,
+    fileExtensions: Set<String>?,
+) {
     val context = LocalContext.current
     val colors = OwnTVTheme.colors
     val roots = remember { StorageAccess.storageRoots(context) }
     var current by remember { mutableStateOf<File?>(null) } // null = the roots list
-    var hasAccess by remember { mutableStateOf(StorageAccess.hasAllFilesAccess()) }
+    var hasAccess by remember { mutableStateOf(StorageAccess.hasStorageAccess(context)) }
     var refresh by remember { mutableIntStateOf(0) }
     var showNewFolder by remember { mutableStateOf(false) }
     val firstFocus = remember { FocusRequester() }
+
+    // Re-check on resume — the settings screen returns no activity result.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) hasAccess = StorageAccess.hasStorageAccess(context)
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     BackHandler { if (current != null) current = current?.parentFile else onDismiss() }
 
@@ -75,27 +121,41 @@ fun StorageBrowser(
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.75f)).focusGroup(), contentAlignment = Alignment.Center) {
-        Column(Modifier.width(660.dp).clip(RoundedCornerShape(20.dp)).background(colors.surfaceContainerHigh).padding(24.dp)) {
-            Text(title, style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
+        Column(Modifier.width(270.dp).clip(RoundedCornerShape(16.dp)).background(colors.surfaceContainerHigh).padding(14.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
             Spacer(Modifier.height(4.dp))
             Text(current?.absolutePath ?: "Pick a location", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(12.dp))
 
             val dir = current
-            val children = remember(dir, refresh) { runCatching { dir?.listFiles()?.toList() }.getOrNull().orEmpty() }
-            val folders = children.filter { it.isDirectory }.sortedBy { it.name.lowercase() }
-            val files = if (mode == BrowseMode.FILE) {
-                children.filter { it.isFile && (fileExtensions == null || it.extension.lowercase() in fileExtensions) }.sortedBy { it.name.lowercase() }
-            } else emptyList()
+            // U2 — listFiles() plus the per-child isDirectory/isFile stats are disk work, and a
+            // `remember` block still runs it on the main thread during composition: a USB drive with
+            // a large folder stalled the frame. Load it on IO instead; the ".." / roots rows render
+            // immediately either way, so D-pad focus still lands the moment the dialog opens.
+            val listing by produceState(Listing.EMPTY, dir, refresh, mode, fileExtensions) {
+                value = Listing.EMPTY
+                value = withContext(Dispatchers.IO) {
+                    val children = runCatching { dir?.listFiles()?.toList() }.getOrNull().orEmpty()
+                    Listing(
+                        folders = children.filter { it.isDirectory }.sortedBy { it.name.lowercase() },
+                        files = if (mode == BrowseMode.FILE) {
+                            children.filter { it.isFile && (fileExtensions == null || it.extension.lowercase() in fileExtensions) }
+                                .sortedBy { it.name.lowercase() }
+                        } else emptyList(),
+                    )
+                }
+            }
+            val folders = listing.folders
+            val files = listing.files
 
             // Cap the list to the screen (minus dialog chrome) so the footer buttons stay reachable.
-            val listMax = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp - 200.dp).coerceIn(140.dp, 360.dp)
+            val listMax = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp - 200.dp).coerceIn(140.dp, 200.dp)
             LazyColumn(Modifier.heightIn(max = listMax).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (dir == null) {
                     if (!hasAccess) {
                         item {
                             BrowserRow(OwnTVIcon.SETTINGS, "Grant full storage access", Modifier.focusRequester(firstFocus)) {
-                                StorageAccess.requestAllFilesAccess(context); hasAccess = StorageAccess.hasAllFilesAccess()
+                                StorageAccess.openStoragePermissionSettings(context)
                             }
                         }
                     }
@@ -110,12 +170,15 @@ fun StorageBrowser(
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                OwnTVButton("Cancel", onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY)
-                if (current != null) OwnTVButton("New folder", onClick = { showNewFolder = true }, style = OwnTVButtonStyle.SECONDARY, icon = OwnTVIcon.ADD)
+            Spacer(Modifier.height(12.dp))
+            if (mode == BrowseMode.FOLDER && current != null) {
+                OwnTVButton("Use this folder", onClick = { current?.let(onPick) }, modifier = Modifier.fillMaxWidth(), compact = true)
+                Spacer(Modifier.height(8.dp))
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                OwnTVButton("Cancel", onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY, compact = true)
                 Spacer(Modifier.weight(1f))
-                if (mode == BrowseMode.FOLDER && current != null) OwnTVButton("Use this folder", onClick = { current?.let(onPick) })
+                if (current != null) OwnTVButton("New folder", onClick = { showNewFolder = true }, style = OwnTVButtonStyle.SECONDARY, icon = OwnTVIcon.ADD, compact = true)
             }
         }
     }
@@ -139,11 +202,11 @@ private fun NewFolderDialog(onCreate: (String) -> Unit, onDismiss: () -> Unit) {
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     BackHandler { onDismiss() }
-    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.8f)).focusGroup(), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.8f)).trapAllFocusExit().focusGroup(), contentAlignment = Alignment.Center) {
         Column(Modifier.dialogPanel(width = 420.dp, corner = 18.dp, fill = colors.surfaceContainerHighest)) {
             Text("New folder", style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
             Spacer(Modifier.height(14.dp))
-            OwnTVTextField(name, { name = it }, label = "Folder name", placeholder = "e.g. My TV", modifier = Modifier.fillMaxWidth().focusRequester(focus))
+            OwnTVTextField(name, { name = it }, label = "Folder name", placeholder = "e.g. My TV", modifier = Modifier.fillMaxWidth().focusRequester(focus), surface = GlassSurface.DIALOGS)
             Spacer(Modifier.height(18.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OwnTVButton("Cancel", onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY)
@@ -157,10 +220,10 @@ private fun NewFolderDialog(onCreate: (String) -> Unit, onDismiss: () -> Unit) {
 @Composable
 private fun BrowserRow(icon: OwnTVIcon, label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val colors = OwnTVTheme.colors
-    FocusableSurface(onClick = onClick, modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), contentAlignment = Alignment.CenterStart) { focused ->
-        Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OwnTVIcon(icon, tint = if (focused) colors.primary else colors.onSurfaceVariant, modifier = Modifier.size(20.dp))
-            Text(label, style = MaterialTheme.typography.titleMedium, color = if (focused) colors.primary else colors.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    FocusableSurface(onClick = onClick, modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), contentAlignment = Alignment.CenterStart, surface = GlassSurface.DIALOGS) { focused ->
+        Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OwnTVIcon(icon, tint = if (focused) colors.primary else colors.onSurfaceVariant, modifier = Modifier.size(16.dp))
+            Text(label, style = MaterialTheme.typography.bodyMedium, color = if (focused) colors.primary else colors.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

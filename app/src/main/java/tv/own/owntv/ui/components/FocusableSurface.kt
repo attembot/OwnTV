@@ -23,7 +23,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 import tv.own.owntv.ui.theme.Dimens
+import tv.own.owntv.ui.theme.GlassSurface
+import tv.own.owntv.ui.theme.LocalGlass
 import tv.own.owntv.ui.theme.OwnTVTheme
+import tv.own.owntv.ui.theme.glass
 
 @Composable
 fun FocusableSurface(
@@ -38,6 +41,18 @@ fun FocusableSurface(
     selectedContainerColor: Color = OwnTVTheme.colors.card,
     focusedScale: Float = 1f,
     glowElevation: Int = 10,
+    // When non-null AND that surface is glassy (glass mode on + surface in scope), the focused/
+    // selected highlight fill renders as a frosted glass slice (Modifier.glass) with a bright white
+    // rim instead of the flat tonal fill + accent border. Idle fills are transparent, which glass()
+    // skips, so the toggle is safe. Null = the original flat-fill behaviour (unchanged for callers).
+    surface: GlassSurface? = null,
+    // Per-call frost multiplier for lighter glass on small chrome (see Modifier.glass). Ignored when [surface] is null.
+    glassFrostScale: Float = 1f,
+    // When >0 AND this surface is glassy, an always-on faint white rim lenses the whole edge even when
+    // unfocused — the liquid-glass edge highlight. Focus still swaps to the brighter rim.
+    // Default 0 = no idle rim (unchanged for the 90+ existing callers); opt-in for discrete controls
+    // like buttons where a permanent glass edge suits them.
+    glassIdleRimAlpha: Float = 0f,
     // When false, this surface never draws the built-in focus/selected outline, so the caller can
     // manage its own border (e.g. the nav ladder, which outlines only the focused-unselected cursor).
     showFocusBorder: Boolean = true,
@@ -63,6 +78,10 @@ fun FocusableSurface(
         label = "focusContainer",
     )
     val showBorder = showFocusBorder && (focused || selected)
+    // Glassy only when a surface is given and it's in the active glass scope. Highlighted glass
+    // rows swap the accent focus border for a bright white glass rim (matches the sidebar).
+    val glassy = surface != null && LocalGlass.current.isGlassy(surface)
+    val borderColor = if (glassy && (focused || selected)) Color.White.copy(alpha = 0.5f) else colors.focusBorder
 
     Box(
         modifier = modifier
@@ -75,10 +94,20 @@ fun FocusableSurface(
                 spotColor = colors.focusGlow,
             )
             .clip(shape)
-            .background(container)
             .then(
-                if (showBorder) Modifier.border(Dimens.FocusBorderWidth, colors.focusBorder, shape)
-                else Modifier
+                // Frosted glass fill when this surface is glassy (glass() skips transparent idle
+                // fills); plain tonal fill otherwise. When surface is null, behaviour is unchanged.
+                if (surface != null) Modifier.glass(surface = surface, baseFill = container, shape = shape, frostScale = glassFrostScale)
+                else Modifier.background(container)
+            )
+            .then(
+                when {
+                    showBorder -> Modifier.border(Dimens.FocusBorderWidth, borderColor, shape)
+                    // Always-on glass edge for opt-in controls (e.g. buttons) when unfocused.
+                    glassy && glassIdleRimAlpha > 0f ->
+                        Modifier.border(1.dp, Color.White.copy(alpha = glassIdleRimAlpha), shape)
+                    else -> Modifier
+                }
             )
             .then(
                 if (onLongClick != null) {

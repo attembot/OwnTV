@@ -1,8 +1,12 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     // Kotlin is provided by AGP 9's built-in Kotlin support. KSP 2.3.6+ is compatible with it.
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.ksp)
+    // Consumes :baselineprofile's output and packages it as baseline.prof (audit ST1).
+    alias(libs.plugins.baselineprofile)
 }
 
 android {
@@ -33,26 +37,66 @@ android {
         versionName = System.getenv("VERSION_NAME") ?: "99.99.99"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // (The fork's old defaultConfig arm-only abiFilters is gone: upstream's `standard` flavor below
+        // now ships exactly those two ARM ABIs, and defaultConfig filters would UNION into the x86_64
+        // emulator flavor, bloating it with arm libs it never loads.)
+    }
 
-        // Personal fork: ship both ARM ABIs, drop the emulator-only x86 ones. Fire TV Sticks (incl. the
-        // 4K Max) run a 32-bit Android runtime and report armeabi-v7a, so an arm64-only APK fails to install
-        // on them (INSTALL_FAILED_NO_MATCHING_ABIS → "App not installed"). armeabi-v7a covers the Fire Stick;
-        // arm64-v8a covers 64-bit boxes. This still cuts ~55 MB of x86/x86_64 libs no TV ever loads.
-        ndk {
-            abiFilters += listOf("armeabi-v7a", "arm64-v8a")
+    // ABI split via product flavors: real Android TV / Fire TV hardware is arm (arm64-v8a covers
+    // everything modern; armeabi-v7a keeps the original 32-bit Nvidia Shield TV 2015/2017, which runs
+    // Android 9+ but is 32-bit). x86_64 is emulator-only — no real TV box uses it. Shipping them as
+    // separate flavors halves the download users get via the Downloader code (~49MB vs the old 104MB
+    // universal APK that bundled all 4 ABIs), which fixes the "parse error on install" reports caused
+    // by truncated downloads. x86 (32-bit Intel) is dropped entirely — even emulators use x86_64.
+    //
+    // Local dev: pick a flavor in Android Studio's "Build Variants" panel before Run (standard for
+    // real devices / arm emulators, x86_64 for an x86_64 emulator). `assembleRelease` builds BOTH.
+    flavorDimensions += "abi"
+    productFlavors {
+        create("standard") {
+            dimension = "abi"
+            ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
+        }
+        create("x86_64") {
+            dimension = "abi"
+            ndk { abiFilters += listOf("x86_64") }
         }
     }
 
-    // Release signing is driven by env vars (set from GitHub secrets in CI). When they're absent
-    // — local dev, debug builds, or unsigned CI — nothing here applies, so builds still work.
-    val releaseKeystore = System.getenv("KEYSTORE_FILE")
+    // Release signing: env vars first (that is how CI injects the GitHub secrets), then Gradle
+    // properties as a local fallback. Put the local ones in the USER-WIDE file — never in the repo:
+    //
+    //   C:\Users\<you>\.gradle\gradle.properties
+    //     owntv.keystoreFile=E:\\MEGA\\CODE\\Github_Keystore\\owntv.keystore
+    //     owntv.keystorePassword=...
+    //     owntv.keyAlias=...
+    //     owntv.keyPassword=...
+    //
+    // With those set, `./gradlew :app:assembleStandardRelease` produces a release-signed APK in any
+    // terminal with no env-var dance, so a local dev build installs straight over a published
+    // release (`adb install -r`) and upgrade/migration testing works with real data.
+    // When neither source is configured — fork CI, or a fresh clone — nothing here applies and
+    // builds still succeed, just unsigned.
+    // Third source: a standalone properties file kept outside the repo entirely. Gradle only reads
+    // gradle.properties from GRADLE_USER_HOME or the project dir, so this one is loaded by hand.
+    val localSigningProps = Properties().apply {
+        val f = File("E:/MEGA/CODE/OwnTV_Gradle/owntv-signing.properties")
+        if (f.isFile) f.inputStream().use { load(it) }
+    }
+
+    fun signingValue(env: String, property: String): String? =
+        System.getenv(env)
+            ?: providers.gradleProperty(property).orNull
+            ?: localSigningProps.getProperty(property)
+
+    val releaseKeystore = signingValue("KEYSTORE_FILE", "owntv.keystoreFile")
     signingConfigs {
         if (releaseKeystore != null) {
             create("release") {
                 storeFile = file(releaseKeystore)
-                storePassword = System.getenv("KEYSTORE_PASSWORD")
-                keyAlias = System.getenv("KEY_ALIAS")
-                keyPassword = System.getenv("KEY_PASSWORD")
+                storePassword = signingValue("KEYSTORE_PASSWORD", "owntv.keystorePassword")
+                keyAlias = signingValue("KEY_ALIAS", "owntv.keyAlias")
+                keyPassword = signingValue("KEY_PASSWORD", "owntv.keyPassword")
             }
         }
     }
@@ -82,12 +126,39 @@ android {
         buildConfig = true
     }
 
+    lint {
+        // CI gates on this (see .github/workflows/android.yml), so an error must mean something.
+        abortOnError = true
+        warningsAsErrors = false
+        checkDependencies = false
+        // Media3's player API surface is almost entirely @UnstableApi; this app is built on it, so
+        // the check fires ~90 times across the player, Home and Live code and carries no signal.
+        // Opting in file-by-file would only move the same acknowledgement into ~12 annotations.
+        disable += "UnsafeOptInUsageError"
+        // local.properties is developer-local and never committed (its Windows SDK path can't be
+        // escaped without breaking the local tooling that writes it). CI has no such file at all.
+        disable += "PropertyEscape"
+        // Reports are what a failed CI run is inspected from.
+        htmlReport = true
+        xmlReport = true
+        textReport = true
+    }
+
     sourceSets["androidTest"].assets.directories.add("$projectDir/schemas")
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+}
+
+// The profile is a list of code paths, not machine code, so one recording serves every ABI flavor.
+// mergeIntoMain writes it to `src/main/generated/baselineProfiles/` instead of the recording flavor's
+// own source set — required here because it has to be recorded on an x86_64 emulator (baseline
+// profile collection needs API 33+, and the arm TV boxes this app targets are older) yet shipped in
+// the `standard` arm APK.
+baselineProfile {
+    mergeIntoMain = true
 }
 
 ksp {
@@ -127,6 +198,15 @@ dependencies {
     // ART on first launch. OwnTV is sideloaded, so without this the bundled profiles never apply.
     implementation(libs.androidx.profileinstaller)
 
+    // Compat splash screen (audit ST3) — branded cold start instead of a blank window.
+    implementation(libs.androidx.core.splashscreen)
+
+    // The recorded startup journey (audit ST1). Regenerate with
+    // `./gradlew :app:generateBaselineProfile` whenever the startup path changes. `mergeIntoMain`
+    // collapses the per-variant tasks into that single one; it records against :app's x86_64 flavor
+    // (see baselineprofile/build.gradle.kts) because collection needs an API 33+ device.
+    baselineProfile(project(":baselineprofile"))
+
     // Database (Room, via KSP) + Paging
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
@@ -137,6 +217,8 @@ dependencies {
 
     // Networking
     implementation(libs.okhttp)
+    implementation(libs.zxing.core) // QR generation for the Remote (companion) add-source flow
+    implementation(libs.juniversalchardet) // local subtitle charset detection (subtitle plan §7.2)
 
     // Media playback — libmpv (FFmpeg) engine
     implementation(libs.libmpv)
@@ -168,6 +250,10 @@ dependencies {
 
     // Test
     testImplementation(libs.junit)
+    // Test-only, never packaged: android.jar's org.json is a stub, and isReturnDefaultValues turns
+    // every JSONObject call into a silent null/0. Backup/restore is all JSON, so the unit tests need
+    // the real implementation to mean anything.
+    testImplementation(libs.org.json)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 }

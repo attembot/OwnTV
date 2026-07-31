@@ -19,6 +19,10 @@ interface PlaybackEngine {
     val videoRes: StateFlow<String?>
     /** Up-to-4 mini stream chips (aspect · resolution · fps · audio) for the player top bar. */
     val streamChips: StateFlow<List<String>> get() = NO_CHIPS
+    /** Re-check [streamChips] now. */
+    fun refreshStreamChips() {}
+    /** Bitrate is only ever displayed in the debug overlay — enable tracking only while it's open. */
+    fun setBitrateTrackingEnabled(enabled: Boolean) {}
     /** Short label of the engine currently decoding ("MPV" / "EXO"), shown as the first top-bar chip.
      *  Null = don't show one. */
     val engineChip: StateFlow<String?> get() = NULL_STRING
@@ -29,6 +33,15 @@ interface PlaybackEngine {
     val currentMeta: StateFlow<MediaMeta>
     val isLiveContent: Boolean
 
+    /** True while the engine decodes audio only (video output stopped to save power) — Audio Mode. */
+    val audioOnly: StateFlow<Boolean> get() = FALSE_FLOW
+    /** Stop the video decoder/output but keep audio playing at position (Audio Mode enter). No-op if
+     *  already audio-only. Audio is uninterrupted — mpv drops the video track (`vid=no`), ExoPlayer
+     *  releases its surface. */
+    fun enterAudioOnly() {}
+    /** Resume video output (Audio Mode exit → back to fullscreen/mini). No-op if not audio-only. */
+    fun exitAudioOnly() {}
+
     fun togglePlayPause()
     fun setZoomMode(mode: ZoomMode)
     fun adjustVolume(delta: Int)
@@ -37,6 +50,9 @@ interface PlaybackEngine {
     fun selectAudio(id: Int)
     fun selectSubtitle(id: Int)
     fun disableSubtitles()
+    /** Attach + select an external subtitle file (OpenSubtitles/local). VOD only (mpv sub-add, or an
+     *  ExoPlayer side-load re-prepare); a live engine ignores it (subtitle plan §3.4). */
+    fun addExternalSubtitle(path: String, title: String, lang: String?) {}
     fun audioTracks(): List<TrackOption>
     fun textTracks(): List<TrackOption>
 
@@ -54,8 +70,14 @@ interface PlaybackEngine {
     val nextUpTitle: StateFlow<String?> get() = NULL_STRING
     /** In-player A/V-sync nudge (ms) — VOD/mpv only; a live engine leaves it at 0. */
     val audioDelayMs: StateFlow<Int> get() = ZERO_INT
+    /** Subtitle-timing offset (ms) for the ACTIVE subtitle — VOD only (subtitle plan §8). */
+    val subDelayMs: StateFlow<Int> get() = ZERO_INT
     fun setSpeed(speed: Double) {}
     fun adjustAudioDelay(deltaMs: Int) {}
+    fun adjustSubtitleDelay(deltaMs: Int) {}
+    fun resetSubtitleDelay() {}
+    /** True when timing adjustment applies to the active subtitle on this engine (plan §8.1). */
+    fun subtitleTimingAvailable(): Boolean = false
     fun previous() {}
     fun next() {}
     fun seekBy(deltaMs: Long) {}
@@ -70,6 +92,7 @@ interface PlaybackEngine {
         private val NULL_ERROR: StateFlow<ErrorInfo?> = MutableStateFlow(null)
         private val NO_CHIPS: StateFlow<List<String>> = MutableStateFlow(emptyList())
         private val NULL_STRING: StateFlow<String?> = MutableStateFlow(null)
+        private val FALSE_FLOW: StateFlow<Boolean> = MutableStateFlow(false)
     }
 }
 
@@ -88,12 +111,19 @@ class MpvPlaybackEngine(private val p: OwnTVPlayer) : PlaybackEngine {
     override val subCount get() = p.subCount
     override val currentMeta get() = p.currentMeta
     override val isLiveContent get() = p.isLiveContent
+    override val audioOnly get() = p.audioOnly
+    override fun enterAudioOnly() = p.enterAudioOnly()
+    override fun exitAudioOnly() = p.exitAudioOnly()
     override val position get() = p.position
     override val duration get() = p.duration
     override val speed get() = p.speed
     override val nav get() = p.nav
     override val nextUpTitle get() = p.nextUpTitle
     override val audioDelayMs get() = p.audioDelayMs
+    override val subDelayMs get() = p.subDelayMs
+    override fun adjustSubtitleDelay(deltaMs: Int) = p.adjustSubtitleDelay(deltaMs)
+    override fun resetSubtitleDelay() = p.resetSubtitleDelay()
+    override fun subtitleTimingAvailable() = p.subtitleTimingAvailable()
     override fun togglePlayPause() = p.togglePlayPause()
     override fun setZoomMode(mode: ZoomMode) = p.setZoomMode(mode)
     override fun adjustVolume(delta: Int) = p.adjustVolume(delta)
@@ -102,9 +132,12 @@ class MpvPlaybackEngine(private val p: OwnTVPlayer) : PlaybackEngine {
     override fun selectAudio(id: Int) = p.selectAudio(id)
     override fun selectSubtitle(id: Int) = p.selectSubtitle(id)
     override fun disableSubtitles() = p.disableSubtitles()
+    override fun addExternalSubtitle(path: String, title: String, lang: String?) = p.addExternalSubtitle(path, title, lang)
     override fun audioTracks() = p.audioTracks()
     override fun textTracks() = p.textTracks()
     override fun streamInfo() = p.streamInfo()
+    override fun setBitrateTrackingEnabled(enabled: Boolean) = p.setBitrateTrackingEnabled(enabled)
+    override fun refreshStreamChips() = p.refreshStreamChips()
     override fun setSpeed(speed: Double) = p.setSpeed(speed)
     override fun adjustAudioDelay(deltaMs: Int) = p.adjustAudioDelay(deltaMs)
     override fun previous() = p.previous()

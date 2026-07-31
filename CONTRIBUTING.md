@@ -50,4 +50,4 @@ We use a simple fork-and-PR flow:
 Open an issue with what you expected, what happened, your device / Android TV version, and steps to
 reproduce. Logs (`adb logcat`) help a lot for playback issues.
 
-By contributing, you agree your contributions are licensed under the project's [MIT License](LICENSE).
+By contributing, you agree your contributions are licensed under the project's [GPLv3 License](LICENSE).

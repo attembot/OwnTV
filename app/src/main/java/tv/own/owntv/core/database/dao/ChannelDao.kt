@@ -43,6 +43,10 @@ interface ChannelDao {
     @Query("DELETE FROM channels WHERE sourceId = :sourceId")
     suspend fun clearSource(sourceId: Long)
 
+    /** One-time cleanup of pre-stable-key M3U rows (remoteId was always NULL under clear-then-insert). */
+    @Query("DELETE FROM channels WHERE sourceId = :sourceId AND remoteId IS NULL")
+    suspend fun deleteNullRemoteIds(sourceId: Long)
+
     @Query("SELECT * FROM channels WHERE id = :id")
     suspend fun getById(id: Long): ChannelEntity?
 
@@ -68,6 +72,22 @@ interface ChannelDao {
      *  channels actually reference, used to filter the bulk EPG sync down from the whole feed. */
     @Query("SELECT DISTINCT LOWER(TRIM(epgChannelId)) FROM channels WHERE epgChannelId IS NOT NULL AND epgChannelId != ''")
     suspend fun allEpgChannelIds(): List<String>
+
+    /**
+     * Normalised tvg-ids of this source's channels that currently have **no** guide data at all (S9).
+     *
+     * A guide sync filters the feed to the channels the user owns, and that set is snapshotted once
+     * when it starts — so a catalog sync running at the same time (or any later one that adds
+     * channels) leaves those channels' programmes permanently missing until the user re-syncs EPG by
+     * hand. This finds exactly the channels in that hole, so they can be topped up from the cached
+     * feed without another download.
+     */
+    @Query(
+        "SELECT DISTINCT LOWER(TRIM(epgChannelId)) FROM channels " +
+            "WHERE sourceId = :sourceId AND epgChannelId IS NOT NULL AND TRIM(epgChannelId) != '' " +
+            "AND LOWER(TRIM(epgChannelId)) NOT IN (SELECT DISTINCT epgChannelId FROM epg_programmes)",
+    )
+    suspend fun epgChannelIdsWithoutProgrammes(sourceId: Long): List<String>
 
     /** Largest archive window (days) across these sources' catch-up channels — 0 if none have catch-up.
      *  Drives how far back the Guide extends so archived programmes are visible. */
@@ -109,8 +129,36 @@ interface ChannelDao {
     @Query("SELECT remoteId FROM channels WHERE sourceId = :sourceId AND remoteId IS NOT NULL")
     suspend fun remoteIdsForSource(sourceId: Long): List<String>
 
-    @Query("SELECT remoteId, id, contentHash FROM channels WHERE sourceId = :sourceId AND remoteId IS NOT NULL")
+    /** Prune scope for the per-category sync fallback — see [MovieDao.remoteIdsInCategories]. */
+    @Query("SELECT remoteId FROM channels WHERE sourceId = :sourceId AND categoryId IN (:categoryIds) AND remoteId IS NOT NULL")
+    suspend fun remoteIdsInCategories(sourceId: Long, categoryIds: List<Long>): List<String>
+
+    @Query("SELECT remoteId, id, contentHash, sortOrder FROM channels WHERE sourceId = :sourceId AND remoteId IS NOT NULL")
     suspend fun contentHashesForSource(sourceId: Long): List<ContentHashProjection>
+
+    // --- Direct tune (channel-number lookup) ---
+    /** All channels whose provider number matches [number] in the given sources. Non-unique because
+     *  provider data can contain duplicates; the caller applies visibility and zap-context policy. */
+    @Query("SELECT * FROM channels WHERE sourceId IN (:sourceIds) AND number = :number ORDER BY sourceId ASC, sortOrder ASC, name ASC, id ASC")
+    suspend fun findByNumber(sourceIds: List<Long>, number: Int): List<ChannelEntity>
+
+    /** Bounded window of channels in provider order AFTER [afterSortOrder]/[afterId] within a category.
+     *  Combined with [channelsBeforeCategory] to build a neighbourhood around a tuned channel.
+     *  Ordered by (sortOrder, id) to match the cursor predicate — avoids mismatch when sortOrder ties. */
+    @Query("SELECT * FROM channels WHERE categoryId = :categoryId AND (sortOrder > :afterSortOrder OR (sortOrder = :afterSortOrder AND id > :afterId)) ORDER BY sortOrder ASC, id ASC LIMIT :limit")
+    suspend fun channelsAfterCategory(categoryId: Long, afterSortOrder: Int, afterId: Long, limit: Int): List<ChannelEntity>
+
+    /** Bounded window of channels in provider order BEFORE [beforeSortOrder]/[beforeId] within a category. */
+    @Query("SELECT * FROM channels WHERE categoryId = :categoryId AND (sortOrder < :beforeSortOrder OR (sortOrder = :beforeSortOrder AND id < :beforeId)) ORDER BY sortOrder DESC, id DESC LIMIT :limit")
+    suspend fun channelsBeforeCategory(categoryId: Long, beforeSortOrder: Int, beforeId: Long, limit: Int): List<ChannelEntity>
+
+    /** Bounded window of channels in provider order AFTER [afterSortOrder]/[afterId] within a source. */
+    @Query("SELECT * FROM channels WHERE sourceId = :sourceId AND (sortOrder > :afterSortOrder OR (sortOrder = :afterSortOrder AND id > :afterId)) ORDER BY sortOrder ASC, id ASC LIMIT :limit")
+    suspend fun channelsAfterSource(sourceId: Long, afterSortOrder: Int, afterId: Long, limit: Int): List<ChannelEntity>
+
+    /** Bounded window of channels in provider order BEFORE [beforeSortOrder]/[beforeId] within a source. */
+    @Query("SELECT * FROM channels WHERE sourceId = :sourceId AND (sortOrder < :beforeSortOrder OR (sortOrder = :beforeSortOrder AND id < :beforeId)) ORDER BY sortOrder DESC, id DESC LIMIT :limit")
+    suspend fun channelsBeforeSource(sourceId: Long, beforeSortOrder: Int, beforeId: Long, limit: Int): List<ChannelEntity>
 
     @Query("DELETE FROM channels WHERE sourceId = :sourceId AND remoteId IN (:remoteIds)")
     suspend fun deleteByRemoteIds(sourceId: Long, remoteIds: List<String>)
@@ -159,6 +207,11 @@ interface ChannelDao {
             "ORDER BY (CASE WHEN o.position IS NULL THEN 1 ELSE 0 END), o.position, c.sortOrder, c.name LIMIT :limit",
     )
     suspend fun snapshotByCategoryManual(categoryId: Long, profileId: Long, contextKey: String, limit: Int): List<ChannelEntity>
+
+    /** Bounded snapshot across all of a profile's playlists, in provider order — the in-player zap /
+     *  channel-list fallback for a channel that has no category of its own. */
+    @Query("SELECT * FROM channels WHERE sourceId IN (:sourceIds) ORDER BY sourceId ASC, sortOrder ASC, name ASC LIMIT :limit")
+    suspend fun snapshotAll(sourceIds: List<Long>, limit: Int): List<ChannelEntity>
 
     /** Bounded snapshot of Favorites in manual order, for the Move session's in-memory reorder. */
     @Query(

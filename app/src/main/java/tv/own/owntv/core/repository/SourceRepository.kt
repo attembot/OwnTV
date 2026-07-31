@@ -34,9 +34,16 @@ class SourceRepository(
     suspend fun addXtreamSource(
         profileId: Long, name: String, serverUrl: String, username: String, password: String,
         userAgent: String? = null, epgUrl: String? = null,
+        syncLive: Boolean = true, syncMovies: Boolean = true, syncSeries: Boolean = true,
+        preferHls: Boolean = false,
     ): SourceEntity = addAndLink(
         profileId,
-        SourceEntity(name = name, type = SourceType.XTREAM, url = serverUrl, username = username, password = password, userAgent = userAgent, epgUrl = epgUrl),
+        SourceEntity(
+            name = name, type = SourceType.XTREAM, url = serverUrl,
+            username = username, password = password, userAgent = userAgent, epgUrl = epgUrl,
+            syncLive = syncLive, syncMovies = syncMovies, syncSeries = syncSeries,
+            preferHls = preferHls,
+        ),
     )
 
     suspend fun addM3uSource(
@@ -48,9 +55,13 @@ class SourceRepository(
 
     suspend fun addStalkerSource(
         profileId: Long, name: String, portalUrl: String, mac: String, userAgent: String? = null,
+        syncLive: Boolean = true, syncMovies: Boolean = true, syncSeries: Boolean = true,
     ): SourceEntity = addAndLink(
         profileId,
-        SourceEntity(name = name, type = SourceType.STALKER, url = portalUrl, mac = mac, userAgent = userAgent),
+        SourceEntity(
+            name = name, type = SourceType.STALKER, url = portalUrl, mac = mac, userAgent = userAgent,
+            syncLive = syncLive, syncMovies = syncMovies, syncSeries = syncSeries,
+        ),
     )
 
     private suspend fun addAndLink(profileId: Long, source: SourceEntity): SourceEntity {
@@ -78,7 +89,13 @@ class SourceRepository(
 
     suspend fun updateSource(source: SourceEntity) = sourceDao.update(source)
 
-    suspend fun sync(source: SourceEntity, onProgress: (ImportStage) -> Unit, contentTypes: SyncContentTypes = SyncContentTypes()): SyncResult {
+    suspend fun sync(
+        source: SourceEntity,
+        onProgress: (ImportStage) -> Unit,
+        contentTypes: SyncContentTypes = SyncContentTypes(),
+        /** User-requested clean resync: allows this run to remove titles the provider no longer lists. */
+        forcePrune: Boolean = false,
+    ): SyncResult {
         val startedAt = SystemClock.elapsedRealtime()
         Log.i(TAG, "sync wrapper start sourceId=${source.id} type=${source.type} contentTypes=$contentTypes")
         // Snapshot favorites/history/resume with stable keys BEFORE the sync clears content (their ids
@@ -89,14 +106,16 @@ class SourceRepository(
             .onFailure { Log.w(TAG, "userData export failed sourceId=${source.id} ms=${SystemClock.elapsedRealtime() - snapshotStartedAt}", it) }
             .getOrNull()
         val coreStartedAt = SystemClock.elapsedRealtime()
-        val (result, _) = syncManager.sync(source, onProgress, contentTypes)
+        val (result, _) = syncManager.sync(source, onProgress, contentTypes, forcePrune)
         Log.i(TAG, "core sync sourceId=${source.id} result=${result.name()} ms=${SystemClock.elapsedRealtime() - coreStartedAt}")
         // Always re-attach the snapshot to the new ids — a failed/cancelled sync can still have
         // rewritten some rows (M3U is clear-then-insert; Xtream REPLACE-upserts renumber ids), and
         // without a relink those favorites/history/resume entries turn invisible until a later
-        // successful sync. Purging genuinely-gone rows is only allowed after a FULL success:
-        // a partial content-type sync never touched the other types, and a failure proves nothing.
-        val purge = result is SyncResult.Success && contentTypes == SyncContentTypes()
+        // successful sync. Purging genuinely-gone rows is only allowed after a complete enabled
+        // success: a partial content-type sync never touched the other types, and a failure proves
+        // nothing. Off sections retain cache + user data, so their favorites stay resolvable.
+        val effective = contentTypes.effectiveFor(source)
+        val purge = result is SyncResult.Success && effective.isCompleteFor(SyncContentTypes.enabledFor(source))
         val relinkStartedAt = SystemClock.elapsedRealtime()
         // Serialized: parallel source syncs (startup refresh runs every source at once) must not
         // relink/purge against each other's mid-flight state.
@@ -105,9 +124,20 @@ class SourceRepository(
                 .onSuccess { Log.i(TAG, "userData relink sourceId=${source.id} rows=${snapshot?.length() ?: 0} purge=$purge ms=${SystemClock.elapsedRealtime() - relinkStartedAt}") }
                 .onFailure { Log.w(TAG, "userData relink failed sourceId=${source.id} ms=${SystemClock.elapsedRealtime() - relinkStartedAt}", it) }
         }
+        // Episodes are fetched lazily on show-open, never by the syncer, so a resync would otherwise
+        // leave every already-opened show frozen on the episode list it cached the first time (S8).
+        // Zeroing the stamps makes the user's "I'll just resync" actually refresh them, on demand
+        // and one show at a time — no episode fetch storm across a 46k-series catalog.
+        if (result is SyncResult.Success && effective.series) {
+            runCatching { seriesDao.invalidateEpisodeCaches(source.id) }
+                .onFailure { Log.w(TAG, "episode cache invalidate failed sourceId=${source.id}", it) }
+        }
         Log.i(TAG, "sync wrapper end sourceId=${source.id} result=${result.name()} totalMs=${SystemClock.elapsedRealtime() - startedAt}")
         return result
     }
+
+    fun getLastSyncStats(sourceId: Long): tv.own.owntv.core.sync.SyncRunStats? =
+        syncManager.getLastSyncStats(sourceId)
 
     /** Per-mediaType row counts of a snapshot, e.g. "types={LIVE=8, MOVIE=6}" — upgrade-path diagnostics. */
     private fun org.json.JSONArray.typeCounts(): String {

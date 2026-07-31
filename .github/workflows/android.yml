@@ -1,11 +1,17 @@
 name: Android CI
 
-# Builds the app on every push / PR, and publishes a GitHub Release with the APK on v* tags.
+# Two jobs:
+#   check — unit tests + lint. Runs on everything, including pull requests. Gates the build.
+#   build — assembles the APK, and publishes a GitHub Release on v* tags. Never runs for a PR, so
+#           PR branches still don't produce APKs (the restriction added in ac33c65 is unchanged);
+#           they only get the test/lint verdict.
 on:
   push:
-    branches: [ "**" ]
+    # Fork: `personal` added — pushes there are this fork's compile check (no local Android SDK).
+    branches: [ main, personal ]
     tags: [ "v*" ]
   pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
 permissions:
@@ -16,7 +22,53 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Nothing was checking the unit tests or lint before, so both could rot silently while the APK
+  # kept building. This job is the gate: if it is red, no APK is produced and no release is cut.
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # One variant, not `test`/`lint` across every flavor: standard+debug is the variant the JVM
+      # tests are written against, and the ABI flavors differ only in the packaged native libs.
+      - name: Unit tests
+        run: |
+          chmod +x ./gradlew
+          ./gradlew testStandardDebugUnitTest --stacktrace
+
+      # abortOnError = true in app/build.gradle.kts, so this fails the job on a lint error.
+      - name: Lint
+        if: always()   # report both verdicts in one run instead of one failure at a time
+        run: ./gradlew lintStandardDebug --stacktrace
+
+      - name: Upload test and lint reports
+        if: always()   # the reports matter most when the step above failed
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-reports
+          path: |
+            app/build/reports/tests/**
+            app/build/reports/lint-results-*.html
+            app/build/reports/lint-results-*.txt
+          if-no-files-found: warn
+
   build:
+    needs: check
+    # PRs get the check job only — no APK, no release. Unchanged from ac33c65.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     env:
       IS_TAG: ${{ startsWith(github.ref, 'refs/tags/v') }}
@@ -84,16 +136,26 @@ jobs:
         run: |
           chmod +x ./gradlew
           if [ -n "$KEYSTORE_FILE" ]; then
-            echo "Building signed release APK"
+            echo "Building signed release APKs (both ABI flavors)"
             ./gradlew assembleRelease --stacktrace
-            SRC=$(ls app/build/outputs/apk/release/*.apk | head -n1)
+            # Product flavors split the output by flavor subfolder:
+            #   standard/release  -> arm (arm64-v8a + armeabi-v7a) — the main download
+            #   x86_64/release    -> x86_64 — emulator / rare x86 box
+            ARM_SRC=$(ls app/build/outputs/apk/standard/release/*.apk | head -n1)
+            X86_SRC=$(ls app/build/outputs/apk/x86_64/release/*.apk | head -n1)
+            echo "Built arm:    $ARM_SRC"
+            echo "Built x86_64: $X86_SRC"
+            echo "ARM_SRC=$ARM_SRC" >> "$GITHUB_ENV"
+            echo "X86_SRC=$X86_SRC" >> "$GITHUB_ENV"
           else
             echo "Building debug APK"
             ./gradlew assembleDebug
-            SRC=$(ls app/build/outputs/apk/debug/*.apk | head -n1)
+            # Debug also builds both flavors; standard (arm) is the one most likely to be tested on a
+            # real device. Surface it as the primary artifact; x86_64 debug is still in its folder.
+            SRC=$(ls app/build/outputs/apk/standard/debug/*.apk | head -n1)
+            echo "Built: $SRC"
+            echo "ARM_SRC=$SRC" >> "$GITHUB_ENV"
           fi
-          echo "Built: $SRC"
-          echo "APK_SRC=$SRC" >> "$GITHUB_ENV"
 
       - name: Name the APK (OwnTV-v<version>)
         run: |
@@ -103,33 +165,61 @@ jobs:
           else
             OUT="OwnTV-dev-${GITHUB_SHA::7}.apk"
           fi
-          cp "$APK_SRC" "dist/$OUT"
+          cp "$ARM_SRC" "dist/$OUT"
           echo "APK_OUT=$OUT" >> "$GITHUB_ENV"
-          echo "Packaged dist/$OUT"
+          echo "Packaged dist/$OUT (arm: arm64-v8a + armeabi-v7a)"
           # Tag builds also ship a stable-named copy so a fixed URL always serves the latest signed
           # release: https://github.com/<repo>/releases/latest/download/OwnTV.apk
           # (used by the Fire TV Downloader code and any "always-latest" sideload link).
           if [ "$IS_TAG" = "true" ]; then
-            cp "$APK_SRC" "dist/OwnTV.apk"
+            cp "$ARM_SRC" "dist/OwnTV.apk"
+            # Separate x86_64 build for emulators / rare Intel boxes. Pinned to the version only —
+            # no always-latest copy, since real devices (the Downloader audience) don't need it.
+            if [ -n "$X86_SRC" ]; then
+              cp "$X86_SRC" "dist/OwnTV-x86_64-v${{ steps.ver.outputs.name }}.apk"
+              echo "Packaged dist/OwnTV-x86_64-v${{ steps.ver.outputs.name }}.apk"
+            fi
           fi
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
+          # Upload the whole dist/ so both the arm APK and the x86_64 APK are captured.
           name: ${{ env.APK_OUT }}
-          path: dist/${{ env.APK_OUT }}
+          path: dist/*
           if-no-files-found: error
 
-      - name: Extract release notes from CHANGELOG.md
+      - name: Extract release notes from CHANGELOG_APP.md
         if: env.IS_TAG == 'true'
+        env:
+          TAG: ${{ github.ref_name }}
         run: |
-          # Take the first "## ..." section of CHANGELOG.md (the newest release) as the release body.
-          # The in-app updater shows this text as the "What's new" changelog.
-          if [ -f CHANGELOG.md ]; then
-            awk '/^## /{n++} n==1' CHANGELOG.md > dist/RELEASE_NOTES.md
+          # The release body is what the in-app updater shows as "What's new", so it must be the
+          # SHORT, bullet-only notes from CHANGELOG_APP.md — never CHANGELOG.md, which is the long
+          # developer/contributor changelog and is read manually on GitHub.
+          #
+          # This runs here rather than only in release-notes.yml because a release published by
+          # GITHUB_TOKEN does not trigger other workflows, so that job never fires for tag builds.
+          # It stays as a fallback for releases published by hand from the GitHub UI.
+          #
+          # Take "## <tag>" up to the next "## v" header; the header may carry a date/"unreleased"
+          # tail ("## v4.1.5 — 2026-07-26") or nothing at all, so match the version as a whole word.
+          if [ -f CHANGELOG_APP.md ]; then
+            awk -v ver="$TAG" '
+              $0 ~ ("^## " ver "([ \t]|$)") { flag=1; next }
+              /^## v/ && flag { flag=0 }
+              flag { print }
+            ' CHANGELOG_APP.md > dist/RELEASE_NOTES.md || true
+            # Trim leading/trailing blank lines.
+            sed -i -e '/./,$!d' dist/RELEASE_NOTES.md
+            awk 'NF{p=NR} {a[NR]=$0} END{for(i=1;i<=p;i++) print a[i]}' \
+              dist/RELEASE_NOTES.md > dist/RELEASE_NOTES.trimmed.md
+            mv dist/RELEASE_NOTES.trimmed.md dist/RELEASE_NOTES.md
           fi
           if [ ! -s dist/RELEASE_NOTES.md ]; then
-            echo "See CHANGELOG.md for details." > dist/RELEASE_NOTES.md
+            echo "::warning::No CHANGELOG_APP.md section for $TAG — publishing a placeholder body."
+            echo "See [CHANGELOG.md](https://github.com/$GITHUB_REPOSITORY/blob/$TAG/CHANGELOG.md) for details." \
+              > dist/RELEASE_NOTES.md
           fi
           echo "--- Release notes ---"
           cat dist/RELEASE_NOTES.md
@@ -142,5 +232,8 @@ jobs:
           files: |
             dist/${{ env.APK_OUT }}
             dist/OwnTV.apk
+            dist/OwnTV-x86_64-v${{ steps.ver.outputs.name }}.apk
           body_path: dist/RELEASE_NOTES.md
-          generate_release_notes: true
+          # Must stay false: it appends GitHub's auto commit/PR list under the body, which buries the
+          # short in-app notes the updater dialog shows.
+          generate_release_notes: false

@@ -50,10 +50,11 @@ import tv.own.owntv.ui.components.OwnTVTextField
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.OwnTVSpinner
 import tv.own.owntv.features.settings.EpgSyncDialog
+import tv.own.owntv.features.settings.RemoteBackupRestoreScreen
 import tv.own.owntv.ui.components.StorageBrowser
 import tv.own.owntv.ui.theme.OwnTVTheme
 
-private enum class Step { WELCOME, DISCLAIMER, SETUP_CHOICE, CREATE_PROFILE, ADD_CONTENT, ADD_SOURCE, IMPORTING, EXISTING, IMPORT_BACKUP }
+private enum class Step { WELCOME, DISCLAIMER, SETUP_CHOICE, CREATE_PROFILE, ADD_CONTENT, ADD_SOURCE_CHOOSER, ADD_SOURCE_REMOTE, ADD_SOURCE, IMPORTING, EXISTING, IMPORT_BACKUP_CHOOSER, IMPORT_BACKUP_REMOTE, IMPORT_BACKUP }
 
 /**
  * Onboarding for one profile. [firstRun] shows the welcome/disclaimer; otherwise it starts at profile
@@ -83,7 +84,7 @@ fun Onboarding(firstRun: Boolean, onDone: () -> Unit, onCancel: () -> Unit, modi
             // no point creating a profile first that the restore would replace).
             Step.SETUP_CHOICE -> SetupChoiceScreen(
                 onCreate = { step = Step.CREATE_PROFILE },
-                onRestore = { backupOrigin = Step.SETUP_CHOICE; step = Step.IMPORT_BACKUP },
+                onRestore = { backupOrigin = Step.SETUP_CHOICE; step = Step.IMPORT_BACKUP_CHOOSER },
                 onBack = { step = Step.DISCLAIMER },
             )
             Step.CREATE_PROFILE -> ProfileEditorDialog(
@@ -93,24 +94,41 @@ fun Onboarding(firstRun: Boolean, onDone: () -> Unit, onCancel: () -> Unit, modi
             )
             Step.ADD_CONTENT -> AddContentScreen(
                 hasExisting = existing.isNotEmpty(),
-                onNew = { step = Step.ADD_SOURCE },
+                onNew = { step = Step.ADD_SOURCE_CHOOSER },
                 onExisting = { step = Step.EXISTING },
-                onImport = { backupOrigin = Step.ADD_CONTENT; step = Step.IMPORT_BACKUP },
+                onImport = { backupOrigin = Step.ADD_CONTENT; step = Step.IMPORT_BACKUP_CHOOSER },
                 onSkip = { vm.finish(onDone) },
             )
+            Step.ADD_SOURCE_CHOOSER -> AddSourceChooserScreen(
+                onRemote = { step = Step.ADD_SOURCE_REMOTE },
+                onManual = { step = Step.ADD_SOURCE },
+                onBack = { step = Step.ADD_CONTENT },
+            )
+            Step.ADD_SOURCE_REMOTE -> RemoteSetupScreen(
+                state = vm.remoteState.collectAsStateWithLifecycle().value,
+                payloads = vm.remotePayloads,
+                onStartListener = { port -> vm.startRemoteListener(port) },
+                onStopListener = { vm.stopRemoteListener() },
+                // A phone submission hands off to the pre-filled Manual form (the user presses Start Import).
+                onPayloadReceived = { step = Step.ADD_SOURCE },
+                onBack = { vm.stopRemoteListener(); step = Step.ADD_SOURCE_CHOOSER },
+            )
             Step.ADD_SOURCE -> AddSourceScreen(
-                onStartXtream = { name, server, user, pass, ua, epg, refresh, live, movies, series, _ ->
-                    vm.startXtream(name, server, user, pass, ua, epg, refresh, live, movies, series)
+                onStartXtream = { name, server, user, pass, ua, epg, refresh, live, movies, series, _, preferHls ->
+                    vm.startXtream(name, server, user, pass, ua, epg, refresh, live, movies, series, preferHls)
                     importOrigin = Step.ADD_SOURCE
                     step = Step.IMPORTING
                 },
                 onStartM3u = { name, url, ua, epg, refresh, _ -> vm.startM3u(name, url, ua, epg, refresh); importOrigin = Step.ADD_SOURCE; step = Step.IMPORTING },
-                onStartStalker = { name, portalUrl, mac, ua, refresh, _ ->
-                    vm.startStalker(name, portalUrl, mac, ua, refresh)
+                onStartStalker = { name, portalUrl, mac, ua, refresh, _, live, movies, series ->
+                    vm.startStalker(name, portalUrl, mac, ua, refresh, live, movies, series)
                     importOrigin = Step.ADD_SOURCE
                     step = Step.IMPORTING
                 },
-                onBack = { step = Step.ADD_CONTENT },
+                // Submissions from the Remote screen land here pre-filled (type + fields).
+                remotePayload = vm.remotePayload,
+                onRemotePayloadConsumed = { vm.consumeRemotePayload() },
+                onBack = { step = Step.ADD_SOURCE_CHOOSER },
                 initial = vm.lastFailedSource, // pre-fill on retry after failed import
                 showDefaultToggle = false, // first playlist in setup: nothing to be "default" over yet
             )
@@ -127,6 +145,21 @@ fun Onboarding(firstRun: Boolean, onDone: () -> Unit, onCancel: () -> Unit, modi
                 onAdd = { ids -> vm.linkExisting(ids); importOrigin = Step.EXISTING; step = Step.IMPORTING },
                 onBack = { step = Step.ADD_CONTENT },
             )
+            Step.IMPORT_BACKUP_CHOOSER -> ImportBackupChooserScreen(
+                onRemote = { step = Step.IMPORT_BACKUP_REMOTE },
+                onLocal = { step = Step.IMPORT_BACKUP },
+                onBack = { step = backupOrigin },
+            )
+            Step.IMPORT_BACKUP_REMOTE -> RemoteBackupRestoreScreen(
+                state = vm.remoteState.collectAsStateWithLifecycle().value,
+                backups = vm.remoteBackups,
+                onStart = { port -> vm.startRemoteRestore(port) },
+                onStop = { vm.stopRemoteRestore() },
+                // An uploaded file starts the restore; the state-driven IMPORT_BACKUP screen shows
+                // progress, the password prompt, or the result from here on.
+                onBackupReceived = { file -> vm.importBackup(file) { onDone() }; step = Step.IMPORT_BACKUP },
+                onBack = { vm.stopRemoteRestore(); step = Step.IMPORT_BACKUP_CHOOSER },
+            )
             Step.IMPORT_BACKUP -> ImportBackupScreen(
                 state = importState,
                 onPick = { file -> vm.importBackup(file) { onDone() } }, // restore activates a profile itself
@@ -135,7 +168,12 @@ fun Onboarding(firstRun: Boolean, onDone: () -> Unit, onCancel: () -> Unit, modi
             )
         }
         // Semi-auto EPG: after the first playlist imports, ask → sync (live count) → done (overlays "All set!").
-        EpgSyncDialog(state = epgSync, onSync = vm::syncPendingEpg, onDismiss = vm::dismissPendingEpg)
+        EpgSyncDialog(
+            state = epgSync,
+            onSync = vm::syncPendingEpg,
+            onDismiss = vm::dismissPendingEpg,
+            onBackground = { vm.syncEpgInBackground(onDone) }, // enter the app; guide keeps downloading
+        )
     }
 }
 
@@ -162,7 +200,7 @@ private fun DisclaimerScreen(onAgree: () -> Unit, onBack: () -> Unit) {
         Spacer(Modifier.height(16.dp))
         Text(
             "OwnTV is a media player only. It includes no channels, playlists, or content. You are " +
-                "responsible for adding your own legally accessible M3U or Xtream sources.",
+                "responsible for adding your own legally accessible Xtream, M3U, or Stalker sources.",
             style = MaterialTheme.typography.bodyLarge,
             color = colors.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -286,8 +324,12 @@ private fun ImportBackupScreen(
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                if (state.retry) "That password didn't match. Try again, or skip to restore everything except saved passwords."
-                else "This backup's passwords are encrypted. Enter the backup password to restore them, or skip to restore everything else and re-enter passwords later.",
+                when {
+                    state.retry && state.sealed -> "That password didn't match. This backup is encrypted — it can't be opened without the password it was created with."
+                    state.retry -> "That password didn't match. Try again, or skip to restore everything except saved passwords."
+                    state.sealed -> "This backup is encrypted. Enter the backup password to open and restore it."
+                    else -> "This backup's passwords are encrypted. Enter the backup password to restore them, or skip to restore everything else and re-enter passwords later."
+                },
                 style = MaterialTheme.typography.bodyMedium, color = OwnTVTheme.colors.onSurfaceVariant,
                 textAlign = TextAlign.Center, modifier = Modifier.widthIn(max = 520.dp),
             )
@@ -303,7 +345,10 @@ private fun ImportBackupScreen(
             Spacer(Modifier.height(20.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OwnTVButton("Back", onClick = onBack, style = OwnTVButtonStyle.SECONDARY)
-                OwnTVButton("Skip (no passwords)", onClick = { onPassword(state.file, null) }, style = OwnTVButtonStyle.SECONDARY)
+                // No "Skip" for a sealed container: without the password there is nothing to restore.
+                if (!state.sealed) {
+                    OwnTVButton("Skip (no passwords)", onClick = { onPassword(state.file, null) }, style = OwnTVButtonStyle.SECONDARY)
+                }
                 OwnTVButton("Restore", onClick = { onPassword(state.file, password) }, enabled = password.isNotBlank())
             }
         }
@@ -317,10 +362,35 @@ private fun ImportBackupScreen(
         else -> StorageBrowser(
             title = "Pick a backup file to restore",
             mode = BrowseMode.FILE,
-            fileExtensions = setOf("json"),
+            // `.own` containers plus pre-4.2 `.json` backups.
+            fileExtensions = tv.own.owntv.core.backup.BackupManager.RESTORE_EXTENSIONS,
             onPick = onPick,
             onDismiss = onBack,
         )
+    }
+}
+
+/** Restore chooser: send the backup from a phone (LAN companion server) or pick a local file. */
+@Composable
+private fun ImportBackupChooserScreen(onRemote: () -> Unit, onLocal: () -> Unit, onBack: () -> Unit) {
+    val colors = OwnTVTheme.colors
+    val fr = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
+    BackHandler { onBack() }
+    Centered {
+        Text("Restore a backup", style = MaterialTheme.typography.headlineLarge, color = colors.onSurface)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "Send the backup from another device (phone or laptop) on the same Wi-Fi, or pick a backup file already on this device.",
+            style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(24.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            ChoiceCard(icon = OwnTVIcon.PLAYLIST, title = "Remote", desc = "Upload from a device on your Wi-Fi", modifier = Modifier.focusRequester(fr), onClick = onRemote)
+            ChoiceCard(icon = OwnTVIcon.DOWNLOADS, title = "Local file", desc = "Pick a backup file on this device", onClick = onLocal)
+        }
+        Spacer(Modifier.height(24.dp))
+        OwnTVButton("Back", onClick = onBack, style = OwnTVButtonStyle.SECONDARY)
     }
 }
 

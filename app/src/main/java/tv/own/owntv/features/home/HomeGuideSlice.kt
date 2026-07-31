@@ -1,5 +1,6 @@
 package tv.own.owntv.features.home
 
+import tv.own.owntv.core.epg.displayLogoUrl
 import android.text.format.DateFormat
 import coil3.compose.AsyncImage
 import androidx.compose.foundation.background
@@ -50,6 +51,7 @@ import tv.own.owntv.core.database.entity.EpgProgrammeEntity
 import tv.own.owntv.ui.theme.Dimens
 import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.OwnTVIcon
+import tv.own.owntv.ui.theme.GlassSurface
 import tv.own.owntv.ui.theme.OwnTVTheme
 import java.util.Date
 
@@ -130,6 +132,7 @@ private fun ChannelCardsRow(
                         focusedContainerColor = OwnTVTheme.colors.surfaceContainerHigh,
                         unfocusedContainerColor = OwnTVTheme.colors.surfaceContainerHigh,
                         selectedContainerColor = OwnTVTheme.colors.surfaceContainerHigh,
+                        surface = GlassSurface.CARDS,
                     ) { focused ->
                         Row(
                             modifier = Modifier
@@ -464,9 +467,9 @@ private fun ChannelLogoBadge(
             .background(if (focused) colors.primaryContainer else colors.surfaceContainerLowest),
         contentAlignment = Alignment.Center,
     ) {
-        if (!channel.logoUrl.isNullOrBlank()) {
+        if (!channel.displayLogoUrl.isNullOrBlank()) {
             AsyncImage(
-                model = channel.logoUrl,
+                model = channel.displayLogoUrl,
                 contentDescription = null,
                 modifier = Modifier.size(40.dp),
                 contentScale = ContentScale.Fit,
@@ -489,9 +492,9 @@ private fun ChannelLogo(
             .background(OwnTVTheme.colors.surfaceContainerLowest),
         contentAlignment = Alignment.Center,
     ) {
-        if (!channel.logoUrl.isNullOrBlank()) {
+        if (!channel.displayLogoUrl.isNullOrBlank()) {
             AsyncImage(
-                model = channel.logoUrl,
+                model = channel.displayLogoUrl,
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit,

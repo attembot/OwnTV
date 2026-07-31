@@ -22,14 +22,13 @@ import tv.own.owntv.ui.theme.OwnTVTheme
  * Layer 3 — content list/grid area. Phase 1/2 render the header plus a reusable [EmptyState]; the
  * real Paging list/grid arrives in the media-section phases (7–9).
  *
- * Per the plan's "Total Count Requirements", the count sits on the subtitle line beneath the title
- * as `ABBR (N unit)` — e.g. `UK (50 channels)` — rather than a separate top-right number.
+ * The count sits on the subtitle line beneath the title — e.g. `50 channels` — rather than a
+ * separate top-right number.
  */
 @Composable
 fun ContentPane(
     sectionTitle: String,
     categoryName: String,
-    categoryAbbr: String,
     countLabel: String,
     emptyIcon: OwnTVIcon,
     emptyMessage: String,
@@ -49,7 +48,7 @@ fun ContentPane(
         )
         Spacer(Modifier.height(Dimens.GapTiny))
         Text(
-            text = "$categoryAbbr ($countLabel)",
+            text = countLabel,
             style = MaterialTheme.typography.titleMedium,
             color = colors.accent,
             fontWeight = FontWeight.Bold,

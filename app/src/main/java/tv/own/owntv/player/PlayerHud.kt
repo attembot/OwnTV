@@ -1,6 +1,13 @@
 package tv.own.owntv.player
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.focusGroup
@@ -26,15 +33,21 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
@@ -49,22 +62,40 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.OwnTVButton
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.OwnTVSpinner
 import tv.own.owntv.ui.components.dialogPanel
+import tv.own.owntv.ui.theme.GlassSurface
+import tv.own.owntv.ui.theme.LocalActionSurface
 import tv.own.owntv.ui.theme.OwnTVTheme
 
 private val SPEEDS = listOf(0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0)
 private val TEAL = Color(0xFF52DBC8)
 
-private enum class HudDialog { NONE, AUDIO, SUBS, SPEED, ZOOM, VOLUME }
+private const val DIRECT_TUNE_TIMEOUT_MS = 2_000L
+private const val DIRECT_TUNE_FEEDBACK_MS = 1_500L
+private const val DIRECT_TUNE_PLAYBACK_WAIT_MS = 8_000L
+private const val MAX_DIRECT_TUNE_DIGITS = 5
+
+private enum class HudDialog { NONE, AUDIO, SUBS, SPEED, ZOOM, VOLUME, SUB_TIMING }
+
+/** What the top-left channel OSD shows for direct tune: the digits being typed, the channel a number
+ *  resolved to, or a failure message. All three render as the same card as the channel OSD. */
+private sealed interface TuneOsd {
+    data class Entry(val digits: String) : TuneOsd
+    data class Tuned(val info: DirectTuneChannelInfo) : TuneOsd
+    data class Message(val digits: String, val text: String) : TuneOsd
+}
 
 @Composable
 fun PlayerHud(
@@ -72,6 +103,8 @@ fun PlayerHud(
     onBack: () -> Unit,
     onPip: (() -> Unit)? = null,
     onMultiView: (() -> Unit)? = null, // enter MultiView seeded with this channel (live only)
+    // Switch to audio-only mode (stops video decode, surfaces the top-bar now-playing bar). Null hides it.
+    onAudioMode: (() -> Unit)? = null,
     // True while the shell draws an overlay ABOVE the HUD (e.g. the channel-list overlay). The HUD goes
     // inert: its auto-hide timer pauses and — crucially — it makes no focus requests, so it can't yank
     // D-pad focus off the overlay. The existing dialog guard below covers only the HUD's OWN dialogs;
@@ -81,6 +114,9 @@ fun PlayerHud(
     onChannelDown: (() -> Unit)? = null,
     // Live: open the channel-list overlay (Left while the controls are hidden). Null = not a live channel.
     onOpenChannelList: (() -> Unit)? = null,
+    // Live: open the watch-history list (Right while the controls are hidden) — jump straight back to a
+    // recent channel without leaving full-screen. Null = not a live channel.
+    onOpenHistoryList: (() -> Unit)? = null,
     // Live rewind / timeshift (catch-up channels). onRewindLive non-null = this live channel can rewind;
     // timeshiftOffsetSec non-null = currently watching that many seconds behind the live edge.
     onRewindLive: (() -> Unit)? = null,
@@ -88,6 +124,10 @@ fun PlayerHud(
     onGoToLive: (() -> Unit)? = null,
     onScrubLive: ((Int) -> Unit)? = null, // timeline scrub: +sec = back, −sec = toward live
     timeshiftOffsetSec: Int? = null,
+    // Direct tune: enter a provider channel number to switch channels. Null = disabled (not live / no channel).
+    onTuneToNumber: (suspend (Int) -> DirectTuneResult)? = null,
+    // Channel identity key for direct tune: changing this cancels any in-flight submission.
+    directTuneContextKey: Long = 0L,
     // Live "compatibility mode": pin this channel to the mpv engine (fixes UHD artifacts / undecodable
     // streams ExoPlayer can't handle). null = not a live channel; true = currently pinned to mpv.
     compatMode: Boolean? = null,
@@ -108,6 +148,15 @@ fun PlayerHud(
     // true = currently playing on ExoPlayer.
     vodOnExo: Boolean? = null,
     onToggleVodEngine: (() -> Unit)? = null,
+    // Movie/episode only: open the OpenSubtitles search from the Subtitles dialog (subtitle plan §4).
+    // Null for Live TV and when there's no current-item context, which hides the ADD SUBTITLES row.
+    onSearchSubtitles: (() -> Unit)? = null,
+    // Movie/episode only: pick a local subtitle file (plan §7) — no account needed, same gating.
+    onSelectLocalSubtitle: (() -> Unit)? = null,
+    // Favorite toggle for the CURRENT item (live channel / movie / series). Null hides the button
+    // (no item context). [favorite] = current state — fills the star teal when true.
+    favorite: Boolean = false,
+    onToggleFavorite: (() -> Unit)? = null,
     // Live guide card (Before / Now playing / Next for the playing channel) — supplied by the shell
     // (the EPG data lives in LiveViewModel, not the player). Rendered on the right edge whenever the
     // controls are visible, like the top-bar channel card; informational only, never focusable.
@@ -163,7 +212,6 @@ fun PlayerHud(
     var channelFlash by remember { mutableIntStateOf(0) }
     var showFlash by remember { mutableStateOf(false) }
     LaunchedEffect(channelFlash) { if (channelFlash > 0) { showFlash = true; delay(3000); showFlash = false } }
-    val zap: (Int) -> Unit = { d -> (if (d < 0) onChannelUp else onChannelDown)?.invoke(); channelFlash++ }
 
     // Engine-switch confirmation toast: a brief "Switched to MPV/ExoPlayer" at the bottom-center when the
     // user flips the engine via the HUD toggle. Mirrors the channel-flash pattern above.
@@ -178,7 +226,113 @@ fun PlayerHud(
         engineMsg = if (vodOnExo == true) "Switched to MPV" else "Switched to ExoPlayer"; engineFlash++; cb()
     } }
 
+    // ---- Direct tune (channel-number entry) ----
+    var digitBuffer by remember { mutableStateOf("") }
+    var submissionRequest by remember { mutableStateOf<Int?>(null) }
+    var submissionTick by remember { mutableIntStateOf(0) }
+
+    var lookupInFlight by remember { mutableStateOf(false) }
+
+    var tuneOsd by remember { mutableStateOf<TuneOsd?>(null) }
+    var tuneOsdTick by remember { mutableIntStateOf(0) }
+
+    val digitsActive = digitBuffer.isNotEmpty()
+    val heldDigitKeys = remember { mutableSetOf<Key>() }
+
+    val cancelDirectTune: () -> Unit = {
+        digitBuffer = ""
+        submissionRequest = null
+        tuneOsd = null
+        heldDigitKeys.clear()
+        submissionTick++
+        tuneOsdTick++
+    }
+
+    val zap: (Int) -> Unit = { d ->
+        cancelDirectTune()
+        (if (d < 0) onChannelUp else onChannelDown)?.invoke(); channelFlash++
+    }
+
+    // Restartable timeout: each new digit restarts the ~2 s window. On expiry, submit.
+    LaunchedEffect(digitBuffer) {
+        if (digitBuffer.isEmpty()) return@LaunchedEffect
+        delay(DIRECT_TUNE_TIMEOUT_MS)
+        val num = digitBuffer.toIntOrNull()
+        digitBuffer = ""
+        if (num != null) { submissionRequest = num; submissionTick++ }
+        else tuneOsd = null
+    }
+    // Submission: keyed on the immutable tick so setting submissionRequest=null doesn't cancel us.
+    // lookupInFlight covers only the suspend callback, not the result-display period.
+    LaunchedEffect(submissionTick) {
+        val num = submissionRequest ?: return@LaunchedEffect
+        submissionRequest = null
+        lookupInFlight = true
+        val result = try {
+            onTuneToNumber?.invoke(num)
+        } finally {
+            lookupInFlight = false
+            // A KeyUp can be lost when focus or the window changes mid-entry (dialog, PiP, app switch),
+            // which would strand that digit in the held set and make the key dead until the next KeyUp.
+            // A completed submission ends the entry, so no held state can legitimately survive it.
+            heldDigitKeys.clear()
+        }
+        tuneOsd = when (result) {
+            is DirectTuneResult.Found -> TuneOsd.Tuned(result.channel)
+            is DirectTuneResult.NotFound -> TuneOsd.Message("$num", "Channel not found")
+            is DirectTuneResult.Ambiguous -> TuneOsd.Message("$num", "Multiple channels")
+            is DirectTuneResult.Failed -> TuneOsd.Message("$num", "Tune failed")
+            is DirectTuneResult.Cancelled -> null
+            null -> null
+        }
+        if (tuneOsd != null) tuneOsdTick++
+    }
+    // Result-feedback expiry, keyed on tuneOsdTick so a new entry invalidates the old timer. A tuned
+    // channel holds the OSD until the new stream is actually on screen (the lookup returns the moment
+    // playback is KICKED OFF, not when it starts) and then DIRECT_TUNE_FEEDBACK_MS longer.
+    LaunchedEffect(tuneOsdTick) {
+        when (val osd = tuneOsd) {
+            is TuneOsd.Tuned -> {
+                if (osd.info.restarted) {
+                    withTimeoutOrNull(DIRECT_TUNE_PLAYBACK_WAIT_MS) {
+                        // Two phases: the outgoing stream can still report playing for a beat (Stalker/mpv
+                        // resolve their URL asynchronously), so wait for the teardown before the start.
+                        snapshotFlow { isPlaying && !buffering && error == null }.first { !it }
+                        snapshotFlow { (isPlaying && !buffering) || error != null }.first { it }
+                    }
+                }
+                delay(DIRECT_TUNE_FEEDBACK_MS)
+                tuneOsd = null
+            }
+            is TuneOsd.Message -> { delay(DIRECT_TUNE_FEEDBACK_MS); tuneOsd = null }
+            is TuneOsd.Entry, null -> Unit
+        }
+    }
+    // Cancellation triggers (CH+/-, D-pad, overlay open, HUD dialog open).
+    LaunchedEffect(inert) { if (inert) cancelDirectTune() }
+    LaunchedEffect(dialog) { if (dialog != HudDialog.NONE) cancelDirectTune() }
+    // Channel-key cleanup: narrow to pending entry state only. Do not clear timed result feedback
+    // from a successful tune that changed the playing channel.
+    LaunchedEffect(directTuneContextKey) {
+        if (digitBuffer.isNotEmpty() || submissionRequest != null) {
+            digitBuffer = ""
+            submissionRequest = null
+            heldDigitKeys.clear()
+            submissionTick++
+            // Abandoned digits have no timer of their own — drop the card with the entry it belonged to.
+            if (tuneOsd is TuneOsd.Entry) tuneOsd = null
+        }
+    }
+    // Back cancels digit entry before it hides/exits controls.
+    BackHandler(enabled = digitsActive) { digitBuffer = ""; tuneOsd = null }
+
     LaunchedEffect(forceShow) { if (forceShow) controlsVisible = true }
+    LaunchedEffect(controlsVisible, player) { if (controlsVisible) player.refreshStreamChips() }
+    DisposableEffect(showInfo, player) {
+        if (showInfo) player.refreshStreamChips()
+        player.setBitrateTrackingEnabled(showInfo)
+        onDispose { player.setBitrateTrackingEnabled(false) }
+    }
     LaunchedEffect(controlsVisible, wakeTick, forceShow, inert) {
         // Don't auto-hide under an overlay — hiding is what triggers the catch-all focus grab below.
         if (controlsVisible && !forceShow && !inert) { delay(4500); controlsVisible = false }
@@ -194,19 +348,70 @@ fun PlayerHud(
         } else runCatching { catchFocus.requestFocus() }
     }
 
+    // The player sits over opaque video (never a glass surface — see Glass.kt), so its HUD buttons
+    // stay flat regardless of glass mode: opt out of the DIALOGS default explicitly.
+    CompositionLocalProvider(LocalActionSurface provides null) {
     Box(
         modifier = modifier.fillMaxSize().onPreviewKeyEvent { e ->
+            // ---- Direct-tune digit capture (before the existing KeyDown guard) ----
+            // Number keys are consumed globally here, HUD visible or not: on a TV remote a digit press
+            // during live playback can only mean "tune to this channel", and swallowing both KeyDown and
+            // KeyUp keeps a half-typed number from leaking into whatever else is focused underneath.
+            // onTuneToNumber is null outside fullscreen live (see OwnTVShell), so nothing else is affected.
+            if (onTuneToNumber != null && !inert && dialog == HudDialog.NONE) {
+                val digit = keyToDigit(e.key)
+                if (digit != null) {
+                    if (e.type == KeyEventType.KeyUp) {
+                        heldDigitKeys.remove(e.key)
+                        return@onPreviewKeyEvent true
+                    }
+                    if (e.type == KeyEventType.KeyDown) {
+                        if (lookupInFlight || !heldDigitKeys.add(e.key)) {
+                            return@onPreviewKeyEvent true
+                        }
+                        val enteredDigits = digitBuffer + digit
+                        tuneOsd = TuneOsd.Entry(enteredDigits)
+                        tuneOsdTick++
+                        if (enteredDigits.length == MAX_DIRECT_TUNE_DIGITS) {
+                            digitBuffer = ""
+                            submissionRequest = enteredDigits.toIntOrNull()
+                            submissionTick++
+                        } else {
+                            digitBuffer = enteredDigits
+                        }
+                        return@onPreviewKeyEvent true
+                    }
+                }
+                // Enter/Center/NumpadEnter: submit immediately while digits are pending.
+                if (e.type == KeyEventType.KeyDown && !lookupInFlight && digitsActive &&
+                    (e.key == Key.DirectionCenter || e.key == Key.Enter || e.key == Key.NumPadEnter)
+                ) {
+                    val num = digitBuffer.toIntOrNull()
+                    digitBuffer = ""
+                    if (num != null) { submissionRequest = num; submissionTick++ }
+                    return@onPreviewKeyEvent true
+                }
+            }
+            // ---- Existing key handling (unchanged, but skip for digit KeyUp already consumed above) ----
             if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
             when {
                 // Channel surfing: dedicated CH+/CH- and media prev/next keys always zap. D-pad Up/Down
                 // zap ONLY while the HUD is hidden (when it's visible, Up/Down navigate the controls) —
                 // this is the only way to change channels on remotes without CH keys (e.g. Fire TV).
-                canZap && (e.key == Key.ChannelUp || e.key == Key.MediaPrevious) -> { zap(-1); true }
-                canZap && (e.key == Key.ChannelDown || e.key == Key.MediaNext) -> { zap(1); true }
-                canZap && !controlsVisible && e.key == Key.DirectionUp -> { zap(-1); true }
-                canZap && !controlsVisible && e.key == Key.DirectionDown -> { zap(1); true }
-                // Left while the HUD is hidden opens the channel-list overlay (live only).
+                //
+                // Direction is channel-number order, not list-position order: "up" (CH+, D-pad Up) is
+                // always the NEXT channel — further down an ascending list, delta +1 — matching the
+                // de facto TV convention (Live Channels, YouTube TV, Pluto TV). All of these keys move
+                // the same way; there is deliberately no split between CH+ and D-pad Up. Wrapping is
+                // intended: CH-/Down from the first channel lands on the last, and vice versa.
+                canZap && (e.key == Key.ChannelUp || e.key == Key.MediaNext) -> { zap(1); true }
+                canZap && (e.key == Key.ChannelDown || e.key == Key.MediaPrevious) -> { zap(-1); true }
+                canZap && !controlsVisible && e.key == Key.DirectionUp -> { zap(1); true }
+                canZap && !controlsVisible && e.key == Key.DirectionDown -> { zap(-1); true }
+                // With the HUD hidden, Left opens this channel's category list and Right the watch
+                // history — the two in-player channel lists (live only).
                 onOpenChannelList != null && !controlsVisible && e.key == Key.DirectionLeft -> { onOpenChannelList(); true }
+                onOpenHistoryList != null && !controlsVisible && e.key == Key.DirectionRight -> { onOpenHistoryList(); true }
                 controlsVisible -> { wakeTick++; false }
                 else -> false
             }
@@ -222,31 +427,68 @@ fun PlayerHud(
         // Stream technical info — drawn over everything (and kept up even when the controls auto-hide), so
         // you can read live bitrate/buffer while watching. Toggled from the bottom bar's info button.
         if (showInfo) {
-            StreamInfoOverlay(player, modifier = Modifier.align(Alignment.TopEnd).padding(top = 84.dp, end = 20.dp))
+            // Sits clear of the taller unified top strip (logo + guide) rather than under the old title row.
+            StreamInfoOverlay(player, modifier = Modifier.align(Alignment.TopEnd).padding(top = 112.dp, end = 20.dp))
         }
 
-        // Channel flash card (zapping with the HUD hidden) — shown independently of the full controls.
-        if (isLive && showFlash && !controlsVisible) {
-            ChannelCard(player, modifier = Modifier.align(Alignment.TopStart).padding(start = 28.dp, top = 28.dp))
+        // Top-left OSD stack: the channel card (briefly on a zap, or the freshly tuned channel) plus the
+        // direct-tune card, which pushes down under it. Drawn outside the controls-visible block so both
+        // zapping and digit entry stay visible with the HUD hidden. With the controls up the unified top
+        // strip already names the channel, so only a direct tune — whose card names the channel the stream
+        // is still switching to — draws here.
+        val tuned = (tuneOsd as? TuneOsd.Tuned)?.info
+        Column(
+            modifier = Modifier.align(Alignment.TopStart)
+                .padding(start = 28.dp, top = if (controlsVisible) 92.dp else 28.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (isLive && (tuned != null || (showFlash && !controlsVisible))) {
+                // A fresh tune drives the card from the lookup result, not player metadata: the Stalker and
+                // mpv paths publish their metadata after an async resolve, which would show the old channel.
+                if (tuned != null) {
+                    ChannelOsdCard(title = tuned.name, subtitle = tuned.number?.let { "#$it" }, logoUrl = tuned.logoUrl)
+                } else {
+                    ChannelCard(player)
+                }
+            }
+            when (val osd = tuneOsd) {
+                is TuneOsd.Entry -> ChannelNumberCard(osd.digits)
+                is TuneOsd.Message -> ChannelNumberCard(osd.digits, error = osd.text)
+                is TuneOsd.Tuned, null -> Unit
+            }
         }
 
         if (controlsVisible) {
-            // Scrim gradients top + bottom for legibility.
-            Box(Modifier.align(Alignment.TopStart).fillMaxWidth().height(200.dp)
-                .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.8f), Color.Transparent))))
-            Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(240.dp)
-                .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)))))
+            // Scrims: a FLAT semi-transparent panel behind the controls, feathered to transparent only at
+            // the inner edge. A pure gradient faded out exactly where the chips and the Now/Next text sit,
+            // so those washed out on bright scenes; a hard-edged band would instead draw a visible seam
+            // across the picture. The colour stops give the panel first, then the feather.
+            Box(Modifier.align(Alignment.TopStart).fillMaxWidth().height(210.dp)
+                .background(Brush.verticalGradient(
+                    0.0f to Color.Black.copy(alpha = 0.72f),
+                    0.5f to Color.Black.copy(alpha = 0.68f),
+                    1.0f to Color.Transparent,
+                )))
+            Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(260.dp)
+                .background(Brush.verticalGradient(
+                    0.0f to Color.Transparent,
+                    0.45f to Color.Black.copy(alpha = 0.68f),
+                    1.0f to Color.Black.copy(alpha = 0.78f),
+                )))
 
             // The active engine (MPV/EXO) leads the mini chips so users can always tell which player is on.
-            TopBar(player, isLive, listOfNotNull(engineChip) + streamChips.ifEmpty { listOfNotNull(videoRes) }, duration, onBack, modifier = Modifier.align(Alignment.TopStart))
-            if (isLive) ChannelCard(player, modifier = Modifier.align(Alignment.TopStart).padding(start = 28.dp, top = 92.dp))
+            // One unified strip: back · logo · chips-over-channel-name · Now/Next guide. The channel name
+            // used to be drawn twice (here and in a floating card below), with the guide stranded on the
+            // right edge — that space belongs to the history list now.
+            TopBar(
+                player, isLive, listOfNotNull(engineChip) + streamChips.ifEmpty { listOfNotNull(videoRes) }, duration, onBack,
+                modifier = Modifier.align(Alignment.TopStart),
+                trailing = if (error == null) liveEpgCard else null,
+            )
 
             // Hide the transport (play/seek/prev/next) and bottom bar while an error is up — the error
             // overlay owns the screen with its own Retry, so the play/rewind/forward must not show behind it.
             if (error == null) {
-                if (liveEpgCard != null) {
-                    Box(Modifier.align(Alignment.CenterEnd).padding(end = 28.dp)) { liveEpgCard() }
-                }
                 CenterControls(player, nav, isPlaying, isLive, onRewindLive, onForwardLive, onGoToLive, timeshiftOffsetSec, playFocus, modifier = Modifier.align(Alignment.Center))
 
                 BottomBar(
@@ -257,7 +499,8 @@ fun PlayerHud(
                     compatMode = compatMode, onToggleCompatMode = toggleCompat,
                     vodOnExo = vodOnExo, onToggleVodEngine = toggleVod,
                     onInfo = { showInfo = !showInfo }, infoOn = showInfo,
-                    onOpenDialog = { dialog = it }, onPip = onPip, onMultiView = onMultiView, onBack = onBack,
+                    favorite = favorite, onToggleFavorite = onToggleFavorite,
+                    onOpenDialog = { dialog = it }, onPip = onPip, onMultiView = onMultiView, onAudioMode = onAudioMode, onBack = onBack,
                     onCornerSwap = onCornerSwap, onCornerAudio = onCornerAudio, onCornerMove = onCornerMove, onCornerGrow = onCornerGrow, onCornerShrink = onCornerShrink, onCornerClose = onCornerClose,
                     onChangeMain = onChangeMain, onChangeCorner = onChangeCorner,
                     cornerAudioOn = cornerAudioOn,
@@ -327,6 +570,7 @@ fun PlayerHud(
             buffering -> OwnTVSpinner(modifier = Modifier.align(Alignment.Center), sizeDp = 56)
         }
     }
+    } // CompositionLocalProvider
 
     when (dialog) {
         // Track lists are SNAPSHOT once when the dialog opens (re-polled only while still empty —
@@ -348,8 +592,19 @@ fun PlayerHud(
         HudDialog.SUBS -> {
             var subTracks by remember { mutableStateOf(player.textTracks()) }
             LaunchedEffect(Unit) { while (subTracks.isEmpty()) { delay(300); subTracks = player.textTracks() } }
-            TrackDialog("Subtitles", subTracks, onSelect = { player.selectSubtitle(it.mpvId); dialog = HudDialog.NONE }, onOff = { player.disableSubtitles(); dialog = HudDialog.NONE }, onDismiss = { dialog = HudDialog.NONE })
+            TrackDialog(
+                "Subtitles", subTracks,
+                onSelect = { player.selectSubtitle(it.mpvId); dialog = HudDialog.NONE },
+                onOff = { player.disableSubtitles(); dialog = HudDialog.NONE },
+                onDismiss = { dialog = HudDialog.NONE },
+                onSearchSubtitles = onSearchSubtitles?.let { open -> { dialog = HudDialog.NONE; open() } },
+                onSelectLocalSubtitle = onSelectLocalSubtitle?.let { open -> { dialog = HudDialog.NONE; open() } },
+                // Subtitle timing (plan §8): only when adjustment applies to the ACTIVE subtitle on the
+                // current engine (any mpv text sub; external side-loads on ExoPlayer).
+                onSubtitleTiming = if (player.subtitleTimingAvailable()) ({ dialog = HudDialog.SUB_TIMING }) else null,
+            )
         }
+        HudDialog.SUB_TIMING -> SubtitleTimingDialog(player, onDismiss = { dialog = HudDialog.NONE })
         HudDialog.SPEED -> SpeedDialog(current = speed, onSelect = { player.setSpeed(it); dialog = HudDialog.NONE }, onDismiss = { dialog = HudDialog.NONE })
         HudDialog.ZOOM -> ZoomDialog(current = zoomMode, onSelect = { player.setZoomMode(it); dialog = HudDialog.NONE }, onDismiss = { dialog = HudDialog.NONE })
         HudDialog.VOLUME -> VolumeDialog(player, onDismiss = { dialog = HudDialog.NONE })
@@ -363,35 +618,84 @@ fun PlayerHud(
 private fun TopBar(
     player: PlaybackEngine, isLive: Boolean, chips: List<String>, duration: Long,
     onBack: () -> Unit, modifier: Modifier = Modifier,
+    // Live only: the Now/Next guide, rendered at the far end of the same strip.
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     // Reactive meta so the title row updates instantly on a channel zap (the plain vars aren't observed).
     val meta by player.currentMeta.collectAsStateWithLifecycle()
     Row(modifier = modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
         CircleButton(OwnTVIcon.BACK, size = 40, onClick = onBack)
         Spacer(Modifier.width(14.dp))
+        // Live: the channel logo sits with the channel NAME (identity), not with the programme — so the
+        // whole "which channel am I on" group reads as one unit however wide the TV is.
+        if (isLive) {
+            ChannelLogo(meta.logoUrl, meta.title, size = 46)
+            Spacer(Modifier.width(14.dp))
+        }
         Column(Modifier.weight(1f)) {
-            meta.subtitle?.takeIf { it.isNotBlank() }?.let {
-                Text(it, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.45f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            val chipRow: @Composable () -> Unit = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val durMin = (duration / 60000)
+                    val parts = buildList {
+                        meta.year?.takeIf { it.isNotBlank() }?.let { add(it) }
+                        if (!isLive && durMin > 0) add("$durMin min")
+                        addAll(chips) // aspect · resolution · fps · audio
+                    }
+                    parts.forEachIndexed { i, label ->
+                        if (i > 0) Box(Modifier.size(3.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.3f)))
+                        Text(label, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.5f))
+                    }
+                    if (isLive) {
+                        if (parts.isNotEmpty()) Box(Modifier.size(3.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.3f)))
+                        LiveBadge()
+                    }
+                }
             }
-            Text(meta.title ?: "", style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.height(2.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                val durMin = (duration / 60000)
-                val parts = buildList {
-                    meta.year?.takeIf { it.isNotBlank() }?.let { add(it) }
-                    if (!isLive && durMin > 0) add("$durMin min")
-                    addAll(chips) // aspect · resolution · fps · audio
+            // Live stacks the technical chips ABOVE the channel name; VOD keeps title-then-chips.
+            if (isLive) {
+                chipRow()
+                Spacer(Modifier.height(2.dp))
+                // Channel number ahead of the name — this is where you look to learn the number of a
+                // channel you arrived at by zapping. meta.subtitle carries it ("#123") only while the
+                // "Channel numbers" setting is on, so an off setting leaves the name alone.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    meta.subtitle?.takeIf { it.isNotBlank() }?.let {
+                        Text(
+                            it,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White.copy(alpha = 0.45f),
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                        )
+                        Spacer(Modifier.width(10.dp))
+                    }
+                    Text(meta.title ?: "", style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                parts.forEachIndexed { i, label ->
-                    if (i > 0) Box(Modifier.size(3.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.3f)))
-                    Text(label, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.5f))
+            } else {
+                meta.subtitle?.takeIf { it.isNotBlank() }?.let {
+                    Text(it, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.45f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                if (isLive) {
-                    if (parts.isNotEmpty()) Box(Modifier.size(3.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.3f)))
-                    LiveBadge()
-                }
+                Text(meta.title ?: "", style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(2.dp))
+                chipRow()
             }
         }
+        if (trailing != null) {
+            Spacer(Modifier.width(28.dp))
+            trailing()
+        }
+    }
+}
+
+/** The channel logo tile, falling back to the first letters of the channel name. */
+@Composable
+private fun ChannelLogo(logoUrl: String?, title: String?, size: Int, modifier: Modifier = Modifier) {
+    Box(
+        modifier.size(size.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFF004F46)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (!logoUrl.isNullOrBlank()) AsyncImage(model = logoUrl, contentDescription = null, modifier = Modifier.fillMaxSize())
+        else Text((title ?: "?").take(3).uppercase(), style = MaterialTheme.typography.labelMedium, color = Color(0xFF6FF8E4), fontWeight = FontWeight.Bold)
     }
 }
 
@@ -406,23 +710,89 @@ private fun LiveBadge() {
     }
 }
 
+/** The player's channel OSD: channel logo beside its name and number. */
 @Composable
-private fun ChannelCard(player: PlaybackEngine, modifier: Modifier = Modifier) {
-    // Collect the reactive meta so the card refreshes the instant a zap changes the channel.
-    val meta by player.currentMeta.collectAsStateWithLifecycle()
+private fun ChannelOsdCard(
+    title: String?,
+    subtitle: String?,
+    logoUrl: String?,
+    modifier: Modifier = Modifier,
+) {
     Row(
         modifier = modifier.widthIn(max = 340.dp).clip(RoundedCornerShape(14.dp)).background(Color.Black.copy(alpha = 0.55f)).padding(14.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Box(Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFF004F46)), contentAlignment = Alignment.Center) {
-            val logo = meta.logoUrl
-            if (!logo.isNullOrBlank()) AsyncImage(model = logo, contentDescription = null, modifier = Modifier.fillMaxSize())
-            else Text((meta.title ?: "?").take(3).uppercase(), style = MaterialTheme.typography.labelMedium, color = Color(0xFF6FF8E4), fontWeight = FontWeight.Bold)
+            if (!logoUrl.isNullOrBlank()) AsyncImage(model = logoUrl, contentDescription = null, modifier = Modifier.fillMaxSize())
+            else Text((title ?: "?").take(3).uppercase(), style = MaterialTheme.typography.labelMedium, color = Color(0xFF6FF8E4), fontWeight = FontWeight.Bold)
         }
         Column {
-            Text(meta.title ?: "", style = MaterialTheme.typography.titleSmall, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            meta.subtitle?.takeIf { it.isNotBlank() }?.let {
+            Text(title ?: "", style = MaterialTheme.typography.titleSmall, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            subtitle?.takeIf { it.isNotBlank() }?.let {
                 Text(it, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChannelCard(player: PlaybackEngine, modifier: Modifier = Modifier) {
+    // Collect the reactive meta so the card refreshes the instant a zap changes the channel.
+    val meta by player.currentMeta.collectAsStateWithLifecycle()
+    ChannelOsdCard(title = meta.title ?: "", subtitle = meta.subtitle, logoUrl = meta.logoUrl, modifier = modifier)
+}
+
+/** Direct-tune entry OSD: the number as it's typed, on the same surface (position, radius, scrim) the
+ *  channel card uses, so a resolved number simply becomes that card. A blinking caret says "still
+ *  accepting digits" and the bar along the bottom drains over the auto-submit window, so the wait is
+ *  visible instead of mysterious. [error] turns it into the failure readout for the same number. */
+@Composable
+private fun ChannelNumberCard(digits: String, error: String? = null, modifier: Modifier = Modifier) {
+    val caret = rememberInfiniteTransition(label = "tuneCaret")
+    val caretAlpha by caret.animateFloat(
+        initialValue = 1f, targetValue = 0f,
+        animationSpec = infiniteRepeatable(tween(600, easing = LinearEasing), RepeatMode.Reverse),
+        label = "tuneCaretAlpha",
+    )
+    val countdown = remember { Animatable(0f) }
+    LaunchedEffect(digits, error) {
+        if (error != null) { countdown.snapTo(0f); return@LaunchedEffect }
+        countdown.snapTo(1f)
+        countdown.animateTo(0f, tween(DIRECT_TUNE_TIMEOUT_MS.toInt(), easing = LinearEasing))
+    }
+    Column(
+        modifier.widthIn(min = 148.dp, max = 340.dp).clip(RoundedCornerShape(14.dp)).background(Color.Black.copy(alpha = 0.55f))
+            // Painted, not laid out: a real bar would fillMaxWidth and stretch the card to its max width.
+            .drawWithContent {
+                drawContent()
+                val barHeight = 3.dp.toPx()
+                val top = Offset(0f, size.height - barHeight)
+                drawRect(Color.White.copy(alpha = 0.08f), topLeft = top, size = Size(size.width, barHeight))
+                drawRect(TEAL, topLeft = top, size = Size(size.width * countdown.value, barHeight))
+            }
+            .padding(bottom = 3.dp),
+    ) {
+        Column(Modifier.padding(start = 16.dp, end = 20.dp, top = 12.dp, bottom = 12.dp)) {
+            Text(
+                "CHANNEL",
+                style = MaterialTheme.typography.labelSmall, color = TEAL, fontWeight = FontWeight.Bold,
+                letterSpacing = 2.sp,
+            )
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    digits,
+                    style = MaterialTheme.typography.headlineSmall, color = Color.White, fontWeight = FontWeight.Bold,
+                    letterSpacing = 3.sp,
+                )
+                if (error == null) {
+                    Box(
+                        Modifier.padding(start = 4.dp, bottom = 4.dp).width(3.dp).height(22.dp)
+                            .clip(RoundedCornerShape(2.dp)).background(TEAL.copy(alpha = caretAlpha)),
+                    )
+                }
+            }
+            error?.let {
+                Text(it, style = MaterialTheme.typography.labelMedium, color = Color(0xFFFF8A80), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -442,7 +812,7 @@ private fun CenterControls(
         if (timeshifting) {
             // Counts down as the archive catches up to the live edge; grows if you pause.
             Text(
-                if (timeshiftOffsetSec!! <= 1) "● At the live edge" else "● ${mmss(timeshiftOffsetSec)} behind live",
+                if (timeshiftOffsetSec <= 1) "● At the live edge" else "● ${mmss(timeshiftOffsetSec)} behind live",
                 style = MaterialTheme.typography.labelLarge,
                 color = OwnTVTheme.colors.accent,
             )
@@ -451,7 +821,7 @@ private fun CenterControls(
         Row(Modifier.focusGroup(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
             if (nav.hasPrev) CircleButton(OwnTVIcon.SKIP_PREVIOUS, size = 52) { player.previous() }
             when {
-                rewindMode -> CircleButton(OwnTVIcon.REWIND, size = 52) { onRewindLive!!() } // step back into the archive
+                rewindMode -> CircleButton(OwnTVIcon.REWIND, size = 52) { onRewindLive() } // step back into the archive
                 !isLive -> CircleButton(OwnTVIcon.REWIND, size = 52) { player.seekBy(-10_000) }
             }
             CircleButton(if (isPlaying) OwnTVIcon.PAUSE else OwnTVIcon.PLAY, size = 72, primary = true, modifier = Modifier.focusRequester(playFocus)) { player.togglePlayPause() }
@@ -480,7 +850,8 @@ private fun BottomBar(
     compatMode: Boolean?, onToggleCompatMode: (() -> Unit)?,
     vodOnExo: Boolean?, onToggleVodEngine: (() -> Unit)?,
     onInfo: (() -> Unit)? = null, infoOn: Boolean = false,
-    onOpenDialog: (HudDialog) -> Unit, onPip: (() -> Unit)?, onMultiView: (() -> Unit)? = null, onBack: () -> Unit,
+    favorite: Boolean = false, onToggleFavorite: (() -> Unit)? = null,
+    onOpenDialog: (HudDialog) -> Unit, onPip: (() -> Unit)?, onMultiView: (() -> Unit)? = null, onAudioMode: (() -> Unit)?, onBack: () -> Unit,
     onCornerSwap: (() -> Unit)? = null, onCornerAudio: (() -> Unit)? = null, onCornerMove: (() -> Unit)? = null, onCornerGrow: (() -> Unit)? = null, onCornerShrink: (() -> Unit)? = null, onCornerClose: (() -> Unit)? = null,
     onChangeMain: (() -> Unit)? = null, onChangeCorner: (() -> Unit)? = null,
     cornerAudioOn: Boolean = false,
@@ -542,8 +913,8 @@ private fun BottomBar(
                 SpeedButton(label = speedLabel, active = speedLabel != "1.0x") { onOpenDialog(HudDialog.SPEED) }
                 CtrlButton(OwnTVIcon.SUBTITLE, badge = subCount.takeIf { it > 0 }) { onOpenDialog(HudDialog.SUBS) }
                 CtrlButton(OwnTVIcon.AUDIO, badge = audioCount.takeIf { it > 1 }) { onOpenDialog(HudDialog.AUDIO) }
-                // Stream technical info (codec/res/HDR/bitrate/decoder/audio/buffer) — toggles the overlay.
-                if (onInfo != null) CtrlButton(OwnTVIcon.VIDEO, active = infoOn) { onInfo() }
+                // Favorite the current channel/movie/series without leaving the stream (teal heart = on).
+                if (onToggleFavorite != null) CtrlButton(OwnTVIcon.FAVORITE, active = favorite) { onToggleFavorite() }
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 // Live "compatibility mode" (Live TV + channels opened from the Guide): pin this channel
@@ -562,7 +933,11 @@ private fun BottomBar(
                 // (The corner/PiP controls live in their own labeled row above — see the top of this Column.)
                 if (onPip != null) CtrlButton(OwnTVIcon.PIP, label = "PiP") { onPip() }
                 if (onMultiView != null) CtrlButton(OwnTVIcon.VIDEO, label = "MultiView") { onMultiView() } // enter the multi-stream grid
-                CtrlButton(OwnTVIcon.FULLSCREEN_EXIT, label = "Exit") { onBack() }
+                if (onAudioMode != null) CtrlButton(OwnTVIcon.HEADPHONES) { onAudioMode() }
+                // Stream technical info (codec/res/HDR/bitrate/decoder/audio/buffer) — toggles the overlay.
+                // Parked at the far right, where the redundant exit-fullscreen button used to sit (Back
+                // already leaves the player, so that button never did anything the remote couldn't).
+                if (onInfo != null) CtrlButton(OwnTVIcon.INFO, active = infoOn) { onInfo() }
             }
         }
     }
@@ -603,8 +978,9 @@ private fun SpeedButton(label: String, active: Boolean, onClick: () -> Unit) {
         selectedContainerColor = Color.Transparent,
         contentAlignment = Alignment.Center,
     ) { focused ->
-        Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            OwnTVIcon(OwnTVIcon.FORWARD, tint = if (active) TEAL else if (focused) Color.White else Color.White.copy(alpha = 0.78f), filled = true, modifier = Modifier.size(16.dp))
+        // The rate itself is the icon — the extra ">>" glyph read as a seek control next to the real
+        // rewind/forward buttons, and "1.0x" already says everything the button does.
+        Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(label, style = MaterialTheme.typography.labelLarge, color = if (active) TEAL else if (focused) Color.White else Color.White.copy(alpha = 0.78f), fontWeight = FontWeight.SemiBold)
         }
     }
@@ -818,6 +1194,14 @@ private fun TrackDialog(
     onDismiss: () -> Unit,
     audioDelayMs: Int? = null,                 // non-null on the Audio dialog (VOD) → show the A/V-sync nudge
     onAdjustAudioDelay: ((Int) -> Unit)? = null,
+    // Non-null on the Subtitles dialog for a movie/episode → an "ADD SUBTITLES" row that opens the
+    // OpenSubtitles search (subtitle plan §4). Absent for Live TV and when no item context exists.
+    onSearchSubtitles: (() -> Unit)? = null,
+    // Non-null on the Subtitles dialog for a movie/episode → "Select local subtitle file" (plan §7).
+    onSelectLocalSubtitle: (() -> Unit)? = null,
+    // Non-null on the Subtitles dialog when timing adjustment applies to the active track (plan §8) →
+    // an "ADJUST" section with a "Subtitle timing" row.
+    onSubtitleTiming: (() -> Unit)? = null,
 ) {
     val colors = OwnTVTheme.colors
     val focus = remember { FocusRequester() }
@@ -832,8 +1216,20 @@ private fun TrackDialog(
     // mid-transition (seen on HDR/HDR10/DTS streams, whose surface re-layout delays window focus) or
     // before the engine has reported the tracks at all — leaving the dialog with NO focused row and
     // the D-pad locked out. Retry over a few frames, and re-run whenever the track list (re)arrives.
-    LaunchedEffect(tracks.size, focusOff) { requestFocusRetrying(focus) }
-    DialogScaffold(title = title, onDismiss = onDismiss) {
+    // The selected row can sit beyond the LazyColumn viewport (e.g. subtitle 11 of 20): it never
+    // composes, its focusRequester never attaches, and focus falls back to the first row ("Off").
+    // Scroll it into view before requesting focus.
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    LaunchedEffect(tracks.size, focusOff) {
+        val target = if (selectedIndex >= 0) selectedIndex + (if (onOff != null) 1 else 0) else 0
+        repeat(10) {
+            androidx.compose.runtime.withFrameNanos { }
+            if (selectedIndex >= 0) runCatching { listState.scrollToItem(target) }
+            if (runCatching { focus.requestFocus() }.isSuccess) return@LaunchedEffect
+            delay(50)
+        }
+    }
+    DialogScaffold(title = title, onDismiss = onDismiss, state = listState) {
         if (tracks.isEmpty() && onOff == null) {
             item { Text("No tracks available.", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, modifier = Modifier.padding(16.dp)) }
         }
@@ -855,6 +1251,35 @@ private fun TrackDialog(
                 modifier = if (focusThis) Modifier.focusRequester(focus) else Modifier,
                 onClick = { onSelect(track) },
             )
+        }
+        // ADD SUBTITLES (subtitles dialog, movie/episode only) — OpenSubtitles search + local file (§4/§7).
+        if (onSearchSubtitles != null || onSelectLocalSubtitle != null) {
+            item {
+                Text(
+                    "ADD SUBTITLES",
+                    style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(start = 16.dp, top = 10.dp, bottom = 2.dp),
+                )
+            }
+            if (onSearchSubtitles != null) {
+                item { OptionRow(label = "Search OpenSubtitles", selected = false, onClick = onSearchSubtitles) }
+            }
+            if (onSelectLocalSubtitle != null) {
+                item { OptionRow(label = "Select local subtitle file", selected = false, onClick = onSelectLocalSubtitle) }
+            }
+        }
+        // ADJUST (subtitles dialog): timing panel for the active subtitle (plan §8).
+        if (onSubtitleTiming != null) {
+            item {
+                Text(
+                    "ADJUST",
+                    style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(start = 16.dp, top = 10.dp, bottom = 2.dp),
+                )
+            }
+            item { OptionRow(label = "Subtitle timing", selected = false, onClick = onSubtitleTiming) }
         }
         // A/V-sync nudge (audio dialog, VOD only) — fixes a badly-muxed file where audio leads/lags the video.
         if (onAdjustAudioDelay != null) {
@@ -962,15 +1387,70 @@ private fun VolumeDialog(player: PlaybackEngine, onDismiss: () -> Unit) {
     }
 }
 
+/**
+ * Subtitle-timing panel (subtitle plan §8.2/§8.3): 100 ms and 500 ms steps + Reset, applied live while
+ * the video keeps playing behind (the backdrop is NOT dimmed so speech and text can be compared).
+ * Positive = subtitles shown later; the direction is always spelled out. Back keeps the value.
+ */
+@Composable
+private fun SubtitleTimingDialog(player: PlaybackEngine, onDismiss: () -> Unit) {
+    val colors = OwnTVTheme.colors
+    val delay by player.subDelayMs.collectAsStateWithLifecycle()
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { requestFocusRetrying(focus) }
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        tv.own.owntv.ui.theme.PopupFontTheme {
+            Box(Modifier.fillMaxSize().padding(bottom = 56.dp), contentAlignment = Alignment.BottomCenter) {
+                Column(Modifier.dialogPanel(width = 560.dp, padding = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Subtitle timing", style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
+                    Spacer(Modifier.height(10.dp))
+                    Text(formatSubDelay(delay), style = MaterialTheme.typography.headlineLarge, color = TEAL)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        when {
+                            delay > 0 -> "Subtitles shown later"
+                            delay < 0 -> "Subtitles shown earlier"
+                            else -> "No offset"
+                        },
+                        style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(18.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OwnTVButton("−0.5 s", onClick = { player.adjustSubtitleDelay(-500) }, style = tv.own.owntv.ui.components.OwnTVButtonStyle.SECONDARY)
+                        OwnTVButton("−0.1 s", onClick = { player.adjustSubtitleDelay(-100) }, style = tv.own.owntv.ui.components.OwnTVButtonStyle.SECONDARY)
+                        OwnTVButton("Reset", onClick = { player.resetSubtitleDelay() }, modifier = Modifier.focusRequester(focus))
+                        OwnTVButton("+0.1 s", onClick = { player.adjustSubtitleDelay(100) }, style = tv.own.owntv.ui.components.OwnTVButtonStyle.SECONDARY)
+                        OwnTVButton("+0.5 s", onClick = { player.adjustSubtitleDelay(500) }, style = tv.own.owntv.ui.components.OwnTVButtonStyle.SECONDARY)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun formatSubDelay(ms: Int): String = when {
+    ms == 0 -> "0.0 s"
+    ms > 0 -> "+%.1f s".format(ms / 1000.0)
+    else -> "−%.1f s".format(-ms / 1000.0)
+}
+
 @Composable
 private fun StepButton(label: String, enabled: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    FocusableSurface(onClick = onClick, enabled = enabled, modifier = modifier.size(64.dp), shape = RoundedCornerShape(18.dp), contentAlignment = Alignment.Center) { _ ->
+    FocusableSurface(onClick = onClick, enabled = enabled, modifier = modifier.size(64.dp), shape = RoundedCornerShape(18.dp), contentAlignment = Alignment.Center, surface = GlassSurface.DIALOGS) { _ ->
         Text(label, style = MaterialTheme.typography.headlineMedium, color = if (enabled) OwnTVTheme.colors.onSurface else OwnTVTheme.colors.outline)
     }
 }
 
 @Composable
-private fun DialogScaffold(title: String, onDismiss: () -> Unit, content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit) {
+private fun DialogScaffold(
+    title: String,
+    onDismiss: () -> Unit,
+    state: androidx.compose.foundation.lazy.LazyListState = androidx.compose.foundation.lazy.rememberLazyListState(),
+    content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
+) {
     val colors = OwnTVTheme.colors
     // A REAL dialog window, not an in-place overlay: it owns the D-pad focus scope, so nothing in the
     // HUD behind it (play button, catch-all focusable, stream-info chips) can compete for or steal
@@ -980,13 +1460,18 @@ private fun DialogScaffold(title: String, onDismiss: () -> Unit, content: androi
         onDismissRequest = onDismiss,
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)), contentAlignment = Alignment.Center) {
-            Column(modifier = Modifier.width(440.dp).clip(RoundedCornerShape(20.dp)).background(colors.surfaceContainerHigh).padding(24.dp)) {
-                Text(title, style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
-                Spacer(Modifier.height(12.dp))
-                // Cap to the screen (minus dialog chrome) so all rows stay reachable on small screens.
-                val listMax = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp - 160.dp).coerceIn(160.dp, 360.dp)
-                LazyColumn(modifier = Modifier.heightIn(max = listMax), verticalArrangement = Arrangement.spacedBy(6.dp), content = content)
+        // Compact glass popup matching the storage picker: smaller font + narrow box.
+        tv.own.owntv.ui.theme.PopupFontTheme(fontScale = 0.72f) {
+            Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)), contentAlignment = Alignment.Center) {
+                // Liquid glass panel (same translucent chrome as the volume/timing dialogs) — the
+                // inner LazyColumn manages its own scroll, so scroll = false.
+                Column(modifier = Modifier.dialogPanel(width = 260.dp, corner = 16.dp, padding = 14.dp, scroll = false)) {
+                    Text(title, style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
+                    Spacer(Modifier.height(8.dp))
+                    // Cap to the screen (minus dialog chrome) so all rows stay reachable on small screens.
+                    val listMax = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp - 160.dp).coerceIn(140.dp, 240.dp)
+                    LazyColumn(state = state, modifier = Modifier.heightIn(max = listMax), verticalArrangement = Arrangement.spacedBy(4.dp), content = content)
+                }
             }
         }
     }
@@ -998,12 +1483,13 @@ private fun OptionRow(label: String, selected: Boolean, modifier: Modifier = Mod
     FocusableSurface(
         onClick = onClick, modifier = modifier.fillMaxWidth(), selected = selected, shape = RoundedCornerShape(12.dp),
         selectedContainerColor = colors.primaryContainer, contentAlignment = Alignment.CenterStart,
+        surface = GlassSurface.DIALOGS,
     ) { focused ->
-        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(label, style = MaterialTheme.typography.titleMedium, color = if (selected) colors.onPrimaryContainer else if (focused) colors.primary else colors.onSurface)
+        Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(label, style = MaterialTheme.typography.bodyMedium, color = if (selected) colors.onPrimaryContainer else if (focused) colors.primary else colors.onSurface)
             if (selected) {
                 Spacer(Modifier.weight(1f))
-                OwnTVIcon(OwnTVIcon.STAR, tint = colors.onPrimaryContainer, filled = true, modifier = Modifier.size(16.dp))
+                OwnTVIcon(OwnTVIcon.STAR, tint = colors.onPrimaryContainer, filled = true, modifier = Modifier.size(14.dp))
             }
         }
     }

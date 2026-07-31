@@ -86,6 +86,7 @@ import tv.own.owntv.ui.components.ContentPanelFill
 import tv.own.owntv.ui.components.roundedPanel
 import tv.own.owntv.ui.format.formatSystemTime
 import tv.own.owntv.ui.theme.Dimens
+import tv.own.owntv.ui.theme.GlassSurface
 import tv.own.owntv.ui.theme.OwnTVTheme
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -619,6 +620,7 @@ private fun HeroRowSection(
                             unfocusedContainerColor = colors.surfaceContainerHigh,
                             selectedContainerColor = colors.surfaceContainerHigh,
                             contentAlignment = Alignment.Center,
+                            surface = GlassSurface.CARDS,
                         ) { focused ->
                             if (isExpanded) {
                                 // No blurred backdrop here: the preview overlay covers this card as soon
@@ -1132,6 +1134,7 @@ private fun LandscapeContinuationCard(
         unfocusedContainerColor = colors.surfaceContainerHigh,
         selectedContainerColor = colors.surfaceContainerHigh,
         contentAlignment = Alignment.Center,
+        surface = GlassSurface.CARDS,
     ) { focused ->
         Column(modifier = Modifier.fillMaxWidth().padding(6.dp)) {
             Box(

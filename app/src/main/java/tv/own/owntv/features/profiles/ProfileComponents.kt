@@ -45,12 +45,18 @@ import tv.own.owntv.ui.components.OwnTVAvatars
 import tv.own.owntv.ui.components.OwnTVButton
 import tv.own.owntv.ui.components.OwnTVButtonStyle
 import tv.own.owntv.ui.components.OwnTVTextField
+import tv.own.owntv.ui.theme.GlassSurface
 import tv.own.owntv.ui.theme.OwnTVTheme
 
 /** Modal scrim wrapper for the profile dialogs. Phase 7 — Popup(focusable=true) creates
  *  a hard focus boundary on Android TV so D-pad stays inside the dialog. */
 @Composable
-internal fun ProfileScrim(onDismiss: () -> Unit, content: @Composable () -> Unit) {
+internal fun ProfileScrim(
+    onDismiss: () -> Unit,
+    width: androidx.compose.ui.unit.Dp = 480.dp,
+    padding: androidx.compose.ui.unit.Dp = 28.dp,
+    content: @Composable () -> Unit,
+) {
     BackHandler { onDismiss() }
     Popup(
         onDismissRequest = onDismiss,
@@ -65,22 +71,29 @@ internal fun ProfileScrim(onDismiss: () -> Unit, content: @Composable () -> Unit
             // Scrollable so small/low-res screens can still reach the lower controls (Kids
             // toggle / PIN / Create were clipped and unreachable on a cut-off screen).
             Column(
-                modifier = Modifier.dialogPanel(width = 480.dp, padding = 28.dp),
+                modifier = Modifier.dialogPanel(width = width, padding = padding),
             ) { content() }
         }
     }
 }
 
-/** Numeric PIN entry. Calls [onSubmit] with the entered digits. */
+/** Numeric PIN entry. Calls [onSubmit] with the entered digits. [compact] renders the small
+ *  popup-menu treatment (narrow panel, Caladea font) used by the Customize screen. */
 @Composable
-internal fun PinDialog(title: String, onSubmit: (String) -> Unit, onDismiss: () -> Unit) {
+internal fun PinDialog(title: String, onSubmit: (String) -> Unit, onDismiss: () -> Unit, compact: Boolean = false) {
+    val dialog: @Composable () -> Unit = { PinDialogBody(title, onSubmit, onDismiss, compact) }
+    if (compact) tv.own.owntv.ui.theme.PopupFontTheme(content = dialog) else dialog()
+}
+
+@Composable
+private fun PinDialogBody(title: String, onSubmit: (String) -> Unit, onDismiss: () -> Unit, compact: Boolean) {
     val colors = OwnTVTheme.colors
     var pin by remember { mutableStateOf("") }
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-    ProfileScrim(onDismiss) {
-        Text(title, style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
-        Spacer(Modifier.height(16.dp))
+    ProfileScrim(onDismiss, width = if (compact) 290.dp else 480.dp, padding = if (compact) 16.dp else 28.dp) {
+        Text(title, style = if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge, color = colors.onSurface)
+        Spacer(Modifier.height(if (compact) 10.dp else 16.dp))
         OwnTVTextField(
             value = pin,
             onValueChange = { if (it.length <= 6 && it.all(Char::isDigit)) pin = it },
@@ -113,12 +126,16 @@ internal fun PinDialog(title: String, onSubmit: (String) -> Unit, onDismiss: () 
  * Create / edit a profile: name, avatar, kids flag and an optional PIN. [initial] non-null = edit.
  * [onConfirm] receives (name, avatarId, isKids, pin): null = leave the PIN unchanged,
  * "" = remove the PIN lock, otherwise = set this PIN.
+ *
+ * [takenNames] are the OTHER profiles' names (lowercased) — profile names must be unique (they're the
+ * merge key for backup restore), so a collision blocks Create/Save with an inline error.
  */
 @Composable
 internal fun ProfileEditorDialog(
     initial: ProfileEntity?,
     onConfirm: (name: String, avatarId: Int, isKids: Boolean, pin: String?) -> Unit,
     onDismiss: () -> Unit,
+    takenNames: Set<String> = emptySet(),
 ) {
     val colors = OwnTVTheme.colors
     var name by remember { mutableStateOf(initial?.name ?: "") }
@@ -128,11 +145,19 @@ internal fun ProfileEditorDialog(
     var removePin by remember { mutableStateOf(false) }
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    val nameTaken = name.trim().isNotEmpty() && name.trim().lowercase() in takenNames
 
     ProfileScrim(onDismiss) {
         Text(if (initial == null) "New profile" else "Edit profile", style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
         Spacer(Modifier.height(16.dp))
         OwnTVTextField(name, { name = it }, label = "Name", placeholder = "e.g. Alex", modifier = Modifier.fillMaxWidth().focusRequester(focus))
+        if (nameTaken) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "This name is already taken — please choose another name.",
+                style = MaterialTheme.typography.bodyMedium, color = Color(0xFFEF4444),
+            )
+        }
         Spacer(Modifier.height(16.dp))
 
         Text("AVATAR", style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant)
@@ -146,6 +171,7 @@ internal fun ProfileEditorDialog(
                     shape = CircleShape,
                     selectedContainerColor = colors.primaryContainer,
                     contentAlignment = Alignment.Center,
+                    surface = GlassSurface.DIALOGS,
                 ) { _ ->
                     OwnTVAvatar(avatarId = id, modifier = Modifier.size(48.dp))
                 }
@@ -178,7 +204,7 @@ internal fun ProfileEditorDialog(
             OwnTVButton(
                 label = if (initial == null) "Create" else "Save",
                 onClick = { onConfirm(name, avatarId, isKids, if (removePin) "" else pin.takeIf { it.isNotBlank() }) },
-                enabled = name.isNotBlank() && (removePin || pin.isEmpty() || pin.length >= 4),
+                enabled = name.isNotBlank() && !nameTaken && (removePin || pin.isEmpty() || pin.length >= 4),
             )
         }
     }
@@ -192,6 +218,7 @@ private fun ToggleRow(label: String, desc: String, checked: Boolean, onToggle: (
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
         contentAlignment = Alignment.CenterStart,
+        surface = GlassSurface.DIALOGS,
     ) { _ ->
         Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {

@@ -15,7 +15,8 @@ val playerModule = module {
     // context, settings, connectivity, okHttpClient (ExoPlayer image-sub handoff), diagnostics, proxyHolder, vodEngineStore
     single { OwnTVPlayer(androidContext(), get(), get(), get(), get(), get(), get()) }
     // ExoPlayer engine for the fast Live preview pane (mpv stays the full/fullscreen player).
-    single { LivePreviewEngine(androidContext(), get(), get()) }
+    // context, okHttpClient, diagnostics, settings, connectivity (auto-resume when the network returns)
+    single { LivePreviewEngine(androidContext(), get(), get(), get(), get()) }
     // Muted ExoPlayer engine for the Home hero preview.
     single { HeroPreviewEngine(androidContext(), get()) }
     // Second, independent ExoPlayer for the picture-in-picture corner (true PiP — a different stream

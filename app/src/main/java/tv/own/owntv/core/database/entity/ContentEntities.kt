@@ -57,6 +57,7 @@ data class CategoryEntity(
         Index(value = ["categoryId", "name"]),
         Index(value = ["sourceId", "sortOrder", "name"]),
         Index(value = ["categoryId", "sortOrder", "name"]),
+        Index(value = ["sourceId", "number"]),
     ],
 )
 @Immutable
@@ -82,6 +83,20 @@ data class ChannelEntity(
     @ColumnInfo(defaultValue = "0") val contentHash: Int = 0,
 )
 
+/** Returns the stream URL to tune, swapping .ts to .m3u8 if preferHls & hlsSupported are active for Xtream. */
+fun ChannelEntity.playStreamUrl(source: SourceEntity?): String =
+    resolveStreamUrl(streamUrl, source)
+
+/** Swaps .ts to .m3u8 if preferHls is active for an Xtream source. */
+fun resolveStreamUrl(url: String, source: SourceEntity?): String {
+    if (source != null && source.type == tv.own.owntv.core.model.SourceType.XTREAM && source.preferHls) {
+        if (url.endsWith(".ts", ignoreCase = true)) {
+            return url.dropLast(3) + ".m3u8"
+        }
+    }
+    return url
+}
+
 @Entity(
     tableName = "movies",
     foreignKeys = [
@@ -104,6 +119,9 @@ data class ChannelEntity(
         // Rating sort (v11): "ORDER BY rating DESC, name" is index-served, not a full temp-B-tree sort.
         Index(value = ["sourceId", "rating", "name"]),
         Index(value = ["categoryId", "rating", "name"]),
+        // Date added sort (v21): same shape as the rating pair, for "ORDER BY addedAt DESC, sortOrder DESC".
+        Index(value = ["sourceId", "addedAt", "sortOrder"]),
+        Index(value = ["categoryId", "addedAt", "sortOrder"]),
     ],
 )
 @Immutable
@@ -146,6 +164,9 @@ data class MovieEntity(
         // Rating sort (v11): "ORDER BY rating DESC, name" is index-served, not a full temp-B-tree sort.
         Index(value = ["sourceId", "rating", "name"]),
         Index(value = ["categoryId", "rating", "name"]),
+        // Date added sort (v21): same shape as the rating pair, for "ORDER BY addedAt DESC, sortOrder DESC".
+        Index(value = ["sourceId", "addedAt", "sortOrder"]),
+        Index(value = ["categoryId", "addedAt", "sortOrder"]),
     ],
 )
 @Immutable
@@ -162,6 +183,15 @@ data class SeriesEntity(
     val remoteId: String? = null,
     val sortOrder: Int = 0,
     @ColumnInfo(defaultValue = "0") val contentHash: Int = 0,
+    val addedAt: Long? = null,
+    /**
+     * When this show's episode list was last fetched from the provider (epoch ms; 0 = never).
+     * Episodes are loaded lazily on open and used to be cached forever, so a show never gained the
+     * episodes the provider added after the first open (S8). This drives the freshness check in
+     * `SeriesRepository.loadEpisodes`. Deliberately *not* in [computeContentHash] — it is local
+     * bookkeeping, not provider content.
+     */
+    @ColumnInfo(defaultValue = "0") val episodesSyncedAt: Long = 0,
 )
 
 @Entity(
@@ -206,10 +236,16 @@ data class EpisodeEntity(
     val remoteId: String? = null,
 )
 
+/**
+ * What a resync needs to know about a row it already holds. [sortOrder] is deliberately *outside*
+ * `computeContentHash()`: folding it in would change every stored hash at once and turn the next
+ * resync of a large catalog into a full rewrite, so the syncer compares it separately (S1).
+ */
 data class ContentHashProjection(
     val remoteId: String,
     val id: Long,
     val contentHash: Int,
+    val sortOrder: Int,
 )
 
 fun ChannelEntity.computeContentHash(): Int = Objects.hash(
@@ -224,5 +260,5 @@ fun MovieEntity.computeContentHash(): Int = Objects.hash(
 
 fun SeriesEntity.computeContentHash(): Int = Objects.hash(
     sourceId, categoryId, name, posterUrl, backdropUrl,
-    year, rating, plot, remoteId,
+    year, rating, plot, remoteId, addedAt,
 )

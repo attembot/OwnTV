@@ -9,6 +9,147 @@
 > (e.g. `(community PR #40 by @codeVerine)`). Issue numbers that are part of a title (e.g. `(#57)`) are
 > fine; explanatory parentheticals are not. Descriptions belong in CHANGELOG.md, never here.
 
+## v4.1.5 — 2026-07-31
+
+### ✨ New features
+
+- **💬 Subtitle appearance — size, colour, position and background, each optional (#96)**
+- **📶 Prefer HLS for Live TV — per source, with format auto-detection** (community PR #97 by @codeVerine)
+- **🆕 Date added — sort Movies and Series by what arrived most recently** (community PR #94 by @cotol1985)
+- **↕️ Series sorting — season and episode order, set per show** (community PR #94 by @cotol1985)
+- **📺 Channel numbers — type a number on the remote to tune in Live TV**
+- **💾 A proper backup file — `.own`, with your wallpaper inside and real encryption**
+- **🗂️ Browsing & lists — decide what Live TV, Movies and Series come back to**
+- **🌍 Metadata language — descriptions and posters in your language**
+- **🎞️ Auto frame rate — match the TV's refresh rate to the video**
+- **🖼️ Guide channel logos — take logos from your XMLTV feed**
+- **↕️ Span move — reorder a whole block of categories at once**
+- **📺 Live TV full screen — redesigned top bar, and a History channel list**
+- **🗂️ Category browser in the player — switch Live TV category without leaving full screen** (community PR #95 by @cotol1985)
+- **📼 Catch-up from Live TV, and catch-up in the player of your choice**
+- **▶️ External player — Live TV support, and a default per section**
+- **🛡️ Database recovery screen — Try again or reset, instead of silent data loss**
+- **🔁 Resync now vs Resync and remove missing titles**
+- **⬇️ Downloads keep running in the background, with a notification**
+- **🚀 Faster cold start with a branded splash screen**
+- **⚡ Fast from the first launch after install, not after a few days**
+
+### 🐛 Fixes
+
+- **Switching category kept the previous category's scroll position**
+- **The + / − buttons became unreachable once a setting hit its maximum (#88)**
+- **Choosing ExoPlayer for a channel that had fallen back to mpv did not stick**
+- **Auto frame rate did nothing on Android 10 and older devices (Fire OS 7)**
+- **A schema problem could wipe your whole library**
+- **A half-finished sync could delete your catalog**
+- **A provider reorder rewrote the entire catalog**
+- **Manual ordering was lost after a re-sync**
+- **Interrupted restores and unreadable backups were silent**
+- **Live TV gave up after a single hiccup, and stopped retrying too early**
+- **Live TV did not resume by itself after a network outage**
+- **Raw MPEG-TS channels dropped the connection every 10–15 seconds**
+- **4K channels fell back to compatibility mode when tuning from one to the next**
+- **Audio-only content showed a false playback error**
+- **Compatibility mode and the engine choice did not stick on Stalker portals**
+- **Short clips were marked watched at position 0**
+- **New episodes never appeared in a series you had already opened**
+- **A truncated guide download was trusted for 24 hours**
+- **Channels added during a guide sync never got programmes**
+- **Paused downloads re-downloaded data they already had**
+- **A removed USB/SD card made a download continue into internal storage**
+- **Subtitle timing offset froze the interface**
+- **Stalker portals with a "virtual" MAC were rejected at setup**
+- **Picking a new background image did nothing until the app was restarted**
+- **The full-screen ◀ channel list showed the wrong channels**
+- **Live channels reported "no external player found" with VLC and MX installed**
+- **Switching engine during a catch-up recording jumped to the live programme**
+- **"Failed on both engines" on items that played fine on the next try**
+- **A live channel opened from the Guide did not appear in History**
+- **Live preview played sound on surround channels with preview audio off**
+- **The Preview audio setting did not apply to a preview already playing**
+- **Resolution badge under-reported wide-format streams (1920×800 read as 720p)**
+- **CH+ and D-pad Up went to the previous channel instead of the next in full screen (#84)**
+
+## v4.1.4 — 2026-07-24
+
+### ✨ New features
+
+- **🧊 Liquid Glass — frosted translucent interface over your own background photo (panels, dialogs, cards, rows, search bars & action buttons)**
+- **⭐ Favorite from the player — add to Favorites without leaving the stream (live, movies & series)**
+- **🗂️ Per-section sync scope — Now / Later / Off for Live, Movies & Series (#74)** (community PR #78)
+- **🎨 Accent color — full HSV picker (hue bar + saturation/brightness square) with live preview**
+- **🎧 Audio Mode — listen with the screen free**
+- **📤 Remote Backup & Restore — move a backup between TVs over Wi-Fi**
+- **📡 Live TV latency control (#72)**
+- **🪟 Configurable mini-player — size & screen position**
+- **🖼️ Live TV preview pane — info-only, genre dots & EPG coverage; no more accidental buttons**
+- **🔄 Sync completion pill — see sync results, queued notifications** (community PR #73 by @pt5pnzghm6-sys)
+- **⚡ Incremental M3U resync — faster, and favorites/history survive resyncs**
+
+### 🐛 Fixes
+
+- **Settings → About shows the updated Telegram group QR code**
+- **Editing a source shows only its own type (no more inactive Xtream/M3U/Stalker chips)**
+- **Custom accent hex codes now render exactly, not a nearby shade**
+- **Accent hex field no longer hidden behind the on-screen keyboard**
+- **Restored backups no longer hide all channels on first sync** (community PR #73 by @pt5pnzghm6-sys)
+- **Concurrent playlist syncs no longer truncate movies / skip series** (community PR #73 by @pt5pnzghm6-sys)
+- **Latency warning popup: focus returns to the Live latency row**
+- **Live preview off: audio no longer keeps playing after you leave a channel**
+- **4K live channels no longer lag/judder on mpv when a provider sends broken timestamps**
+- **Playlists & EPG Sources menus: focus stays inside the list on entry, edit, re-sync, delete**
+- **Settings dialogs: D-pad can no longer escape behind the scrim**
+- **Settings / Video Player lists no longer scroll-animate from the top when a dialog closes**
+- **OpenSubtitles / Network / Metadata settings: focus no longer escapes on entry or state changes**
+- **Profiles / Mini-player / Customize / CH+- paging / Weather: focus returns to the row that opened a dialog**
+- **Long-press menus in Movies / Series / Live / Guide trap D-pad focus**
+- **Downloads: focus moves to the next download when you delete one**
+- **Home & Customize category lists trap vertical D-pad focus**
+- **Category rail: abbreviation badges removed (#75)**
+- **OpenSubtitles sign-in & local-file buttons removed from the subtitle search overlay — sign in from Settings**
+- **Catch-up dialog: D-pad focus no longer escapes the popup; picks up Lora popup styling**
+- **Category rail highlight: sharper 8dp corners (Live / Series / Movies)**
+
+## v4.1.3 — 2026-07-19
+
+### ✨ New features
+
+- **💬 External subtitles — OpenSubtitles search & local subtitle files**
+- **👥 Profile-based backups — pick profiles to export (PIN-protected), restore now merges without wiping**
+- **🔐 OpenSubtitles logins now ride in encrypted backups (per profile)**
+- **🗂️ Categories grouped by provider + new-category Show/Hide control** (community PR #70 by @pt5pnzghm6-sys)
+- **📱 Add a playlist from your phone (Remote setup)** (core idea from @zarga03, PR #66)
+- **⏱️ EPG guide sync can Run in background during setup**
+- **🔍 Default UI zoom is now 90% for a better out-of-the-box fit**
+- **📺 Current programme under each channel in the Live TV list & in-player channel overlay**
+- **🎯 Smarter EPG matching — picker suggests related channels first, more robust auto-match**
+- **🎬 Better TMDB title cleaning for movie & series matching**
+- **🔄 EPG / Guide syncs now show the background status pill**
+- **📦 Smaller downloads — split arm + x86_64 APK builds**
+- **⬇️ In-app updater picks the APK matching your device**
+- **🔒 Customize PIN stored as a salted hash** (community PR #65 by @aravindtri)
+- **📊 Measured fps, bitrate & dropped-frame stats for ExoPlayer** (community PR #67 by @pt5pnzghm6-sys)
+- **📊 Bitrate in the player top-bar chips for all playback**
+- **📊 "Measured stream stats" toggle (Settings → Video Player → Diagnostics)**
+- **🔀 CH+ / CH− keys now page the category & item lists — incl. Settings → Customize (skip N, long-press for first/last)**
+- **🗂️ One-click full storage access that works on more TVs**
+- **🎨 Compact popup menus in a new serif font**
+
+### 🐛 Fixes
+
+- **Storage access grant no longer dead-ends on some Android 11/12 TVs**
+- **Storage picker focus can no longer escape the popup**
+- **Deleting an EPG source shows a "Deleting…" status and can't orphan guide data**
+- **EPG match re-syncs from the network when the cache has no data for the matched channel**
+- **Match EPG from Live TV now updates the preview pane immediately**
+- **Focus returns to the channel after the Match EPG dialog closes**
+- **Match EPG / review popups: buttons on the right, focus stays inside the popup**
+- **Customize screen now respects the selected playlist**
+- **Customize screen renamed to "Customize Categories & Items"**
+- **Hero preview URLs redacted in error logs**
+- **Live TV "Now" no longer shows a future programme on short-EPG gaps (#68)**
+- **CH+ / CH− long-press disabled on the "All" list; skip-dialog buttons aligned**
+
 ## v4.1.2 — 2026-07-14
 
 ### ✨ New features
