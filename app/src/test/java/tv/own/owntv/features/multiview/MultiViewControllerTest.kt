@@ -23,7 +23,9 @@ class MultiViewControllerTest {
         override val state: StateFlow<CornerState> = MutableStateFlow(CornerState.IDLE)
         override val meta: StateFlow<MediaMeta> = MutableStateFlow(MediaMeta())
         override var currentUrl: String? = null
-        var muted = true
+        // @JvmField: the generated setter would clash with the CornerEngine.setMuted override (same
+        // JVM signature) — exposing the raw field skips accessor generation entirely.
+        @JvmField var muted = true
         var released = false
         var stops = 0
         override fun play(url: String, meta: MediaMeta, muted: Boolean, userAgent: String?) { currentUrl = url; this.muted = muted }
