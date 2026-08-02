@@ -58,10 +58,7 @@ internal fun ProfileScrim(
     content: @Composable () -> Unit,
 ) {
     BackHandler { onDismiss() }
-    Popup(
-        onDismissRequest = onDismiss,
-        properties = PopupProperties(focusable = true),
-    ) {
+    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
         Box(
             modifier = Modifier
                 .fillMaxSize()

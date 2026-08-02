@@ -42,6 +42,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.koin.androidx.compose.koinViewModel
 import androidx.tv.material3.MaterialTheme
@@ -580,13 +582,19 @@ internal fun PickerDialog(
         options
     }
     val selIndex = shown.indexOfFirst { it.first == selected }.coerceAtLeast(0)
-    LaunchedEffect(Unit) { runCatching { (if (searchable) searchFr else fr).requestFocus() } }
+    LaunchedEffect(shown, selected, searchable) {
+        // Nested pickers attach in the same frame their opener loses focus. Wait until this popup's
+        // focus window exists, otherwise focus remains on the Add/Remove or Prefix/Suffix button.
+        kotlinx.coroutines.delay(80)
+        runCatching { (if (searchable) searchFr else fr).requestFocus() }
+    }
     BackHandler { onDismiss() }
-    tv.own.owntv.ui.theme.PopupFontTheme {
-    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)).trapAllFocusExit().focusGroup(), contentAlignment = Alignment.Center) {
-        Column(
-            modifier = Modifier.dialogPanel(width = 280.dp, corner = 16.dp, padding = 14.dp, scroll = false),
-        ) {
+    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
+        tv.own.owntv.ui.theme.PopupFontTheme {
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)).trapAllFocusExit().focusGroup(), contentAlignment = Alignment.Center) {
+                Column(
+                    modifier = Modifier.dialogPanel(width = 280.dp, corner = 16.dp, padding = 14.dp, scroll = false),
+                ) {
             Text(title, style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
             Spacer(Modifier.height(10.dp))
             if (searchable) {
@@ -624,8 +632,9 @@ internal fun PickerDialog(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 OwnTVButton("Close", onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY)
             }
+                }
+            }
         }
-    }
     }
 }
 

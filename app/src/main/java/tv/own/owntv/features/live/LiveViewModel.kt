@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
@@ -40,12 +41,15 @@ import androidx.paging.filter
 import androidx.paging.map
 import tv.own.owntv.core.customize.CustomizationStore
 import tv.own.owntv.core.customize.CustomizeKeys
+import tv.own.owntv.features.customize.MoveTarget
 import tv.own.owntv.core.epg.CatchupUrl
 import tv.own.owntv.core.customize.SectionCustomizations
 import tv.own.owntv.core.customize.applyCustomizations
+import tv.own.owntv.core.customize.applyCustomizationsWithCustoms
 import tv.own.owntv.core.database.dao.CategoryDao
 import tv.own.owntv.core.database.dao.ChannelDao
 import tv.own.owntv.core.database.dao.ContentOrderDao
+import tv.own.owntv.core.database.dao.CustomCategoryDao
 import tv.own.owntv.core.database.dao.FavoriteDao
 import tv.own.owntv.core.database.dao.HistoryDao
 import tv.own.owntv.core.database.dao.ProfileDao
@@ -77,6 +81,8 @@ sealed interface LiveKey {
     data object History : LiveKey
     data object All : LiveKey
     data class Folder(val id: Long) : LiveKey
+    /** A user-created combined category (issue #87); [id] is its "custom:<uuid>" customization key. */
+    data class Custom(val id: String) : LiveKey
 }
 
 // Persistence for the "remember last category" toggles. The same rail model backs Live TV, Movies and
@@ -86,6 +92,7 @@ fun LiveKey.serialize(): String = when (this) {
     LiveKey.History -> "HIST"
     LiveKey.All -> "ALL"
     is LiveKey.Folder -> "FOLDER:$id"
+    is LiveKey.Custom -> "CUSTOM:$id"
 }
 
 fun parseLiveKey(s: String): LiveKey? = when {
@@ -93,6 +100,7 @@ fun parseLiveKey(s: String): LiveKey? = when {
     s == "HIST" -> LiveKey.History
     s == "ALL" -> LiveKey.All
     s.startsWith("FOLDER:") -> s.removePrefix("FOLDER:").toLongOrNull()?.let { LiveKey.Folder(it) }
+    s.startsWith("CUSTOM:") -> LiveKey.Custom(s.removePrefix("CUSTOM:"))
     else -> null
 }
 
@@ -130,6 +138,7 @@ class LiveViewModel(
     val previewEngine: tv.own.owntv.player.LivePreviewEngine,
     private val forceMpvStore: tv.own.owntv.core.player.ForceMpvStore,
     private val contentOrderDao: ContentOrderDao,
+    private val customCategoryDao: CustomCategoryDao,
     private val streamUrlResolver: tv.own.owntv.core.stalker.StreamUrlResolver,
     private val epgRepository: tv.own.owntv.core.repository.EpgRepository,
     private val externalPlayerLauncher: tv.own.owntv.core.player.ExternalPlayerLauncher,
@@ -252,6 +261,60 @@ class LiveViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, SectionCustomizations())
 
+    /** The user's custom combined categories with live member counts — the "Move to…" dialog's list. */
+    val moveTargets: StateFlow<List<MoveTarget>> = combine(ctx, custom) { c, cust -> c to cust }
+        .flatMapLatest { (c, cust) ->
+            if (c.profileId < 0 || cust.customCategories.isEmpty()) flowOf(emptyList())
+            else customCategoryDao.observeCountsByContexts(
+                c.profileId,
+                MediaType.LIVE,
+                cust.customCategories.map { it.id },
+                c.sourceIds.ifEmpty { listOf(-1L) },
+            ).map { counts ->
+                cust.customCategories.map { cc ->
+                    MoveTarget(
+                        id = cc.id,
+                        displayName = cust.categoryNames[cc.id] ?: cc.name,
+                        count = counts.firstOrNull { it.contextKey == cc.id }?.count ?: 0,
+                    )
+                }
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** The stable key of a provider folder ([null] when the folder vanished) — the Move dialog's origin. */
+    fun folderKey(id: Long): String? = folderContextKeys.value[id]
+
+    /** Creates a custom category (issue #87) — the Move dialog's "＋ New category…" flow. */
+    fun createCustomCategory(name: String) {
+        viewModelScope.launch {
+            val pid = currentProfileId() ?: return@launch
+            customize.createCustomCategory(pid, MediaType.LIVE, name)
+        }
+    }
+
+    /**
+     * Moves (or copies, [keepInOrigin]) one channel into a custom category (issue #87). The item is
+     * appended at the category's tail (maxPosition + 1). Without [keepInOrigin] the item leaves its
+     * origin: a favorite row is deleted, a custom-category membership row is deleted, and a provider
+     * folder is marked in movedFromOrigin — the pager chain then drops it from that folder while
+     * keeping it in All / search / recent.
+     */
+    fun moveToCategory(itemKey: String, itemId: Long, originKey: String, targetId: String, keepInOrigin: Boolean) {
+        if (targetId == originKey) return
+        viewModelScope.launch {
+            val pid = currentProfileId() ?: return@launch
+            customCategoryDao.appendItem(pid, MediaType.LIVE, targetId, itemId)
+            if (!keepInOrigin) {
+                when {
+                    originKey == ContentOrderEntity.FAV_CONTEXT -> favoriteDao.remove(pid, MediaType.LIVE, itemId)
+                    CustomizeKeys.isCustom(originKey) -> customCategoryDao.deleteItem(pid, MediaType.LIVE, originKey, itemId)
+                    else -> customize.setItemMovedFromOrigin(pid, MediaType.LIVE, itemKey, originKey, moved = true)
+                }
+            }
+        }
+    }
+
     /**
      * Category DB ids of the profile's hidden categories. Hiding a category used to only drop its rail
      * folder — its channels still showed in "All Channels", search and recently-watched (so hiding the
@@ -280,10 +343,15 @@ class LiveViewModel(
         .flatMapLatest { c ->
             if (c.profileId < 0) flowOf(defaultRail)
             else combine(categoryDao.observe(c.sourceIds, MediaType.LIVE), custom, sortMode) { cats, cust, sort ->
-                // A–Z also sorts the category folders; manually moved categories stay pinned first.
-                val folders = cats.applyCustomizations(cust, alphaRest = sort == SettingsRepository.SortMode.ALPHA)
-                defaultRail + folders.map { (cat, name) ->
-                    LiveRailItem(LiveKey.Folder(cat.id), name)
+                // A–Z also sorts the category folders (custom categories included); manually moved
+                // categories stay pinned first. Custom categories ride the SAME customization keys,
+                // so renames/hides/reorders apply to them with no extra code (#87).
+                val folders = cats.applyCustomizationsWithCustoms(cust, cust.customCategories, alphaRest = sort == SettingsRepository.SortMode.ALPHA)
+                defaultRail + folders.map { e ->
+                    LiveRailItem(
+                        key = e.categoryId?.let { LiveKey.Folder(it) } ?: LiveKey.Custom(e.customId!!),
+                        title = e.displayName,
+                    )
                 }
             }
         }
@@ -308,9 +376,17 @@ class LiveViewModel(
             }.flow.map { paging ->
                 val cust = cs.cust
                 val hiddenCats = cs.hiddenCats
-                if (cust.hiddenItems.isEmpty() && cust.itemNames.isEmpty() && hiddenCats.isEmpty()) paging
+                val movedFrom = cust.movedFromOrigin
+                if (cust.hiddenItems.isEmpty() && cust.itemNames.isEmpty() && hiddenCats.isEmpty() && movedFrom.isEmpty()) paging
                 else paging
-                    .filter { ch -> isChannelVisible(ch, cust, hiddenCats) }
+                    .filter { ch ->
+                        CustomizeKeys.channel(ch) !in cust.hiddenItems &&
+                            (key is LiveKey.Custom || ch.categoryId == null || ch.categoryId !in hiddenCats) &&
+                            // Moved-out items leave ONLY their origin folder (they stay in All/search).
+                            (movedFrom[CustomizeKeys.channel(ch)]?.let { origin ->
+                                key !is LiveKey.Folder || origin != folderContextKeys.value[key.id]
+                            } ?: true)
+                    }
                     .map { ch -> cust.itemNames[CustomizeKeys.channel(ch)]?.let { ch.copy(name = it) } ?: ch }
             }
         }
@@ -379,7 +455,8 @@ class LiveViewModel(
         if (q.isEmpty()) channelDao.allForSources(ids, limit) else channelDao.searchList(q, ids, limit)
     }
 
-    /** One-shot channels for a browse [key] (All / Favorites / History / a Folder) — backs the browse picker. */
+    /** One-shot channels for a browse [key] (All / Favorites / History / a Folder / a custom category)
+     *  — backs the browse picker. */
     suspend fun channelsFor(key: LiveKey, limit: Int = 300): List<ChannelEntity> = withContext(Dispatchers.IO) {
         val c = ctx.value
         if (c.sourceIds.isEmpty()) return@withContext emptyList()
@@ -388,6 +465,8 @@ class LiveViewModel(
             LiveKey.Favorites -> channelDao.listFavorites(c.profileId, limit)
             LiveKey.History -> channelDao.listHistory(c.profileId, limit)
             is LiveKey.Folder -> channelDao.listByCategory(key.id, limit)
+            // v4.1.6 added user-created combined categories; the corner/tile picker browses them too.
+            is LiveKey.Custom -> customCategoryDao.snapshotChannels(c.profileId, key.id, c.sourceIds, limit)
         }
     }
 
@@ -426,7 +505,9 @@ class LiveViewModel(
         viewModelScope.launch {
             if (!settings.rememberCategoryLive.first()) return@launch
             val saved = parseLiveKey(settings.lastLiveCategory.first()) ?: return@launch
-            if (saved is LiveKey.Folder) {
+            // A saved Folder/Custom is honoured only while it still exists in this profile's rail —
+            // a deleted custom category or a re-synced-away folder must not resurrect on restart.
+            if (saved is LiveKey.Folder || saved is LiveKey.Custom) {
                 val ok = kotlinx.coroutines.withTimeoutOrNull(5_000) {
                     railItems.first { list -> list.any { it.key == saved } }
                 } != null
@@ -566,19 +647,19 @@ class LiveViewModel(
     }
 
     // The ordered channel list the player zaps within (CH+/CH-, D-pad up/down) and shows in the
-    // left-hand overlay. It is ALWAYS the playing channel's own provider category — never the rail
-    // the user happened to launch from. Opening a channel from History or All Channels used to leave
-    // the player stuck browsing that rail; now tuning re-arms the list from `channel.categoryId`.
+    // left-hand overlay. This is playback CONTEXT: the Favorites/History/All/folder/custom rail that
+    // launched the channel, or a provider category explicitly selected in the in-player browser.
+    // `channel.categoryId` remains metadata and is used only when a caller has no browse context.
     private var zapList: List<ChannelEntity> = emptyList()
     private val _canZap = MutableStateFlow(false)
     val canZap: StateFlow<Boolean> = _canZap.asStateFlow()
     // The opened channel list, exposed so the in-player channel-list overlay can show & jump within it.
     private val _zapChannels = MutableStateFlow<List<ChannelEntity>>(emptyList())
     val zapChannels: StateFlow<List<ChannelEntity>> = _zapChannels.asStateFlow()
-    /** Heading for the left overlay — the playing channel's category name (or "All Channels"). */
+    /** Heading for the left overlay — the name of the active playback browse context. */
     private val _zapListTitle = MutableStateFlow("Channels")
     val zapListTitle: StateFlow<String> = _zapListTitle.asStateFlow()
-    /** The category [zapList] was built from; null means the uncategorized → All fallback. */
+    /** Provider category selected in the in-player browser, or null for a synthetic/caller-owned rail. */
     private var zapCategoryId: Long? = null
     private var zapArmed = false
 
@@ -611,6 +692,7 @@ class LiveViewModel(
             if (list.isEmpty()) return@launch
             zapCategoryId = categoryId
             zapArmed = true
+            zapList = list
             _zapChannels.value = list
             // CH+/- and the channel-list button read this; without it they keep acting on the
             // previously loaded category.
@@ -740,10 +822,18 @@ class LiveViewModel(
         return channelDao.recentlyWatched(pid, 1).first().firstOrNull()
     }
 
-    /** Open a channel fullscreen. [list] is the rail the user launched from and is deliberately IGNORED:
-     *  the player always zaps/browses within the channel's own provider category ([armZapList]). */
-    @Suppress("UNUSED_PARAMETER")
+    /** Open a channel fullscreen, preserving the browse context it was launched from. The channel's
+     *  provider category is metadata (used by [previewCategoryName]); it must not replace Favorites,
+     *  History, All, a custom category, or the provider folder the user is actually browsing. */
     fun watchFullscreen(channel: ChannelEntity, list: List<ChannelEntity>) {
+        zapListJob?.cancel()
+        zapList = list
+        _zapChannels.value = list
+        _canZap.value = list.size > 1
+        val key = _selected.value
+        zapCategoryId = (key as? LiveKey.Folder)?.id
+        zapArmed = true
+        _zapListTitle.value = railItems.value.firstOrNull { it.key == key }?.title ?: "Channels"
         ensurePlaying(channel)
     }
 
@@ -752,6 +842,7 @@ class LiveViewModel(
      *  programme dialog), not the zap-through-a-category flow the history debounce exists to filter,
      *  and a live channel opened from the Guide was not reliably landing in History. */
     fun watchFromGuide(channel: ChannelEntity) {
+        armZapList(channel)
         ensurePlaying(channel)
         recordLiveHistory(channel, immediate = true)
     }
@@ -1071,7 +1162,6 @@ class LiveViewModel(
         // History is still recorded, so the channel shows up in History/Recently watched either way.
         if (externalPlayerOn.value) { playExternal(channel); return }
         _previewChannel.value = channel
-        armZapList(channel) // zap/browse within THIS channel's category, whatever rail we came from
         timeshiftJob?.cancel(); tickJob?.cancel(); _timeshiftOffsetSec.value = null // normal live = not timeshifted
         _catchupActive.value = false // tuning live ends any archive playback the HUD was showing
         // Self-learning routing: a channel the user pinned to mpv skips ExoPlayer entirely (no artifacts/silent
@@ -1197,15 +1287,27 @@ class LiveViewModel(
     fun ensurePlayingById(channelId: Long) {
         viewModelScope.launch {
             val channel = channelDao.getById(channelId) ?: return@launch
+            armZapList(channel)
             ensurePlaying(channel)
         }
     }
 
-    /** [zapChannels] is the caller's rail and is deliberately IGNORED — the zap/overlay list always comes
-     *  from the channel's own category ([armZapList]), which also fixes the stale-list case in #55. */
-    @Suppress("UNUSED_PARAMETER")
+    /** Open a channel from a caller-owned rail (for example Home favorites), preserving that rail as the
+     *  playback browse/zap context instead of replacing it with provider-category metadata. */
     suspend fun ensurePlayingByIdAsync(channelId: Long, zapChannels: List<ChannelEntity> = emptyList()): Boolean {
         val channel = channelDao.getById(channelId) ?: return false
+        if (zapChannels.isEmpty()) {
+            // A single Home "continue watching" tile has no browse rail of its own.
+            armZapList(channel)
+        } else {
+            zapListJob?.cancel()
+            zapList = zapChannels
+            _zapChannels.value = zapChannels
+            _canZap.value = zapChannels.size > 1
+            zapCategoryId = null
+            zapArmed = true
+            _zapListTitle.value = "Channels"
+        }
         ensurePlaying(channel)
         return true
     }
@@ -1605,6 +1707,7 @@ class LiveViewModel(
                 LiveKey.All -> if (playlist) channelDao.pagingAllOriginal(ids) else channelDao.pagingAll(ids)
                 LiveKey.Favorites -> channelDao.pagingFavoritesManual(c.profileId, ContentOrderEntity.FAV_CONTEXT, ids)
                 LiveKey.History -> channelDao.pagingHistory(c.profileId, ids)
+                is LiveKey.Custom -> customCategoryDao.pagingChannels(c.profileId, key.id, ids)
                 is LiveKey.Folder -> {
                     val ctxKey = folderContextKeys.value[key.id] ?: ""
                     // C3 fast path: no manual order in this folder → the plain indexed query has
@@ -1618,6 +1721,7 @@ class LiveViewModel(
                 LiveKey.All -> channelDao.searchAll(query, ids)
                 LiveKey.Favorites -> channelDao.searchFavorites(query, c.profileId, ids)
                 LiveKey.History -> channelDao.searchHistory(query, c.profileId, ids)
+                is LiveKey.Custom -> customCategoryDao.searchChannels(query, c.profileId, key.id, ids)
                 is LiveKey.Folder -> channelDao.searchInCategory(query, key.id)
             }
         }
@@ -1628,11 +1732,13 @@ class LiveViewModel(
             val pid = currentProfileId() ?: return@launch
             val contextKey = when (key) {
                 is LiveKey.Folder -> folderContextKeys.value[key.id] ?: return@launch
+                is LiveKey.Custom -> key.id
                 LiveKey.Favorites -> ContentOrderEntity.FAV_CONTEXT
                 else -> return@launch
             }
             val items = when (key) {
                 is LiveKey.Folder -> channelDao.snapshotByCategoryManual(key.id, pid, contextKey, 5000)
+                is LiveKey.Custom -> customCategoryDao.snapshotChannels(pid, key.id, ctx.value.sourceIds.ifEmpty { listOf(-1L) }, 5000)
                 LiveKey.Favorites -> channelDao.snapshotFavoritesManual(pid, contextKey, ctx.value.sourceIds.ifEmpty { listOf(-1L) }, 5000)
                 LiveKey.History, LiveKey.All -> return@launch
             }
@@ -1692,6 +1798,7 @@ class LiveViewModel(
             LiveKey.All -> if (hiddenCats.isEmpty()) channelDao.countAll(ids) else channelDao.countAllExcluding(ids, hiddenCats.toList())
             LiveKey.Favorites -> channelDao.countFavorites(c.profileId, ids)
             LiveKey.History -> channelDao.countHistory(c.profileId, ids)
+            is LiveKey.Custom -> customCategoryDao.countMembers(c.profileId, MediaType.LIVE, key.id, ids)
             is LiveKey.Folder -> channelDao.countByCategory(key.id)
         }
     }

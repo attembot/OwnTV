@@ -186,7 +186,7 @@ internal fun ProgrammeDetailDialog(
             onDismiss = { showPlayerChooser = false },
         )
     }
-    Popup(onDismissRequest = onDismiss, properties = PopupProperties(focusable = true)) {
+    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
         BackHandler { onDismiss() }
       CompactPopupFont(compact) {
         Box(
@@ -264,7 +264,7 @@ private fun CatchupPlayerChooser(
     val colors = OwnTVTheme.colors
     val fr = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
-    Popup(onDismissRequest = onDismiss, properties = PopupProperties(focusable = true)) {
+    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
         BackHandler { onDismiss() }
         PopupFontTheme(fontScale = 0.7f) {
             Box(

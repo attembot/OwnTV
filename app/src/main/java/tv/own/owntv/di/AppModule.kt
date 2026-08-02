@@ -5,6 +5,7 @@ import org.koin.core.module.dsl.viewModel
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
 import tv.own.owntv.core.companion.CompanionController
+import tv.own.owntv.features.customize.CustomizeItemsViewModel
 import tv.own.owntv.features.customize.CustomizeViewModel
 import tv.own.owntv.features.downloads.DownloadsViewModel
 import tv.own.owntv.features.epg.EpgViewModel
@@ -87,6 +88,7 @@ val appModule = module {
     viewModelOf(::DownloadsViewModel)
     viewModelOf(::EpgViewModel)
     viewModelOf(::CustomizeViewModel)
+    viewModelOf(::CustomizeItemsViewModel)
     viewModelOf(::BackupViewModel)
     viewModelOf(::EpgSourcesViewModel)
 }

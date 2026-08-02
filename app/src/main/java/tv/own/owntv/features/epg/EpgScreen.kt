@@ -294,7 +294,7 @@ fun EpgScreen(
             }
             // Category filter (#8): narrow the guide to one group instead of all channels at once.
             if (guideCategories.isNotEmpty()) {
-                val catLabel = categoryFilter?.let { id -> guideCategories.firstOrNull { it.id == id }?.name } ?: "All"
+                val catLabel = categoryFilter?.let { key -> guideCategories.firstOrNull { it.key == key }?.name } ?: "All"
                 OwnTVButton("Category: $catLabel", onClick = { showCategoryPicker = true }, icon = OwnTVIcon.MENU, style = OwnTVButtonStyle.SECONDARY)
                 Spacer(Modifier.width(12.dp))
             }
@@ -393,7 +393,7 @@ fun EpgScreen(
                             onExitToChannels = { inCellMode = false },
                             onMoveCursor = { cursorTime = it },
                             onStripFocused = { focusedChannel = channel },
-                            categoryColor = guideCategories.firstOrNull { it.id == channel.categoryId }?.name?.let { ChannelGenre.dotFor(it) },
+                            categoryColor = guideCategories.firstOrNull { it.categoryId == channel.categoryId }?.name?.let { ChannelGenre.dotFor(it) },
                         )
                     }
                 }
@@ -469,9 +469,9 @@ fun EpgScreen(
     if (showCategoryPicker) {
         tv.own.owntv.features.settings.PickerDialog(
             title = "Guide category",
-            options = listOf("ALL" to "All categories") + guideCategories.map { it.id.toString() to it.name },
-            selected = categoryFilter?.toString() ?: "ALL",
-            onSelect = { vm.setCategoryFilter(it.toLongOrNull()); showCategoryPicker = false },
+            options = listOf("ALL" to "All categories") + guideCategories.map { it.key to it.name },
+            selected = categoryFilter ?: "ALL",
+            onSelect = { vm.setCategoryFilter(it.takeUnless { value -> value == "ALL" }); showCategoryPicker = false },
             onDismiss = { showCategoryPicker = false },
             searchable = true,
         )
@@ -499,7 +499,7 @@ private fun EpgMatchReviewDialog(
 
     // Popup(focusable=true) creates a hard focus boundary — clicking Accept/Skip removes an item
     // from the LazyColumn, but focus stays inside instead of escaping to the main nav bar.
-    Popup(onDismissRequest = onDone, properties = PopupProperties(focusable = true)) {
+    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDone) {
     tv.own.owntv.ui.theme.PopupFontTheme(fontScale = 0.75f) {
     Box(
         Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)),

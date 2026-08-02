@@ -1363,10 +1363,7 @@ private fun VolumeDialog(player: PlaybackEngine, onDismiss: () -> Unit) {
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { requestFocusRetrying(focus) }
     // Real dialog window for the same focus isolation as DialogScaffold (see there).
-    androidx.compose.ui.window.Dialog(
-        onDismissRequest = onDismiss,
-        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
-    ) {
+    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)), contentAlignment = Alignment.Center) {
             Column(Modifier.dialogPanel(padding = 28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("Volume", style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
@@ -1398,10 +1395,7 @@ private fun SubtitleTimingDialog(player: PlaybackEngine, onDismiss: () -> Unit) 
     val delay by player.subDelayMs.collectAsStateWithLifecycle()
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { requestFocusRetrying(focus) }
-    androidx.compose.ui.window.Dialog(
-        onDismissRequest = onDismiss,
-        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
-    ) {
+    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
         tv.own.owntv.ui.theme.PopupFontTheme {
             Box(Modifier.fillMaxSize().padding(bottom = 56.dp), contentAlignment = Alignment.BottomCenter) {
                 Column(Modifier.dialogPanel(width = 560.dp, padding = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1456,10 +1450,7 @@ private fun DialogScaffold(
     // HUD behind it (play button, catch-all focusable, stream-info chips) can compete for or steal
     // focus — which is what intermittently locked the subtitle/audio pickers out of focus on
     // codec-heavy (HDR/DTS) streams. Back is handled by the window itself via onDismissRequest.
-    androidx.compose.ui.window.Dialog(
-        onDismissRequest = onDismiss,
-        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
-    ) {
+    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
         // Compact glass popup matching the storage picker: smaller font + narrow box.
         tv.own.owntv.ui.theme.PopupFontTheme(fontScale = 0.72f) {
             Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)), contentAlignment = Alignment.Center) {

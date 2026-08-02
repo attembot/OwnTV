@@ -38,9 +38,8 @@ import tv.own.owntv.ui.components.roundedPanel
 import tv.own.owntv.ui.theme.OwnTVTheme
 
 /**
- * Network → Proxy (Approach 1): one app-wide HTTP proxy. Enabling it routes all app traffic (playlist,
- * Xtream API, EPG, images, downloads, updates, ExoPlayer) and mpv playback through the proxy. SOCKS and
- * per-playlist overrides are not part of this version (see extras/PROXY_SUPPORT_PLAN.md).
+ * Network → Proxy: one app-wide HTTP proxy. Enabling it routes all app traffic (playlist,
+ * Xtream API, EPG, images, downloads, updates, ExoPlayer) and mpv playback through the proxy.
  */
 @Composable
 fun NetworkSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
@@ -49,8 +48,6 @@ fun NetworkSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val config by vm.proxyConfig.collectAsStateWithLifecycle()
     val testState by vm.proxyTest.collectAsStateWithLifecycle()
 
-    // Seed the editable form from the stored config once it's loaded (and whenever it changes from
-    // outside, e.g. first composition). Local state lets the user edit freely, then Save persists.
     var seeded by remember { mutableStateOf(false) }
     var enabled by remember { mutableStateOf(false) }
     var host by remember { mutableStateOf("") }
@@ -82,9 +79,6 @@ fun NetworkSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         modifier = modifier
             .fillMaxSize()
             .roundedPanel()
-            // onEnter is the safety net for entry focus: if the LaunchedEffect(Unit) above fires before
-            // firstFocus is attached (race), or the user D-pads in from the sidebar later, route focus to
-            // the "Use proxy" row instead of letting it fall outside the panel to the sidebar.
             .focusProperties { onEnter = { runCatching { firstFocus.requestFocus() } } }
             .focusGroup()
             .verticalScroll(rememberScrollState())

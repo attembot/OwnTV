@@ -1,6 +1,8 @@
 package tv.own.owntv.ui.theme
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.unit.isUnspecified
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -34,6 +36,8 @@ val PopupFontFamily = FontFamily(
     loraItalic(FontWeight.Bold),
 )
 
+private val LocalPopupTypographyApplied = compositionLocalOf { false }
+
 /**
  * Wraps popup-menu content so every text style inside uses [PopupFontFamily]. [fontScale] shrinks
  * (or grows) all font sizes and line heights — 1f keeps the design sizes; the EPG match/review
@@ -41,32 +45,41 @@ val PopupFontFamily = FontFamily(
  */
 @Composable
 fun PopupFontTheme(fontScale: Float = 1f, content: @Composable () -> Unit) {
+    // Popup bodies historically wrapped themselves even when their platform host already supplied
+    // the popup theme. Keep nesting idempotent so the shared host's 30% scale is never multiplied by
+    // an older per-dialog 0.75/0.50 scale and made unreadably small.
+    if (LocalPopupTypographyApplied.current) {
+        content()
+        return
+    }
     val t = MaterialTheme.typography
     fun androidx.compose.ui.text.TextStyle.popup() = copy(
         fontFamily = PopupFontFamily,
         fontSize = if (fontScale == 1f) fontSize else fontSize * fontScale,
         lineHeight = if (fontScale == 1f || lineHeight.isUnspecified) lineHeight else lineHeight * fontScale,
     )
-    MaterialTheme(
-        colorScheme = MaterialTheme.colorScheme,
-        shapes = MaterialTheme.shapes,
-        typography = Typography(
-            displayLarge = t.displayLarge.popup(),
-            displayMedium = t.displayMedium.popup(),
-            displaySmall = t.displaySmall.popup(),
-            headlineLarge = t.headlineLarge.popup(),
-            headlineMedium = t.headlineMedium.popup(),
-            headlineSmall = t.headlineSmall.popup(),
-            titleLarge = t.titleLarge.popup(),
-            titleMedium = t.titleMedium.popup(),
-            titleSmall = t.titleSmall.popup(),
-            bodyLarge = t.bodyLarge.popup(),
-            bodyMedium = t.bodyMedium.popup(),
-            bodySmall = t.bodySmall.popup(),
-            labelLarge = t.labelLarge.popup(),
-            labelMedium = t.labelMedium.popup(),
-            labelSmall = t.labelSmall.popup(),
-        ),
-        content = content,
-    )
+    CompositionLocalProvider(LocalPopupTypographyApplied provides true) {
+        MaterialTheme(
+            colorScheme = MaterialTheme.colorScheme,
+            shapes = MaterialTheme.shapes,
+            typography = Typography(
+                displayLarge = t.displayLarge.popup(),
+                displayMedium = t.displayMedium.popup(),
+                displaySmall = t.displaySmall.popup(),
+                headlineLarge = t.headlineLarge.popup(),
+                headlineMedium = t.headlineMedium.popup(),
+                headlineSmall = t.headlineSmall.popup(),
+                titleLarge = t.titleLarge.popup(),
+                titleMedium = t.titleMedium.popup(),
+                titleSmall = t.titleSmall.popup(),
+                bodyLarge = t.bodyLarge.popup(),
+                bodyMedium = t.bodyMedium.popup(),
+                bodySmall = t.bodySmall.popup(),
+                labelLarge = t.labelLarge.popup(),
+                labelMedium = t.labelMedium.popup(),
+                labelSmall = t.labelSmall.popup(),
+            ),
+            content = content,
+        )
+    }
 }

@@ -73,9 +73,9 @@ fun StorageBrowser(
     // Hosted in a real window: D-pad focus physically cannot escape to the screen behind. An
     // inline overlay loses focus containment when rows are added/removed (the grant-access row
     // after returning from system settings) and Compose reassigns focus outside the trap.
-    Dialog(
+    OwnTVPopup(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = false),
+        dismissOnBackPress = false,
     ) {
         tv.own.owntv.ui.theme.PopupFontTheme(fontScale = 0.72f) {
             StorageBrowserContent(title, mode, onPick, onDismiss, fileExtensions)

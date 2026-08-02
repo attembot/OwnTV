@@ -55,8 +55,12 @@ import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import tv.own.owntv.core.customize.CustomizeKeys
+import tv.own.owntv.core.database.entity.ContentOrderEntity
 import tv.own.owntv.core.database.entity.DownloadEntity
 import tv.own.owntv.core.database.entity.MovieEntity
+import tv.own.owntv.features.customize.MoveToCategoryDialog
+import tv.own.owntv.ui.components.TextInputDialog
 import tv.own.owntv.core.model.DownloadStatus
 import tv.own.owntv.features.live.LiveKey
 import tv.own.owntv.features.settings.data.SettingsRepository
@@ -113,6 +117,12 @@ fun MoviesScreen(
     val metadataMode by vm.metadataMode.collectAsStateWithLifecycle()
     val moveState by vm.moveState.collectAsStateWithLifecycle()
     var contextMovie by remember { mutableStateOf<MovieEntity?>(null) }
+    // The movie the "Move to category…" flow is moving (issue #87), with the origin captured at
+    // menu-open time (the rail can't change under the modal, but capturing is still safer).
+    var moveItem by remember { mutableStateOf<MovieEntity?>(null) }
+    var moveOriginKey by remember { mutableStateOf<String?>(null) }
+    var moveOriginName by remember { mutableStateOf("this category") }
+    var creatingCategory by remember { mutableStateOf(false) }
     // Fullscreen TMDB details window (§11.1); null = closed.
     var detailsMovie by remember { mutableStateOf<MovieEntity?>(null) }
     // "Set TMDB name" dialog target (§11.2 U5b); null = closed.
@@ -205,13 +215,16 @@ fun MoviesScreen(
     //     list no longer contains it, so focus the NEAREST surviving neighbour by position (the item
     //     that slid into the removed slot, else the new last item, else first item). Only if the whole
     //     category is now empty do we let focus leave (there's nothing here to land on).
-    LaunchedEffect(contextMovie) {
+    LaunchedEffect(contextMovie, moveItem, creatingCategory) {
         if (contextMovie != null) return@LaunchedEffect
         // Opening the TMDB Details window or the Set TMDB name dialog closes the menu; don't yank focus
         // back to the grid — they need it (and trap it). The grid is refocused when they close (see below).
         if (detailsMovie != null) return@LaunchedEffect
         if (setTmdbNameMovie != null) return@LaunchedEffect
         if (trailerVideoKey != null) return@LaunchedEffect
+        // The context menu closes before MoveToCategoryDialog (and its nested name prompt) opens.
+        // Do not focus the grid behind either modal; re-run this effect when the whole flow closes.
+        if (moveItem != null || creatingCategory) return@LaunchedEffect
         val targetId = contextMovieId
         if (targetId == null) { contextMovieIndex = -1; return@LaunchedEffect }
         val items = movies.itemSnapshotList.items
@@ -474,7 +487,7 @@ fun MoviesScreen(
             title = m.name,
             isFavorite = favoriteIds.contains(m.id),
             watched = watched,
-            canMove = selectedKey is LiveKey.Folder || selectedKey == LiveKey.Favorites,
+            canMove = selectedKey is LiveKey.Folder || selectedKey is LiveKey.Custom || selectedKey == LiveKey.Favorites,
             isHistory = selectedKey == LiveKey.History,
             hasTmdbDetails = metadataMode.enrich && cacheForM != null,
             trailerKey = if (metadataMode.enrich) cacheForM?.trailerKey else null,
@@ -486,6 +499,17 @@ fun MoviesScreen(
                 contextMovie = null
             },
             onMove = { contextMovie = null; vm.enterMoveMode(m, selectedKey) },
+            onMoveToCategory = {
+                moveOriginKey = when (val k = selectedKey) {
+                    is LiveKey.Folder -> vm.folderKey(k.id)
+                    is LiveKey.Custom -> k.id
+                    LiveKey.Favorites -> ContentOrderEntity.FAV_CONTEXT
+                    else -> null
+                }
+                moveOriginName = railItems.firstOrNull { it.key == selectedKey }?.title ?: "this category"
+                moveItem = m
+                contextMovie = null
+            },
             onHide = { vm.hideMovie(m); contextMovie = null },
             onRemoveFromHistory = { vm.removeFromHistory(m.id); contextMovie = null },
             onDownload = {
@@ -506,6 +530,35 @@ fun MoviesScreen(
             onDeleteSubtitles = if (contextMovieSubs.isNotEmpty()) ({ showDeleteSubs = true }) else null,
             onDismiss = { contextMovie = null },
         )
+    }
+
+    // Move to… a combined category (issue #87), incl. the "＋ New category…" name prompt.
+    val moveTargets by vm.moveTargets.collectAsStateWithLifecycle()
+    if (creatingCategory) {
+        TextInputDialog(
+            title = "New category",
+            hint = "A combined category for this profile — move channels, movies or series into it.",
+            confirmLabel = "Create",
+            allowBlank = false,
+            onConfirm = { vm.createCustomCategory(it); creatingCategory = false },
+            onDismiss = { creatingCategory = false },
+        )
+    } else {
+        moveItem?.let { m ->
+            val originKey = moveOriginKey
+            if (originKey != null) {
+                MoveToCategoryDialog(
+                    moveTargets = moveTargets.filterNot { it.id == originKey },
+                    originName = moveOriginName,
+                    onNewCategory = { creatingCategory = true },
+                    onMove = { targetId, keepInOrigin ->
+                        vm.moveToCategory(CustomizeKeys.movie(m), m.id, originKey, targetId, keepInOrigin)
+                        moveItem = null
+                    },
+                    onDismiss = { moveItem = null },
+                )
+            }
+        }
     }
 
     // Per-item "Delete subtitles" popup (§11) — individual deletion; closes when none remain.
@@ -618,6 +671,8 @@ private fun MovieContextMenu(
     onToggleFavorite: () -> Unit,
     onToggleWatched: () -> Unit,
     onMove: () -> Unit,
+    // "Move to category…" (issue #87): send this movie into a user's combined category.
+    onMoveToCategory: () -> Unit,
     onHide: () -> Unit,
     onRemoveFromHistory: () -> Unit,
     onDownload: () -> Unit,
@@ -656,6 +711,7 @@ private fun MovieContextMenu(
                 modifier = Modifier.fillMaxWidth(),
             )
             if (canMove) OwnTVButton("Move", onClick = onMove, style = OwnTVButtonStyle.SECONDARY, modifier = Modifier.fillMaxWidth())
+            if (canMove) OwnTVButton("Move to category…", onClick = onMoveToCategory, style = OwnTVButtonStyle.SECONDARY, modifier = Modifier.fillMaxWidth())
             if (isHistory) OwnTVButton("Remove from History", onClick = onRemoveFromHistory, style = OwnTVButtonStyle.SECONDARY, modifier = Modifier.fillMaxWidth())
             OwnTVButton("Hide", onClick = onHide, style = OwnTVButtonStyle.SECONDARY, modifier = Modifier.fillMaxWidth())
             OwnTVButton("Download", onClick = onDownload, style = OwnTVButtonStyle.SECONDARY, icon = OwnTVIcon.DOWNLOADS, modifier = Modifier.fillMaxWidth())

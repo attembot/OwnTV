@@ -11,6 +11,7 @@ import androidx.paging.PagingData
 import androidx.paging.PagingSource
 import androidx.paging.cachedIn
 import androidx.paging.filter
+import androidx.paging.map
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
@@ -28,6 +29,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -35,9 +37,11 @@ import kotlinx.coroutines.launch
 import tv.own.owntv.core.customize.CustomizationStore
 import tv.own.owntv.core.customize.SectionCustomizations
 import tv.own.owntv.core.customize.applyCustomizations
+import tv.own.owntv.core.customize.applyCustomizationsWithCustoms
 import tv.own.owntv.core.customize.CustomizeKeys
 import tv.own.owntv.core.database.dao.CategoryDao
 import tv.own.owntv.core.database.dao.ContentOrderDao
+import tv.own.owntv.core.database.dao.CustomCategoryDao
 import tv.own.owntv.core.database.dao.FavoriteDao
 import tv.own.owntv.core.database.dao.HistoryDao
 import tv.own.owntv.core.database.dao.ProgressDao
@@ -62,6 +66,7 @@ import tv.own.owntv.core.storage.StorageAccess
 import tv.own.owntv.features.live.LiveKey
 import tv.own.owntv.features.live.parseLiveKey
 import tv.own.owntv.features.live.serialize
+import tv.own.owntv.features.customize.MoveTarget
 import tv.own.owntv.features.live.LiveRailItem
 import tv.own.owntv.core.repository.activeProfileSources
 import tv.own.owntv.features.settings.data.SettingsRepository
@@ -85,6 +90,7 @@ class SeriesViewModel(
     private val downloadManager: DownloadManager,
     private val launcherIntegrationRepository: LauncherIntegrationRepository,
     private val contentOrderDao: ContentOrderDao,
+    private val customCategoryDao: CustomCategoryDao,
     private val seriesSortOrderDao: SeriesSortOrderDao,
     private val metadata: tv.own.owntv.core.metadata.MetadataRepository,
     private val externalPlayerLauncher: tv.own.owntv.core.player.ExternalPlayerLauncher,
@@ -129,6 +135,60 @@ class SeriesViewModel(
             else customize.observe(c.profileId, MediaType.SERIES)
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, SectionCustomizations())
+
+    /** The user's custom combined categories with live member counts — the "Move to…" dialog's list. */
+    val moveTargets: StateFlow<List<MoveTarget>> = combine(ctx, custom) { c, cust -> c to cust }
+        .flatMapLatest { (c, cust) ->
+            if (c.profileId < 0 || cust.customCategories.isEmpty()) flowOf(emptyList())
+            else customCategoryDao.observeCountsByContexts(
+                c.profileId,
+                MediaType.SERIES,
+                cust.customCategories.map { it.id },
+                c.sourceIds.ifEmpty { listOf(-1L) },
+            ).map { counts ->
+                cust.customCategories.map { cc ->
+                    MoveTarget(
+                        id = cc.id,
+                        displayName = cust.categoryNames[cc.id] ?: cc.name,
+                        count = counts.firstOrNull { it.contextKey == cc.id }?.count ?: 0,
+                    )
+                }
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** The stable key of a provider folder ([null] when the folder vanished) — the Move dialog's origin. */
+    fun folderKey(id: Long): String? = folderContextKeys.value[id]
+
+    /** Creates a custom category (issue #87) — the Move dialog's "＋ New category…" flow. */
+    fun createCustomCategory(name: String) {
+        viewModelScope.launch {
+            val pid = currentProfileId() ?: return@launch
+            customize.createCustomCategory(pid, MediaType.SERIES, name)
+        }
+    }
+
+    /**
+     * Moves (or copies, [keepInOrigin]) one series into a custom category (issue #87). The item is
+     * appended at the category's tail (maxPosition + 1). Without [keepInOrigin] the item leaves its
+     * origin: a favorite row is deleted, a custom-category membership row is deleted, and a provider
+     * folder is marked in movedFromOrigin — the pager chain then drops it from that folder while
+     * keeping it in All / search / recent.
+     */
+    fun moveToCategory(itemKey: String, itemId: Long, originKey: String, targetId: String, keepInOrigin: Boolean) {
+        if (targetId == originKey) return
+        viewModelScope.launch {
+            val pid = currentProfileId() ?: return@launch
+            customCategoryDao.appendItem(pid, MediaType.SERIES, targetId, itemId)
+            if (!keepInOrigin) {
+                when {
+                    originKey == ContentOrderEntity.FAV_CONTEXT -> favoriteDao.remove(pid, MediaType.SERIES, itemId)
+                    CustomizeKeys.isCustom(originKey) -> customCategoryDao.deleteItem(pid, MediaType.SERIES, originKey, itemId)
+                    else -> customize.setItemMovedFromOrigin(pid, MediaType.SERIES, itemKey, originKey, moved = true)
+                }
+            }
+        }
+    }
 
     /**
      * Category DB ids of this profile's hidden Series categories — so hiding a category hides its
@@ -334,10 +394,15 @@ class SeriesViewModel(
                 customize.observe(c.profileId, MediaType.SERIES),
                 sortMode,
             ) { cats, cust, sort ->
-                // A–Z also sorts the category folders; manually moved categories stay pinned first.
-                val folders = cats.applyCustomizations(cust, alphaRest = sort == SettingsRepository.SortMode.ALPHA)
-                defaultRail + folders.map { (cat, name) ->
-                    LiveRailItem(LiveKey.Folder(cat.id), name)
+                // A–Z also sorts the category folders (custom categories included); manually moved
+                // categories stay pinned first. Custom categories ride the SAME customization keys,
+                // so renames/hides/reorders apply to them with no extra code (#87).
+                val folders = cats.applyCustomizationsWithCustoms(cust, cust.customCategories, alphaRest = sort == SettingsRepository.SortMode.ALPHA)
+                defaultRail + folders.map { e ->
+                    LiveRailItem(
+                        key = e.categoryId?.let { LiveKey.Folder(it) } ?: LiveKey.Custom(e.customId!!),
+                        title = e.displayName,
+                    )
                 }
             }
         }
@@ -356,10 +421,19 @@ class SeriesViewModel(
             Pager(PagingConfig(pageSize = 60, prefetchDistance = 30, initialLoadSize = 90, maxSize = 300)) {
                 pagingSource(args.key, args.ctx, args.query, args.sort)
             }.flow.map { paging ->
-                if (cs.cust.hiddenItems.isEmpty() && cs.hiddenCats.isEmpty()) paging
+                val cust = cs.cust
+                val movedFrom = cust.movedFromOrigin
+                if (cust.hiddenItems.isEmpty() && cust.itemNames.isEmpty() && cs.hiddenCats.isEmpty() && movedFrom.isEmpty()) paging
                 else paging.filter { s ->
-                    CustomizeKeys.series(s) !in cs.cust.hiddenItems &&
-                        (s.categoryId == null || s.categoryId !in cs.hiddenCats)
+                    CustomizeKeys.series(s) !in cust.hiddenItems &&
+                        (args.key is LiveKey.Custom || s.categoryId == null || s.categoryId !in cs.hiddenCats) &&
+                        // Moved-out items leave ONLY their origin folder (they stay in All/search).
+                        (movedFrom[CustomizeKeys.series(s)]?.let { origin ->
+                            args.key !is LiveKey.Folder || origin != folderContextKeys.value[args.key.id]
+                        } ?: true)
+                }.map { s ->
+                    // Bulk-renamed titles (Customize items screen) show here like Live TV does.
+                    cust.itemNames[CustomizeKeys.series(s)]?.let { s.copy(name = it) } ?: s
                 }
             }
         }
@@ -811,11 +885,13 @@ class SeriesViewModel(
             val pid = currentProfileId() ?: return@launch
             val contextKey = when (key) {
                 is LiveKey.Folder -> folderContextKeys.value[key.id] ?: return@launch
+                is LiveKey.Custom -> key.id
                 LiveKey.Favorites -> ContentOrderEntity.FAV_CONTEXT
                 else -> return@launch
             }
             val items = when (key) {
                 is LiveKey.Folder -> seriesDao.snapshotByCategoryManual(key.id, pid, contextKey, 5000)
+                is LiveKey.Custom -> customCategoryDao.snapshotSeries(pid, key.id, ctx.value.sourceIds.ifEmpty { listOf(-1L) }, 5000)
                 LiveKey.Favorites -> seriesDao.snapshotFavoritesManual(pid, contextKey, ctx.value.sourceIds.ifEmpty { listOf(-1L) }, 5000)
                 LiveKey.History, LiveKey.All -> return@launch
             }
@@ -893,6 +969,7 @@ class SeriesViewModel(
             }
             LiveKey.Favorites -> seriesDao.pagingFavoritesManual(c.profileId, ContentOrderEntity.FAV_CONTEXT, ids)
             LiveKey.History -> seriesDao.pagingHistory(c.profileId, ids)
+            is LiveKey.Custom -> customCategoryDao.pagingSeries(c.profileId, key.id, ids)
             is LiveKey.Folder -> {
                 val ctxKey = folderContextKeys.value[key.id] ?: ""
                 when {
@@ -910,6 +987,7 @@ class SeriesViewModel(
                 else seriesDao.searchAll(query, ids)
             LiveKey.Favorites -> seriesDao.searchFavorites(query, c.profileId, ids)
             LiveKey.History -> seriesDao.searchHistory(query, c.profileId, ids)
+            is LiveKey.Custom -> customCategoryDao.searchSeries(query, c.profileId, key.id, ids)
             is LiveKey.Folder ->
                 if (dateAdded) seriesDao.searchInCategoryDateAdded(query, key.id)
                 else seriesDao.searchInCategory(query, key.id)
@@ -924,6 +1002,7 @@ class SeriesViewModel(
                 else seriesDao.countAllExcluding(ids, hiddenCats.toList())
             LiveKey.Favorites -> seriesDao.countFavorites(c.profileId, ids)
             LiveKey.History -> seriesDao.countHistory(c.profileId, ids)
+            is LiveKey.Custom -> customCategoryDao.countMembers(c.profileId, MediaType.SERIES, key.id, ids)
             is LiveKey.Folder -> seriesDao.countByCategory(key.id)
         }
     }
@@ -942,7 +1021,9 @@ class SeriesViewModel(
         viewModelScope.launch {
             if (!settings.rememberCategorySeries.first()) return@launch
             val saved = parseLiveKey(settings.lastSeriesCategory.first()) ?: return@launch
-            if (saved is LiveKey.Folder) {
+            // A saved Folder/Custom is honoured only while it still exists in this profile's rail —
+            // a deleted custom category or a re-synced-away folder must not resurrect on restart.
+            if (saved is LiveKey.Folder || saved is LiveKey.Custom) {
                 val ok = kotlinx.coroutines.withTimeoutOrNull(5_000) {
                     railItems.first { list -> list.any { it.key == saved } }
                 } != null

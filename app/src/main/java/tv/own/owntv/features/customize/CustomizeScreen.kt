@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -48,8 +49,8 @@ import tv.own.owntv.core.model.MediaType
 import tv.own.owntv.core.util.Pin
 import tv.own.owntv.features.profiles.PinDialog
 import tv.own.owntv.features.settings.PickerDialog
-import tv.own.owntv.features.settings.Row2
 import tv.own.owntv.features.settings.SettingsViewModel
+import tv.own.owntv.features.settings.data.SettingsRepository
 import tv.own.owntv.ui.components.chNavPaging
 import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.jumpLazyListTo
@@ -78,16 +79,23 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val rows by vm.rows.collectAsStateWithLifecycle()
     val hiddenChannels by vm.hiddenChannels.collectAsStateWithLifecycle()
     val hideNewCategories by vm.hideNewCategories.collectAsStateWithLifecycle()
+    val currentSort by vm.currentSort.collectAsStateWithLifecycle()
     val rangeAnchorKey by vm.rangeAnchorKey.collectAsStateWithLifecycle()
     val rangeMode by vm.rangeMode.collectAsStateWithLifecycle()
     val rangeEndKey by vm.rangeEndKey.collectAsStateWithLifecycle()
     val rangeSelectedKeys by vm.rangeSelectedKeys.collectAsStateWithLifecycle()
     val pinLock by vm.pinLock.collectAsStateWithLifecycle()
+    val selectedCategory by vm.selectedCategory.collectAsStateWithLifecycle()
     val colors = OwnTVTheme.colors
     var renaming by remember { mutableStateOf<CustomizeCatRow?>(null) }
     var showNewCatPicker by remember { mutableStateOf(false) }
+    var showSortPicker by remember { mutableStateOf(false) }
     // The category whose Hide button was clicked to close a range — opens the Show/Hide/Cancel prompt.
     var rangeEnd by remember { mutableStateOf<CustomizeCatRow?>(null) }
+    // ＋ New category (issue #87): name prompt, then the empty combined category appears in the list.
+    var creatingCategory by remember { mutableStateOf(false) }
+    // Custom category pending deletion — confirmed in a scrim before anything is removed (plan §3.5).
+    var deletingCategory by remember { mutableStateOf<CustomizeCatRow?>(null) }
     // PIN gate: asked on every entry (state is per-composition, so leaving the screen re-locks it).
     var unlocked by remember { mutableStateOf(false) }
     var pinError by remember { mutableStateOf(false) }
@@ -97,7 +105,12 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     var confirmPinStage by remember { mutableStateOf(false) }
     var pinMismatch by remember { mutableStateOf(false) }
     val firstFocus = remember { FocusRequester() }
-    val newCatRowFocus = remember { FocusRequester() } // "New category behavior" row — restore target after its picker
+    val sortFocus = remember { FocusRequester() }
+    val newCategoriesFocus = remember { FocusRequester() }
+    val newCatPillFocus = remember { FocusRequester() } // "＋ New category" pill — restore target after its name prompt
+    val pinFocus = remember { FocusRequester() }
+    val removePinFocus = remember { FocusRequester() }
+    var itemsReturnKey by remember { mutableStateOf<String?>(null) }
     // Opener row for whichever dialog (new-category picker, rename) is open — restored on close so
     // focus doesn't always jump back to the Live TV section chip.
     var dialogReturn by remember { mutableStateOf<FocusRequester?>(null) }
@@ -153,20 +166,44 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     }
 
     LaunchedEffect(Unit) { kotlinx.coroutines.delay(60); runCatching { firstFocus.requestFocus() } }
-    // Restore focus to the row that opened a dialog (new-category picker / rename) when it closes —
-    // previously closing either always landed on the Live TV section chip (firstFocus).
-    LaunchedEffect(showNewCatPicker, renaming) {
-        if (showNewCatPicker || renaming != null) return@LaunchedEffect
+    // Restore focus to the row that opened a dialog (new-category picker / rename / new-category
+    // prompt / delete confirm) when it closes — previously closing either always landed on the Live
+    // TV section chip (firstFocus).
+    LaunchedEffect(showNewCatPicker, showSortPicker, renaming, creatingCategory, deletingCategory, rangeEnd, editingPin) {
+        if (showNewCatPicker || showSortPicker || renaming != null || creatingCategory ||
+            deletingCategory != null || rangeEnd != null || editingPin != null
+        ) return@LaunchedEffect
         dialogReturn?.let { opener ->
             kotlinx.coroutines.delay(60)
             runCatching { opener.requestFocus() }
         }
         dialogReturn = null
     }
+    // The category list is disposed while its item screen is open. Back recreates the row, so
+    // explicitly return to the same category name instead of letting focus escape to Settings.
+    LaunchedEffect(selectedCategory, rows) {
+        if (selectedCategory == null) {
+            val key = itemsReturnKey ?: return@LaunchedEffect
+            val index = rows.indexOfFirst { it.key == key }
+            if (index >= 0) {
+                listState.scrollToItem(headerOffset + index)
+                kotlinx.coroutines.delay(80)
+                runCatching { rowFocusers.getOrNull(index)?.requestFocus() }
+            } else {
+                runCatching { firstFocus.requestFocus() }
+            }
+            itemsReturnKey = null
+        }
+    }
 
     // While a span selection is in progress, Back cancels the selection instead of leaving the screen.
-    BackHandler { if (rangeAnchorKey != null) vm.cancelRange() else onBack() }
+    BackHandler { if (rangeAnchorKey != null) vm.cancelRange() else if (selectedCategory != null) vm.closeItems() else onBack() }
 
+    // Items screen — shown when the user presses OK on a category name. The items screen covers the
+    // full panel including the dialogs, so when it's up, render nothing else.
+    if (selectedCategory != null) {
+        CustomizeItemsScreen(onBack = { vm.closeItems() })
+    } else {
     // Action pills on this panel frost with CARDS (the surface the panel rows use), not the DIALOGS
     // default. Covers the chip/move/unhide buttons; trailing Popups don't inherit this anyway.
     CompositionLocalProvider(LocalActionSurface provides GlassSurface.CARDS) {
@@ -180,35 +217,11 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             .focusGroup()
             .padding(horizontal = 40.dp, vertical = 28.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "Customize Categories & Items",
-                style = MaterialTheme.typography.headlineLarge,
-                color = colors.onSurface,
-                modifier = Modifier.weight(1f),
-            )
-            // Optional PIN lock on this screen, controlled from here. Per-profile and NOT exported in
-            // backups. Only reachable once unlocked — to be here with a PIN set the user already
-            // entered it, so changing or removing it needs no further verification.
-            if (pinLock.pin == null) {
-                OwnTVButton(
-                    "🔒 Set PIN",
-                    onClick = { firstPin = ""; confirmPinStage = false; pinMismatch = false; editingPin = PinEdit.SET },
-                )
-            } else {
-                OwnTVButton(
-                    "🔒 Change PIN",
-                    onClick = { firstPin = ""; confirmPinStage = false; pinMismatch = false; editingPin = PinEdit.CHANGE },
-                    style = OwnTVButtonStyle.SECONDARY,
-                )
-                Spacer(Modifier.width(10.dp))
-                OwnTVButton(
-                    "Remove lock",
-                    onClick = { editingPin = PinEdit.REMOVE },
-                    style = OwnTVButtonStyle.SECONDARY,
-                )
-            }
-        }
+        Text(
+            "Customize Categories & Items",
+            style = MaterialTheme.typography.headlineLarge,
+            color = colors.onSurface,
+        )
         Spacer(Modifier.height(4.dp))
         Text(
             "Hide & unhide channels, movies and series, and rename or reorder categories for this " +
@@ -218,29 +231,67 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         )
         Spacer(Modifier.height(16.dp))
 
-        // Same preference for every section (Live/Movies/Series), so it lives above the section picker
-        // rather than being buried in each section's category list.
-        Row2(
-            icon = OwnTVIcon.PLAYLIST,
-            title = "New category behavior",
-            desc = if (hideNewCategories) {
-                "Hide - new categories added on re-sync are hidden by default"
-            } else {
-                "Show - new categories added on re-sync are shown by default"
-            },
-            chip = if (hideNewCategories) "Hide" else "Show",
-            primaryChip = !hideNewCategories,
-            chevron = true,
-            onClick = { dialogReturn = newCatRowFocus; showNewCatPicker = true },
-            modifier = Modifier.focusRequester(newCatRowFocus),
-        )
-        Spacer(Modifier.height(16.dp))
-
-        // Section picker
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        // One compact strip, matching the agreed mockup: section tabs left, actions right.
+        Row(verticalAlignment = Alignment.CenterVertically) {
             SectionChip("Live TV", section == MediaType.LIVE, Modifier.focusRequester(firstFocus)) { vm.selectSection(MediaType.LIVE) }
+            Spacer(Modifier.width(10.dp))
             SectionChip("Movies", section == MediaType.MOVIE) { vm.selectSection(MediaType.MOVIE) }
+            Spacer(Modifier.width(10.dp))
             SectionChip("Series", section == MediaType.SERIES) { vm.selectSection(MediaType.SERIES) }
+            Spacer(Modifier.weight(1f))
+            // Sort pill — reuses the same per-section sort mode that Browse uses.
+            OwnTVButton(
+                label = "Sort: ${if (currentSort == SettingsRepository.SortMode.PLAYLIST) "Provider" else if (currentSort == SettingsRepository.SortMode.ALPHA) "A–Z" else currentSort.name} ▾",
+                onClick = { dialogReturn = sortFocus; showSortPicker = true },
+                style = OwnTVButtonStyle.SECONDARY,
+                modifier = Modifier.focusRequester(sortFocus),
+            )
+            Spacer(Modifier.width(10.dp))
+            // New categories pill — same setting as the old Row2, now compact.
+            OwnTVButton(
+                label = "New categories: ${if (hideNewCategories) "Hide" else "Show"} ▾",
+                onClick = { dialogReturn = newCategoriesFocus; showNewCatPicker = true },
+                style = OwnTVButtonStyle.SECONDARY,
+                modifier = Modifier.focusRequester(newCategoriesFocus),
+            )
+            Spacer(Modifier.width(10.dp))
+            // ＋ New category (issue #87) — creates an empty combined category; items are moved into
+            // it from the browse context menus or this screen's items view.
+            OwnTVButton(
+                label = "＋ New category",
+                onClick = { dialogReturn = newCatPillFocus; creatingCategory = true },
+                style = OwnTVButtonStyle.SECONDARY,
+                modifier = Modifier.focusRequester(newCatPillFocus),
+            )
+            Spacer(Modifier.width(10.dp))
+            // Optional PIN lock, restyled as compact pills instead of the old full-width block.
+            if (pinLock.pin == null) {
+                OwnTVButton(
+                    "🔒 Set PIN",
+                    onClick = {
+                        dialogReturn = pinFocus
+                        firstPin = ""; confirmPinStage = false; pinMismatch = false; editingPin = PinEdit.SET
+                    },
+                    modifier = Modifier.focusRequester(pinFocus),
+                )
+            } else {
+                OwnTVButton(
+                    "🔒 Change PIN",
+                    onClick = {
+                        dialogReturn = pinFocus
+                        firstPin = ""; confirmPinStage = false; pinMismatch = false; editingPin = PinEdit.CHANGE
+                    },
+                    style = OwnTVButtonStyle.SECONDARY,
+                    modifier = Modifier.focusRequester(pinFocus),
+                )
+                Spacer(Modifier.width(10.dp))
+                OwnTVButton(
+                    "Remove lock",
+                    onClick = { dialogReturn = removePinFocus; editingPin = PinEdit.REMOVE },
+                    style = OwnTVButtonStyle.SECONDARY,
+                    modifier = Modifier.focusRequester(removePinFocus),
+                )
+            }
         }
         Spacer(Modifier.height(16.dp))
 
@@ -255,8 +306,10 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             ) {
                 Text(
                     when {
-                        rangeMode == CustomizeViewModel.RangeMode.HIDE ->
+                        rangeMode == SpanSelector.Mode.HIDE ->
                             "Span selection started. Press Show/Hide on the end item to select the span."
+                        rangeMode == SpanSelector.Mode.RENAME ->
+                            "Rename span started. Press Rename on the end item to select the span."
                         rangeEndKey == null ->
                             "Move span started. Press ⤒ ↑ ↓ ⤓ on the end item to move the whole span."
                         else ->
@@ -317,7 +370,10 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                     )
                     Spacer(Modifier.height(4.dp))
                 }
-                items(hiddenChannels.entries.sortedBy { it.value.lowercase() }, key = { "hid:${it.key}" }) { (key, label) ->
+                itemsIndexed(
+                    hiddenChannels.entries.sortedBy { it.value.lowercase() },
+                    key = { _, entry -> "hid:${entry.key}" },
+                ) { hiddenIndex, (key, label) ->
                     Row(
                         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(colors.surfaceContainerHigh).padding(horizontal = 16.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -331,7 +387,14 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                             modifier = Modifier.weight(1f),
                         )
                         Spacer(Modifier.width(10.dp))
-                        OwnTVButton("Unhide", onClick = { vm.unhideChannel(key) }, style = OwnTVButtonStyle.SECONDARY)
+                        OwnTVButton(
+                            "Unhide",
+                            onClick = { vm.unhideChannel(key) },
+                            style = OwnTVButtonStyle.SECONDARY,
+                            modifier = if (hiddenIndex == 0) {
+                                Modifier.focusProperties { up = firstFocus }
+                            } else Modifier,
+                        )
                     }
                 }
                 item {
@@ -352,23 +415,48 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 }
             }
             itemsIndexed(rows, key = { _, r -> r.key }) { index, row ->
-                val inMoveRange = rangeAnchorKey != null && rangeMode == CustomizeViewModel.RangeMode.MOVE
+                val inMoveRange = rangeAnchorKey != null && rangeMode == SpanSelector.Mode.MOVE
+                val inRenameRange = rangeAnchorKey != null && rangeMode == SpanSelector.Mode.RENAME
                 CategoryRow(
                     row = row,
-                    inRangeMode = rangeAnchorKey != null && rangeMode == CustomizeViewModel.RangeMode.HIDE,
+                    inRangeMode = rangeAnchorKey != null && rangeMode == SpanSelector.Mode.HIDE,
+                    inRenameRange = inRenameRange,
                     isInSpan = row.key in rangeSelectedKeys,
                     focusRequester = rowFocusers.getOrNull(index),
+                    upFocusRequester = firstFocus.takeIf { index == 0 && hiddenChannels.isEmpty() },
                     onRowFocused = { focusedCatIndex = index },
                     // While a move span is active every arrow acts on the whole block, not this row.
-                    onMoveUp = { if (inMoveRange) vm.moveRange(row, CustomizeViewModel.MoveKind.UP) else vm.move(row, up = true) },
-                    onMoveDown = { if (inMoveRange) vm.moveRange(row, CustomizeViewModel.MoveKind.DOWN) else vm.move(row, up = false) },
-                    onMoveTop = { if (inMoveRange) vm.moveRange(row, CustomizeViewModel.MoveKind.TOP) else vm.moveToEdge(row, top = true) },
-                    onMoveBottom = { if (inMoveRange) vm.moveRange(row, CustomizeViewModel.MoveKind.BOTTOM) else vm.moveToEdge(row, top = false) },
+                    onMoveUp = { if (inMoveRange) vm.moveRange(row, MoveKind.UP) else vm.move(row, up = true) },
+                    onMoveDown = { if (inMoveRange) vm.moveRange(row, MoveKind.DOWN) else vm.move(row, up = false) },
+                    onMoveTop = { if (inMoveRange) vm.moveRange(row, MoveKind.TOP) else vm.moveToEdge(row, top = true) },
+                    onMoveBottom = { if (inMoveRange) vm.moveRange(row, MoveKind.BOTTOM) else vm.moveToEdge(row, top = false) },
                     onMoveLongPress = { vm.beginMoveRange(row) },
-                    onRename = { renaming = row },
+                    // Long-press Rename anchors a rename span; while one is active, pressing Rename on
+                    // a second row opens the bulk rename flow over the whole span. On the anchor row
+                    // itself it cancels, mirroring the Show/Hide span behavior.
+                    // Restore focus to this row's first button when the rename dialog (or its delete
+                    // confirm) closes — same restore target as the span-rename path below.
+                    onRename = { dialogReturn = rowFocusers.getOrNull(index); renaming = row },
+                    onRenameLongPress = { vm.beginRenameRange(row) },
+                    onPickRenameEnd = {
+                        if (row.key == rangeAnchorKey) {
+                            vm.cancelRange()
+                        } else {
+                            dialogReturn = rowFocusers.getOrNull(index)
+                            // No active span (anchor vanished?) — fall back to the single rename.
+                            if (vm.finishRenameRange(row) == null) renaming = row
+                        }
+                    },
                     onToggleHidden = { vm.setCategoryHidden(row, !row.hidden) },
                     onHideLongPress = { vm.beginRange(row) },
-                    onPickRangeEnd = { if (row.key == rangeAnchorKey) vm.cancelRange() else rangeEnd = row },
+                    onPickRangeEnd = {
+                        if (row.key == rangeAnchorKey) vm.cancelRange()
+                        else {
+                            dialogReturn = rowFocusers.getOrNull(index)
+                            rangeEnd = row
+                        }
+                    },
+                    onOpenItems = { itemsReturnKey = row.key; vm.openItems(row) },
                 )
             }
         }
@@ -384,13 +472,59 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         )
     }
 
+    if (showSortPicker) {
+        PickerDialog(
+            title = "Sort categories",
+            options = listOf("PLAYLIST" to "Provider", "ALPHA" to "A–Z"),
+            selected = currentSort.name,
+            onSelect = { value ->
+                val mode = runCatching { SettingsRepository.SortMode.valueOf(value) }.getOrNull()
+                if (mode != null) vm.setSort(mode)
+                showSortPicker = false
+            },
+            onDismiss = { showSortPicker = false },
+        )
+    }
+
+    // Custom category pending deletion (opened from the rename dialog's Delete) — confirmed first,
+    // plan §3.5: "It must never touch content."
+    deletingCategory?.let { row ->
+        PinConfirmDialog(
+            title = "Delete “${row.displayName}”?",
+            message = "The combined category is removed. Its items stay in their original categories.",
+            confirmLabel = "Delete",
+            onConfirm = {
+                vm.deleteCustomCategory(row)
+                deletingCategory = null
+                renaming = null
+            },
+            onDismiss = { deletingCategory = null },
+        )
+    }
+
     renaming?.let { row ->
+        val isCustom = row.categoryId == null
         TextInputDialog(
-            title = "Rename category",
+            title = if (isCustom) "Rename or delete category" else "Rename category",
             initial = row.displayName,
             hint = "Only for this profile. Leave blank to restore “${row.originalName}”.",
             onConfirm = { vm.renameCategory(row, it.takeIf { t -> t.isNotBlank() }); renaming = null },
             onDismiss = { renaming = null },
+            // Custom combined categories can be deleted from their own rename dialog (plan §3.5);
+            // the confirm scrim above runs before anything is removed.
+            onDelete = if (isCustom) { { deletingCategory = row; renaming = null } } else null,
+        )
+    }
+
+    // ＋ New category (issue #87): name the empty combined category, then it appears in the list.
+    if (creatingCategory) {
+        TextInputDialog(
+            title = "New category",
+            hint = "A combined category for this profile — move channels, movies or series into it.",
+            confirmLabel = "Create",
+            allowBlank = false,
+            onConfirm = { vm.createCustomCategory(it); creatingCategory = false },
+            onDismiss = { creatingCategory = false },
         )
     }
 
@@ -403,6 +537,10 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             onDismiss = { vm.cancelRange(); rangeEnd = null },
         )
     }
+
+    // Bulk rename (issue #86): choice popup, rule builder, review, restore-confirm, refusal.
+    // Its popups restore D-pad focus to the row that opened the flow when the whole flow closes.
+    BulkRenameFlow(vm.bulk, returnFocus = dialogReturn)
 
     editingPin?.let { mode ->
         when (mode) {
@@ -449,6 +587,7 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         }
     }
     } // CompositionLocalProvider
+    } // else (selectedCategory == null)
 }
 
 /**
@@ -516,8 +655,10 @@ private fun SectionChip(label: String, selected: Boolean, modifier: Modifier = M
 private fun CategoryRow(
     row: CustomizeCatRow,
     inRangeMode: Boolean,
+    inRenameRange: Boolean,
     isInSpan: Boolean,
     focusRequester: FocusRequester?,
+    upFocusRequester: FocusRequester?,
     onRowFocused: () -> Unit,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
@@ -525,9 +666,12 @@ private fun CategoryRow(
     onMoveBottom: () -> Unit,
     onMoveLongPress: () -> Unit,
     onRename: () -> Unit,
+    onRenameLongPress: () -> Unit,
+    onPickRenameEnd: () -> Unit,
     onToggleHidden: () -> Unit,
     onHideLongPress: () -> Unit,
     onPickRangeEnd: () -> Unit,
+    onOpenItems: () -> Unit,
 ) {
     val colors = OwnTVTheme.colors
     Row(
@@ -539,37 +683,63 @@ private fun CategoryRow(
             .padding(horizontal = 16.dp, vertical = 8.dp)
             // CH+- paging: a focusGroup with a FocusRequester so a jump lands focus on this row's first
             // button; report up whenever any of the row's buttons gains focus (the paging anchor).
-            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .focusGroup()
             .onFocusChanged { if (it.hasFocus) onRowFocused() },
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                row.displayName,
-                style = MaterialTheme.typography.titleSmall,
-                color = if (row.hidden) colors.onSurfaceVariant else colors.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (row.hidden || row.renamed || row.providerName != null) {
+        // Name as a focusable button — OK opens the category's items; D-pad walks names one press per
+        // row. Right steps into move arrows, Rename and Hide/Show.
+        FocusableSurface(
+            onClick = onOpenItems,
+            modifier = Modifier
+                .weight(1f)
+                // Match the action pills' normal 12.dp + label height so the name focus target is
+                // not visibly shorter than the move/Rename/Hide controls beside it.
+                .heightIn(min = 42.dp)
+                .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+                .then(
+                    if (upFocusRequester != null) Modifier.focusProperties { up = upFocusRequester }
+                    else Modifier,
+                ),
+            // Use the same compact pill treatment as the action buttons to the right.
+            shape = RoundedCornerShape(50),
+            focusedScale = 1f,
+            unfocusedContainerColor = Color.Transparent,
+            focusedContainerColor = colors.primaryContainer,
+            surface = GlassSurface.CARDS,
+            contentAlignment = Alignment.CenterStart,
+        ) { focused ->
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
                 Text(
-                    buildString {
-                        if (row.hidden) append("Hidden")
-                        if (row.renamed) {
-                            if (isNotEmpty()) append("  ·  ")
-                            append("was “${row.originalName}”")
-                        }
-                        row.providerName?.let {
-                            if (isNotEmpty()) append("  ·  ")
-                            append(it)
-                        }
+                    row.displayName,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = when {
+                        row.hidden -> colors.onSurfaceVariant
+                        focused -> colors.onPrimaryContainer
+                        else -> colors.onSurface
                     },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = colors.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (row.hidden || row.renamed || row.providerName != null) {
+                    Text(
+                        buildString {
+                            if (row.hidden) append("Hidden")
+                            if (row.renamed) {
+                                if (isNotEmpty()) append("  ·  ")
+                                append("was “${row.originalName}”")
+                            }
+                            row.providerName?.let {
+                                if (isNotEmpty()) append("  ·  ")
+                                append(it)
+                            }
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = colors.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
         Spacer(Modifier.width(10.dp))
@@ -583,7 +753,14 @@ private fun CategoryRow(
         Spacer(Modifier.width(6.dp))
         OwnTVButton("⤓", onClick = onMoveBottom, onLongClick = onMoveLongPress, style = OwnTVButtonStyle.SECONDARY)
         Spacer(Modifier.width(6.dp))
-        OwnTVButton("Rename", onClick = onRename, style = OwnTVButtonStyle.SECONDARY)
+        // Long-press anchors a rename span; a normal press picks the span end while one is active,
+        // otherwise it opens the single-row rename dialog.
+        OwnTVButton(
+            "Rename",
+            onClick = { if (inRenameRange) onPickRenameEnd() else onRename() },
+            onLongClick = onRenameLongPress,
+            style = OwnTVButtonStyle.SECONDARY,
+        )
         Spacer(Modifier.width(6.dp))
         OwnTVButton(
             label = if (row.hidden) "Show" else "Hide",

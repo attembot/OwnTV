@@ -9,6 +9,19 @@
 > (e.g. `(community PR #40 by @codeVerine)`). Issue numbers that are part of a title (e.g. `(#57)`) are
 > fine; explanatory parentheticals are not. Descriptions belong in CHANGELOG.md, never here.
 
+## v4.1.6 — 2026-08-01
+
+### ✨ New features
+
+- **✏️ Bulk editing — rename channels, movies and series in bulk (#86)**
+- **🗂️ Custom combined categories (#87)**
+- **🌐 Custom DNS server — global, app-wide (#90)**
+
+### 🐛 Fixes
+
+- **Live TV playback switched away from the category it was opened from**
+- **Auto frame rate could still cause screen blackouts when turned off**
+
 ## v4.1.5 — 2026-07-31
 
 ### ✨ New features

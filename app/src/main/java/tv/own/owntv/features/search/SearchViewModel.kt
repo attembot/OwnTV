@@ -193,7 +193,7 @@ class SearchViewModel(
         if (!c.hasAny) return SearchResults()
         val fts = ftsQueryFor(q)
         // Respect this profile's customizations: hidden items and hidden categories never surface,
-        // renames are shown (channels only — movies/series have no per-item rename).
+        // renames are shown (channels, and bulk-renamed movies/series from Customize).
         val custLive = customize.observe(pid, MediaType.LIVE).first()
         val custMovie = customize.observe(pid, MediaType.MOVIE).first()
         val custSeries = customize.observe(pid, MediaType.SERIES).first()
@@ -213,13 +213,15 @@ class SearchViewModel(
                 .filter {
                     CustomizeKeys.movie(it) !in custMovie.hiddenItems &&
                         (it.categoryId == null || it.categoryId !in hiddenMovieCats)
-                },
+                }
+                .map { m -> custMovie.itemNames[CustomizeKeys.movie(m)]?.let { m.copy(name = it) } ?: m },
             series = if (c.seriesSourceIds.isEmpty()) emptyList()
             else (if (fts != null) seriesDao.searchListFts(fts, c.seriesSourceIds, LIMIT) else seriesDao.searchList(q, c.seriesSourceIds, LIMIT))
                 .filter {
                     CustomizeKeys.series(it) !in custSeries.hiddenItems &&
                         (it.categoryId == null || it.categoryId !in hiddenSeriesCats)
-                },
+                }
+                .map { s -> custSeries.itemNames[CustomizeKeys.series(s)]?.let { s.copy(name = it) } ?: s },
         )
     }
 

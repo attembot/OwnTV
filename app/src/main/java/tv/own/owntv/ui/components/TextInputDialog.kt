@@ -33,42 +33,63 @@ import tv.own.owntv.ui.theme.OwnTVTheme
 
 /**
  * A simple TV dialog with one text field (e.g. renaming a channel/category). [onConfirm] receives the
- * trimmed text — possibly empty, which callers treat as "reset to original".
+ * trimmed text — possibly empty, which callers treat as "reset to original". [onDelete] is optional
+ * and renders a destructive button (tinted with the app's favorite/error color) at the left end of
+ * the button row — used by the custom-category rename dialog (issue #87) to delete the category.
  */
 @Composable
 fun TextInputDialog(
     title: String,
-    initial: String,
+    initial: String = "",
     onConfirm: (String) -> Unit,
     onDismiss: () -> Unit,
     label: String = "Name",
     confirmLabel: String = "Save",
     hint: String? = null,
+    onDelete: (() -> Unit)? = null,
+    allowBlank: Boolean = true,
 ) {
     val colors = OwnTVTheme.colors
     var value by remember { mutableStateOf(initial) }
     val fieldFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { fieldFocus.requestFocus() } }
-    BackHandler { onDismiss() }
-    Box(
-        modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.75f)).trapAllFocusExit().focusGroup(),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            Modifier.dialogPanel(width = 480.dp, padding = 28.dp),
+    // A focusable platform popup is a hard boundary from the parent dialog/screen. This matters for
+    // nested editors (for example Rule builder -> Rule value): an in-tree overlay lets the parent's
+    // focus trap keep D-pad focus behind the editor, leaving its text field completely unreachable.
+    OwnTVPopup(onDismissRequest = onDismiss) {
+        // Wait until the popup window is attached before asking Android to focus/show the IME.
+        LaunchedEffect(Unit) {
+            kotlinx.coroutines.delay(80)
+            runCatching { fieldFocus.requestFocus() }
+        }
+        BackHandler { onDismiss() }
+        Box(
+            modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.75f)).trapAllFocusExit().focusGroup(),
+            contentAlignment = Alignment.Center,
         ) {
-            Text(title, style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
-            if (hint != null) {
-                Spacer(Modifier.height(6.dp))
-                Text(hint, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
-            }
-            Spacer(Modifier.height(18.dp))
-            OwnTVTextField(value = value, onValueChange = { value = it }, label = label, modifier = Modifier.fillMaxWidth(), focusRequester = fieldFocus, surface = GlassSurface.DIALOGS)
-            Spacer(Modifier.height(22.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OwnTVButton("Cancel", onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY)
-                Spacer(Modifier.weight(1f))
-                OwnTVButton(confirmLabel, onClick = { onConfirm(value.trim()) })
+            Column(
+                Modifier.dialogPanel(width = 480.dp, padding = 28.dp),
+            ) {
+                Text(title, style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
+                if (hint != null) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(hint, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+                }
+                Spacer(Modifier.height(18.dp))
+                OwnTVTextField(value = value, onValueChange = { value = it }, label = label, modifier = Modifier.fillMaxWidth(), focusRequester = fieldFocus, surface = GlassSurface.DIALOGS)
+                Spacer(Modifier.height(22.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (onDelete != null) {
+                        OwnTVButton("Delete", onClick = onDelete, style = OwnTVButtonStyle.SECONDARY)
+                        Spacer(Modifier.weight(1f))
+                    }
+                    OwnTVButton("Cancel", onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY)
+                    Spacer(Modifier.weight(1f))
+                    OwnTVButton(
+                        confirmLabel,
+                        onClick = { onConfirm(value.trim()) },
+                        enabled = allowBlank || value.isNotBlank(),
+                    )
+                }
             }
         }
     }

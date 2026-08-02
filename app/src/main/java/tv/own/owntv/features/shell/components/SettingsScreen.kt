@@ -97,7 +97,7 @@ import java.io.File
 
 private enum class TileTone { PRIMARY, SECONDARY, TERTIARY }
 
-private enum class SettingsTab { ROOT, SOURCES, EPG, PROFILES, BACKUP, VIDEO, MINI_PLAYER, CUSTOMIZE, HOME, NETWORK, METADATA, WEATHER, NAV_MENU, CH_NAV }
+private enum class SettingsTab { ROOT, SOURCES, EPG, PROFILES, BACKUP, VIDEO, MINI_PLAYER, CUSTOMIZE, HOME, NETWORK, DNS, METADATA, WEATHER, NAV_MENU, CH_NAV }
 
 /**
  * The MD3 Settings screen (shown when [MainSection.SETTINGS] is active): grouped sections, each row
@@ -230,6 +230,7 @@ fun SettingsScreen(
         SettingsTab.CUSTOMIZE to FocusRequester(),
         SettingsTab.HOME to FocusRequester(),
         SettingsTab.NETWORK to FocusRequester(),
+        SettingsTab.DNS to FocusRequester(),
         SettingsTab.METADATA to FocusRequester(),
         SettingsTab.WEATHER to FocusRequester(),
         SettingsTab.NAV_MENU to FocusRequester(),
@@ -259,6 +260,7 @@ fun SettingsScreen(
         SettingsTab.CUSTOMIZE -> { CustomizeScreen(onBack = { tab = SettingsTab.ROOT }, modifier = modifier); return }
         SettingsTab.HOME -> { HomeSettingsScreen(onBack = { tab = SettingsTab.ROOT }, modifier = modifier); return }
         SettingsTab.NETWORK -> { tv.own.owntv.features.settings.NetworkSettingsScreen(onBack = { tab = SettingsTab.ROOT }, modifier = modifier); return }
+        SettingsTab.DNS -> { tv.own.owntv.features.settings.DnsSettingsScreen(onBack = { tab = SettingsTab.ROOT }, modifier = modifier); return }
         SettingsTab.METADATA -> { tv.own.owntv.features.settings.MetadataSettingsScreen(onBack = { tab = SettingsTab.ROOT }, modifier = modifier); return }
         SettingsTab.WEATHER -> { tv.own.owntv.features.settings.WeatherSettingsScreen(onBack = { tab = SettingsTab.ROOT }, modifier = modifier); return }
         SettingsTab.NAV_MENU -> { tv.own.owntv.features.settings.NavMenuSettingsScreen(onBack = { tab = SettingsTab.ROOT }, modifier = modifier); return }
@@ -552,6 +554,12 @@ fun SettingsScreen(
             onClick = { open(SettingsTab.NETWORK) }, showChevron = true,
             modifier = Modifier.focusRequester(rowFocus.getValue(SettingsTab.NETWORK)),
         )
+        SettingsRow(
+            tone = TileTone.SECONDARY, icon = OwnTVIcon.SEARCH,
+            title = "DNS", desc = "Use a custom DNS server for domain lookups",
+            onClick = { open(SettingsTab.DNS) }, showChevron = true,
+            modifier = Modifier.focusRequester(rowFocus.getValue(SettingsTab.DNS)),
+        )
 
         SectionDivider()
         GroupLabel("App")
@@ -639,6 +647,7 @@ fun SettingsScreen(
                 SettingsSearchEntry("Playback", "Live latency", "live buffer latency delay low latency seconds close to live edge", OwnTVIcon.LIVE_TV, TileTone.TERTIARY) { open(SettingsTab.VIDEO) },
                 SettingsSearchEntry("Playback", "Playback error log", "error crash failure diagnostics report", OwnTVIcon.HISTORY, TileTone.SECONDARY) { savedScroll = scrollState.value; dialogReturn = searchFieldFocus; showErrorLog = true },
                 SettingsSearchEntry("Network", "Proxy", "http traffic route", OwnTVIcon.SHARE, TileTone.SECONDARY) { open(SettingsTab.NETWORK) },
+                SettingsSearchEntry("Network", "DNS", "domain lookup resolver doh dns-over-https", OwnTVIcon.SEARCH, TileTone.SECONDARY) { open(SettingsTab.DNS) },
                 SettingsSearchEntry("App", "App startup", "launch open landing", OwnTVIcon.HOME, TileTone.SECONDARY,
                     chip = startupMode.label) { savedScroll = scrollState.value; dialogReturn = searchFieldFocus; showStartup = true },
                 SettingsSearchEntry("App", "Check for updates", "github release version", OwnTVIcon.DOWNLOADS, TileTone.PRIMARY,

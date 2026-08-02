@@ -1,5 +1,81 @@
 # Changelog
 
+## v4.1.6 — 2026-08-01
+
+### ✏️ Bulk editing — rename channels, movies and series in bulk (#86)
+
+- **The Customize screen got a proper item list.** A category's name is now a focusable button (one
+  D-pad press per row, instead of walking past the arrows first): OK opens that category's items —
+  every row visible, hidden items marked and recoverable, paged so a category with tens of thousands
+  of rows still opens instantly.
+- **Per-row Rename on Live TV** renames one channel from the item list; Movies and Series get bulk
+  rename only (one film exists in ten languages, so per-row renames are meaningless there).
+- **Bulk rename with rules.** Long-press Rename (or use the header pill on Movies/Series) to select a
+  span with the same remote-friendly flow as Hide/Move. Build an ordered rule list that adds or
+  removes prefixes and suffixes, supports several removable alternatives separated by semicolons,
+  and optionally ignores case and trims leftover separators. The live review shows every proposed
+  name before anything is written. Applied names are stored per profile and section, survive
+  re-syncs, and appear everywhere — Live TV, Movies, Series, search and recently-watched.
+- **Auto cleanup** creates an editable rule preset for country/provider tags, quality and codec tags,
+  emoji, symbols and stray separators, then opens the same review before applying anything.
+- **Restore original names** undoes a bulk rename for the whole span — the only undo for a bulk
+  apply, so it is one tap away and always available.
+- Renamed names travel in backups and are per profile, like every other customization.
+
+### 🗂️ Custom combined categories (#87)
+
+- **Create your own combined categories** from the Customize screen — a "＋ New category" pill on
+  every section. A combined category can hold channels, movies or series from any source folder,
+  side by side, in one rail at the top of Browse.
+- **Move to category…** is available in the Live/Movies/Series context menu and on the Customize
+  item list. Items leave their origin folder by default (they stay findable in All Channels and
+  search); tick "Keep in <origin> as well" to keep a copy. Moving out of Favorites un-favourites
+  the item; moving out of another combined category removes it there.
+- **Combined categories behave like folders**: rename them, delete them (items stay in their
+  original categories), reorder their items manually, hide them from Browse, and they remember
+  their own last-focused item. They are per profile and survive re-syncs and backups.
+- **"Hide new categories by default"** is now set from the add-source window too — a profile-wide
+  default so categories that arrive on a future sync start hidden until you show them from
+  Customize.
+
+### 🌐 Custom DNS server — global, app-wide (#90)
+
+- **Settings → Network → DNS** is a new screen, a sibling to the existing Proxy screen. Configure a
+  custom DNS server and all OwnTV domain lookups — playlist sync, Xtream/Stalker API, EPG, images,
+  ExoPlayer streams — resolve through it instead of the system resolver.
+- **Two modes, auto-detected from what you enter.** A plain IP like `8.8.8.8` or `1.1.1.1:53` sends
+  standard DNS-over-UDP queries. A URL starting with `https://` — e.g. `https://dns.google/dns-query`
+  — uses DNS-over-HTTPS (RFC 8484), which encrypts your lookups so they can't be snooped or tampered
+  with between your device and the server.
+- **One-tap presets for Google, Cloudflare and Quad9** fill the DoH URL instantly and save it. They light
+  up to show which one is active.
+- **The DNS server is live-updated** — flip it on and off, or swap servers, and every future lookup uses
+  the new setting immediately. No client rebuild, same pattern as the global proxy.
+- **"Test DNS"** resolves `dns.google` through your configured server and reports the resolved IPs and
+  round-trip time, so you can confirm it's working before saving.
+- **The toggle alone is not enough.** Turning it on reveals the server field and preset buttons. Only
+  when a server is entered and saved is DNS actually enabled — a red warning reminds you while the
+  toggle is on but no server is configured. Toggling it off immediately disables custom DNS.
+- Custom DNS is backed up and restored alongside the other settings. It does not contain secrets, so it
+  travels in plaintext in the settings section.
+- **mpv/FFmpeg is not affected** — it uses the system resolver internally and has no configurable DNS
+  option. The setting covers everything that goes through OkHttp, which is most of the app's traffic.
+- Built-in support for Android's `org.json` parser so the DoH JSON responses (per RFC 8484) are parsed
+  with zero additional dependencies.
+
+### 🐛 Fixes
+
+- **Live TV playback switched to the channel's provider category after opening it from Favorites,
+  History, All Channels or a custom category.** The preview pane still shows the channel's real
+  provider category as metadata, but full-screen playback now keeps the browse context it was launched
+  from. D-pad Up/Down, CH+/− and the Left channel-list overlay all stay within that same context. A
+  category explicitly chosen from the in-player category browser becomes the new playback context.
+- **Auto frame rate could still blank the TV when the setting was Off.** Media3/ExoPlayer and mpv each
+  had their own surface-level frame-rate request in addition to OwnTV's window-level controller, so
+  disabling the toggle did not stop every display-mode request. All three paths now obey the setting,
+  and turning it off clears an already-applied surface hint. AFR defaults to Off in v4.1.6; existing
+  installs are reset to Off exactly once, while any choice the user makes afterward is preserved.
+
 ## v4.1.5 — 2026-07-31
 
 ### 💬 Subtitle appearance — size, colour, position and background, each optional (#96)

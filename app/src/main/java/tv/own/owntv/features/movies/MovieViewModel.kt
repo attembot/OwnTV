@@ -11,6 +11,7 @@ import androidx.paging.PagingData
 import androidx.paging.PagingSource
 import androidx.paging.cachedIn
 import androidx.paging.filter
+import androidx.paging.map
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
@@ -36,8 +38,10 @@ import tv.own.owntv.core.customize.CustomizationStore
 import tv.own.owntv.core.customize.CustomizeKeys
 import tv.own.owntv.core.customize.SectionCustomizations
 import tv.own.owntv.core.customize.applyCustomizations
+import tv.own.owntv.core.customize.applyCustomizationsWithCustoms
 import tv.own.owntv.core.database.dao.CategoryDao
 import tv.own.owntv.core.database.dao.ContentOrderDao
+import tv.own.owntv.core.database.dao.CustomCategoryDao
 import tv.own.owntv.core.database.dao.FavoriteDao
 import tv.own.owntv.core.database.dao.HistoryDao
 import tv.own.owntv.core.database.dao.MovieDao
@@ -54,6 +58,7 @@ import tv.own.owntv.core.database.entity.WatchHistoryEntity
 import tv.own.owntv.core.launcher.LauncherIntegrationRepository
 import tv.own.owntv.core.model.MediaType
 import tv.own.owntv.core.util.throttleLatest
+import tv.own.owntv.features.customize.MoveTarget
 import tv.own.owntv.features.live.LiveRailItem
 import tv.own.owntv.features.live.LiveKey
 import tv.own.owntv.features.live.parseLiveKey
@@ -79,6 +84,7 @@ class MovieViewModel(
     private val downloadManager: DownloadManager,
     private val launcherIntegrationRepository: LauncherIntegrationRepository,
     private val contentOrderDao: ContentOrderDao,
+    private val customCategoryDao: CustomCategoryDao,
     private val metadata: tv.own.owntv.core.metadata.MetadataRepository,
     private val externalPlayerLauncher: tv.own.owntv.core.player.ExternalPlayerLauncher,
     private val streamUrlResolver: tv.own.owntv.core.stalker.StreamUrlResolver,
@@ -122,6 +128,60 @@ class MovieViewModel(
             else customize.observe(c.profileId, MediaType.MOVIE)
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, SectionCustomizations())
+
+    /** The user's custom combined categories with live member counts — the "Move to…" dialog's list. */
+    val moveTargets: StateFlow<List<MoveTarget>> = combine(ctx, custom) { c, cust -> c to cust }
+        .flatMapLatest { (c, cust) ->
+            if (c.profileId < 0 || cust.customCategories.isEmpty()) flowOf(emptyList())
+            else customCategoryDao.observeCountsByContexts(
+                c.profileId,
+                MediaType.MOVIE,
+                cust.customCategories.map { it.id },
+                c.sourceIds.ifEmpty { listOf(-1L) },
+            ).map { counts ->
+                cust.customCategories.map { cc ->
+                    MoveTarget(
+                        id = cc.id,
+                        displayName = cust.categoryNames[cc.id] ?: cc.name,
+                        count = counts.firstOrNull { it.contextKey == cc.id }?.count ?: 0,
+                    )
+                }
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** The stable key of a provider folder ([null] when the folder vanished) — the Move dialog's origin. */
+    fun folderKey(id: Long): String? = folderContextKeys.value[id]
+
+    /** Creates a custom category (issue #87) — the Move dialog's "＋ New category…" flow. */
+    fun createCustomCategory(name: String) {
+        viewModelScope.launch {
+            val pid = currentProfileId() ?: return@launch
+            customize.createCustomCategory(pid, MediaType.MOVIE, name)
+        }
+    }
+
+    /**
+     * Moves (or copies, [keepInOrigin]) one movie into a custom category (issue #87). The item is
+     * appended at the category's tail (maxPosition + 1). Without [keepInOrigin] the item leaves its
+     * origin: a favorite row is deleted, a custom-category membership row is deleted, and a provider
+     * folder is marked in movedFromOrigin — the pager chain then drops it from that folder while
+     * keeping it in All / search / recent.
+     */
+    fun moveToCategory(itemKey: String, itemId: Long, originKey: String, targetId: String, keepInOrigin: Boolean) {
+        if (targetId == originKey) return
+        viewModelScope.launch {
+            val pid = currentProfileId() ?: return@launch
+            customCategoryDao.appendItem(pid, MediaType.MOVIE, targetId, itemId)
+            if (!keepInOrigin) {
+                when {
+                    originKey == ContentOrderEntity.FAV_CONTEXT -> favoriteDao.remove(pid, MediaType.MOVIE, itemId)
+                    CustomizeKeys.isCustom(originKey) -> customCategoryDao.deleteItem(pid, MediaType.MOVIE, originKey, itemId)
+                    else -> customize.setItemMovedFromOrigin(pid, MediaType.MOVIE, itemKey, originKey, moved = true)
+                }
+            }
+        }
+    }
 
     /**
      * Category DB ids of this profile's hidden Movie categories — so hiding a category hides its
@@ -239,10 +299,15 @@ class MovieViewModel(
                 customize.observe(c.profileId, MediaType.MOVIE),
                 sortMode,
             ) { cats, cust, sort ->
-                // A–Z also sorts the category folders; manually moved categories stay pinned first.
-                val folders = cats.applyCustomizations(cust, alphaRest = sort == SettingsRepository.SortMode.ALPHA)
-                defaultRail + folders.map { (cat, name) ->
-                    LiveRailItem(LiveKey.Folder(cat.id), name)
+                // A–Z also sorts the category folders (custom categories included); manually moved
+                // categories stay pinned first. Custom categories ride the SAME customization keys,
+                // so renames/hides/reorders apply to them with no extra code (#87).
+                val folders = cats.applyCustomizationsWithCustoms(cust, cust.customCategories, alphaRest = sort == SettingsRepository.SortMode.ALPHA)
+                defaultRail + folders.map { e ->
+                    LiveRailItem(
+                        key = e.categoryId?.let { LiveKey.Folder(it) } ?: LiveKey.Custom(e.customId!!),
+                        title = e.displayName,
+                    )
                 }
             }
         }
@@ -261,10 +326,19 @@ class MovieViewModel(
             Pager(PagingConfig(pageSize = 60, prefetchDistance = 30, initialLoadSize = 90, maxSize = 300)) {
                 pagingSource(args.key, args.ctx, args.query, args.sort)
             }.flow.map { paging ->
-                if (cs.cust.hiddenItems.isEmpty() && cs.hiddenCats.isEmpty()) paging
+                val cust = cs.cust
+                val movedFrom = cust.movedFromOrigin
+                if (cust.hiddenItems.isEmpty() && cust.itemNames.isEmpty() && cs.hiddenCats.isEmpty() && movedFrom.isEmpty()) paging
                 else paging.filter { m ->
-                    CustomizeKeys.movie(m) !in cs.cust.hiddenItems &&
-                        (m.categoryId == null || m.categoryId !in cs.hiddenCats)
+                    CustomizeKeys.movie(m) !in cust.hiddenItems &&
+                        (args.key is LiveKey.Custom || m.categoryId == null || m.categoryId !in cs.hiddenCats) &&
+                        // Moved-out items leave ONLY their origin folder (they stay in All/search).
+                        (movedFrom[CustomizeKeys.movie(m)]?.let { origin ->
+                            args.key !is LiveKey.Folder || origin != folderContextKeys.value[args.key.id]
+                        } ?: true)
+                }.map { m ->
+                    // Bulk-renamed titles (Customize items screen) show here like Live TV does.
+                    cust.itemNames[CustomizeKeys.movie(m)]?.let { m.copy(name = it) } ?: m
                 }
             }
         }
@@ -545,11 +619,13 @@ class MovieViewModel(
             val pid = currentProfileId() ?: return@launch
             val contextKey = when (key) {
                 is LiveKey.Folder -> folderContextKeys.value[key.id] ?: return@launch
+                is LiveKey.Custom -> key.id
                 LiveKey.Favorites -> ContentOrderEntity.FAV_CONTEXT
                 else -> return@launch
             }
             val items = when (key) {
                 is LiveKey.Folder -> movieDao.snapshotByCategoryManual(key.id, pid, contextKey, 5000)
+                is LiveKey.Custom -> customCategoryDao.snapshotMovies(pid, key.id, ctx.value.sourceIds.ifEmpty { listOf(-1L) }, 5000)
                 LiveKey.Favorites -> movieDao.snapshotFavoritesManual(pid, contextKey, ctx.value.sourceIds.ifEmpty { listOf(-1L) }, 5000)
                 LiveKey.History, LiveKey.All -> return@launch
             }
@@ -628,6 +704,7 @@ class MovieViewModel(
             }
             LiveKey.Favorites -> movieDao.pagingFavoritesManual(c.profileId, ContentOrderEntity.FAV_CONTEXT, ids)
             LiveKey.History -> movieDao.pagingHistory(c.profileId, ids)
+            is LiveKey.Custom -> customCategoryDao.pagingMovies(c.profileId, key.id, ids)
             is LiveKey.Folder -> {
                 val ctxKey = folderContextKeys.value[key.id] ?: ""
                 when {
@@ -645,6 +722,7 @@ class MovieViewModel(
                 else movieDao.searchAll(query, ids)
             LiveKey.Favorites -> movieDao.searchFavorites(query, c.profileId, ids)
             LiveKey.History -> movieDao.searchHistory(query, c.profileId, ids)
+            is LiveKey.Custom -> customCategoryDao.searchMovies(query, c.profileId, key.id, ids)
             is LiveKey.Folder ->
                 if (dateAdded) movieDao.searchInCategoryDateAdded(query, key.id)
                 else movieDao.searchInCategory(query, key.id)
@@ -659,6 +737,7 @@ class MovieViewModel(
                 else movieDao.countAllExcluding(ids, hiddenCats.toList())
             LiveKey.Favorites -> movieDao.countFavorites(c.profileId, ids)
             LiveKey.History -> movieDao.countHistory(c.profileId, ids)
+            is LiveKey.Custom -> customCategoryDao.countMembers(c.profileId, MediaType.MOVIE, key.id, ids)
             is LiveKey.Folder -> movieDao.countByCategory(key.id)
         }
     }
@@ -677,7 +756,9 @@ class MovieViewModel(
         viewModelScope.launch {
             if (!settings.rememberCategoryMovies.first()) return@launch
             val saved = parseLiveKey(settings.lastMoviesCategory.first()) ?: return@launch
-            if (saved is LiveKey.Folder) {
+            // A saved Folder/Custom is honoured only while it still exists in this profile's rail —
+            // a deleted custom category or a re-synced-away folder must not resurrect on restart.
+            if (saved is LiveKey.Folder || saved is LiveKey.Custom) {
                 val ok = kotlinx.coroutines.withTimeoutOrNull(5_000) {
                     railItems.first { list -> list.any { it.key == saved } }
                 } != null

@@ -55,9 +55,13 @@ import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import tv.own.owntv.core.customize.CustomizeKeys
+import tv.own.owntv.core.database.entity.ContentOrderEntity
 import tv.own.owntv.core.database.entity.DownloadEntity
 import tv.own.owntv.core.database.entity.EpisodeEntity
 import tv.own.owntv.core.database.entity.SeriesEntity
+import tv.own.owntv.features.customize.MoveToCategoryDialog
+import tv.own.owntv.ui.components.TextInputDialog
 import tv.own.owntv.core.model.DownloadStatus
 import tv.own.owntv.features.live.LiveKey
 import tv.own.owntv.features.settings.data.SettingsRepository
@@ -146,6 +150,8 @@ private fun SeriesContextMenu(
     onShowDetails: () -> Unit,
     onToggleFavorite: () -> Unit,
     onMove: () -> Unit,
+    // "Move to category…" (issue #87): send this series into a user's combined category.
+    onMoveToCategory: () -> Unit,
     onHide: () -> Unit,
     onRemoveFromHistory: () -> Unit,
     onDownload: () -> Unit,
@@ -176,6 +182,7 @@ private fun SeriesContextMenu(
                 modifier = Modifier.fillMaxWidth().focusRequester(focus),
             )
             if (canMove) OwnTVButton("Move", onClick = onMove, style = OwnTVButtonStyle.SECONDARY, modifier = Modifier.fillMaxWidth())
+            if (canMove) OwnTVButton("Move to category…", onClick = onMoveToCategory, style = OwnTVButtonStyle.SECONDARY, modifier = Modifier.fillMaxWidth())
             if (isHistory) OwnTVButton("Remove from History", onClick = onRemoveFromHistory, style = OwnTVButtonStyle.SECONDARY, modifier = Modifier.fillMaxWidth())
             OwnTVButton("Hide", onClick = onHide, style = OwnTVButtonStyle.SECONDARY, modifier = Modifier.fillMaxWidth())
             OwnTVButton("Download all episodes", onClick = onDownload, style = OwnTVButtonStyle.SECONDARY, icon = OwnTVIcon.DOWNLOADS, modifier = Modifier.fillMaxWidth())
@@ -222,6 +229,12 @@ private fun SeriesGrid(
     val series = vm.series.collectAsLazyPagingItems()
     val moveState by vm.moveState.collectAsStateWithLifecycle()
     var contextSeries by remember { mutableStateOf<tv.own.owntv.core.database.entity.SeriesEntity?>(null) }
+    // The series the "Move to category…" flow is moving (issue #87), with the origin captured at
+    // menu-open time (the rail can't change under the modal, but capturing is still safer).
+    var moveItem by remember { mutableStateOf<tv.own.owntv.core.database.entity.SeriesEntity?>(null) }
+    var moveOriginKey by remember { mutableStateOf<String?>(null) }
+    var moveOriginName by remember { mutableStateOf("this category") }
+    var creatingCategory by remember { mutableStateOf(false) }
     // "Set TMDB name" dialog target (§11.2 U5b); null = closed.
     var setTmdbNameSeries by remember { mutableStateOf<tv.own.owntv.core.database.entity.SeriesEntity?>(null) }
     // In-app trailer playback (§7.3 U4); non-null = fullscreen player open with this YouTube key.
@@ -290,7 +303,7 @@ private fun SeriesGrid(
     //     list no longer contains it, so focus the NEAREST surviving neighbour by position (the item
     //     that slid into the removed slot, else the new last item, else first item). Only if the whole
     //     category is now empty do we let focus leave (there's nothing here to land on).
-    LaunchedEffect(contextSeries) {
+    LaunchedEffect(contextSeries, moveItem, creatingCategory) {
         if (contextSeries != null) return@LaunchedEffect
         // Opening the TMDB Details window closes the menu; let the window keep focus (it traps focus and
         // refocuses the series on close), don't yank it back to the grid here.
@@ -299,6 +312,9 @@ private fun SeriesGrid(
         if (setTmdbNameSeries != null) return@LaunchedEffect
         // Same for the trailer player.
         if (trailerVideoKey != null) return@LaunchedEffect
+        // The context menu closes before MoveToCategoryDialog (and its nested name prompt) opens.
+        // Do not focus the grid behind either modal; re-run this effect when the whole flow closes.
+        if (moveItem != null || creatingCategory) return@LaunchedEffect
         val targetId = contextSeriesId
         if (targetId == null) { contextSeriesIndex = -1; return@LaunchedEffect }
         val items = series.itemSnapshotList.items
@@ -578,7 +594,7 @@ private fun SeriesGrid(
         SeriesContextMenu(
             title = s.name,
             isFavorite = favoriteIds.contains(s.id),
-            canMove = selectedKey is LiveKey.Folder || selectedKey == LiveKey.Favorites,
+            canMove = selectedKey is LiveKey.Folder || selectedKey is LiveKey.Custom || selectedKey == LiveKey.Favorites,
             isHistory = selectedKey == LiveKey.History,
             hasTmdbDetails = metadataMode.enrich && cacheForS != null,
             trailerKey = if (metadataMode.enrich) cacheForS?.trailerKey else null,
@@ -586,6 +602,17 @@ private fun SeriesGrid(
             onShowDetails = { contextSeries = null; detailsSeries = s },
             onToggleFavorite = { vm.toggleFavorite(s); contextSeries = null },
             onMove = { contextSeries = null; vm.enterMoveMode(s, selectedKey) },
+            onMoveToCategory = {
+                moveOriginKey = when (val k = selectedKey) {
+                    is LiveKey.Folder -> vm.folderKey(k.id)
+                    is LiveKey.Custom -> k.id
+                    LiveKey.Favorites -> ContentOrderEntity.FAV_CONTEXT
+                    else -> null
+                }
+                moveOriginName = railItems.firstOrNull { it.key == selectedKey }?.title ?: "this category"
+                moveItem = s
+                contextSeries = null
+            },
             onHide = { vm.hideSeries(s); contextSeries = null },
             onRemoveFromHistory = { vm.removeFromHistory(s.id); contextSeries = null },
             onDownload = { vm.downloadSeries(s); contextSeries = null },
@@ -598,6 +625,35 @@ private fun SeriesGrid(
             onPlayTrailer = { key -> contextSeries = null; trailerVideoKey = key },
             onDismiss = { contextSeries = null },
         )
+    }
+
+    // Move to… a combined category (issue #87), incl. the "＋ New category…" name prompt.
+    val moveTargets by vm.moveTargets.collectAsStateWithLifecycle()
+    if (creatingCategory) {
+        TextInputDialog(
+            title = "New category",
+            hint = "A combined category for this profile — move channels, movies or series into it.",
+            confirmLabel = "Create",
+            allowBlank = false,
+            onConfirm = { vm.createCustomCategory(it); creatingCategory = false },
+            onDismiss = { creatingCategory = false },
+        )
+    } else {
+        moveItem?.let { s ->
+            val originKey = moveOriginKey
+            if (originKey != null) {
+                MoveToCategoryDialog(
+                    moveTargets = moveTargets.filterNot { it.id == originKey },
+                    originName = moveOriginName,
+                    onNewCategory = { creatingCategory = true },
+                    onMove = { targetId, keepInOrigin ->
+                        vm.moveToCategory(CustomizeKeys.series(s), s.id, originKey, targetId, keepInOrigin)
+                        moveItem = null
+                    },
+                    onDismiss = { moveItem = null },
+                )
+            }
+        }
     }
 
     // Fullscreen TMDB details window (§11.1) — read-only, Back exits; refocus the series on close.

@@ -54,7 +54,10 @@ import coil3.compose.AsyncImage
 import org.koin.androidx.compose.koinViewModel
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import tv.own.owntv.core.customize.CustomizeKeys
 import tv.own.owntv.core.database.entity.ChannelEntity
+import tv.own.owntv.core.database.entity.ContentOrderEntity
+import tv.own.owntv.features.customize.MoveToCategoryDialog
 import tv.own.owntv.features.settings.SettingsViewModel
 import tv.own.owntv.features.shell.components.CategoryRail
 import tv.own.owntv.ui.components.MoveOrderOverlay
@@ -189,6 +192,12 @@ fun LiveScreen(
         mutableStateOf<Pair<ChannelEntity, tv.own.owntv.core.database.entity.EpgProgrammeEntity>?>(null)
     }
     var contextChannel by remember { mutableStateOf<ChannelEntity?>(null) } // long-press quick menu
+    // The channel the "Move to category…" flow is moving (issue #87), with the origin captured at
+    // menu-open time (the rail can't change under the modal, but capturing is still safer).
+    var moveItem by remember { mutableStateOf<ChannelEntity?>(null) }
+    var moveOriginKey by remember { mutableStateOf<String?>(null) }
+    var moveOriginName by remember { mutableStateOf("this category") }
+    var creatingCategory by remember { mutableStateOf(false) }
     // When the long-press menu closes (Cancel, Favourite, Hide) WITHOUT opening another dialog, return focus
     // to the channel it was opened from — otherwise focus falls back to the nav panel.
     var contextMenuOpen by remember { mutableStateOf(false) }
@@ -224,8 +233,23 @@ fun LiveScreen(
         contextMenuOpen = false
         // A follow-up dialog (rename / match EPG / catch-up / move) grabs focus itself — only restore
         // for plain closes (Cancel, Favourite, Hide, Close). Those dialogs restore on their own close.
-        if (renaming != null || matchingEpg != null || catchupChannel != null || enteringMoveMode) return@LaunchedEffect
+        if (renaming != null || matchingEpg != null || catchupChannel != null || enteringMoveMode ||
+            moveItem != null || creatingCategory
+        ) return@LaunchedEffect
         restoreToContextRow()
+    }
+    // The context menu closes before the shared Move-to-category dialog opens. Treat both the move
+    // picker and its nested New-category prompt as one focus-owning flow, then restore the original
+    // row only after the whole flow closes. Otherwise the menu-close effect can steal focus behind
+    // the new dialog.
+    var moveCategoryWasOpen by remember { mutableStateOf(false) }
+    LaunchedEffect(moveItem, creatingCategory) {
+        if (moveItem != null || creatingCategory) {
+            moveCategoryWasOpen = true
+        } else if (moveCategoryWasOpen) {
+            moveCategoryWasOpen = false
+            restoreToContextRow()
+        }
     }
     // The Match EPG dialog grabbed focus while open — when it closes (pick/clear/dismiss), put focus
     // back on the channel it was opened for instead of letting it fall to the nav panel.
@@ -500,7 +524,7 @@ fun LiveScreen(
             channelName = ch.name,
             isFavorite = favoriteIds.contains(ch.id),
             hasCatchup = ch.catchup,
-            canMove = selectedKey is LiveKey.Folder || selectedKey == LiveKey.Favorites,
+            canMove = selectedKey is LiveKey.Folder || selectedKey is LiveKey.Custom || selectedKey == LiveKey.Favorites,
             isHistory = selectedKey == LiveKey.History,
             onToggleFavorite = { vm.toggleFavorite(ch); contextChannel = null },
             onRename = { renaming = ch; contextChannel = null },
@@ -509,11 +533,51 @@ fun LiveScreen(
             onCatchup = { catchupChannel = ch; contextChannel = null },
             onPlayExternal = { vm.playExternal(ch); contextChannel = null },
             onMove = { contextChannel = null; enteringMoveMode = true; vm.enterMoveMode(ch, selectedKey) },
+            onMoveToCategory = {
+                moveOriginKey = when (val k = selectedKey) {
+                    is LiveKey.Folder -> vm.folderKey(k.id)
+                    is LiveKey.Custom -> k.id
+                    LiveKey.Favorites -> ContentOrderEntity.FAV_CONTEXT
+                    else -> null
+                }
+                moveOriginName = railItems.firstOrNull { it.key == selectedKey }?.title ?: "this category"
+                moveItem = ch
+                contextChannel = null
+            },
             onRemoveFromHistory = { vm.removeFromHistory(ch.id); contextChannel = null },
             onWatchInCorner = { pip.openCorner(ch); contextChannel = null },
             onMultiView = { contextChannel = null; onOpenMultiView(ch) },
             onDismiss = { contextChannel = null },
         )
+    }
+
+    // Move to… a combined category (issue #87), incl. the "＋ New category…" name prompt.
+    val moveTargets by vm.moveTargets.collectAsStateWithLifecycle()
+    if (creatingCategory) {
+        TextInputDialog(
+            title = "New category",
+            hint = "A combined category for this profile — move channels, movies or series into it.",
+            confirmLabel = "Create",
+            allowBlank = false,
+            onConfirm = { vm.createCustomCategory(it); creatingCategory = false },
+            onDismiss = { creatingCategory = false },
+        )
+    } else {
+        moveItem?.let { ch ->
+            val originKey = moveOriginKey
+            if (originKey != null) {
+                MoveToCategoryDialog(
+                    moveTargets = moveTargets.filterNot { it.id == originKey },
+                    originName = moveOriginName,
+                    onNewCategory = { creatingCategory = true },
+                    onMove = { targetId, keepInOrigin ->
+                        vm.moveToCategory(CustomizeKeys.channel(ch), ch.id, originKey, targetId, keepInOrigin)
+                        moveItem = null
+                    },
+                    onDismiss = { moveItem = null },
+                )
+            }
+        }
     }
 
     // Move mode overlay — intercepts D-pad Up/Down/OK/Back while reordering.
@@ -617,6 +681,8 @@ private fun ChannelContextMenu(
     onCatchup: () -> Unit,
     onPlayExternal: () -> Unit,
     onMove: () -> Unit,
+    // "Move to category…" (issue #87): send this channel into a user's combined category.
+    onMoveToCategory: () -> Unit,
     onRemoveFromHistory: () -> Unit,
     onWatchInCorner: () -> Unit,
     onMultiView: () -> Unit,
@@ -655,6 +721,7 @@ private fun ChannelContextMenu(
             OwnTVButton("Picture-in-picture", onClick = onWatchInCorner, style = OwnTVButtonStyle.SECONDARY, icon = OwnTVIcon.PIP, modifier = Modifier.fillMaxWidth())
             OwnTVButton("MultiView", onClick = onMultiView, style = OwnTVButtonStyle.SECONDARY, icon = OwnTVIcon.PIP, modifier = Modifier.fillMaxWidth())
             if (canMove) OwnTVButton("Move", onClick = onMove, style = OwnTVButtonStyle.SECONDARY, modifier = Modifier.fillMaxWidth())
+            if (canMove) OwnTVButton("Move to category…", onClick = onMoveToCategory, style = OwnTVButtonStyle.SECONDARY, modifier = Modifier.fillMaxWidth())
             if (isHistory) OwnTVButton("Remove from History", onClick = onRemoveFromHistory, style = OwnTVButtonStyle.SECONDARY, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(4.dp))
             OwnTVButton("Close", onClick = onDismiss, modifier = Modifier.fillMaxWidth())
@@ -929,10 +996,7 @@ private fun CatchupDialog(
     // (same fix as EpgMatchDialog / ChannelContextMenu). trapAllFocusExit() additionally blocks
     // directional exits through the scrim. PopupFontTheme swaps in the Lora serif + scales fonts to
     // match the other popup menus (0.75f), and the box is shrunk to that same denser size.
-    androidx.compose.ui.window.Popup(
-        onDismissRequest = onDismiss,
-        properties = androidx.compose.ui.window.PopupProperties(focusable = true),
-    ) {
+    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
     tv.own.owntv.ui.theme.PopupFontTheme(fontScale = 0.75f) {
         Box(
             Modifier.fillMaxSize()
@@ -1017,10 +1081,7 @@ internal fun EpgMatchDialog(
 
     // Popup(focusable=true) is a hard focus boundary: a stray D-pad right/left with no target inside
     // can no longer drop focus onto the screen behind the scrim (same fix as EpgMatchReviewDialog).
-    androidx.compose.ui.window.Popup(
-        onDismissRequest = onDismiss,
-        properties = androidx.compose.ui.window.PopupProperties(focusable = true),
-    ) {
+    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
     tv.own.owntv.ui.theme.PopupFontTheme(fontScale = 0.75f) {
     androidx.compose.foundation.layout.Box(
         Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.7f)).focusGroup(),

@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
@@ -36,7 +37,20 @@ private class MpvSurfaceView(context: Context, private val player: OwnTVPlayer) 
         pendingFps = fps
         if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.R) return
         val surface = holder.surface ?: return
-        if (!surface.isValid || fps <= 0f) return
+        if (!surface.isValid) return
+        if (fps <= 0f) {
+            runCatching {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    surface.clearFrameRate()
+                } else {
+                    // clearFrameRate() was added in API 34. On Android 11–13, passing 0 clears the
+                    // previously requested surface frame-rate hint using the original API 30 contract.
+                    @Suppress("DEPRECATION")
+                    surface.setFrameRate(0f, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
+                }
+            }
+            return
+        }
         runCatching {
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
                 surface.setFrameRate(fps, Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE, Surface.CHANGE_FRAME_RATE_ALWAYS)
@@ -91,8 +105,10 @@ fun MpvVideoSurface(player: OwnTVPlayer, modifier: Modifier = Modifier, autoFram
             AndroidView(
                 modifier = viewModifier,
                 factory = { ctx -> MpvSurfaceView(ctx, player) },
-                // Match the display refresh rate to the video FPS once known (kills 24fps-on-60Hz judder).
-                update = { it.applyVideoFrameRate(fps ?: 0f) },
+                // The surface-level hint is part of AFR too. Previously this stayed active when the
+                // setting was Off, so Android 11+ TVs could still perform the exact HDMI handshake the
+                // user had disabled AFR to avoid.
+                update = { it.applyVideoFrameRate(if (autoFrameRate) fps ?: 0f else 0f) },
             )
         }
         // Image-subtitle (PGS/VOBSUB/DVB) overlay for the ExoPlayer handoff. Mounted ONLY while ExoPlayer
@@ -136,6 +152,9 @@ fun ExoPreviewSurface(
     // Only the full-screen live player passes autoFrameRate = true — the in-pane preview must never
     // reconfigure the display while the user is just scrolling the channel list.
     val fps by engine.videoFps.collectAsStateWithLifecycle()
+    // Media3 has its own Surface.setFrameRate path, independent of FrameRateController. Keep it off in
+    // previews/mini-player and make the full-screen path obey the same AFR setting.
+    LaunchedEffect(engine, autoFrameRate) { engine.setAutoFrameRateEnabled(autoFrameRate) }
     AutoFrameRateEffect(fps, autoFrameRate)
     BoxWithConstraints(modifier.background(Color.Black).clipToBounds(), contentAlignment = Alignment.Center) {
         val aspect by engine.videoAspect.collectAsStateWithLifecycle()

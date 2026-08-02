@@ -1,5 +1,6 @@
 package tv.own.owntv.ui.components
 
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.focusProperties
@@ -28,6 +29,8 @@ fun Modifier.trapVerticalFocusExit(): Modifier = focusProperties {
  * inside the dialog. Inside the group, moves between children are unaffected (onExit only fires when
  * leaving the group).
  */
-fun Modifier.trapAllFocusExit(): Modifier = focusProperties {
-    onExit = { cancelFocusChange() }
-}
+fun Modifier.trapAllFocusExit(): Modifier =
+    // Modal scrims are the common host for popups. Consuming the IME inset here makes centred
+    // content lay out above an on-screen keyboard; dialogPanel's verticalScroll keeps tall forms
+    // reachable in the reduced height.
+    imePadding().focusProperties { onExit = { cancelFocusChange() } }

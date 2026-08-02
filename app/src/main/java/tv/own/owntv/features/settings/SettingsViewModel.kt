@@ -258,7 +258,7 @@ class SettingsViewModel(
     }
 
     val autoFrameRate: StateFlow<Boolean> = settings.autoFrameRate
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     fun setAutoFrameRate(enabled: Boolean) {
         viewModelScope.launch { settings.setAutoFrameRate(enabled) }
@@ -1086,6 +1086,82 @@ class SettingsViewModel(
                 onSuccess = { ProxyTestState.Ok(it) },
                 onFailure = { ProxyTestState.Fail(friendlyProxyError(it)) },
             )
+        }
+    }
+
+    // --- Global custom DNS — same pattern as proxy ---
+
+    val dnsConfig: StateFlow<tv.own.owntv.core.network.DnsConfig> = settings.dnsConfig
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.core.network.DnsConfig())
+
+    fun saveDns(enabled: Boolean, host: String, port: Int, dohUrl: String) {
+        viewModelScope.launch { settings.saveDns(enabled, host, port, dohUrl) }
+    }
+
+    sealed interface DnsTestState {
+        data object Idle : DnsTestState
+        data object Testing : DnsTestState
+        data class Ok(val millis: Long, val resolvedIps: List<String>) : DnsTestState
+        data class Fail(val message: String) : DnsTestState
+    }
+
+    private val _dnsTest = MutableStateFlow<DnsTestState>(DnsTestState.Idle)
+    val dnsTest: StateFlow<DnsTestState> = _dnsTest.asStateFlow()
+
+    fun resetDnsTest() { _dnsTest.value = DnsTestState.Idle }
+
+    fun testDns(enabled: Boolean, host: String, port: Int, dohUrl: String) {
+        if (_dnsTest.value == DnsTestState.Testing) return
+        val doh = dohUrl.trim()
+        val h = host.trim()
+        if (enabled && h.isBlank() && doh.isBlank()) {
+            _dnsTest.value = DnsTestState.Fail("Enter a DNS server host or a DoH URL.")
+            return
+        }
+        val testHost = "dns.google" // a reliable hostname for testing DNS
+        _dnsTest.value = DnsTestState.Testing
+        viewModelScope.launch {
+            val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching {
+                    val cfg = tv.own.owntv.core.network.DnsConfig(
+                        enabled = enabled,
+                        host = h,
+                        port = if (port in 1..65535) port else 53,
+                        dohUrl = doh,
+                    )
+                    // Build a temporary DnsConfigHolder so we can resolve via the same backends
+                    val holder = tv.own.owntv.core.network.DnsConfigHolder(
+                        kotlinx.coroutines.flow.flowOf(cfg),
+                    )
+                    val start = System.currentTimeMillis()
+                    val addrs = holder.dns.lookup(testHost)
+                    val ms = System.currentTimeMillis() - start
+                    if (addrs.isEmpty()) throw java.io.IOException("DNS returned no addresses for $testHost")
+                    addrs.map { it.hostAddress ?: "?" } to ms
+                }
+            }
+            _dnsTest.value = result.fold(
+                onSuccess = { (ips, ms) -> DnsTestState.Ok(ms, ips) },
+                onFailure = { DnsTestState.Fail(friendlyDnsError(it)) },
+            )
+        }
+    }
+
+    private fun friendlyDnsError(e: Throwable): String {
+        val msg = e.message.orEmpty()
+        return when {
+            msg.contains("UnknownHostException", ignoreCase = true) || msg.contains("unknown host", ignoreCase = true) ->
+                "DNS server not reachable."
+            msg.contains("timeout", ignoreCase = true) || msg.contains("timed out", ignoreCase = true) ->
+                "DNS request timed out."
+            msg.contains("Network is unreachable", ignoreCase = true) ->
+                "Network is unreachable — check the server address."
+            msg.contains("refused", ignoreCase = true) ->
+                "Connection refused — check the server address and port."
+            e is java.net.SocketTimeoutException ->
+                "DNS request timed out."
+            e is java.io.IOException && msg.isNotBlank() -> msg
+            else -> "DNS test failed — check the server address."
         }
     }
 

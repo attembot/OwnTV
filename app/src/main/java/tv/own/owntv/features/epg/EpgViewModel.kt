@@ -37,6 +37,7 @@ import tv.own.owntv.core.parser.XtreamClient
 import tv.own.owntv.core.customize.CustomizationStore
 import tv.own.owntv.core.customize.CustomizeKeys
 import tv.own.owntv.core.customize.applyCustomizations
+import tv.own.owntv.core.customize.applyCustomizationsWithCustoms
 import tv.own.owntv.core.database.entity.ChannelEntity
 import tv.own.owntv.core.database.entity.EpgProgrammeEntity
 import tv.own.owntv.core.database.entity.WatchHistoryEntity
@@ -70,6 +71,14 @@ data class EpgUiState(
     val favoriteCount: Int = 0,
 )
 
+/** Provider or user-created category offered by the Guide category picker. */
+data class GuideCategory(
+    val key: String,
+    val name: String,
+    val categoryId: Long? = null,
+    val customId: String? = null,
+)
+
 /**
  * Drives the EPG guide grid. Loads the active profile's EPG-capable channels and the programmes in a
  * rolling [GRID_HOURS] window from the DB, and can re-download the bulk XMLTV guide via [EpgRepository].
@@ -92,28 +101,45 @@ class EpgViewModel(
     private val categoryDao: tv.own.owntv.core.database.dao.CategoryDao,
     private val streamUrlResolver: tv.own.owntv.core.stalker.StreamUrlResolver,
     private val externalPlayerLauncher: tv.own.owntv.core.player.ExternalPlayerLauncher,
+    private val customCategoryDao: tv.own.owntv.core.database.dao.CustomCategoryDao,
 ) : ViewModel() {
 
-    /** Guide category filter: null = all channels, otherwise only that category's channels (#8). */
-    private val _categoryFilter = MutableStateFlow<Long?>(null)
-    val categoryFilter: StateFlow<Long?> = _categoryFilter.asStateFlow()
+    // This profile's customizations — shared by the Guide picker, guide rows, and manual EPG match.
+    // It must be initialized before guideCategories (Kotlin property initializers run top-to-bottom).
+    private val custom: StateFlow<SectionCustomizations> = settings.activeProfileId
+        .flatMapLatest { pid -> if (pid < 0) flowOf(SectionCustomizations()) else customize.observe(pid, MediaType.LIVE) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SectionCustomizations())
+
+    /** Guide category filter: null = all channels, otherwise a provider/custom stable key. */
+    private val _categoryFilter = MutableStateFlow<String?>(null)
+    val categoryFilter: StateFlow<String?> = _categoryFilter.asStateFlow()
 
     /** Live categories for the active profile — drives the guide's "Category" picker. Applies the
      *  profile's Live customizations like the Live TV rail does: hidden categories stay out of the
      *  picker, renames show, manually reordered categories stay pinned first. */
-    val guideCategories: StateFlow<List<tv.own.owntv.core.database.entity.CategoryEntity>> =
+    val guideCategories: StateFlow<List<GuideCategory>> =
         activeProfileSources(settings, sourceDao)
             .flatMapLatest { aps ->
                 if (aps.sources.isEmpty()) flowOf(emptyList())
                 else combine(categoryDao.observe(aps.liveSourceIds, MediaType.LIVE), settings.sortLive, custom) { cats, sort, cust ->
                     // Mirror Live TV: hidden filtered + renames + pinned order; A–Z sorts the rest.
-                    cats.applyCustomizations(cust, alphaRest = sort == SettingsRepository.SortMode.ALPHA)
-                        .map { (cat, name) -> if (name == cat.name) cat else cat.copy(name = name) }
+                    cats.applyCustomizationsWithCustoms(
+                        cust,
+                        cust.customCategories,
+                        alphaRest = sort == SettingsRepository.SortMode.ALPHA,
+                    ).map { entry ->
+                        GuideCategory(
+                            key = entry.key,
+                            name = entry.displayName,
+                            categoryId = entry.categoryId,
+                            customId = entry.customId,
+                        )
+                    }
                 }
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    fun setCategoryFilter(categoryId: Long?) { _categoryFilter.value = categoryId }
+    fun setCategoryFilter(categoryKey: String?) { _categoryFilter.value = categoryKey }
 
     private val _state = MutableStateFlow(EpgUiState())
     val state: StateFlow<EpgUiState> = _state.asStateFlow()
@@ -326,11 +352,6 @@ class EpgViewModel(
         val windowMs = channel.catchupDays.coerceAtLeast(1) * 24L * 60 * 60 * 1000
         return now - programme.startMs <= windowMs
     }
-
-    // This profile's customizations — for changing a channel's manual EPG match from the Guide (#10).
-    private val custom: StateFlow<SectionCustomizations> = settings.activeProfileId
-        .flatMapLatest { pid -> if (pid < 0) flowOf(SectionCustomizations()) else customize.observe(pid, MediaType.LIVE) }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, SectionCustomizations())
 
     /** Live channels this profile has favourited — so the Guide can show/toggle a channel's star. */
     val favoriteChannelIds: StateFlow<Set<Long>> = settings.activeProfileId
@@ -605,13 +626,18 @@ class EpgViewModel(
                 if (cust.hiddenCategories.isEmpty()) emptySet()
                 else categoryDao.observe(ids, MediaType.LIVE).first()
                     .filter { CustomizeKeys.category(it) in cust.hiddenCategories }.map { it.id }.toSet()
-            val categoryFilter = _categoryFilter.value?.takeIf { it !in hiddenCatIds }
+            val categoryFilter = _categoryFilter.value
+                ?.let { key -> guideCategories.value.firstOrNull { it.key == key } }
+            val customMemberIds = categoryFilter?.customId
+                ?.let { customCategoryDao.itemIds(pid, MediaType.LIVE, it).toSet() }
             // Heavy work — filter hidden, apply renames + manual EPG matches, sort, category-filter — runs off
             // the main thread (#3/#5) so a 50k-channel playlist never freezes the UI building the guide list.
             val channels = withContext(Dispatchers.Default) {
                 val auto = rawChannels
                     .filter { CustomizeKeys.channel(it) !in cust.hiddenItems }
-                    .filter { it.categoryId == null || it.categoryId !in hiddenCatIds }
+                    .filter {
+                        customMemberIds != null || it.categoryId == null || it.categoryId !in hiddenCatIds
+                    }
                     .map { ch -> cust.itemNames[CustomizeKeys.channel(ch)]?.let { ch.copy(name = it) } ?: ch }
                 val matched = applyEpgMatches(auto, cust, playlistIds, q)
                 // Order the guide by its own sort. LIVE_TV mirrors the Live sort; CATCHUP floats archive
@@ -634,7 +660,14 @@ class EpgViewModel(
                     SettingsRepository.GuideSort.LIVE_TV -> liveOrdered
                 }.let { sorted ->
                     // Category filter (#8): when a group is chosen, show only its channels.
-                    categoryFilter?.let { catId -> sorted.filter { it.categoryId == catId } } ?: sorted
+                    when {
+                        customMemberIds != null -> sorted.filter { it.id in customMemberIds }
+                        categoryFilter?.categoryId != null -> sorted.filter { ch ->
+                            ch.categoryId == categoryFilter.categoryId &&
+                                cust.movedFromOrigin[CustomizeKeys.channel(ch)] != categoryFilter.key
+                        }
+                        else -> sorted
+                    }
                 }
             }
             val stored = epgDao.countForSources(ids)

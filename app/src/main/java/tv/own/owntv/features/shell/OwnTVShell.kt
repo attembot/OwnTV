@@ -205,7 +205,7 @@ fun OwnTVShell(
     val vodExoActive by player.exoActiveState.collectAsStateWithLifecycle()
     // Auto frame rate: only ever applied to the FULL-SCREEN surface (never the mini-player or the
     // in-pane Live preview) — see FrameRateController.
-    val autoFrameRate by settingsRepo.autoFrameRate.collectAsStateWithLifecycle(initialValue = true)
+    val autoFrameRate by settingsRepo.autoFrameRate.collectAsStateWithLifecycle(initialValue = false)
     // Direct tune (type a channel number on the remote). Settings → Video Player → Live TV; default on.
     val directTuneEnabled by settingsRepo.directTune.collectAsStateWithLifecycle(initialValue = true)
     // "Prefer EPG logos": start following the setting once, here rather than in Application.onCreate —

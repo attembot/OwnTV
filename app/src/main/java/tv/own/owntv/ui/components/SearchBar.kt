@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.text.style.TextOverflow
@@ -74,7 +76,10 @@ fun SearchBar(
     var editing by remember { mutableStateOf(false) }
     val pillFocus = remember { FocusRequester() }
     val fieldFocus = remember { FocusRequester() }
+    val bringIntoView = remember { BringIntoViewRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
+    val tvImeWatcher = LocalTvImeWatcher.current
+    val tvImeMetrics = LocalTvImeMetrics.current
     val shape = RoundedCornerShape(50)
     val focused = pillFocused || editing
     // Glassy only when a surface is given and it's in the active glass scope (matches FocusableSurface).
@@ -90,9 +95,20 @@ fun SearchBar(
 
     // Enter edit mode after recomposition has made the field focusable (canFocus = editing).
     LaunchedEffect(editing) {
-        if (editing) runCatching {
-            fieldFocus.requestFocus()
+        if (editing) {
+            tvImeWatcher?.onImeRequested()
+            runCatching { fieldFocus.requestFocus() }
             keyboard?.show()
+            kotlinx.coroutines.delay(120)
+            runCatching { bringIntoView.bringIntoView() }
+        } else {
+            tvImeWatcher?.onImeDismissed()
+        }
+    }
+    LaunchedEffect(editing, tvImeMetrics.keyboardTopPx, tvImeMetrics.visible) {
+        if (editing && tvImeMetrics.visible) {
+            kotlinx.coroutines.delay(32)
+            runCatching { bringIntoView.bringIntoView() }
         }
     }
 
@@ -134,6 +150,7 @@ fun SearchBar(
                     onValueChange = onQueryChange,
                     modifier = Modifier
                         .fillMaxWidth()
+                        .bringIntoViewRequester(bringIntoView)
                         .focusRequester(fieldFocus)
                         .focusProperties { canFocus = editing }
                         .onFocusChanged { if (editing && !it.isFocused) editing = false }
@@ -142,8 +159,9 @@ fun SearchBar(
                             // instead of bubbling to the screen's BackHandler.
                             if (it.key == Key.Back) {
                                 if (it.type == KeyEventType.KeyUp) {
-                                    editing = false
-                                    runCatching { pillFocus.requestFocus() }
+                                editing = false
+                                keyboard?.hide()
+                                runCatching { pillFocus.requestFocus() }
                                 }
                                 true
                             } else {
@@ -156,6 +174,7 @@ fun SearchBar(
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = {
                         editing = false
+                        keyboard?.hide()
                         runCatching { pillFocus.requestFocus() }
                     }),
                 )

@@ -61,13 +61,14 @@ Scan to join from your phone:
 
 ### 🎬 Playback
 - **Dual engine** — libmpv (FFmpeg) for max compatibility + ExoPlayer for instant Live TV; per-channel toggle and automatic VOD fallback between them
-- Zero-copy **4K HDR** direct rendering · **auto frame rate** (24/25/50/60 fps display matching) · channel zapping (D-pad/CH±) · surround sound + 150% volume boost
+- Zero-copy **4K HDR** direct rendering · opt-in **auto frame rate** (off by default; 24/25/50/60 fps display matching) · context-aware channel zapping (D-pad/CH± stays in Favorites, History, All or the opened category) · surround sound + 150% volume boost
 - **Subtitles** — text (SRT/ASS), image (PGS/VOBSUB/DVB), closed captions, plus OpenSubtitles search & local files with timing adjust; customisable size, colour, position and background transparency
 - Resume prompts, next-episode auto-play, mini-player/PiP, **audio-only mode**, and a live codec/resolution/HDR stream-info overlay
 
 ### 🧭 Browse
 - **Continue Watching** home with TMDB-enriched previews; Live / Movies / Series / Downloads / Guide sections
-- Per-profile customizable rows, Favorites & History, inline + global search, multi-playlist switcher
+- Per-profile customizable rows, Favorites & History, bulk rename rules, custom combined categories,
+  inline + global search, and a multi-playlist switcher
 - **TMDB** posters, plots, cast & trailers **in 40 languages**; scales to ~50k channels / ~168k movies with priority + incremental syncing
 
 ### 📥 Sources & EPG

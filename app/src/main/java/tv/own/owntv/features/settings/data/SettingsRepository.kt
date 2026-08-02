@@ -127,8 +127,14 @@ class SettingsRepository(private val context: Context) {
         // Live TV latency: preset name + the custom seconds used when the preset is CUSTOM.
         val LIVE_LATENCY_MODE = stringPreferencesKey("live_latency_mode")
         val LIVE_LATENCY_CUSTOM_SECS = intPreferencesKey("live_latency_custom_secs")
+        // v4.1.6 one-shot: reset live latency to the safe Balanced preset. Subsequent user changes are
+        // preserved across every later update.
+        val LIVE_LATENCY_RESET_416 = booleanPreferencesKey("live_latency_reset_416")
         val HDR_ENABLED = booleanPreferencesKey("hdr_enabled")
         val AUTO_FRAME_RATE = booleanPreferencesKey("auto_frame_rate")
+        // v4.1.6 one-shot: AFR caused visible HDMI re-handshakes on some TVs. Existing installs are
+        // forced Off once; subsequent user changes are preserved across every later update.
+        val AUTO_FRAME_RATE_RESET_416 = booleanPreferencesKey("auto_frame_rate_reset_416")
         val ANDROID_TV_HOME = booleanPreferencesKey("android_tv_home")
         // Video Player Settings
         val HW_DECODING = booleanPreferencesKey("hw_decoding")
@@ -176,6 +182,11 @@ class SettingsRepository(private val context: Context) {
         val PROXY_PORT = intPreferencesKey("proxy_port")
         val PROXY_USER = stringPreferencesKey("proxy_user")
         val PROXY_PASS = stringPreferencesKey("proxy_pass")
+        // Global custom DNS — one app-wide DNS server (plain UDP or DoH). Sibling to global proxy.
+        val DNS_ENABLED = booleanPreferencesKey("dns_enabled")
+        val DNS_HOST = stringPreferencesKey("dns_host")
+        val DNS_PORT = intPreferencesKey("dns_port")
+        val DNS_DOH_URL = stringPreferencesKey("dns_doh_url")
         // Weather chip: show/hide + manual location override (blank = auto-detect from public IP).
         val WEATHER_ENABLED = booleanPreferencesKey("weather_enabled")
         val WEATHER_LOCATION = stringPreferencesKey("weather_location")
@@ -944,12 +955,28 @@ class SettingsRepository(private val context: Context) {
     /**
      * Switch the display's refresh rate to match the video frame rate (24/25/30/50/60 fps) during
      * full-screen playback, and restore it on exit. Applies to both engines and to Live TV as well as
-     * VOD. Default on; turn off if a TV/AV receiver re-handshakes HDMI noisily on every channel change.
+     * VOD. Default off; users whose display switches cleanly can opt in.
      */
-    val autoFrameRate: Flow<Boolean> = prefsFlow { it[Keys.AUTO_FRAME_RATE] ?: true }
+    val autoFrameRate: Flow<Boolean> = prefsFlow { prefs ->
+        // Also report Off before the startup migration coroutine completes, so an auto-resumed channel
+        // cannot briefly request a display-mode switch on the first 4.1.6 launch.
+        if (prefs[Keys.AUTO_FRAME_RATE_RESET_416] == true) prefs[Keys.AUTO_FRAME_RATE] ?: false else false
+    }
 
     suspend fun setAutoFrameRate(enabled: Boolean) {
-        context.dataStore.edit { it[Keys.AUTO_FRAME_RATE] = enabled }
+        context.dataStore.edit {
+            it[Keys.AUTO_FRAME_RATE] = enabled
+            it[Keys.AUTO_FRAME_RATE_RESET_416] = true
+        }
+    }
+
+    /** v4.1.6 only: force AFR Off exactly once, including for users who previously enabled it. */
+    suspend fun migrateAutoFrameRate416() {
+        context.dataStore.edit { prefs ->
+            if (prefs[Keys.AUTO_FRAME_RATE_RESET_416] == true) return@edit
+            prefs[Keys.AUTO_FRAME_RATE] = false
+            prefs[Keys.AUTO_FRAME_RATE_RESET_416] = true
+        }
     }
 
     /** Mirror continue-watching rows into Android TV home surfaces. */
@@ -1010,11 +1037,29 @@ class SettingsRepository(private val context: Context) {
 
     /** Live TV latency preset (a [LiveLatency] name). */
     val liveLatencyMode: Flow<String> = prefsFlow { prefs ->
-        prefs[Keys.LIVE_LATENCY_MODE] ?: LiveLatency.DEFAULT.name
+        // Also report Balanced before the startup migration coroutine completes, so an auto-resumed
+        // channel cannot briefly reuse an unsafe low/custom latency on the first 4.1.6 launch.
+        if (prefs[Keys.LIVE_LATENCY_RESET_416] == true) {
+            prefs[Keys.LIVE_LATENCY_MODE] ?: LiveLatency.DEFAULT.name
+        } else {
+            LiveLatency.BALANCED.name
+        }
     }
 
     suspend fun setLiveLatencyMode(name: String) {
-        context.dataStore.edit { it[Keys.LIVE_LATENCY_MODE] = name }
+        context.dataStore.edit {
+            it[Keys.LIVE_LATENCY_MODE] = name
+            it[Keys.LIVE_LATENCY_RESET_416] = true
+        }
+    }
+
+    /** v4.1.6 only: force live latency to Balanced exactly once, including existing custom choices. */
+    suspend fun migrateLiveLatency416() {
+        context.dataStore.edit { prefs ->
+            if (prefs[Keys.LIVE_LATENCY_RESET_416] == true) return@edit
+            prefs[Keys.LIVE_LATENCY_MODE] = LiveLatency.BALANCED.name
+            prefs[Keys.LIVE_LATENCY_RESET_416] = true
+        }
     }
 
     /** Custom live buffer seconds, used when the preset is [LiveLatency.CUSTOM]. */
@@ -1162,17 +1207,20 @@ class SettingsRepository(private val context: Context) {
         // key, background transparency an int key).
         Keys.SUB_COLOR,
         Keys.SUB_POSITION,
+        // Custom DNS — not secret, backed up alongside proxy
+        Keys.DNS_HOST, Keys.DNS_DOH_URL,
     )
     private val backupStringSetKeys = listOf(
         // The STATIC-mode hidden set rides with backup so a reinstall keeps the user's hidden icons.
         Keys.NAV_MENU_HIDDEN,
     )
-    private val backupIntKeys = listOf(Keys.UI_ZOOM_PCT, Keys.AUDIO_DELAY_MS, Keys.CATCHUP_OFFSET_MIN, Keys.PROXY_PORT, Keys.CH_NAV_UP_SKIP, Keys.CH_NAV_DOWN_SKIP, Keys.MINI_PLAYER_SIZE_PCT, Keys.LIVE_LATENCY_CUSTOM_SECS, Keys.GLASS_SCOPE, Keys.GLASS_ALPHA, Keys.GLASS_BLUR, Keys.SUB_BG_OPACITY)
+    private val backupIntKeys = listOf(Keys.UI_ZOOM_PCT, Keys.AUDIO_DELAY_MS, Keys.CATCHUP_OFFSET_MIN, Keys.PROXY_PORT, Keys.DNS_PORT, Keys.CH_NAV_UP_SKIP, Keys.CH_NAV_DOWN_SKIP, Keys.MINI_PLAYER_SIZE_PCT, Keys.LIVE_LATENCY_CUSTOM_SECS, Keys.GLASS_SCOPE, Keys.GLASS_ALPHA, Keys.GLASS_BLUR, Keys.SUB_BG_OPACITY)
     private val backupBoolKeys = listOf(
         Keys.LIVE_PREVIEW, Keys.LIVE_PREVIEW_AUDIO, Keys.HDR_ENABLED, Keys.AUTO_FRAME_RATE, Keys.ANDROID_TV_HOME, Keys.HW_DECODING,
         Keys.VOD_PREFER_EXO, Keys.MEASURED_STREAM_STATS, Keys.DIRECT_TUNE, Keys.EXTERNAL_PLAYER,
         Keys.EXTERNAL_PLAYER_LIVE, Keys.EXTERNAL_PLAYER_MOVIES, Keys.EXTERNAL_PLAYER_SERIES, Keys.UPDATE_CHECK_ON_START, Keys.SURROUND_SOUND, Keys.AUTO_PLAY_NEXT, Keys.PROXY_ENABLED,
         Keys.WEATHER_ENABLED, Keys.WEATHER_FAHRENHEIT, Keys.RESUME_LAST_CHANNEL, Keys.METADATA_ENABLED, Keys.CH_NAV_ENABLED,
+        Keys.DNS_ENABLED,
         Keys.REMEMBER_LAST_LIVE, Keys.REMEMBER_LAST_MOVIES, Keys.REMEMBER_LAST_SERIES,
         Keys.REMEMBER_CAT_LIVE, Keys.REMEMBER_CAT_MOVIES, Keys.REMEMBER_CAT_SERIES,
         Keys.SUB_STYLE_ENABLED,
@@ -1410,5 +1458,29 @@ class SettingsRepository(private val context: Context) {
     /** Sets only the proxy password (used on restore once decrypted). Blank clears it. */
     suspend fun setProxyPassword(password: String) {
         context.dataStore.edit { it[Keys.PROXY_PASS] = password }
+    }
+
+    // --- Global custom DNS — sibling to the global proxy. Supports plain DNS-over-UDP (host + port)
+    //     and DNS-over-HTTPS (DoH) via a URL. No auth is needed for DNS; the server field is not a
+    //     secret (it's the DNS server the user wants to use). Backed by DnsConfigHolder, same pattern
+    //     as ProxyConfigHolder. ---
+
+    /** Live snapshot of the DNS config as a single object (consumed by DnsConfigHolder). */
+    val dnsConfig: Flow<tv.own.owntv.core.network.DnsConfig> = prefsFlow { p ->
+        tv.own.owntv.core.network.DnsConfig(
+            enabled = p[Keys.DNS_ENABLED] ?: false,
+            host = p[Keys.DNS_HOST] ?: "",
+            port = p[Keys.DNS_PORT] ?: 53,
+            dohUrl = p[Keys.DNS_DOH_URL] ?: "",
+        )
+    }
+
+    suspend fun saveDns(enabled: Boolean, host: String, port: Int, dohUrl: String) {
+        context.dataStore.edit {
+            it[Keys.DNS_ENABLED] = enabled
+            it[Keys.DNS_HOST] = host.trim()
+            it[Keys.DNS_PORT] = port.coerceIn(1, 65535)
+            it[Keys.DNS_DOH_URL] = dohUrl.trim()
+        }
     }
 }

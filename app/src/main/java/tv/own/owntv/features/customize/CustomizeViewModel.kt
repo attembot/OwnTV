@@ -19,6 +19,8 @@ import kotlinx.coroutines.launch
 import tv.own.owntv.core.customize.CustomizationStore
 import tv.own.owntv.core.customize.CustomizeKeys
 import tv.own.owntv.core.database.dao.CategoryDao
+import tv.own.owntv.core.database.dao.ContentOrderDao
+import tv.own.owntv.core.database.dao.CustomCategoryDao
 import tv.own.owntv.core.database.dao.SourceDao
 import tv.own.owntv.core.model.MediaType
 import tv.own.owntv.core.repository.ActiveProfileSources
@@ -26,9 +28,11 @@ import tv.own.owntv.core.repository.activeProfileSources
 import tv.own.owntv.features.settings.data.SettingsRepository
 
 /** One category row in the Customize screen (hidden rows stay visible here, marked, for unhiding).
- *  [providerName] is null when only one source is in scope. */
+ *  [categoryId] is null for a user's custom combined category (issue #87) — there is no provider
+ *  row behind it. [providerName] is null when only one source is in scope. */
 data class CustomizeCatRow(
     val key: String,
+    val categoryId: Long?,
     val originalName: String,
     val displayName: String,
     val hidden: Boolean,
@@ -45,6 +49,8 @@ class CustomizeViewModel(
     private val settings: SettingsRepository,
     private val sourceDao: SourceDao,
     private val categoryDao: CategoryDao,
+    private val customCategoryDao: CustomCategoryDao,
+    private val contentOrderDao: ContentOrderDao,
     private val customize: CustomizationStore,
 ) : ViewModel() {
 
@@ -83,29 +89,21 @@ class CustomizeViewModel(
     private val _section = MutableStateFlow(MediaType.LIVE)
     val section: StateFlow<MediaType> = _section.asStateFlow()
 
-    /** What a span selection in progress will do once its end is picked. */
-    enum class RangeMode { HIDE, MOVE }
+    // --- Span selection (shared machinery, see SpanSelector.kt) ---
 
-    /** Which way a move (single row or whole span) shifts the affected rows. */
-    enum class MoveKind { UP, DOWN, TOP, BOTTOM }
-
-    // Range select: key of the anchor category (the long-pressed Hide/move button), or null when no
-    // range is in progress. The UI highlights the anchor and shows a hint while this is set.
-    private val _rangeAnchorKey = MutableStateFlow<String?>(null)
-    val rangeAnchorKey: StateFlow<String?> = _rangeAnchorKey.asStateFlow()
-
-    private val _rangeMode = MutableStateFlow(RangeMode.HIDE)
-    val rangeMode: StateFlow<RangeMode> = _rangeMode.asStateFlow()
-
-    // MOVE spans only: once the end has been picked the block stays selected, so the user can keep
-    // pressing ↑/↓/⤒/⤓ to walk the whole block instead of re-selecting it for every step.
-    private val _rangeEndKey = MutableStateFlow<String?>(null)
-    val rangeEndKey: StateFlow<String?> = _rangeEndKey.asStateFlow()
+    private val span = SpanSelector(
+        getRows = { rows.value },
+        getKey = { it.key },
+        scope = viewModelScope,
+    )
+    val rangeAnchorKey: StateFlow<String?> = span.anchorKey
+    val rangeMode: StateFlow<SpanSelector.Mode> = span.mode
+    val rangeEndKey: StateFlow<String?> = span.endKey
 
     fun selectSection(type: MediaType) {
         _section.value = type
         // A pending range belongs to the section it was started in — switching sections cancels it.
-        cancelRange()
+        span.cancel()
     }
 
     /** Categories of the selected section, in their customized order, including hidden ones. */
@@ -121,11 +119,24 @@ class CustomizeViewModel(
                 ) { cats, cust, sources ->
                     val providerNames = sources.associate { it.id to it.name }.takeIf { sourceIds.size > 1 }
                     val orderIndex = cust.categoryOrder.withIndex().associate { (i, k) -> k to i }
-                    val keyed = cats.map { it to CustomizeKeys.category(it) }
-                    val (pinned, rest) = keyed.partition { (_, k) -> k in orderIndex }
-                    (pinned.sortedBy { (_, k) -> orderIndex.getValue(k) } + rest).map { (cat, key) ->
+                    // Provider folders + the user's custom combined categories (#87) in ONE list, so
+                    // hide/rename/reorder apply uniformly (their keys share the CustomizeKeys
+                    // namespace). Custom rows carry categoryId = null and no provider name.
+                    val entries = cust.customCategories.map { cc ->
+                        CustomizeCatRow(
+                            key = cc.id,
+                            categoryId = null,
+                            originalName = cc.name,
+                            displayName = cust.categoryNames[cc.id] ?: cc.name,
+                            hidden = cc.id in cust.hiddenCategories,
+                            renamed = cc.id in cust.categoryNames,
+                            providerName = "Custom",
+                        )
+                    } + cats.map { cat ->
+                        val key = CustomizeKeys.category(cat)
                         CustomizeCatRow(
                             key = key,
+                            categoryId = cat.id,
                             originalName = cat.name,
                             displayName = cust.categoryNames[key] ?: cat.name,
                             hidden = key in cust.hiddenCategories,
@@ -133,6 +144,8 @@ class CustomizeViewModel(
                             providerName = providerNames?.get(cat.sourceId),
                         )
                     }
+                    val (pinned, rest) = entries.partition { it.key in orderIndex }
+                    pinned.sortedBy { orderIndex.getValue(it.key) } + rest
                 }
             }
         }
@@ -156,6 +169,87 @@ class CustomizeViewModel(
         val pid = ctx.value.profileId
         if (pid < 0) return
         viewModelScope.launch { settings.setHideNewCategoriesDefault(pid, hidden) }
+    }
+
+    // --- Sort (reuses SettingsRepository.SortMode — the same per-section value Browse uses) ---
+
+    /** Current sort mode for the selected section, for the Sort pill in the header strip. */
+    val currentSort: StateFlow<SettingsRepository.SortMode> = combine(ctx, _section) { c, s -> c to s }
+        .flatMapLatest { (c, s) ->
+            if (c.profileId < 0) flowOf(SettingsRepository.SortMode.PLAYLIST)
+            else when (s) {
+                MediaType.LIVE -> settings.sortLive
+                MediaType.MOVIE -> settings.sortMovies
+                MediaType.SERIES -> settings.sortSeries
+                MediaType.EPISODE -> flowOf(SettingsRepository.SortMode.PLAYLIST)
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsRepository.SortMode.PLAYLIST)
+
+    fun setSort(mode: SettingsRepository.SortMode) {
+        viewModelScope.launch {
+            when (_section.value) {
+                MediaType.LIVE -> settings.setSortLive(mode)
+                MediaType.MOVIE -> settings.setSortMovies(mode)
+                MediaType.SERIES -> settings.setSortSeries(mode)
+                MediaType.EPISODE -> { } // not applicable
+            }
+        }
+    }
+
+    // --- Items screen navigation ---
+
+    private val _selectedCategory = MutableStateFlow<CustomizeCatRow?>(null)
+    val selectedCategory: StateFlow<CustomizeCatRow?> = _selectedCategory.asStateFlow()
+
+    fun openItems(row: CustomizeCatRow) { _selectedCategory.value = row }
+    fun closeItems() { _selectedCategory.value = null }
+
+    /** Data the items ViewModel needs to page the selected category. [categoryId] is null for a
+     *  custom combined category (issue #87) — the items screen then pages the membership join. */
+    data class ItemsCtx(val categoryId: Long?, val mediaType: MediaType, val sourceIds: List<Long>)
+
+    fun ctxForItems(): ItemsCtx? {
+        val c = ctx.value
+        if (c.profileId < 0) return null
+        return ItemsCtx(
+            categoryId = _selectedCategory.value?.categoryId,
+            mediaType = _section.value,
+            sourceIds = c.sourceIdsFor(_section.value),
+        )
+    }
+
+    // --- custom combined categories (issue #87) ---
+
+    /** Creates a custom category for the selected section — the "＋ New category" pill. */
+    fun createCustomCategory(name: String) {
+        val pid = ctx.value.profileId
+        if (pid < 0) return
+        viewModelScope.launch {
+            customize.createCustomCategory(pid, _section.value, name)
+        }
+    }
+
+    /**
+     * Deletes a custom combined category (issue #87). Room rows are cleared FIRST (membership +
+     * manual order inside it), then the DataStore definition — so the rail never shows a half-dead
+     * category. The provider items themselves are never touched.
+     */
+    fun deleteCustomCategory(row: CustomizeCatRow) {
+        val pid = ctx.value.profileId
+        if (pid < 0 || !CustomizeKeys.isCustom(row.key)) return
+        viewModelScope.launch {
+            val type = _section.value
+            // Capture stable member keys first so deleting a destination restores any provider
+            // origins those items left when they were moved here.
+            val formerMemberKeys = customCategoryDao.stableItemKeys(pid, row.key).toSet()
+            // 1) Room: drop the category's membership + its content_order rows (the category's own
+            //    rail-order rows ride the same contextKey as the browse screens' reorder).
+            customCategoryDao.clearContext(pid, type, row.key)
+            contentOrderDao.clearContext(pid, type, row.key)
+            // 2) DataStore: remove the definition + any hide/rename pins on it.
+            customize.deleteCustomCategory(pid, type, row.key, formerMemberKeys)
+        }
     }
 
     fun setCategoryHidden(row: CustomizeCatRow, hidden: Boolean) {
@@ -190,19 +284,7 @@ class CustomizeViewModel(
      * The block keeps its internal order; a move that would run off either end is a no-op.
      */
     private fun moveBlock(lo: Int, hi: Int, kind: MoveKind) {
-        val current = rows.value
-        if (lo < 0 || hi > current.lastIndex || lo > hi) return
-        val target = when (kind) {
-            MoveKind.UP -> if (lo == 0) return else lo - 1
-            MoveKind.DOWN -> if (hi == current.lastIndex) return else lo + 1
-            MoveKind.TOP -> if (lo == 0) return else 0
-            MoveKind.BOTTOM -> if (hi == current.lastIndex) return else current.size - (hi - lo + 1)
-        }
-        val block = current.subList(lo, hi + 1).toList()
-        val reordered = current.toMutableList().apply {
-            subList(lo, hi + 1).clear()
-            addAll(target, block)
-        }
+        val reordered = moveBlock(rows.value, lo, hi, kind) ?: return
         viewModelScope.launch {
             customize.setCategoryOrder(ctx.value.profileId, _section.value, reordered.map { it.key })
         }
@@ -214,81 +296,69 @@ class CustomizeViewModel(
         }
     }
 
-    // --- range (span) select: long-press a Hide or move button to anchor, press another to set the
-    // end. A HIDE span then hides/shows the whole block; a MOVE span walks it up/down/top/bottom. ---
+    // --- range (span) select: delegated to SpanSelector; persistence stays here. ---
 
-    /** Begins a hide/show range at [row] (its Hide button was long-pressed). */
-    fun beginRange(row: CustomizeCatRow) {
-        _rangeMode.value = RangeMode.HIDE
-        _rangeEndKey.value = null
-        _rangeAnchorKey.value = row.key
-    }
+    fun beginRange(row: CustomizeCatRow) = span.beginRange(row.key)
+    fun beginMoveRange(row: CustomizeCatRow) = span.beginMoveRange(row.key)
+    fun cancelRange() = span.cancel()
+    fun keysInRange(endRow: CustomizeCatRow): List<String>? = span.keysInRange(endRow)
 
-    /** Begins a move range at [row] (one of its ⤒ ↑ ↓ ⤓ buttons was long-pressed). */
-    fun beginMoveRange(row: CustomizeCatRow) {
-        _rangeMode.value = RangeMode.MOVE
-        _rangeEndKey.value = null
-        _rangeAnchorKey.value = row.key
-    }
-
-    fun cancelRange() {
-        _rangeAnchorKey.value = null
-        _rangeEndKey.value = null
-        _rangeMode.value = RangeMode.HIDE
-    }
-
-    /**
-     * Keys of every category between the current anchor and [endRow], inclusive, in displayed
-     * order — independent of which end was picked first. Null if there is no valid anchor.
-     */
-    fun keysInRange(endRow: CustomizeCatRow): List<String>? {
-        val anchorKey = _rangeAnchorKey.value ?: return null
-        val current = rows.value
-        val anchorIndex = current.indexOfFirst { it.key == anchorKey }
-        val endIndex = current.indexOfFirst { it.key == endRow.key }
-        if (anchorIndex < 0 || endIndex < 0) return null
-        val lo = minOf(anchorIndex, endIndex)
-        val hi = maxOf(anchorIndex, endIndex)
-        return current.subList(lo, hi + 1).map { it.key }
-    }
-
-    /** Applies hide/show to the whole span ending at [endRow], then clears the range. */
     fun applyRange(endRow: CustomizeCatRow, hidden: Boolean) {
-        val keys = keysInRange(endRow) ?: return
+        val keys = span.keysInRange(endRow) ?: return
         viewModelScope.launch {
             customize.setCategoriesHidden(ctx.value.profileId, _section.value, keys, hidden)
         }
-        cancelRange()
+        span.cancel()
     }
 
-    /**
-     * Moves the whole selected block one step [kind]. The first press after anchoring uses [endRow]
-     * as the span end and locks the block in; later presses reuse that block, so ↑/↓/⤒/⤓ can be
-     * pressed repeatedly to walk it. The selection survives the move — Back or Cancel clears it.
-     */
     fun moveRange(endRow: CustomizeCatRow, kind: MoveKind) {
-        val anchorKey = _rangeAnchorKey.value ?: return
-        val endKey = _rangeEndKey.value ?: endRow.key
+        val anchorKey = span.anchorKey.value ?: return
+        val endKey = span.endKey.value ?: endRow.key
         val current = rows.value
         val anchorIndex = current.indexOfFirst { it.key == anchorKey }
         val endIndex = current.indexOfFirst { it.key == endKey }
         if (anchorIndex < 0 || endIndex < 0) return
-        _rangeEndKey.value = endKey
+        span.setEndKey(endKey)
         moveBlock(minOf(anchorIndex, endIndex), maxOf(anchorIndex, endIndex), kind)
     }
 
+    val rangeSelectedKeys: StateFlow<Set<String>> = span.selectedKeys
+
+    // --- bulk rename (issue #86) ---
+
     /**
-     * Keys of every row in the span currently selected — the anchor alone until an end is picked.
-     * Drives the block highlight; empty when no range is in progress.
+     * One-shot bulk-rename flow for the current section's category rows. Every accepted rename lands
+     * in ONE [CustomizationStore] write; restore clears only the selected keys' entries.
      */
-    val rangeSelectedKeys: StateFlow<Set<String>> =
-        combine(_rangeAnchorKey, _rangeEndKey, rows) { anchorKey, endKey, current ->
-            if (anchorKey == null) return@combine emptySet()
-            val anchorIndex = current.indexOfFirst { it.key == anchorKey }
-            if (anchorIndex < 0) return@combine emptySet()
-            val endIndex = endKey?.let { k -> current.indexOfFirst { it.key == k } } ?: anchorIndex
-            if (endIndex < 0) return@combine setOf(anchorKey)
-            current.subList(minOf(anchorIndex, endIndex), maxOf(anchorIndex, endIndex) + 1)
-                .mapTo(mutableSetOf()) { it.key }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+    val bulk = BulkRenameSession(
+        scope = viewModelScope,
+        persist = { renames ->
+            val pid = ctx.value.profileId
+            if (pid >= 0) customize.applyBulkRenames(pid, _section.value, renames)
+        },
+        restore = { keys ->
+            val pid = ctx.value.profileId
+            if (pid >= 0) customize.clearCategoryNames(pid, _section.value, keys)
+        },
+        existingNames = { selectedKeys ->
+            val pid = ctx.value.profileId
+            if (pid < 0) emptySet()
+            else customize.observe(pid, _section.value).first().categoryNames
+                .filterKeys { it !in selectedKeys }
+                .values.toSet() + rows.value.filter { it.key !in selectedKeys }.map { it.originalName }
+        },
+    )
+
+    fun beginRenameRange(row: CustomizeCatRow) = span.beginRenameRange(row.key)
+
+    /**
+     * Ends the RENAME span at [endRow] and opens the bulk flow over the spanned rows' ORIGINAL
+     * names. Returns null when no span is active — the caller then opens the single-row rename.
+     */
+    fun finishRenameRange(endRow: CustomizeCatRow): List<String>? {
+        val keys = span.finishRenameRange(endRow.key) ?: return null
+        val byKey = rows.value.associateBy { it.key }
+        bulk.start(keys.mapNotNull { byKey[it]?.let { row -> row.key to row.originalName } })
+        return keys
+    }
 }

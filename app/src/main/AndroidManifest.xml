@@ -87,6 +87,7 @@
             android:banner="@drawable/tv_banner"
             android:exported="true"
             android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustPan"
             android:theme="@style/Theme.OwnTV.Starting">
             <!-- LEANBACK_LAUNCHER shows it on TV launchers; LAUNCHER shows it on phone/tablet/box home
                  screens (so non-TV devices get an app icon, not just an install). -->

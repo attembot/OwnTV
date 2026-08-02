@@ -194,7 +194,8 @@ or **narrow the whole app to just one**.
   EPG, or the provider's short guide). The Now line has a thin progress bar and the minutes left, and
   updates by itself. It's informational only — it never takes D‑pad focus.
 - **Left key → channel list**: with the on‑screen controls hidden, press **Left** to pop up a **channel
-  list overlay** for the **playing channel's own category** (its name is the heading) — scroll and **OK**
+  list overlay** for the browse context the channel was opened from — **Favorites, History, All Channels,
+  a provider folder or a custom category** (its name is the heading) — scroll and **OK**
   to switch channels without leaving full‑screen. Each row also shows the **current programme** (small
   line) so you can pick by what's on. Press **Back** to close it.
 - 🗂️ **Left again → category browser**: from that channel list, press **Left** a second time for a list of
@@ -206,7 +207,7 @@ or **narrow the whole app to just one**.
   watched**, so you can hop back without leaving full screen. Press **Right** again, or **Back**, to close.
 - ⓘ **Stream info** is the right‑most button on the control bar; **Back** exits full screen (there's no
   separate exit button).
-- **CH+ / CH−** (or Up/Down on the channel‑list overlay) zap through the current category. **CH+, D‑pad
+- **CH+ / CH−** (or Up/Down on the channel‑list overlay) zap through that same playback context. **CH+, D‑pad
   Up and Next all move to the next channel**; **CH−, D‑pad Down and Previous** to the previous one. The
   list wraps, so CH− on the first channel lands on the last, and CH+ on the last returns to the first.
   D‑pad Up/Down zap only while the controls are hidden — with the control bar up they navigate it.
@@ -519,6 +520,41 @@ For **movies and series episodes** (streamed or downloaded), the player's **Subt
   individual channels, movies and series from one place. Pick a section at the top (Live TV / Movies /
   Series) — hidden items are listed first, each with an **Unhide** button, and your categories follow below.
   With a long provider category list, use **CH+ / CH−** to page it (long‑press = first/last folder).
+  - 🗂️ **Open a category's items**: focus a category **name** and press **OK** — every channel, movie or
+    series in it opens as its own list (paged, so even a huge category opens instantly). Hidden items
+    show up there marked **Hidden**, with a **Show** button; each Live channel row also has **Rename**,
+    and every row has the usual reorder buttons. **Back** returns to the category list.
+  - ⚡ **Hide, show or rename every item at once — no separate “Hide all / Show all” button needed**:
+    on the **first item**, focus the action you want (**Hide**, **Show**, or **Rename** where shown) and
+    **long‑press** it to enter span mode. Then **long‑press CH−** to jump straight to the **last item**
+    while keeping the whole range selected, and press the same action on that last row. Every item from
+    first to last is applied together. Short‑press CH− / CH+ can skip through smaller spans;
+    long‑press **CH+** returns straight to the first item.
+  - ✏️ **Bulk rename (#86)**: **long‑press Rename** on a category (or an item in Live TV) to start a
+    rename span, then press **Rename** on the last row — every row in between is selected. Movies and
+    Series have no per‑row Rename, so their item lists get a **✎ Rename items** pill in the header that
+    selects the whole category. From the popup:
+    - **✎ Add rule** — add or remove a **prefix** or **suffix**. Separate several removable alternatives
+      with semicolons; the case-insensitive and trim-leftovers options handle capitalization and
+      separators. Rules run from top to bottom, and the **live review** shows every proposed name
+      before anything is written.
+    - **✨ Auto cleanup** — creates editable rules for country/provider tags, quality and codec tags,
+      emoji, symbols and stray separators, then opens the same review.
+    - **↺ Restore original names** — undoes a bulk rename for the whole span; the only undo, always
+      available.
+    Renamed names are per profile, survive re‑syncs, and show everywhere the original name does —
+    Live TV, Movies, Series, search and recently‑watched.
+  - 🗂️ **Custom combined categories (#87)**: press **＋ New category** at the top to create your own
+    combined category for the section. It appears as its own rail at the top of Browse (Live TV /
+    Movies / Series). Fill it from:
+    - **Live/Movies/Series context menu → Move to category…**, or
+    - the **Move to…** button on the Customize item list.
+    A **"Keep in <origin> as well"** checkbox decides whether the item stays in its original folder
+    or leaves it (items that leave are still findable in **All** and search; moving out of Favorites
+    un‑favourites them). Combined categories can be **renamed** (its rename dialog has a **Delete**
+    button — deleting removes the category, items stay in their original folders), **hidden**,
+    **reordered as a block** with the span trick, and their items can be **reordered manually** with
+    the row arrows. They're per profile and ride in Backup & Restore.
   - **Hide a range of categories fast**: focus a category's **Hide** button and **long‑press (select‑hold)** it to
     enter **span/range mode**. Then scroll **up or down** — every category between your starting point and the
     category you land on gets hidden together as a range. Handy for quickly hiding a big block of categories (or
@@ -532,9 +568,10 @@ For **movies and series episodes** (streamed or downloaded), the player's **Subt
   - 🗂️ **New category behavior (Show / Hide)**: at the top of the screen, choose what happens to a
     category your provider adds on a **later re-sync** — **Show** (default) or **Hide** it automatically.
     Handy if you keep only a few categories visible and don't want new ones popping up. It's per profile
-    and rides in Backup & Restore. When a re-sync changes categories, the completion message tells you how
-    many were **added / removed**. With two or more playlists in view, category lists are **grouped by
-    provider** and each Customize row shows which provider it belongs to.
+    and rides in Backup & Restore; the **add-source window** has the same **"Hide new categories by
+    default"** toggle, so you can set it before the first sync. When a re-sync changes categories, the
+    completion message tells you how many were **added / removed**. With two or more playlists in view,
+    category lists are **grouped by provider** and each Customize row shows which provider it belongs to.
   - 🔒 **Optional PIN lock**: tap **Set PIN** at the top-right to lock this screen. Once set, opening
     Customize Categories & Items asks for the PIN each time, so nobody else can unhide items or change your category
     setup. The PIN is per-profile and is **not** included in backups (so a restore can never lock you out).
@@ -583,11 +620,12 @@ For **movies and series episodes** (streamed or downloaded), the player's **Subt
   the top — with Live TV also restoring the last focused channel. These are independent of **App startup
   → Last channel**.
 - 🌈 **HDR** — use HDR output when the video and TV support it. Turn on for HDR/Dolby Vision content.
-- 🎞️ **Auto frame rate** (Playback, on) — in full screen, asks the TV to switch to a refresh rate matching
+- 🎞️ **Auto frame rate** (Playback, off by default) — in full screen, asks the TV to switch to a refresh rate matching
   the video (24/25/30/50/60 fps) and hands the display back on exit, so 24fps films and 25/50fps
   broadcasts stop juddering on a 60Hz panel. Works for Live TV and VOD on both engines, and never
-  changes resolution. Turn it off if your TV or receiver re-handshakes HDMI noisily on every channel
-  change.
+  changes resolution. Enable it only if your TV or receiver switches refresh rates cleanly without a
+  visible HDMI re-handshake. The v4.1.6 update resets it to Off once for existing users; changing it
+  afterward is remembered normally, and Off disables both ExoPlayer and mpv frame-rate requests.
 - 🧩 **Hardware decoder** (Video Player Settings) — hardware decoding is on for smooth 4K; switch to software
   only if a specific codec misbehaves.
 - 📡 **Live latency** (Video Player Settings) — how close to the live edge Live TV plays, trading latency

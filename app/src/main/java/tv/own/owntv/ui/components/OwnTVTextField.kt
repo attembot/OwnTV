@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -83,7 +85,10 @@ fun OwnTVTextField(
     var editing by remember { mutableStateOf(false) }
     val pillFocus = remember { FocusRequester() }
     val innerFocus = remember { FocusRequester() }
+    val bringIntoView = remember { BringIntoViewRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
+    val tvImeWatcher = LocalTvImeWatcher.current
+    val tvImeMetrics = LocalTvImeMetrics.current
     val shape = RoundedCornerShape(12.dp)
     val focused = fieldFocused || editing
     var showPassword by remember { mutableStateOf(false) }
@@ -101,9 +106,26 @@ fun OwnTVTextField(
     }
 
     LaunchedEffect(editing) {
-        if (editing) runCatching { innerFocus.requestFocus(); keyboard?.show() }
+        if (editing) {
+            // Tell the shared popup before showing the IME. If this TV publishes no inset/frame
+            // change, the calibrated estimate still constrains the modal immediately.
+            tvImeWatcher?.onImeRequested()
+            runCatching { innerFocus.requestFocus() }
+            keyboard?.show()
+            kotlinx.coroutines.delay(120)
+            runCatching { bringIntoView.bringIntoView() }
+        } else {
+            tvImeWatcher?.onImeDismissed()
+        }
     }
-
+    // A measured inset/frame can arrive after the keyboard animation. Bring the existing field into
+    // the dialogPanel scroll viewport again using the final geometry.
+    LaunchedEffect(editing, tvImeMetrics.keyboardTopPx, tvImeMetrics.visible) {
+        if (editing && tvImeMetrics.visible) {
+            kotlinx.coroutines.delay(32)
+            runCatching { bringIntoView.bringIntoView() }
+        }
+    }
     Column(modifier = modifier) {
         Text(label, style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant)
         Spacer(Modifier.height(6.dp))
@@ -134,15 +156,17 @@ fun OwnTVTextField(
                     value = value,
                     onValueChange = onValueChange,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 14.dp)
-                        .focusRequester(innerFocus)
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 14.dp)
+                    .bringIntoViewRequester(bringIntoView)
+                    .focusRequester(innerFocus)
                         .focusProperties { canFocus = editing }
                         .onFocusChanged { if (editing && !it.isFocused) editing = false }
                         .onPreviewKeyEvent {
                             if (it.key == Key.Back) {
                                 if (it.type == KeyEventType.KeyUp) {
                                     editing = false
+                                    keyboard?.hide()
                                     runCatching { pillFocus.requestFocus() }
                                 }
                                 true
@@ -154,7 +178,11 @@ fun OwnTVTextField(
                     singleLine = true,
                     cursorBrush = SolidColor(colors.primary),
                     keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { editing = false; runCatching { pillFocus.requestFocus() } }),
+                    keyboardActions = KeyboardActions(onDone = {
+                        editing = false
+                        keyboard?.hide()
+                        runCatching { pillFocus.requestFocus() }
+                    }),
                     visualTransformation = if (isPassword && !showPassword) PasswordVisualTransformation() else VisualTransformation.None,
                     decorationBox = { inner ->
                         Box(Modifier.fillMaxWidth()) {

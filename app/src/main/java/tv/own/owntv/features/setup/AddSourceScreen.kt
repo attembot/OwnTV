@@ -21,6 +21,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,14 +36,21 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 import tv.own.owntv.core.companion.CompanionPayload
+import tv.own.owntv.core.database.dao.ProfileDao
+import tv.own.owntv.core.database.dao.resolveExistingProfileId
 import tv.own.owntv.core.database.entity.SourceEntity
 import tv.own.owntv.core.model.SourceType
 import tv.own.owntv.core.sync.SyncScopeChoice
 import tv.own.owntv.features.settings.PickerDialog
 import tv.own.owntv.features.settings.data.PlaylistAutoRefresh
+import tv.own.owntv.features.settings.data.SettingsRepository
 import tv.own.owntv.ui.components.BrowseMode
 import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.OwnTVButton
@@ -157,6 +165,21 @@ fun AddSourceScreen(
     val firstFocus = remember { FocusRequester() }
     val startImportFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
+
+    // Profile-wide "hide new categories on sync" default (issue #87, Phase 4). Written straight to
+    // DataStore — no callback signature change — so it lands on the ACTIVE profile at add time. The row
+    // is only shown while ADDING (an edit re-syncs nothing new) and only when a profile exists (the
+    // setup wizard may still be profile-less; the value defaults to off there).
+    val settings: SettingsRepository = koinInject()
+    val profileDao: ProfileDao = koinInject()
+    val scope = rememberCoroutineScope()
+    var hideNewCatsProfile by remember { mutableStateOf(-1L) }
+    LaunchedEffect(Unit) {
+        val preferred = settings.activeProfileId.first()
+        hideNewCatsProfile = profileDao.resolveExistingProfileId(preferred) ?: -1L
+    }
+    val hideNewCats by settings.hideNewCategoriesDefault(hideNewCatsProfile)
+        .collectAsStateWithLifecycle(initialValue = false)
 
     // Pre-fill from a Remote (companion) submission handed off by the host. StateFlow replays its
     // current value to this new collector, so the payload posted before this screen mounted still lands.
@@ -367,6 +390,15 @@ fun AddSourceScreen(
                 SyncScopeRow(label = "Movies", desc = "VOD movie catalog", value = syncMovies, editing = editing) { syncMovies = it }
                 Spacer(Modifier.height(8.dp))
                 SyncScopeRow(label = "Series", desc = "TV series catalog", value = syncSeries, editing = editing) { syncSeries = it }
+            }
+
+            if (!editing && hideNewCatsProfile >= 0) {
+                Spacer(Modifier.height(16.dp))
+                ToggleRow(
+                    label = "Hide new categories by default",
+                    desc = "Profile-wide: categories that appear on future syncs start hidden. See them anytime in Customize.",
+                    checked = hideNewCats,
+                ) { hidden -> scope.launch { settings.setHideNewCategoriesDefault(hideNewCatsProfile, hidden) } }
             }
 
             Spacer(Modifier.height(28.dp))
