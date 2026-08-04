@@ -36,6 +36,14 @@ android {
         // than any published release and the in-app updater never offers an "update" while developing.
         versionName = System.getenv("VERSION_NAME") ?: "99.99.99"
 
+        // Opt-in local diagnostic APKs keep the rolling playback trace enabled even when they are
+        // release-signed (so they can update an installed production build without changing its data).
+        buildConfigField(
+            "boolean",
+            "DIAGNOSTIC_BUILD",
+            (providers.gradleProperty("diagnosticBuild").orNull == "true").toString(),
+        )
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // (The fork's old defaultConfig arm-only abiFilters is gone: upstream's `standard` flavor below
         // now ships exactly those two ARM ABIs, and defaultConfig filters would UNION into the x86_64

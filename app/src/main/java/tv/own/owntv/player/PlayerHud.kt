@@ -201,6 +201,8 @@ fun PlayerHud(
 
     var controlsVisible by remember { mutableStateOf(true) }
     var showInfo by remember { mutableStateOf(false) } // stream technical-info overlay
+    // Used only by "Report this stream", which writes the current readout into the playback log (F18).
+    val reportContext = androidx.compose.ui.platform.LocalContext.current
     var wakeTick by remember { mutableIntStateOf(0) }
     val forceShow = error != null || dialog != HudDialog.NONE
     // First Back hides the controls (instead of leaving the channel); with the controls already hidden
@@ -499,6 +501,22 @@ fun PlayerHud(
                     compatMode = compatMode, onToggleCompatMode = toggleCompat,
                     vodOnExo = vodOnExo, onToggleVodEngine = toggleVod,
                     onInfo = { showInfo = !showInfo }, infoOn = showInfo,
+                    onReport = {
+                        val meta = player.currentMeta.value
+                        val snapshot = buildString {
+                            appendLine(player.streamInfo().joinToString("\n") { (k, v) -> "  $k: $v" })
+                            appendLine("  position: ${formatTime(position)}${if (duration > 0) " / ${formatTime(duration)}" else ""}")
+                        }
+                        PlaybackErrorLog.report(
+                            context = reportContext,
+                            engine = engineChip ?: "?",
+                            live = isLive,
+                            title = meta.title,
+                            snapshot = snapshot,
+                        )
+                        engineMsg = "Stream report saved to the playback log"
+                        engineFlash++
+                    },
                     favorite = favorite, onToggleFavorite = onToggleFavorite,
                     onOpenDialog = { dialog = it }, onPip = onPip, onMultiView = onMultiView, onAudioMode = onAudioMode, onBack = onBack,
                     onCornerSwap = onCornerSwap, onCornerAudio = onCornerAudio, onCornerMove = onCornerMove, onCornerGrow = onCornerGrow, onCornerShrink = onCornerShrink, onCornerClose = onCornerClose,
@@ -584,9 +602,10 @@ fun PlayerHud(
                 "Audio Track", audioTracks,
                 onSelect = { player.selectAudio(it.mpvId); dialog = HudDialog.NONE }, onOff = null,
                 onDismiss = { dialog = HudDialog.NONE },
-                // A/V-sync nudge only for VOD (mpv) — live A/V is the provider's; ExoPlayer has no audio-delay.
-                audioDelayMs = if (!isLive) audioDelayMs else null,
-                onAdjustAudioDelay = if (!isLive) ({ d -> player.adjustAudioDelay(d) }) else null,
+                // A/V-sync nudge wherever the engine can actually shift audio: mpv, VOD *and* live (a live
+                // stream can arrive with the provider's own drift baked in). Hidden on ExoPlayer (F19e).
+                audioDelayMs = if (player.audioDelayAvailable()) audioDelayMs else null,
+                onAdjustAudioDelay = if (player.audioDelayAvailable()) ({ d -> player.adjustAudioDelay(d) }) else null,
             )
         }
         HudDialog.SUBS -> {
@@ -849,7 +868,7 @@ private fun BottomBar(
     onScrubLive: ((Int) -> Unit)?, timeshiftOffsetSec: Int?,
     compatMode: Boolean?, onToggleCompatMode: (() -> Unit)?,
     vodOnExo: Boolean?, onToggleVodEngine: (() -> Unit)?,
-    onInfo: (() -> Unit)? = null, infoOn: Boolean = false,
+    onInfo: (() -> Unit)? = null, infoOn: Boolean = false, onReport: (() -> Unit)? = null,
     favorite: Boolean = false, onToggleFavorite: (() -> Unit)? = null,
     onOpenDialog: (HudDialog) -> Unit, onPip: (() -> Unit)?, onMultiView: (() -> Unit)? = null, onAudioMode: (() -> Unit)?, onBack: () -> Unit,
     onCornerSwap: (() -> Unit)? = null, onCornerAudio: (() -> Unit)? = null, onCornerMove: (() -> Unit)? = null, onCornerGrow: (() -> Unit)? = null, onCornerShrink: (() -> Unit)? = null, onCornerClose: (() -> Unit)? = null,
@@ -938,6 +957,11 @@ private fun BottomBar(
                 // Parked at the far right, where the redundant exit-fullscreen button used to sit (Back
                 // already leaves the player, so that button never did anything the remote couldn't).
                 if (onInfo != null) CtrlButton(OwnTVIcon.INFO, active = infoOn) { onInfo() }
+                // "Report this stream": copies the readout the user is looking at into the playback log,
+                // so a "this channel judders" complaint carries the codec/decoder/bitrate that caused it.
+                // Only offered while the info overlay is open — there is nothing to report otherwise, and
+                // the bar stays as short as it was for everyone who never needs this.
+                if (infoOn && onReport != null) CtrlButton(OwnTVIcon.SHARE) { onReport() }
             }
         }
     }

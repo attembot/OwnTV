@@ -107,6 +107,31 @@ object FrameRateController {
     /** 1..MAX_MULTIPLE if [refreshRate] is (about) that many times [fps], else null. */
     private fun multipleOf(refreshRate: Float, fps: Float): Int? =
         (1..MAX_MULTIPLE).firstOrNull { abs(refreshRate - it * fps) <= TOLERANCE_HZ }
+
+    /**
+     * The refresh rate a matching display mode would give for [fps], or null when switching would not
+     * help — because the display is already on a clean multiple, or because no mode at the current
+     * resolution is one. Used to decide whether suggesting Auto frame rate is honest (F13): on a panel
+     * with only a 60 Hz mode, 25 fps judder cannot be fixed by AFR and the app must not pretend it can.
+     */
+    fun betterRefreshRateFor(activity: Activity, fps: Float): Float? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || fps <= 0f) return null
+        return runCatching {
+            val display: Display = activity.windowManager.defaultDisplay ?: return null
+            val current = display.mode ?: return null
+            if (multipleOf(current.refreshRate, fps) != null) return null // already clean — nothing to gain
+            display.supportedModes
+                ?.filter { it.physicalWidth == current.physicalWidth && it.physicalHeight == current.physicalHeight }
+                ?.mapNotNull { mode -> multipleOf(mode.refreshRate, fps)?.let { mode to it } }
+                ?.minByOrNull { (mode, mult) -> mult * 1000 + abs(mode.refreshRate - mult * fps) }
+                ?.first?.refreshRate
+        }.getOrNull()
+    }
+
+    /** The refresh rate the display is on right now, or null if it can't be read. */
+    fun currentRefreshRate(activity: Activity): Float? = runCatching {
+        activity.windowManager.defaultDisplay?.mode?.refreshRate
+    }.getOrNull()
 }
 
 /**

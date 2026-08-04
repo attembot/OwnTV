@@ -24,6 +24,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import tv.own.owntv.core.database.dao.ProfileDao
+import tv.own.owntv.player.AudioOutputPolicy
+import tv.own.owntv.player.SurroundMode
 import tv.own.owntv.core.database.dao.SourceDao
 import tv.own.owntv.core.database.entity.SourceEntity
 import tv.own.owntv.core.network.ConnectivityObserver
@@ -42,6 +44,8 @@ import tv.own.owntv.core.database.dao.resolveExistingProfileId
 import tv.own.owntv.core.launcher.LauncherIntegrationRepository
 import tv.own.owntv.features.settings.data.ChNavLimits
 import tv.own.owntv.features.settings.data.EpgAutoRefresh
+import tv.own.owntv.features.settings.data.PanelSection
+import tv.own.owntv.features.settings.data.PanelShares
 import tv.own.owntv.features.settings.data.PlaylistAutoRefresh
 import tv.own.owntv.features.settings.data.SettingsRepository
 import tv.own.owntv.features.settings.data.SubtitleStyle
@@ -264,11 +268,23 @@ class SettingsViewModel(
         viewModelScope.launch { settings.setAutoFrameRate(enabled) }
     }
 
-    val surroundSound: StateFlow<Boolean> = settings.surroundSound
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+    // The old surround BOOLEAN is gone from here: [surroundMode] replaced it, and the leftover flow
+    // defaulted to `true` where the setting's own default is `false` — a trap for anyone who wired a UI
+    // to it. The legacy key itself still lives in SettingsRepository, which reads it so an upgrading
+    // user's old choice carries into the three-state setting.
+    val surroundMode: StateFlow<SurroundMode> = settings.surroundMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SurroundMode.AUTO)
 
-    fun setSurroundSound(enabled: Boolean) {
-        viewModelScope.launch { settings.setSurroundSound(enabled) }
+    /** Cycle Auto → Stereo only → Surround → Auto. Any change clears the session's stereo latch: the
+     *  user touching this control is explicitly asking the audio output for another chance. */
+    fun cycleSurroundMode() {
+        val next = when (surroundMode.value) {
+            SurroundMode.AUTO -> SurroundMode.STEREO
+            SurroundMode.STEREO -> SurroundMode.SURROUND
+            SurroundMode.SURROUND -> SurroundMode.AUTO
+        }
+        AudioOutputPolicy.clearLatch()
+        viewModelScope.launch { settings.setSurroundMode(next) }
     }
 
     val autoPlayNext: StateFlow<Boolean> = settings.autoPlayNext
@@ -300,6 +316,21 @@ class SettingsViewModel(
     /** Nudge the manual UTC offset by [deltaMinutes] (the picker's − / + steps), clamped to range. */
     fun adjustCatchupOffset(deltaMinutes: Int) {
         viewModelScope.launch { settings.setCatchupOffsetMinutes(catchupOffsetMinutes.value + deltaMinutes) }
+    }
+
+    /** Global guide shift in minutes (0 = off). Per-channel overrides live in the channel menu. */
+    val epgOffsetMinutes: StateFlow<Int> = settings.epgOffsetMinutes
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+
+    val epgOffsetRangeMinutes: IntRange = settings.epgOffsetRangeMinutes
+
+    /** Nudge the global EPG offset by [deltaMinutes] (the picker's − / + steps), clamped to range. */
+    fun adjustEpgOffset(deltaMinutes: Int) {
+        viewModelScope.launch { settings.setEpgOffsetMinutes(epgOffsetMinutes.value + deltaMinutes) }
+    }
+
+    fun setEpgOffsetMinutes(minutes: Int) {
+        viewModelScope.launch { settings.setEpgOffsetMinutes(minutes) }
     }
 
     val androidTvHomeEnabled: StateFlow<Boolean> = settings.androidTvHomeEnabled
@@ -342,6 +373,9 @@ class SettingsViewModel(
 
     val measuredStreamStats: StateFlow<Boolean> = settings.measuredStreamStats.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
     fun setMeasuredStreamStats(enabled: Boolean) { viewModelScope.launch { settings.setMeasuredStreamStats(enabled) } }
+
+    val detailedDiagnostics: StateFlow<Boolean> = settings.detailedDiagnostics.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    fun setDetailedDiagnostics(enabled: Boolean) { viewModelScope.launch { settings.setDetailedDiagnostics(enabled) } }
 
     val directTune: StateFlow<Boolean> = settings.directTune.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
     fun setDirectTune(enabled: Boolean) { viewModelScope.launch { settings.setDirectTune(enabled) } }
@@ -413,11 +447,33 @@ class SettingsViewModel(
     val chNavDownSkip: StateFlow<Int> = settings.chNavDownSkip.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ChNavLimits.DEFAULT_SKIP)
     fun setChNavDownSkip(n: Int) { viewModelScope.launch { settings.setChNavDownSkip(n) } }
 
+    // --- Manual panel widths: one StateFlow per section, so Live/Movies/Series each read their own ---
+    private fun <T> panelFlows(source: (PanelSection) -> kotlinx.coroutines.flow.Flow<T>, initial: T): Map<PanelSection, StateFlow<T>> =
+        PanelSection.entries.associateWith {
+            source(it).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), initial)
+        }
+
+    val panelWidthEnabled: Map<PanelSection, StateFlow<Boolean>> = panelFlows(settings::panelWidthEnabled, false)
+    val panelShares: Map<PanelSection, StateFlow<PanelShares?>> = panelFlows(settings::panelShares, null)
+
+    fun setPanelWidths(s: PanelSection, enabled: Boolean, shares: PanelShares) {
+        viewModelScope.launch { settings.setPanelWidths(s, enabled, shares) }
+    }
+
     val preferredAudioLang: StateFlow<String> = settings.preferredAudioLang.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
     fun setPreferredAudioLang(lang: String) { viewModelScope.launch { settings.setPreferredAudioLang(lang) } }
 
     val preferredSubLang: StateFlow<String> = settings.preferredSubLang.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
     fun setPreferredSubLang(lang: String) { viewModelScope.launch { settings.setPreferredSubLang(lang) } }
+
+    /** OpenSubtitles search language filter — off (the default) means results come back in every language. */
+    val subSearchFilterEnabled: StateFlow<Boolean> =
+        settings.subSearchFilterEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    fun setSubSearchFilterEnabled(enabled: Boolean) { viewModelScope.launch { settings.setSubSearchFilterEnabled(enabled) } }
+
+    val subSearchLanguages: StateFlow<String> =
+        settings.subSearchLanguages.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+    fun setSubSearchLanguages(codes: String) { viewModelScope.launch { settings.setSubSearchLanguages(codes) } }
 
     // --- Personalization (theme / accent / UI zoom) ---
     val themeMode: StateFlow<ThemeMode> = settings.themeMode.stateIn(viewModelScope, SharingStarted.Eagerly, ThemeMode.DARK)
@@ -523,6 +579,18 @@ class SettingsViewModel(
         settings.liveLatencyCustomSecs.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.features.settings.data.LiveBuffer.CUSTOM_DEFAULT)
     fun setLiveLatencyCustomSecs(secs: Int) {
         viewModelScope.launch { settings.setLiveLatencyCustomSecs(secs) }
+    }
+
+    /** "Pre-buffer" (F07): the global choice, in seconds (0 = Off). */
+    val livePrerollSecs: StateFlow<Int> =
+        settings.livePrerollSecs.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.features.settings.data.LiveBuffer.PREROLL_OFF)
+    fun setLivePrerollSecs(secs: Int) {
+        viewModelScope.launch { settings.setLivePrerollSecs(secs) }
+    }
+
+    /** Per-playlist override of the above. `-1` = follow the global value. */
+    fun setSourcePreroll(sourceId: Long, secs: Int) {
+        viewModelScope.launch { sourceDao.updateLivePreroll(sourceId, secs) }
     }
 
     val animationLevel: StateFlow<tv.own.owntv.ui.theme.AnimationLevel> =

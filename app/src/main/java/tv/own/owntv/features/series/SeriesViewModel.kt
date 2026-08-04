@@ -710,13 +710,17 @@ class SeriesViewModel(
         }
     }
 
+    /** The source User-Agent behind an episode — the external player needs it as an intent extra. */
+    private suspend fun episodeSourceUa(episode: EpisodeEntity): String? =
+        seriesDao.getSeriesById(episode.seriesId)?.let { sourceDao.getById(it.sourceId) }?.userAgent
+
     fun playEpisodeExternal(episode: EpisodeEntity) {
         _lastPlayedEpisodeId.value = episode.id
         viewModelScope.launch {
             val pid = currentProfileId()
             Log.d(TAG, "playEpisodeExternal episodeId=${episode.id}")
             val url = resolvedEpisodeUrlOrNull(episode) ?: return@launch
-            externalPlayerLauncher.launch(url, episode.name)
+            externalPlayerLauncher.launch(url, episode.name, episodeSourceUa(episode), episode.httpHeaders)
             if (pid != null) {
                 runCatching {
                     historyDao.record(WatchHistoryEntity(profileId = pid, mediaType = MediaType.EPISODE, itemId = episode.id))
@@ -748,7 +752,7 @@ class SeriesViewModel(
             if (settings.externalPlayerSeries.first()) {
                 Log.d(TAG, "playEpisodeQueue seriesId=${show.id} episodeId=${episode.id} -> external player")
                 val url = resolvedEpisodeUrlOrNull(episode) ?: return@launch
-                externalPlayerLauncher.launch(url, episode.name)
+                externalPlayerLauncher.launch(url, episode.name, sourceDao.getById(show.sourceId)?.userAgent, episode.httpHeaders)
                 if (pid != null) {
                     runCatching {
                         historyDao.record(WatchHistoryEntity(profileId = pid, mediaType = MediaType.EPISODE, itemId = episode.id))
@@ -781,6 +785,7 @@ class SeriesViewModel(
                         resolveUrl = if (needsResolve && source != null) {
                             { streamUrlResolver.resolve(source, ep.streamUrl, vod = true, episode = ep.episodeNumber) }
                         } else null,
+                        httpHeaders = ep.httpHeaders,
                     )
                 },
                 startIndex = startIndex,

@@ -55,10 +55,19 @@ sealed interface HeroItem {
     val watchNextType: LauncherWatchNextType
     val lastEngagementAt: Long
 
+    /** Playlist this item came from — used to give the preview the same source-wide User-Agent the
+     *  player uses. */
+    val sourceId: Long
+
+    /** This item's own `Key: Value` request headers (M3U), or null. Same reason as [sourceId]. */
+    val httpHeaders: String?
+
     data class MovieHero(
         val movie: MovieEntity,
         val item: LauncherContinuationItem,
     ) : HeroItem {
+        override val sourceId: Long = movie.sourceId
+        override val httpHeaders: String? = movie.httpHeaders
         override val streamUrl: String = movie.streamUrl
         override val seekToMs: Long = (item.positionMs - 10_000L).coerceAtLeast(0L)
         override val positionMs: Long = item.positionMs
@@ -72,6 +81,8 @@ sealed interface HeroItem {
         val episode: EpisodeEntity,
         val item: LauncherContinuationItem,
     ) : HeroItem {
+        override val sourceId: Long = series.sourceId // episodes hang off the series, which owns the source
+        override val httpHeaders: String? = episode.httpHeaders
         override val streamUrl: String = episode.streamUrl
         override val seekToMs: Long = if (item.watchNextType == LauncherWatchNextType.NEXT) {
             0L
@@ -88,6 +99,8 @@ sealed interface HeroItem {
         val channel: ChannelEntity,
         val watchedAt: Long,
     ) : HeroItem {
+        override val sourceId: Long = channel.sourceId
+        override val httpHeaders: String? = channel.httpHeaders
         override val streamUrl: String = channel.streamUrl
         override val seekToMs: Long = 0L
         override val positionMs: Long = 0L
@@ -262,6 +275,18 @@ class HomeViewModel(
 
     fun stopPreview() {
         heroPreviewEngine.stop()
+    }
+
+    /**
+     * Start the hero preview for [hero] with the SAME request identity the player would use: the
+     * playlist's User-Agent plus the item's own headers. Without them a source that needs a custom UA or
+     * a Referer had a home screen that 403'd on every preview while the item itself played fine.
+     */
+    suspend fun startPreview(hero: HeroItem) {
+        val ua = withContext(Dispatchers.IO) {
+            runCatching { sourceDao.getById(hero.sourceId)?.userAgent }.getOrNull()
+        }
+        heroPreviewEngine.play(hero.streamUrl, hero.seekToMs, ua, hero.httpHeaders)
     }
 
     fun refresh() {
@@ -529,22 +554,32 @@ class HomeViewModel(
         val sourceIds = (activeIds.toList() + epgIds).distinct()
         val customizations = customize.observe(profileId, tv.own.owntv.core.model.MediaType.LIVE).first()
         val programmes = linkedMapOf<Long, List<EpgProgrammeEntity>>()
+        // Channels with a guide shift query a moved window and get moved rows back, so the rail's
+        // progress bars line up with what's actually on. Grouped, so no shift = one query as before.
+        val globalShift = settings.epgOffsetMinutes.first()
         val channelKeys = channels.mapNotNull { channel ->
             val key = customizations.epgMatches[CustomizeKeys.channel(channel)] ?: channel.epgChannelId
             key?.trim()?.lowercase()
                 ?.takeIf { it.isNotEmpty() }
-                ?.let { channel.id to it }
+                ?.let { Triple(channel.id, it, tv.own.owntv.core.epg.EpgShift.minutesFor(customizations, channel, globalShift)) }
         }
-        val rowsByKey = channelKeys
-            .map { it.second }
-            .distinct()
-            .chunked(400)
-            .flatMap { epgKeys -> epgDao.programmeSummariesForChannels(sourceIds, epgKeys, windowStart, windowEnd) }
-            .groupBy { it.epgChannelId }
-
-        for ((channelId, epgKey) in channelKeys) {
-            rowsByKey[epgKey]?.takeIf { it.isNotEmpty() }?.let { programmes[channelId] = it }
+        val collected = HashMap<Long, List<EpgProgrammeEntity>>()
+        for ((shift, group) in channelKeys.groupBy { it.third }) {
+            val from = tv.own.owntv.core.epg.EpgShift.toStored(windowStart, shift)
+            val to = tv.own.owntv.core.epg.EpgShift.toStored(windowEnd, shift)
+            val rowsByKey = group
+                .map { it.second }
+                .distinct()
+                .chunked(400)
+                .flatMap { epgKeys -> epgDao.programmeSummariesForChannels(sourceIds, epgKeys, from, to) }
+                .groupBy { it.epgChannelId }
+            for ((channelId, epgKey, _) in group) {
+                rowsByKey[epgKey]?.takeIf { it.isNotEmpty() }
+                    ?.let { collected[channelId] = tv.own.owntv.core.epg.EpgShift.apply(it, shift) }
+            }
         }
+        // Back into channel order — the rail renders straight off this map's iteration order.
+        for (channel in channels) collected[channel.id]?.let { programmes[channel.id] = it }
 
         GuideSliceState(
             channels = channels,

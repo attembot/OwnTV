@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
@@ -63,7 +64,10 @@ import tv.own.owntv.features.customize.MoveToCategoryDialog
 import tv.own.owntv.ui.components.TextInputDialog
 import tv.own.owntv.core.model.DownloadStatus
 import tv.own.owntv.features.live.LiveKey
+import tv.own.owntv.features.settings.data.PanelSection
+import tv.own.owntv.features.settings.data.computePanelWidths
 import tv.own.owntv.features.settings.data.SettingsRepository
+import tv.own.owntv.features.settings.rememberPanelShares
 import tv.own.owntv.features.shell.components.CategoryRail
 import tv.own.owntv.features.shell.components.MediaDetailsScreen
 import tv.own.owntv.features.shell.components.PreviewPane
@@ -261,8 +265,14 @@ fun MoviesScreen(
         contextMovieIndex = -1
     }
 
-    Row(modifier = modifier.fillMaxSize().onFocusChanged { if (it.hasFocus) onChildFocused() }, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    // Manual panel widths (Settings → Panel Width Adjustment). Null = this section is at Default, and
+    // the three panels below keep their stock Dimens/weight() sizing.
+    val panelShares = rememberPanelShares(PanelSection.MOVIES, settingsVm)
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+    val panels = panelShares?.let { computePanelWidths(it, maxWidth) }
+    Row(modifier = Modifier.fillMaxSize().onFocusChanged { if (it.hasFocus) onChildFocused() }, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         CategoryRail(
+            width = panels?.category ?: Dimens.RailWidthFixed,
             categories = railItems.map { RailCategory(it.title, it.icon, showGenreDot = it.key is LiveKey.Folder) },
             selectedIndex = selectedIndex,
             onSelect = { idx -> railItems.getOrNull(idx)?.let { vm.select(it.key) } },
@@ -282,7 +292,7 @@ fun MoviesScreen(
 
         Column(
             modifier = Modifier
-                .weight(1.8f)
+                .then(if (panels != null) Modifier.width(panels.list) else Modifier.weight(1.8f))
                 .fillMaxSize()
                 .roundedPanel(fillColor = ContentPanelFill)
                 .onFocusChanged { gridPaneFocused = it.hasFocus }
@@ -452,7 +462,13 @@ fun MoviesScreen(
             }
         }
 
-        Box(modifier = Modifier.weight(1f).fillMaxSize().roundedPanel(fillColor = PreviewPanelFill).padding(Dimens.GapLarge)) {
+        Box(
+            modifier = Modifier
+                .then(if (panels != null) Modifier.width(panels.preview) else Modifier.weight(1f))
+                .fillMaxSize()
+                .roundedPanel(fillColor = PreviewPanelFill)
+                .padding(Dimens.GapLarge),
+        ) {
             MovieDetailsPane(
                 movie = selectedMovie,
                 meta = selectedMovieMeta?.takeIf { it.movieId == selectedMovie?.id }?.cache,
@@ -461,6 +477,7 @@ fun MoviesScreen(
                 downloadStrip = selectedMovie?.let { m -> downloadStates[m.id]?.let { tv.own.owntv.ui.components.downloadStripFor(listOf(it)) } },
             )
         }
+    }
     }
 
     resumePrompt?.let { (m, pos) ->

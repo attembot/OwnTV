@@ -39,15 +39,17 @@ class SubtitleSearchViewModel(
         data class SignedOut(val sessionExpired: Boolean = false) : UiState
         data object Loading : UiState
         data class Results(val results: List<Result>, val showingAllLanguages: Boolean) : UiState
-        data object Empty : UiState
+
+        /** [showingAllLanguages] false = a language filter was applied, so widening is worth offering. */
+        data class Empty(val showingAllLanguages: Boolean) : UiState
         data class Error(val message: String) : UiState
     }
 
     private val _state = MutableStateFlow<UiState>(UiState.Loading)
     val state: StateFlow<UiState> = _state.asStateFlow()
 
-    /** Prefilled title for the "Edit search" field (the current item's title). */
-    val initialQuery: String get() = controller.current.value?.title.orEmpty()
+    /** Prefilled title for the "Edit search" field (the cleaned title the search itself uses). */
+    val initialQuery: String get() = controller.searchTitle
 
     /** Non-null while a chosen subtitle is downloading (disables the list, shows progress). */
     private val _applying = MutableStateFlow<Long?>(null)
@@ -134,7 +136,8 @@ class SubtitleSearchViewModel(
         runCatching { controller.search(languages, editedQuery) }
             .onSuccess { json ->
                 val results = parse(json)
-                _state.value = if (results.isEmpty()) UiState.Empty else UiState.Results(results, showingAll)
+                _state.value =
+                    if (results.isEmpty()) UiState.Empty(showingAll) else UiState.Results(results, showingAll)
             }
             .onFailure { e -> _state.value = errorState(e) }
     }

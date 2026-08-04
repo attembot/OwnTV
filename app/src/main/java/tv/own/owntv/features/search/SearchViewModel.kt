@@ -40,6 +40,7 @@ import tv.own.owntv.core.database.entity.FavoriteEntity
 import tv.own.owntv.core.database.entity.MovieEntity
 import tv.own.owntv.core.database.entity.SeriesEntity
 import tv.own.owntv.core.database.entity.WatchHistoryEntity
+import tv.own.owntv.core.database.entity.playStreamUrl
 import tv.own.owntv.core.model.MediaType
 import tv.own.owntv.core.repository.activeProfileSources
 import tv.own.owntv.features.settings.data.SettingsRepository
@@ -257,22 +258,18 @@ class SearchViewModel(
         }
     }
 
-    fun playChannel(channel: ChannelEntity) {
-        viewModelScope.launch {
-            val source = sourceDao.getById(channel.sourceId)
-            // Stalker stores the portal cmd, not a playable URL — mint one (create_link) before playing.
-            val url = if (streamUrlResolver.needsResolve(source)) {
-                runCatching { streamUrlResolver.resolve(source!!, channel.streamUrl) }
-                    .onFailure { Log.w(TAG, "stalker resolve failed channelId=${channel.id}", it) }
-                    .getOrNull() ?: return@launch
-            } else {
-                channel.streamUrl
-            }
-            player.play(url, title = channel.name, logoUrl = channel.displayLogoUrl, isLive = true, userAgent = source?.userAgent)
-        }
+    /** The non-playback half of tuning a channel result: watch history + the recent-searches entry.
+     *  The shell calls this and then hands playback to LiveViewModel's shared path (F05), so a channel
+     *  opened from Search gets the same engine routing as one opened from Live TV. */
+    fun noteChannelPlayed(channel: ChannelEntity) {
         record(MediaType.LIVE, channel.id)
         rememberCurrentQuery()
     }
+
+    // A second live-start path used to live here as a "standalone host" fallback: mpv straight away, no
+    // ExoPlayer-first ladder, no per-channel engine pin, no learned quirks. It was unreachable in the app
+    // (the shell always supplies the callback) but it was a standing invitation for the two paths to
+    // drift, so SearchScreen now REQUIRES the shared callback and this copy is gone.
 
     fun playMovie(movie: MovieEntity) {
         viewModelScope.launch {
@@ -288,12 +285,13 @@ class SearchViewModel(
             }
             // Global external-player toggle: same chokepoint behavior as MovieViewModel.play().
             if (settings.externalPlayerMovies.first()) {
-                externalPlayerLauncher.launch(url, movie.name)
+                externalPlayerLauncher.launch(url, movie.name, source?.userAgent, movie.httpHeaders)
                 return@launch
             }
             player.play(
                 url, title = movie.name, year = movie.year?.toString(), isLive = false,
                 userAgent = source?.userAgent,
+                httpHeaders = movie.httpHeaders,
                 // P6 — same stable engine-pin identity MovieViewModel uses, so a pin made in one
                 // screen applies in the other.
                 contentKey = tv.own.owntv.core.player.enginePinKey(movie.sourceId, "MOVIE", movie.remoteId),

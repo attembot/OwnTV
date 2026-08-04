@@ -94,6 +94,9 @@ fun CategoryRail(
     // Caller-supplied list state. Defaulted so existing callers are unchanged, but Live/Movies/Series
     // pass their own so CH+- key paging can drive the rail's scroll position from the screen.
     listState: androidx.compose.foundation.lazy.LazyListState = rememberLazyListState(),
+    // Column width. Defaults to the stock rail width; Live/Movies/Series override it when the user has
+    // turned on manual panel widths for that section (see PanelWidths.kt).
+    width: androidx.compose.ui.unit.Dp = Dimens.RailWidthFixed,
 ) {
     val colors = OwnTVTheme.colors
     var hasFocus by remember { mutableStateOf(false) }
@@ -126,7 +129,7 @@ fun CategoryRail(
 
     // Fixed full-label column in the screen's Row — a real grid column (no overlay), so it takes its own
     // space and nothing reflows when focus enters/leaves it.
-    Box(modifier = modifier.fillMaxHeight().width(Dimens.RailWidthFixed).roundedPanel(fillColor = RailPanelFill)) {
+    Box(modifier = modifier.fillMaxHeight().width(width).roundedPanel(fillColor = RailPanelFill)) {
         LazyColumn(
             state = listState,
             modifier = Modifier

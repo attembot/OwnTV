@@ -19,6 +19,9 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -61,6 +64,7 @@ import org.koin.androidx.compose.koinViewModel
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import tv.own.owntv.features.customize.CustomizeScreen
+import tv.own.owntv.player.SurroundMode
 import tv.own.owntv.features.settings.HomeSettingsScreen
 import tv.own.owntv.features.settings.data.SettingsRepository
 import tv.own.owntv.features.update.UpdateDialog
@@ -97,7 +101,7 @@ import java.io.File
 
 private enum class TileTone { PRIMARY, SECONDARY, TERTIARY }
 
-private enum class SettingsTab { ROOT, SOURCES, EPG, PROFILES, BACKUP, VIDEO, MINI_PLAYER, CUSTOMIZE, HOME, NETWORK, DNS, METADATA, WEATHER, NAV_MENU, CH_NAV }
+private enum class SettingsTab { ROOT, SOURCES, EPG, PROFILES, BACKUP, VIDEO, MINI_PLAYER, CUSTOMIZE, HOME, NETWORK, DNS, METADATA, WEATHER, NAV_MENU, CH_NAV, PANEL_WIDTH }
 
 /**
  * The MD3 Settings screen (shown when [MainSection.SETTINGS] is active): grouped sections, each row
@@ -124,6 +128,7 @@ fun SettingsScreen(
     var showUpdate by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
     var showCatchupTime by remember { mutableStateOf(false) }
+    var showEpgOffset by remember { mutableStateOf(false) }
     var showClearHistory by remember { mutableStateOf(false) }
     var showAnimations by remember { mutableStateOf(false) }
     var showStartup by remember { mutableStateOf(false) }
@@ -156,6 +161,7 @@ fun SettingsScreen(
     val updateRowFocus = remember { FocusRequester() }
     val aboutRowFocus = remember { FocusRequester() }
     val catchupRowFocus = remember { FocusRequester() }
+    val epgOffsetRowFocus = remember { FocusRequester() }
     val clearHistoryRowFocus = remember { FocusRequester() }
     val animationsRowFocus = remember { FocusRequester() }
     val startupRowFocus = remember { FocusRequester() }
@@ -166,13 +172,13 @@ fun SettingsScreen(
     // doesn't visibly jump/scroll when the dialog opens or when we refocus the opener row afterward.
     val scrollState = rememberScrollState()
     var savedScroll by remember { mutableIntStateOf(0) }
-    val anyDialogOpen = showZoom || showTheme || showAccent || showFolderPicker || showUpdate || showAbout || showCatchupTime || showClearHistory || showAnimations || showStartup || showErrorLog || showBgImageChooser || showBgPicker || showGlassEffect || showBrowsing
+    val anyDialogOpen = showZoom || showTheme || showAccent || showFolderPicker || showUpdate || showAbout || showCatchupTime || showEpgOffset || showClearHistory || showAnimations || showStartup || showErrorLog || showBgImageChooser || showBgPicker || showGlassEffect || showBrowsing
     // When a dialog closes, restore focus to the row that opened it. NOTE: this restore crosses
     // INTO the root focus group from outside (the dialog), but onEnter does NOT fire for programmatic
     // requestsFocus (only for directional entry) — so dialogReturn must be cleared HERE, not in onEnter.
     // If it's left set, the next directional entry (e.g. sidebar→here) would re-route to a stale row.
     var dialogReturn by remember { mutableStateOf<FocusRequester?>(null) }
-    LaunchedEffect(showZoom, showTheme, showAccent, showFolderPicker, showUpdate, showAbout, showCatchupTime, showClearHistory, showAnimations, showStartup, showErrorLog, showBgImageChooser, showBgPicker, showGlassEffect, showBrowsing) {
+    LaunchedEffect(showZoom, showTheme, showAccent, showFolderPicker, showUpdate, showAbout, showCatchupTime, showEpgOffset, showClearHistory, showAnimations, showStartup, showErrorLog, showBgImageChooser, showBgPicker, showGlassEffect, showBrowsing) {
         if (!anyDialogOpen) {
             // When a scrim dialog is torn down, Compose's focus re-search through the newly-exposed
             // scrollable Column resets its scroll to 0 and then bringIntoView-animates to wherever
@@ -194,12 +200,13 @@ fun SettingsScreen(
     val previewAudio by settingsVm.livePreviewAudio.collectAsStateWithLifecycle()
     val hdr by settingsVm.hdrEnabled.collectAsStateWithLifecycle()
     val autoFrameRate by settingsVm.autoFrameRate.collectAsStateWithLifecycle()
-    val surroundSound by settingsVm.surroundSound.collectAsStateWithLifecycle()
+    val surroundMode by settingsVm.surroundMode.collectAsStateWithLifecycle()
     val autoPlayNext by settingsVm.autoPlayNext.collectAsStateWithLifecycle()
     val updateCheckOnStart by settingsVm.updateCheckOnStart.collectAsStateWithLifecycle()
     val channelNumbers by settingsVm.directTune.collectAsStateWithLifecycle()
     val catchupTz by settingsVm.catchupTimezone.collectAsStateWithLifecycle()
     val catchupOffset by settingsVm.catchupOffsetMinutes.collectAsStateWithLifecycle()
+    val epgOffset by settingsVm.epgOffsetMinutes.collectAsStateWithLifecycle()
     val catchupChannels by settingsVm.catchupChannelCount.collectAsStateWithLifecycle()
     val catchupPlayer by settingsVm.catchupPlayer.collectAsStateWithLifecycle()
     val accent by settingsVm.accent.collectAsStateWithLifecycle()
@@ -217,6 +224,11 @@ fun SettingsScreen(
     val rememberCatLive by settingsVm.rememberCategoryLive.collectAsStateWithLifecycle()
     val rememberCatMovies by settingsVm.rememberCategoryMovies.collectAsStateWithLifecycle()
     val rememberCatSeries by settingsVm.rememberCategorySeries.collectAsStateWithLifecycle()
+    // "Custom" on the Panel Width row as soon as any one of the three sections is switched on.
+    val panelWidthLive by settingsVm.panelWidthEnabled.getValue(tv.own.owntv.features.settings.data.PanelSection.LIVE).collectAsStateWithLifecycle()
+    val panelWidthMovies by settingsVm.panelWidthEnabled.getValue(tv.own.owntv.features.settings.data.PanelSection.MOVIES).collectAsStateWithLifecycle()
+    val panelWidthSeries by settingsVm.panelWidthEnabled.getValue(tv.own.owntv.features.settings.data.PanelSection.SERIES).collectAsStateWithLifecycle()
+    val panelWidthCustom = panelWidthLive || panelWidthMovies || panelWidthSeries
 
     // Restore focus to the row a sub-screen was opened from when the user navigates back.
     var lastTab by remember { mutableStateOf<SettingsTab?>(null) }
@@ -235,6 +247,7 @@ fun SettingsScreen(
         SettingsTab.WEATHER to FocusRequester(),
         SettingsTab.NAV_MENU to FocusRequester(),
         SettingsTab.CH_NAV to FocusRequester(),
+        SettingsTab.PANEL_WIDTH to FocusRequester(),
     ) }
     val open: (SettingsTab) -> Unit = { lastTab = it; tab = it }
     // Restore focus to the row a sub-screen was opened from when the user navigates back. Fresh entry
@@ -265,6 +278,7 @@ fun SettingsScreen(
         SettingsTab.WEATHER -> { tv.own.owntv.features.settings.WeatherSettingsScreen(onBack = { tab = SettingsTab.ROOT }, modifier = modifier); return }
         SettingsTab.NAV_MENU -> { tv.own.owntv.features.settings.NavMenuSettingsScreen(onBack = { tab = SettingsTab.ROOT }, modifier = modifier); return }
         SettingsTab.CH_NAV -> { tv.own.owntv.features.settings.ChNavSettingsScreen(onBack = { tab = SettingsTab.ROOT }, modifier = modifier); return }
+        SettingsTab.PANEL_WIDTH -> { tv.own.owntv.features.settings.PanelWidthSettingsScreen(onBack = { tab = SettingsTab.ROOT }, modifier = modifier); return }
         SettingsTab.ROOT -> Unit
     }
 
@@ -354,6 +368,32 @@ fun SettingsScreen(
             modifier = Modifier.focusRequester(rowFocus.getValue(SettingsTab.EPG)),
         )
         SettingsRow(
+            tone = TileTone.SECONDARY, icon = OwnTVIcon.EPG,
+            title = "EPG time offset",
+            desc = "Shift the whole guide when a feed's times don't match what's actually on. " +
+                "A single channel can be shifted on its own from its long-press menu (Live TV or Guide) — " +
+                "that's the one for East/West versions sharing a guide.",
+            chip = tv.own.owntv.core.epg.EpgShift.label(epgOffset),
+            chipTone = if (epgOffset == 0) TileTone.SECONDARY else TileTone.PRIMARY,
+            onClick = { savedScroll = scrollState.value; dialogReturn = epgOffsetRowFocus; showEpgOffset = true }, showChevron = true,
+            modifier = Modifier.focusRequester(epgOffsetRowFocus),
+        )
+        // Sits with the EPG offset, not with Playback: both answer "the guide/archive clock is wrong",
+        // and a user fixing one almost always looks at the other next.
+        SettingsRow(
+            tone = TileTone.SECONDARY, icon = OwnTVIcon.EPG,
+            title = "Catch-up",
+            desc = if (catchupChannels > 0) "$catchupChannels channels support catch-up · timezone and player for archive playback"
+                else "No catch-up channels available on this playlist",
+            chip = when (catchupTz) {
+                SettingsRepository.CatchupTimezone.DEVICE -> "Device"
+                SettingsRepository.CatchupTimezone.MANUAL -> utcOffsetLabel(catchupOffset)
+            },
+            chipTone = TileTone.PRIMARY,
+            onClick = { savedScroll = scrollState.value; dialogReturn = catchupRowFocus; showCatchupTime = true }, showChevron = true,
+            modifier = Modifier.focusRequester(catchupRowFocus),
+        )
+        SettingsRow(
             tone = TileTone.PRIMARY, icon = OwnTVIcon.SORT,
             title = "Customize Categories & Items", desc = "Hide & unhide items, rename & reorder categories",
             onClick = { open(SettingsTab.CUSTOMIZE) }, showChevron = true,
@@ -374,6 +414,14 @@ fun SettingsScreen(
             chipTone = if (chNavEnabled) TileTone.PRIMARY else TileTone.SECONDARY,
             onClick = { open(SettingsTab.CH_NAV) }, showChevron = true,
             modifier = Modifier.focusRequester(rowFocus.getValue(SettingsTab.CH_NAV)),
+        )
+        SettingsRow(
+            tone = TileTone.PRIMARY, icon = OwnTVIcon.ZOOM,
+            title = "Panel Width Adjustment", desc = "Resize the category, list and preview panels in Live TV, Movies & Series",
+            chip = if (panelWidthCustom) "Custom" else "Default",
+            chipTone = if (panelWidthCustom) TileTone.PRIMARY else TileTone.SECONDARY,
+            onClick = { open(SettingsTab.PANEL_WIDTH) }, showChevron = true,
+            modifier = Modifier.focusRequester(rowFocus.getValue(SettingsTab.PANEL_WIDTH)),
         )
         SettingsRow(
             tone = TileTone.PRIMARY, icon = OwnTVIcon.PLAYLIST,
@@ -491,7 +539,9 @@ fun SettingsScreen(
         )
         SettingsRow(
             tone = TileTone.PRIMARY, icon = OwnTVIcon.VIDEO,
-            title = "HDR", desc = "Use HDR output when the video & TV support it",
+            // F01: the flag only reaches mpv (`hdr-compute-peak` / tone-mapping). ExoPlayer hands HDR
+            // straight to the display and has no equivalent switch, so say which player it steers.
+            title = "HDR", desc = "Use HDR output when the video & TV support it (mpv player)",
             chip = if (hdr) "On" else "Off",
             chipTone = if (hdr) TileTone.PRIMARY else TileTone.SECONDARY,
             onClick = { settingsVm.setHdrEnabled(!hdr) },
@@ -507,10 +557,14 @@ fun SettingsScreen(
         SettingsRow(
             tone = TileTone.SECONDARY, icon = OwnTVIcon.AUDIO,
             title = "Surround sound",
-            desc = "Decode Dolby/DTS to surround (5.1/7.1) for a real 5.1/7.1 receiver. Leave OFF for TV speakers or a stereo soundbar — multichannel can lag audio behind video on some TVs/soundbars. If it drifts, nudge the player's Audio menu → A/V sync.",
-            chip = if (surroundSound) "On" else "Off",
-            chipTone = if (surroundSound) TileTone.PRIMARY else TileTone.SECONDARY,
-            onClick = { settingsVm.setSurroundSound(!surroundSound) },
+            desc = when (surroundMode) {
+                SurroundMode.AUTO -> "Auto — try Dolby/DTS surround, and switch back to stereo by itself if the TV or soundbar doesn't actually play it. Recommended."
+                SurroundMode.STEREO -> "Stereo only — always decode in the app and send plain 2.0 sound. Use this on TV speakers or a stereo soundbar, or if audio ever lags behind the picture."
+                SurroundMode.SURROUND -> "Surround — send Dolby/DTS to a real 5.1/7.1 receiver. If it goes silent or stutters, OwnTV still drops back to stereo and tells you."
+            },
+            chip = surroundMode.label,
+            chipTone = if (surroundMode == SurroundMode.STEREO) TileTone.SECONDARY else TileTone.PRIMARY,
+            onClick = { settingsVm.cycleSurroundMode() },
         )
         SettingsRow(
             tone = TileTone.SECONDARY, icon = OwnTVIcon.SKIP_NEXT,
@@ -521,19 +575,6 @@ fun SettingsScreen(
             onClick = { settingsVm.setAutoPlayNext(!autoPlayNext) },
         )
         SettingsRow(
-            tone = TileTone.SECONDARY, icon = OwnTVIcon.EPG,
-            title = "Catch-up",
-            desc = if (catchupChannels > 0) "$catchupChannels channels support catch-up · timezone and player for archive playback"
-                else "No catch-up channels available on this playlist",
-            chip = when (catchupTz) {
-                SettingsRepository.CatchupTimezone.DEVICE -> "Device"
-                SettingsRepository.CatchupTimezone.MANUAL -> utcOffsetLabel(catchupOffset)
-            },
-            chipTone = TileTone.PRIMARY,
-            onClick = { savedScroll = scrollState.value; dialogReturn = catchupRowFocus; showCatchupTime = true }, showChevron = true,
-            modifier = Modifier.focusRequester(catchupRowFocus),
-        )
-        SettingsRow(
             tone = TileTone.TERTIARY, icon = OwnTVIcon.VIDEO,
             title = "Video Player Settings", desc = "Decoder, subtitles, sync",
             onClick = { open(SettingsTab.VIDEO) }, showChevron = true,
@@ -541,7 +582,7 @@ fun SettingsScreen(
         )
         SettingsRow(
             tone = TileTone.SECONDARY, icon = OwnTVIcon.HISTORY,
-            title = "Playback error log", desc = "The last playback failures — details to read or report",
+            title = "Playback error log", desc = "Recent failures and playback events — read, export or report",
             onClick = { savedScroll = scrollState.value; dialogReturn = errorLogRowFocus; showErrorLog = true }, showChevron = true,
             modifier = Modifier.focusRequester(errorLogRowFocus),
         )
@@ -599,12 +640,22 @@ fun SettingsScreen(
                 SettingsSearchEntry("Profile", "Profiles", "viewers kids mode pin lock account", OwnTVIcon.PERSON, TileTone.SECONDARY) { open(SettingsTab.PROFILES) },
                 SettingsSearchEntry("Content", "Playlists", "m3u xtream source sync add remove", OwnTVIcon.PLAYLIST, TileTone.PRIMARY) { open(SettingsTab.SOURCES) },
                 SettingsSearchEntry("Content", "EPG Sources", "xmltv guide feed program", OwnTVIcon.EPG, TileTone.PRIMARY) { open(SettingsTab.EPG) },
+                SettingsSearchEntry("Content", "EPG time offset", "epg guide time offset shift timezone east west hours", OwnTVIcon.EPG, TileTone.SECONDARY,
+                    chip = tv.own.owntv.core.epg.EpgShift.label(epgOffset),
+                    chipTone = if (epgOffset == 0) TileTone.SECONDARY else TileTone.PRIMARY) { savedScroll = scrollState.value; dialogReturn = searchFieldFocus; showEpgOffset = true },
+                SettingsSearchEntry("Content", "Catch-up", "archive timezone offset catchup external player vlc mx", OwnTVIcon.EPG, TileTone.SECONDARY,
+                    chip = when (catchupTz) {
+                        SettingsRepository.CatchupTimezone.DEVICE -> "Device"
+                        SettingsRepository.CatchupTimezone.MANUAL -> utcOffsetLabel(catchupOffset)
+                    }) { savedScroll = scrollState.value; dialogReturn = searchFieldFocus; showCatchupTime = true },
                 SettingsSearchEntry("Content", "Guide channel logos", "channel logo icon xmltv guide picon playlist", OwnTVIcon.EPG, TileTone.SECONDARY) { open(SettingsTab.EPG) },
                 SettingsSearchEntry("Content", "Customize Categories & Items", "hide unhide rename reorder categories", OwnTVIcon.SORT, TileTone.PRIMARY) { open(SettingsTab.CUSTOMIZE) },
                 SettingsSearchEntry("Content", "Sidebar Menu Customization", "side rail icons dynamic static hide show adapt playlist", OwnTVIcon.MENU, TileTone.PRIMARY,
                     chip = navMenuMode.label, chipTone = if (navMenuMode == tv.own.owntv.features.settings.data.SettingsRepository.NavMenuMode.DYNAMIC) TileTone.PRIMARY else TileTone.SECONDARY) { open(SettingsTab.NAV_MENU) },
                 SettingsSearchEntry("Content", "CH+- Key Paging", "channel up down skip page list category channel", OwnTVIcon.PLAYLIST, TileTone.PRIMARY,
                     chip = if (chNavEnabled) "On" else "Off", chipTone = if (chNavEnabled) TileTone.PRIMARY else TileTone.SECONDARY) { open(SettingsTab.CH_NAV) },
+                SettingsSearchEntry("Content", "Panel Width Adjustment", "panel width size resize category list preview poster column layout live movies series", OwnTVIcon.ZOOM, TileTone.PRIMARY,
+                    chip = if (panelWidthCustom) "Custom" else "Default", chipTone = if (panelWidthCustom) TileTone.PRIMARY else TileTone.SECONDARY) { open(SettingsTab.PANEL_WIDTH) },
                 SettingsSearchEntry("Content", "Browsing & lists", "remember position scroll category last item live movies series reset top", OwnTVIcon.PLAYLIST, TileTone.PRIMARY) { savedScroll = scrollState.value; dialogReturn = browsingRowFocus; showBrowsing = true },
                 SettingsSearchEntry("Content", "Home screen", "rows hero reorder filter", OwnTVIcon.HOME, TileTone.SECONDARY) { open(SettingsTab.HOME) },
                 SettingsSearchEntry("Content", "Metadata (TMDB)", "posters plots cast ratings", OwnTVIcon.VIDEO, TileTone.PRIMARY) { open(SettingsTab.METADATA) },
@@ -633,19 +684,16 @@ fun SettingsScreen(
                     chip = if (hdr) "On" else "Off", chipTone = if (hdr) TileTone.PRIMARY else TileTone.SECONDARY, showChevron = false) { settingsVm.setHdrEnabled(!hdr) },
                 SettingsSearchEntry("Playback", "Auto frame rate", "afr refresh rate hz judder 24fps 25fps 50hz 60hz display mode match", OwnTVIcon.VIDEO, TileTone.PRIMARY,
                     chip = if (autoFrameRate) "On" else "Off", chipTone = if (autoFrameRate) TileTone.PRIMARY else TileTone.SECONDARY, showChevron = false) { settingsVm.setAutoFrameRate(!autoFrameRate) },
-                SettingsSearchEntry("Playback", "Surround sound", "dolby dts 5.1 7.1 receiver audio", OwnTVIcon.AUDIO, TileTone.SECONDARY,
-                    chip = if (surroundSound) "On" else "Off", chipTone = if (surroundSound) TileTone.PRIMARY else TileTone.SECONDARY, showChevron = false) { settingsVm.setSurroundSound(!surroundSound) },
+                SettingsSearchEntry("Playback", "Surround sound", "dolby dts 5.1 7.1 receiver audio stereo off disable", OwnTVIcon.AUDIO, TileTone.SECONDARY,
+                    chip = surroundMode.label, chipTone = if (surroundMode == SurroundMode.STEREO) TileTone.SECONDARY else TileTone.PRIMARY, showChevron = false) { settingsVm.cycleSurroundMode() },
                 SettingsSearchEntry("Playback", "Auto-play next episode", "autoplay series season", OwnTVIcon.SKIP_NEXT, TileTone.SECONDARY,
                     chip = if (autoPlayNext) "On" else "Off", chipTone = if (autoPlayNext) TileTone.PRIMARY else TileTone.SECONDARY, showChevron = false) { settingsVm.setAutoPlayNext(!autoPlayNext) },
-                SettingsSearchEntry("Playback", "Catch-up", "archive timezone offset catchup external player vlc mx", OwnTVIcon.EPG, TileTone.SECONDARY,
-                    chip = when (catchupTz) {
-                        SettingsRepository.CatchupTimezone.DEVICE -> "Device"
-                        SettingsRepository.CatchupTimezone.MANUAL -> utcOffsetLabel(catchupOffset)
-                    }) { savedScroll = scrollState.value; dialogReturn = searchFieldFocus; showCatchupTime = true },
                 SettingsSearchEntry("Playback", "Video Player Settings", "decoder subtitles sync", OwnTVIcon.VIDEO, TileTone.TERTIARY) { open(SettingsTab.VIDEO) },
                 SettingsSearchEntry("Playback", "Subtitle appearance", "subtitle size color colour position transparency background opacity", OwnTVIcon.SUBTITLE, TileTone.TERTIARY) { open(SettingsTab.VIDEO) },
                 SettingsSearchEntry("Playback", "Live latency", "live buffer latency delay low latency seconds close to live edge", OwnTVIcon.LIVE_TV, TileTone.TERTIARY) { open(SettingsTab.VIDEO) },
-                SettingsSearchEntry("Playback", "Playback error log", "error crash failure diagnostics report", OwnTVIcon.HISTORY, TileTone.SECONDARY) { savedScroll = scrollState.value; dialogReturn = searchFieldFocus; showErrorLog = true },
+                SettingsSearchEntry("Playback", "Pre-buffer live streams", "prebuffer preroll pre-roll start after buffering buffer before playing rebuffer stutter freeze every few seconds per playlist", OwnTVIcon.LIVE_TV, TileTone.TERTIARY) { open(SettingsTab.VIDEO) },
+                SettingsSearchEntry("Playback", "Playback error log", "error crash failure diagnostics report event export log", OwnTVIcon.HISTORY, TileTone.SECONDARY) { savedScroll = scrollState.value; dialogReturn = searchFieldFocus; showErrorLog = true },
+                SettingsSearchEntry("Playback", "Detailed playback logging", "diagnostics verbose trace logcat debug report bug live engine", OwnTVIcon.INFO, TileTone.SECONDARY) { open(SettingsTab.VIDEO) },
                 SettingsSearchEntry("Network", "Proxy", "http traffic route", OwnTVIcon.SHARE, TileTone.SECONDARY) { open(SettingsTab.NETWORK) },
                 SettingsSearchEntry("Network", "DNS", "domain lookup resolver doh dns-over-https", OwnTVIcon.SEARCH, TileTone.SECONDARY) { open(SettingsTab.DNS) },
                 SettingsSearchEntry("App", "App startup", "launch open landing", OwnTVIcon.HOME, TileTone.SECONDARY,
@@ -692,6 +740,15 @@ fun SettingsScreen(
             player = catchupPlayer,
             onSetPlayer = settingsVm::setCatchupPlayer,
             onDismiss = { showCatchupTime = false },
+        )
+    }
+    if (showEpgOffset) {
+        EpgOffsetSettingDialog(
+            offsetMinutes = epgOffset,
+            offsetRange = settingsVm.epgOffsetRangeMinutes,
+            onAdjust = settingsVm::adjustEpgOffset,
+            onReset = { settingsVm.setEpgOffsetMinutes(0) },
+            onDismiss = { showEpgOffset = false },
         )
     }
     if (showAbout) {
@@ -1056,6 +1113,8 @@ private fun PlaybackErrorLogDialog(onDismiss: () -> Unit) {
     val colors = OwnTVTheme.colors
     val context = androidx.compose.ui.platform.LocalContext.current
     var refresh by remember { mutableStateOf(0) }
+    var exportPath by remember { mutableStateOf<String?>(null) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     val entries by androidx.compose.runtime.produceState<List<tv.own.owntv.player.PlaybackErrorLog.Entry>?>(initialValue = null, refresh) {
         value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             tv.own.owntv.player.PlaybackErrorLog.read(context)
@@ -1069,11 +1128,17 @@ private fun PlaybackErrorLogDialog(onDismiss: () -> Unit) {
         modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.75f)).trapAllFocusExit().focusGroup(),
         contentAlignment = Alignment.Center,
     ) {
-        Column(modifier = Modifier.dialogPanel(width = 640.dp, padding = 28.dp)) {
+        // scroll = false: the entries live in a LazyColumn, which manages its own scrolling. A plain
+        // verticalScroll column can't work here — with 25 entries and nothing focusable inside them the
+        // panel grew past the screen and the D-pad had no way to move the scroll, so the oldest entries
+        // were simply unreachable.
+        Column(modifier = Modifier.dialogPanel(width = 640.dp, padding = 28.dp, scroll = false)) {
             Text("Playback error log", style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
             Spacer(Modifier.height(6.dp))
             Text(
-                "The most recent playback failures (newest first). Include these details when reporting a problem.",
+                "The most recent playback failures, notable events (a decode fallback, an engine handoff) " +
+                    "and any stream reports you saved from the player — newest first. Export writes them to a " +
+                    "file you can attach to a bug report.",
                 style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant,
             )
             Spacer(Modifier.height(14.dp))
@@ -1081,38 +1146,72 @@ private fun PlaybackErrorLogDialog(onDismiss: () -> Unit) {
             when {
                 list == null -> Text("Loading…", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
                 list.isEmpty() -> Text("No playback errors recorded.", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
-                else -> list.forEach { e ->
-                    Column(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(colors.surface)
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                    ) {
-                        Text(
-                            "${timeFmt.format(java.util.Date(e.atMs))}  ·  ${e.engine}  ·  ${if (e.live) "Live" else "VOD"}",
-                            style = MaterialTheme.typography.labelMedium, color = colors.primary,
-                        )
-                        e.reason?.let {
-                            Spacer(Modifier.height(2.dp))
-                            Text(it, style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
+                // Each entry is focusable even though there is nothing to activate: on a TV that is the
+                // only thing that makes a list scroll. Up from the buttons walks back through the history.
+                else -> LazyColumn(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(list) { e ->
+                        FocusableSurface(
+                            onClick = {},
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            contentAlignment = Alignment.CenterStart,
+                            surface = GlassSurface.DIALOGS,
+                        ) { _ ->
+                            Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp)) {
+                                // The kind matters at a glance now: a log full of "Event" lines next to one
+                                // "Error" tells a very different story from ten failures in a row.
+                                val kindLabel = when (e.kind) {
+                                    tv.own.owntv.player.PlaybackErrorLog.Kind.ERROR -> "Error"
+                                    tv.own.owntv.player.PlaybackErrorLog.Kind.EVENT -> "Event"
+                                    tv.own.owntv.player.PlaybackErrorLog.Kind.REPORT -> "Report"
+                                }
+                                Text(
+                                    "${timeFmt.format(java.util.Date(e.atMs))}  ·  $kindLabel  ·  ${e.engine}  ·  ${if (e.live) "Live" else "VOD"}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = if (e.kind == tv.own.owntv.player.PlaybackErrorLog.Kind.ERROR) colors.primary else colors.onSurfaceVariant,
+                                )
+                                e.reason?.let {
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(it, style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
+                                }
+                                e.spec?.let {
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(it, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+                                }
+                                e.raw?.let {
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(it, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 3, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                                }
+                                Spacer(Modifier.height(2.dp))
+                                Text("${e.model} · ${e.android}", style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
+                            }
                         }
-                        e.spec?.let {
-                            Spacer(Modifier.height(2.dp))
-                            Text(it, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
-                        }
-                        e.raw?.let {
-                            Spacer(Modifier.height(2.dp))
-                            Text(it, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 3, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                        }
-                        Spacer(Modifier.height(2.dp))
-                        Text("${e.model} · ${e.android}", style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
                     }
-                    Spacer(Modifier.height(8.dp))
                 }
+            }
+            exportPath?.let {
+                Spacer(Modifier.height(12.dp))
+                Text("Saved to $it", style = MaterialTheme.typography.bodySmall, color = colors.primary)
             }
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (!entries.isNullOrEmpty()) {
+                    // Plain-text dump next to the app's other external files, so it can be pulled over adb
+                    // or picked up by a file manager — a TV has nowhere useful to "share" to.
+                    OwnTVButton("Export", onClick = {
+                        scope.launch {
+                            val f = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                tv.own.owntv.player.PlaybackErrorLog.export(context)
+                            }
+                            exportPath = f?.absolutePath ?: "— export failed"
+                        }
+                    }, style = OwnTVButtonStyle.SECONDARY)
                     OwnTVButton("Clear log", onClick = {
                         tv.own.owntv.player.PlaybackErrorLog.clear(context)
+                        exportPath = null
                         refresh++
                     }, style = OwnTVButtonStyle.SECONDARY)
                 }
@@ -1654,7 +1753,9 @@ private fun CatchupTimeDialog(
             if (manual) {
                 Spacer(Modifier.height(22.dp))
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                    StepButton("–", enabled = offsetMinutes > offsetRange.first) { onAdjustOffset(-60) }
+                    // Dimmed, never disabled — a disabled button leaves the focus graph and the D-pad
+                    // then walks straight out of the dialog.
+                    StepButton("–", dimmed = offsetMinutes <= offsetRange.first) { onAdjustOffset(-60) }
                     Text(
                         utcOffsetLabel(offsetMinutes),
                         style = MaterialTheme.typography.headlineMedium,
@@ -1662,7 +1763,7 @@ private fun CatchupTimeDialog(
                         modifier = Modifier.width(150.dp),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     )
-                    StepButton("+", enabled = offsetMinutes < offsetRange.last) { onAdjustOffset(60) }
+                    StepButton("+", dimmed = offsetMinutes >= offsetRange.last) { onAdjustOffset(60) }
                 }
             }
             // Which player takes an archive programme. Archives are the streams the in-app engines
@@ -1687,6 +1788,73 @@ private fun CatchupTimeDialog(
             }
             Spacer(Modifier.height(24.dp))
             OwnTVButton("Done", onClick = onDismiss, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
+/**
+ * Global guide shift. Some XMLTV feeds publish in a timezone the channels don't actually air in;
+ * this moves every programme by a fixed amount. A per-channel override (channel long-press → EPG
+ * time offset) wins over it — that's what a lineup carrying both East and West feeds needs, since
+ * one global shift can only ever fix one of the two.
+ */
+@Composable
+private fun EpgOffsetSettingDialog(
+    offsetMinutes: Int,
+    offsetRange: IntRange,
+    onAdjust: (Int) -> Unit,
+    onReset: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val colors = OwnTVTheme.colors
+    val firstFocus = remember { FocusRequester() }
+    val doneFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
+    BackHandler { onDismiss() }
+    Box(
+        modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)).trapAllFocusExit().focusGroup(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier.dialogPanel(width = 480.dp, padding = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text("EPG time offset", style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Moves every programme in the guide. Use it when the whole feed is on the wrong clock; " +
+                    "for a single channel (an East/West version sharing one guide), long-press the channel " +
+                    "in Live TV or the Guide and set its own offset there.",
+                style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+            Spacer(Modifier.height(22.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                // Dimmed, never disabled: a disabled button leaves the focus graph, so reaching a limit
+                // used to drop focus out of the dialog entirely. The adjust is clamped anyway.
+                StepButton("–", dimmed = offsetMinutes <= offsetRange.first, modifier = Modifier.focusRequester(firstFocus)) { onAdjust(-30) }
+                Text(
+                    tv.own.owntv.core.epg.EpgShift.label(offsetMinutes),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = colors.primary,
+                    modifier = Modifier.width(150.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+                StepButton("+", dimmed = offsetMinutes >= offsetRange.last) { onAdjust(30) }
+            }
+            Spacer(Modifier.height(24.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (offsetMinutes != 0) {
+                    // Reset removes itself from the row (the offset becomes 0), taking the focused
+                    // element with it — so hand focus to Done in the same click.
+                    OwnTVButton(
+                        "Reset",
+                        onClick = { onReset(); runCatching { doneFocus.requestFocus() } },
+                        style = OwnTVButtonStyle.SECONDARY, modifier = Modifier.weight(1f),
+                    )
+                }
+                OwnTVButton("Done", onClick = onDismiss, modifier = Modifier.weight(1f).focusRequester(doneFocus))
+            }
         }
     }
 }

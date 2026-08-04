@@ -42,6 +42,69 @@ import tv.own.owntv.ui.theme.PopupFontTheme
 import tv.own.owntv.ui.components.roundedPanel
 
 /**
+ * Languages the OpenSubtitles search can be restricted to (ISO 639-1, the codes their API expects).
+ *
+ * Its own list on purpose: VideoPlayerSettingsScreen's LANGUAGES covers embedded-track matching with
+ * 3-letter codes and only 15 entries (no Greek, among many), which is far too narrow for a subtitle
+ * library that carries ~60 languages. Blank is not offered — the filter row is hidden when the toggle
+ * is off, and "off" is what means "all languages".
+ */
+private val SUB_SEARCH_LANGUAGES = listOf(
+    "ar" to "Arabic",
+    "bg" to "Bulgarian",
+    "zh-cn" to "Chinese (Simplified)",
+    "zh-tw" to "Chinese (Traditional)",
+    "hr" to "Croatian",
+    "cs" to "Czech",
+    "da" to "Danish",
+    "nl" to "Dutch",
+    "en" to "English",
+    "et" to "Estonian",
+    "fi" to "Finnish",
+    "fr" to "French",
+    "de" to "German",
+    "el" to "Greek",
+    "he" to "Hebrew",
+    "hi" to "Hindi",
+    "hu" to "Hungarian",
+    "id" to "Indonesian",
+    "it" to "Italian",
+    "ja" to "Japanese",
+    "ko" to "Korean",
+    "lv" to "Latvian",
+    "lt" to "Lithuanian",
+    "ms" to "Malay",
+    "no" to "Norwegian",
+    "fa" to "Persian",
+    "pl" to "Polish",
+    "pt-br" to "Portuguese (Brazil)",
+    "pt-pt" to "Portuguese (Portugal)",
+    "ro" to "Romanian",
+    "ru" to "Russian",
+    "sr" to "Serbian",
+    "sk" to "Slovak",
+    "sl" to "Slovenian",
+    "es" to "Spanish",
+    "sv" to "Swedish",
+    "th" to "Thai",
+    "tr" to "Turkish",
+    "uk" to "Ukrainian",
+    "vi" to "Vietnamese",
+)
+
+private fun subSearchLangName(code: String) =
+    SUB_SEARCH_LANGUAGES.firstOrNull { it.first == code }?.second ?: code.ifBlank { "Not set" }
+
+/** Device language if OpenSubtitles carries it, else English — the seed when the filter is first turned on. */
+private fun defaultSearchLang(): String {
+    val locale = java.util.Locale.getDefault()
+    val tag = "${locale.language}-${locale.country}".lowercase()
+    return SUB_SEARCH_LANGUAGES.firstOrNull { it.first == tag }?.first
+        ?: SUB_SEARCH_LANGUAGES.firstOrNull { it.first == locale.language.lowercase() }?.first
+        ?: "en"
+}
+
+/**
  * Settings → Video Player → Subtitles → OpenSubtitles account (subtitle plan §5.2/§5.3).
  * The connection is per OwnTV profile; users sign in with their own free OpenSubtitles account.
  */
@@ -51,9 +114,16 @@ fun OpenSubtitlesAccountScreen(onBack: () -> Unit, modifier: Modifier = Modifier
     val vm: OpenSubtitlesViewModel = koinViewModel()
     val state by vm.state.collectAsStateWithLifecycle()
     val error by vm.error.collectAsStateWithLifecycle()
+    // Search-language filter lives in the shared settings VM (plain DataStore prefs, not account state).
+    val settingsVm: SettingsViewModel = koinViewModel()
+    val filterEnabled by settingsVm.subSearchFilterEnabled.collectAsStateWithLifecycle()
+    val searchLang by settingsVm.subSearchLanguages.collectAsStateWithLifecycle()
 
     var showSignIn by remember { mutableStateOf(false) }
     var showDeleteSubs by remember { mutableStateOf(false) }
+    var showLangPicker by remember { mutableStateOf(false) }
+    var langPickerWasOpen by remember { mutableStateOf(false) }
+    val langRowFocus = remember { FocusRequester() }
     // Returning from the Delete-subtitles screen should land back on the row that opened it,
     // not the first row (Sign out / Sign in).
     var returnedFromDelete by remember { mutableStateOf(false) }
@@ -170,8 +240,36 @@ fun OpenSubtitlesAccountScreen(onBack: () -> Unit, modifier: Modifier = Modifier
             }
         }
 
+        // Search language filter (available regardless of sign-in state — it's a search preference).
+        Spacer(Modifier.height(14.dp))
+        GroupLabel("Search")
+        Row2(
+            icon = OwnTVIcon.SUBTITLE, title = "Filter by language",
+            desc = "Off shows every language OpenSubtitles has for a title, so you can pick from the " +
+                "full list. On shows only your chosen language.",
+            chip = if (filterEnabled) "On" else "Off", primaryChip = filterEnabled,
+            onClick = {
+                // Turning the filter on with nothing chosen yet would silently behave like "off"
+                // (no codes = no filter), so seed it from the device language, falling back to English.
+                if (!filterEnabled && searchLang.isBlank()) settingsVm.setSubSearchLanguages(defaultSearchLang())
+                settingsVm.setSubSearchFilterEnabled(!filterEnabled)
+            },
+        )
+        if (filterEnabled) {
+            Spacer(Modifier.height(6.dp))
+            Row2(
+                icon = OwnTVIcon.SUBTITLE, title = "Search language",
+                desc = "Only subtitles in this language appear in search results. You can still press " +
+                    "\"All languages\" in the results to see everything for one search.",
+                chip = subSearchLangName(searchLang), chevron = true,
+                modifier = Modifier.focusRequester(langRowFocus),
+                onClick = { showLangPicker = true },
+            )
+        }
+
         // Delete downloaded subtitles (available regardless of sign-in state — cached files are local).
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(14.dp))
+        GroupLabel("Downloads")
         Row2(
             icon = OwnTVIcon.SUBTITLE, title = "Delete subtitles",
             desc = "Remove subtitles you've downloaded for movies and series.",
@@ -206,6 +304,32 @@ fun OpenSubtitlesAccountScreen(onBack: () -> Unit, modifier: Modifier = Modifier
             },
             onDismiss = { showSignIn = false },
         )
+    }
+
+    if (showLangPicker) {
+        // Searchable — the list is long enough that D-pad scrolling to e.g. Ukrainian is tedious.
+        PickerDialog(
+            title = "Search language",
+            options = SUB_SEARCH_LANGUAGES,
+            selected = searchLang,
+            searchable = true,
+            onSelect = {
+                if (it != searchLang) settingsVm.setSubSearchLanguages(it)
+                showLangPicker = false
+            },
+            onDismiss = { showLangPicker = false },
+        )
+    }
+    // Return focus to the language row after the dialog closes instead of letting it fall to the first
+    // row (same pattern as MetadataSettingsScreen). Gated so it can't steal entry focus on first compose.
+    LaunchedEffect(showLangPicker) {
+        if (showLangPicker) {
+            langPickerWasOpen = true
+        } else if (langPickerWasOpen) {
+            langPickerWasOpen = false
+            kotlinx.coroutines.delay(80)
+            runCatching { langRowFocus.requestFocus() }
+        }
     }
 
     error?.let { message ->

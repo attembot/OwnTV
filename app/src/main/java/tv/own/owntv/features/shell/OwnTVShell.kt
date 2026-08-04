@@ -164,6 +164,9 @@ fun OwnTVShell(
     var showLocalSubPicker by remember { mutableStateOf(false) }
     val localSubToast = tv.own.owntv.ui.components.rememberInAppToast()
     val mpvEngine = remember(player) { tv.own.owntv.player.MpvPlaybackEngine(player) }
+    // Audio focus + MediaSession (F27). This is the only place that knows which engine currently owns
+    // the speaker, so it hands that engine over and takes it back when the player closes.
+    val playbackSession = koinInject<tv.own.owntv.player.PlaybackSession>()
     val launcherIntegrationRepository = koinInject<LauncherIntegrationRepository>()
     val homeVm = org.koin.androidx.compose.koinViewModel<HomeViewModel>()
     val movieVm = org.koin.androidx.compose.koinViewModel<MovieViewModel>()
@@ -192,20 +195,30 @@ fun OwnTVShell(
     // arbitration's other keys, which previously left both windows audible (or both silent).
     var audioTick by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     // Same activity-scoped instances the Live/Guide screens use — lets the fullscreen HUD zap channels
-    // up/down (CH+/CH-) through whichever section's list opened the stream.
+    // up/down (CH+/CH-). Guide tunes start through LiveViewModel too (they set zapSource = LIVE_TV), so
+    // there is exactly ONE zap path: liveVm's. The Guide keeps its own EpgViewModel only for the grid.
     val liveVm = org.koin.androidx.compose.koinViewModel<LiveViewModel>()
     val epgVm = org.koin.androidx.compose.koinViewModel<tv.own.owntv.features.epg.EpgViewModel>()
     val liveCanZap by liveVm.canZap.collectAsStateWithLifecycle()
-    val epgCanZap by epgVm.canZap.collectAsStateWithLifecycle()
     // Full-screen is running on the ExoPlayer engine (a promoted Live preview) rather than mpv.
     val liveOnExo by liveVm.liveOnExo.collectAsStateWithLifecycle()
     // A catch-up archive programme is playing (Guide "Watch from start" or the Live TV catch-up picker)
     // rather than the live stream — the HUD swaps live-only controls for the VOD ones.
     val catchupActive by liveVm.catchupActive.collectAsStateWithLifecycle()
     val vodExoActive by player.exoActiveState.collectAsStateWithLifecycle()
+    // Publish the active engine to the system (audio focus + MediaSession), and detach when the player
+    // is closed — an inactive session must not keep answering the TV's transport keys or the Assistant.
+    LaunchedEffect(liveOnExo, playerMode) {
+        playbackSession.attach(
+            if (playerMode == PlayerMode.NONE) null else if (liveOnExo) liveVm.previewEngine else mpvEngine,
+        )
+    }
     // Auto frame rate: only ever applied to the FULL-SCREEN surface (never the mini-player or the
     // in-pane Live preview) — see FrameRateController.
     val autoFrameRate by settingsRepo.autoFrameRate.collectAsStateWithLifecycle(initialValue = false)
+    // ...and the one-time suggestion to turn it on, for the 25-fps-on-60-Hz judder the direct render path
+    // cannot fix by itself (F13). `true` until the flag is read, so it can never flash on first frame.
+    val afrPrompted by settingsRepo.autoFrameRatePrompted.collectAsStateWithLifecycle(initialValue = true)
     // Direct tune (type a channel number on the remote). Settings → Video Player → Live TV; default on.
     val directTuneEnabled by settingsRepo.directTune.collectAsStateWithLifecycle(initialValue = true)
     // "Prefer EPG logos": start following the setting once, here rather than in Application.onCreate —
@@ -607,7 +620,6 @@ fun OwnTVShell(
                             val isLiveStream = liveOnExo || player.isLiveContent
                             val zapFn: ((Int) -> Unit)? = when {
                                 !isLiveStream -> null
-                                zapSource == MainSection.EPG && epgCanZap -> epgVm::zap
                                 zapSource == MainSection.LIVE_TV && liveCanZap -> liveVm::zap
                                 else -> null
                             }
@@ -666,6 +678,16 @@ fun OwnTVShell(
                             // Open the actual series (its episode list), then switch to the Series section —
                             // the screen shares this SeriesViewModel, so it shows the opened show.
                             onOpenSeries = { series -> seriesVm.openSeries(series); onSelectSection(MainSection.SERIES) },
+                            // A channel found in Search tunes through the same LiveViewModel path as one
+                            // opened from Live TV or the Guide (F05) — Prefer HLS, the ExoPlayer→mpv
+                            // ladder, compatibility-mode pins, the external-player toggle, and CH+/- zap.
+                            onPlayChannel = { ch ->
+                                restoreFocus = false
+                                liveVm.watchFromGuide(ch)
+                                zapSource = MainSection.LIVE_TV
+                                homeVm.stopPreview()
+                                if (playerMode != PlayerMode.MINI && !liveVm.externalPlayerOn.value) playerMode = PlayerMode.FULLSCREEN
+                            },
                             onChildFocused = { focusedLayer = ShellLayer.CONTENT },
                             modifier = Modifier.fillMaxSize(),
                         )
@@ -803,7 +825,34 @@ fun OwnTVShell(
                 MpvVideoSurface(player = player, modifier = Modifier.fillMaxSize(), autoFrameRate = isFull && autoFrameRate)
             }
             // Direct render mode: mpv can't draw subtitles on the decoder-owned surface — the app does.
-            if (isFull && !liveOnExo) tv.own.owntv.player.SubtitleOverlay(player = player, modifier = Modifier.fillMaxSize())
+            // Also drawn docked (F19b): the mini-player is a real watching mode for a subtitled film, and
+            // dropping the only line of dialogue there made subtitles look broken. Scaled to the box.
+            if (!liveOnExo) {
+                tv.own.owntv.player.SubtitleOverlay(
+                    player = player, modifier = Modifier.fillMaxSize(),
+                    // Tied to the chosen mini size, but nudged up and floored: a strictly proportional
+                    // line would be unreadable in the smallest box.
+                    sizeScale = if (isFull) 1f else {
+                        (tv.own.owntv.player.MiniPlayerSize.fraction(miniSizePct) * 1.5f).coerceIn(0.35f, 0.7f)
+                    },
+                )
+            }
+            if (isFull && !autoFrameRate && !afrPrompted) {
+                // Frame rate of whichever engine is on screen. On the mpv side this is what the direct
+                // path judders on; on Exo it now survives "Measured stream stats" being off (F14).
+                val activeFps by if (liveOnExo) {
+                    liveVm.previewEngine.videoFps.collectAsStateWithLifecycle()
+                } else {
+                    player.videoFps.collectAsStateWithLifecycle()
+                }
+                tv.own.owntv.player.AutoFrameRatePrompt(
+                    fps = activeFps,
+                    afrEnabled = autoFrameRate,
+                    alreadyPrompted = afrPrompted,
+                    onEnable = { scope.launch { settingsRepo.setAutoFrameRate(true) } },
+                    onDismiss = { scope.launch { settingsRepo.setAutoFrameRatePrompted() } },
+                )
+            }
             if (isFull) {
                 // CH+/CH- zap through the channel list of whichever section opened the current stream
                 // (Live TV or the Guide); never for VOD. When live plays on ExoPlayer (liveOnExo=true) the
@@ -814,7 +863,8 @@ fun OwnTVShell(
                     !isLiveStream -> null
                     // Zapping retunes the main out-of-band (ensurePlaying unmutes it); bump audioTick so the
                     // audio arbitration re-applies its plan while a PiP corner holds the sound.
-                    zapSource == MainSection.EPG && epgCanZap -> ({ d -> epgVm.zap(d); audioTick++ })
+                    // (v4.1.7 deleted the EPG zap branch upstream — it was unreachable, and EpgViewModel.zap
+                    // is gone now that LiveViewModel is the only live-start path.)
                     zapSource == MainSection.LIVE_TV && liveCanZap -> ({ d -> liveVm.zap(d); audioTick++ })
                     else -> null
                 }

@@ -1,5 +1,304 @@
 # Changelog
 
+## v4.1.7 — 2026-08-04
+
+### 📐 Panel Width Adjustment — set how wide the categories, list and preview panels are
+
+- **New setting: Settings → Panel Width Adjustment**, with a separate popup for **Live TV**, **Movies**
+  and **Series**. Each panel gets its own **−/+** control, so you can widen the channel list on a small
+  screen, shrink the category rail you never scroll, or give the preview more room for artwork.
+- **The numbers are shares of the screen and always add up to 100%.** Category 30% + List 20% +
+  Preview 50% is the whole row. A running **Total size** line shows where you are, and saving while it
+  doesn't read 100% is refused with a note in red telling you what to fix — so a panel can never quietly
+  eat another one.
+- Each section has its own **Customize panel** switch and a **Reset** back to the standard widths, and a
+  section left off keeps the layout exactly as it is today. Movie and series posters re-flow by
+  themselves, so a narrower list simply shows fewer per row. The settings travel with your backup.
+
+### 🔊 Surround sound rebuilt — Auto, Stereo only, Surround, and it can no longer leave you in silence
+
+- **The setting is now three choices instead of an on/off switch: Auto (new default), Stereo only, and
+  Surround.** They answer one question — who decodes Dolby/DTS. **Surround** sends it to your TV or
+  receiver to decode; **Stereo only** decodes it inside OwnTV and sends plain stereo, which is the right
+  answer for TV speakers and stereo soundbars; **Auto** starts like Surround and drops back to stereo by
+  itself the moment your audio output is caught failing. Your existing choice is kept: if you had
+  surround on you stay on Surround, if you had turned it off you stay on Stereo only, and if you never
+  touched it you get Auto.
+- **The setting now actually applies to Live TV.** It only ever reached the compatibility player, and
+  Live TV normally uses the standard one — so on live channels the switch did nothing at all in either
+  position, and a TV that mishandles Dolby got handed Dolby regardless of what you had chosen. This is
+  the cause behind live channels that played picture with no sound, or whose sound drifted, no matter
+  what you changed.
+- **New safety net: if your TV or soundbar accepts the sound and then doesn't play it, OwnTV notices and
+  switches to stereo for you.** It watches for the audio output going silent, erroring, or repeatedly
+  starving, then falls back, tells you, and gets sound back within a few seconds. It runs in **all three
+  modes, including Surround** — asking for 5.1 is not asking for silence — and once it has fired, every
+  player in the app stays on stereo for the rest of the session, so switching channels or engines can't
+  lose the sound again. Restart the app, or change the setting, to give your equipment another go.
+- **Stream info now tells you what the audio is actually doing.** A new **Audio out** row shows whether
+  your TV/receiver is decoding the sound (passthrough) or OwnTV is, whether surround is currently
+  allowed, and — if the safety net fired — why. Useful when you have no receiver display to check
+  against.
+
+### ⏱️ Live latency really changes the buffer now — and a new Pre-buffer control, per playlist
+
+- **The Live latency setting finally drives the actual buffer.** On the standard player it was mostly
+  decoration: the buffer sizes were fixed no matter what you chose, and the only thing the setting fed
+  was a hint that HLS understands and a plain MPEG-TS stream ignores completely — which is what many
+  providers serve. Choosing "most stable" therefore changed nothing for a lot of people. Both players
+  now size their live buffer from the setting.
+- **New setting: Pre-buffer live streams (off / 2 / 5 / 10 s).** It collects that much video before a
+  live channel starts playing — and again after a stutter — instead of starting on the first frame. It
+  is an *amount of video*, not a countdown: on a fast provider 10s of video arrive in well under a
+  second, so the channel still starts instantly. On a provider that hiccups every few seconds, it holds
+  the picture until there is enough to play through.
+- **Pre-buffer per playlist.** Most people have one troublesome provider and several fine ones, so any
+  playlist can override the global value (or keep following it). Settings → Video Player → Live TV.
+- **Stream info shows what the player actually applied** — a **Live buffer** row with the pre-buffer
+  amount, the buffer depth, and whether a playlist override is in force. Defaults are unchanged: Balanced
+  with Pre-buffer off reproduces the previous behaviour exactly.
+
+### 🎞️ Auto frame rate works out the frame rate by itself — and offers itself when 25 fps judders
+
+- **Auto frame rate now works on channels that don't declare their frame rate.** Most live streams
+  don't, and the feature had nothing to act on — so on exactly the content it exists for (25 fps
+  European channels on a 60 Hz TV) it did nothing at all. The frame rate is now measured from playback
+  when the stream doesn't state one, and only used when two readings agree and land on a real broadcast
+  rate — a wrong guess would ask the TV for the wrong mode. On the standard player the measurement no
+  longer depends on the *Measured stream stats* toggle being on.
+- **A one-time suggestion when it would help.** If a channel judders because its frame rate doesn't
+  divide into your TV's refresh rate, and your TV really has a better mode, OwnTV offers to turn Auto
+  frame rate on — naming the actual numbers. Shown **once ever**, never on a TV that has nothing better
+  to switch to, and it can be turned off again in Settings → Video Player.
+
+### 🗓️ Guide time offset — for a guide that is hours out, globally or for one channel
+
+- **New setting: Settings → EPG → Guide time offset.** Shifts the whole guide by up to −12 h/+14 h in
+  15-minute steps. It is for the common case where a provider publishes one XMLTV feed in its own time
+  zone, so every programme in the Guide sits a few hours away from what is actually on screen.
+- **Per-channel override in the long-press menu**, in both Live TV and the Guide. Networks routinely hang
+  their East and West feeds off the same guide data, so one of the two is always wrong; now you can
+  correct that channel alone. An explicit "no shift" on a channel is an override too — it pins that
+  channel to the feed's own times while the global offset moves everything else.
+- **The correction applies everywhere the guide is read** — the Guide grid, Now/Next, the "On now" rows,
+  the catch-up picker and the archive URLs built from those programmes — and it never rewrites stored
+  data, so a resync or a guide refresh cannot undo it.
+
+### 🎧 Sound behaves like a TV app now — and the remote's transport keys work
+
+- **A notification or a system sound no longer plays straight over your film.** The app now asks for
+  audio focus and ducks: the sound dips briefly and comes back. Only another app taking the audio
+  permanently pauses playback.
+- **Play/pause, next and previous from the remote, a headset or voice now reach the player**, through a
+  system media session that works with both players. It publishes what is playing, and seek/skip are
+  offered for films and episodes only. With the player closed, those keys do nothing to OwnTV.
+
+### 🩺 Diagnostics you can actually send
+
+- **New: Settings → Video player → Detailed playback logging.** The full live playback trace used to
+  exist only in development builds, so a report from a normal install came back with nothing in it. It
+  can now be switched on in any build, and it only affects what is written down — never playback.
+- **The playback log now records events, not just failures** — a decode rescue, a handoff between
+  players, the stereo safety net firing, a provider that only allows one stream. A juddering picture or
+  drifting sound is not a crash, so previously there was nothing in the log to send.
+- **New: "Report this stream"** in the player. Open the stream info overlay (ⓘ) and a share button
+  appears; it saves exactly the readout you are looking at — codec, resolution, HDR, bitrate, decoder,
+  audio, buffer, engine, position — into the playback log.
+- **New: Export**, in Settings → Playback error log. Writes the whole log plus the live trace to a file
+  and shows you the path, so it can be pulled off the TV with
+  `adb pull /sdcard/Android/data/tv.own.owntv/files/owntv-playback-report.txt`.
+
+### 🧩 M3U playlists: per-item headers, and catch-up that actually builds a URL
+
+- **Per-channel HTTP options in an M3U playlist are honoured.** `#EXTVLCOPT:http-user-agent`,
+  `#EXTVLCOPT:http-referrer`, `#EXTHTTP`, `#KODIPROP` stream headers and the
+  `http://host/x.ts|User-Agent=…&Referer=…` suffix were all ignored — and the pipe suffix was worse than
+  ignored, it was sent as part of the URL. A playlist where one restream needs its own User-Agent or
+  Referer (routine for CDN-token playlists) answered 403 with nothing the user could do. Both players
+  send them now, including across the automatic switch between players. A per-channel User-Agent
+  overrides the playlist-wide one.
+- **Catch-up on M3U playlists works for the common `catchup="append"` style**, plus `shift`,
+  `flussonic` and `xc`. The catch-up *type* was parsed and thrown away, so the most widespread form built
+  a broken URL and "Watch from start" played nothing at all. `{lutc}`, `{now}` and `{timenow}` are now
+  substituted instead of being sent to the provider literally.
+- **Per-item HTTP options now work on movies and series too, not just live channels.** A playlist that
+  gives a film or an episode its own User-Agent or Referer had those options dropped, so exactly the
+  same 403 that used to hit live channels hit VOD instead. They are now stored per item and sent by
+  both players — and by an external player, which previously received no headers or User-Agent at all
+  from anywhere in the app. In a series they are applied per episode, so a season that mixes
+  header-carrying and plain episodes plays right through.
+- These need one playlist refresh before they take effect.
+
+### 🐛 Fixes
+
+- **4K movies that failed to play on some TVs now get a real rescue instead of a wrong error.** Four
+  things stacked up: the "out of memory" decoder error was not recognised, a decoder failure was
+  reported as a malformed file from the provider, there was no fallback between the direct hardware path
+  and software decoding (which is capped at 1080p, so 4K had none at all), and nothing ever asked the TV
+  what it can actually decode. Playback now steps down through an extra hardware rung before software,
+  and when the TV genuinely cannot decode a video the message says so — instead of blaming the file.
+- **A film or episode now gets every decoding option before it gives up, whichever player you prefer.**
+  Playback tries the standard player's hardware decoder, then its software decoder, then the
+  compatibility player's hardware decoder, then its software decoder — the same four rungs in the same
+  order, mirrored, whichever player you set as your preferred one. The standard player's software rung
+  existed only for catch-up recordings before this, so a video that its hardware decoder could not
+  handle skipped straight to the other player and, on the way, lost the setting you had chosen.
+- **A file that repeatedly defeats your preferred player stops re-trying it.** When a video fails on the
+  standard player for a decoding reason, that film or episode is remembered and opens on the
+  compatibility player next time; and if three items in a row have had to switch, the rest of the
+  session starts on the working player straight away. Changing the preferred-player setting clears this,
+  and nothing is remembered for a failure that was the network's fault rather than the decoder's.
+- **The Home screen's background preview no longer holds a channel open on a dead stream.** It had no
+  time limit of its own, so a stream that connected but never produced a picture kept the connection —
+  which matters on providers that allow one stream at a time. It also decoded and discarded the audio
+  it never plays; that is switched off at the source now.
+- **Channels found in Search now play exactly like channels opened from Live TV.** Search had its own
+  minimal way of starting a channel, so it skipped the Prefer HLS setting, the automatic switch to the
+  compatibility player, per-channel compatibility pins and the channel list for CH+/CH−. A channel that
+  needed any of that failed in Search while playing fine elsewhere. There is now one shared path for
+  every place a live channel can be started.
+- **Prefer HLS also applies in the TV Guide and to catch-up.** A playlist whose provider only serves
+  this account HLS could fail to open from the Guide, and its catch-up recordings were always requested
+  in the other format.
+- **Retry on a movie retries the movie.** The Retry button always restarted playback as if it were a
+  live stream: back to the beginning, with live-stream settings — and on a portal playlist it could even
+  end up on the last live channel you watched. It now resumes the film where it stopped.
+- **Long films on portal (Stalker) playlists survive their link expiring.** Those playlists hand out
+  stream links that expire after a couple of hours, which is well inside a long movie; a retry then
+  failed on the dead link. The app now asks the portal for a fresh link, for movies and episodes as well
+  as live channels.
+- **Providers that allow one stream at a time recover in the compatibility player too.** It treated the
+  provider's "your one connection is already in use" answer as a flat refusal and gave up almost
+  immediately, while the standard player waited and reconnected — the reason a channel could play on one
+  player and not the other. It now backs off and retries, and remembers that provider for the session.
+
+- **"Hardware decoding: Off" now applies to the standard player too.** It only ever reached the
+  compatibility player, so turning it off to work around a TV whose decoder mishandles a stream still
+  left that decoder in charge whenever playback used the standard player — including all normal Live TV.
+  Both players now prefer software decoders when it is off, with the hardware decoder still available as
+  a backstop, so nothing that used to play can stop playing. The **Decoder** row in stream info also
+  reports the decoder that is really in use instead of always claiming hardware.
+
+- **Live TV channels that only allow one stream at a time no longer lock themselves out.** Some providers permit a single connection per account and refuse the second one. Switching between the standard and compatibility player, or opening a channel right after another, could leave the app competing with itself: the engine that had just been asked to stop was still connected, so the new one was refused and the channel showed an error or an endless spinner. Each engine now fully releases its connection before the other one starts, the app waits briefly and retries once when a provider says the account is still in use, and on such providers the muted preview no longer runs while a channel is playing full-screen.
+- **Audio and video no longer drift apart on live channels in compatibility mode.** A workaround for a handful of feeds with broken timestamps — letting the picture run on its own clock — was being applied to every live channel, which slowly pushed the sound ahead of or behind the picture on perfectly healthy streams. Live playback now keeps accurate audio-synced timing, and the workaround switches on only for a channel that actually reports broken timestamps.
+- **Channels whose provider refuses the standard player's stream URLs are handed to the compatibility player sooner.** Some panels sign every segment with a short-lived token and then reject it; the standard player cannot recover from that by design. Two refusals are now enough to switch engines, and the provider is remembered for the rest of the session so its other channels start on the working engine right away.
+- **A provider that refuses playback outright is no longer hammered with the identical request.** The retry ladder stops repeating a request that was already rejected, while the alternative-format and player fallbacks still get their turn.
+- **Catch-up recordings that opened with sound but no picture now recover by themselves.** A recording
+  starts in the middle of the video stream, which some TV decoders cannot begin from; playback now
+  reopens it in software decoding and remembers that provider, so its other recordings start on the
+  working path straight away. That memory is now kept across app restarts as well — re-learning it cost
+  a whole failed recording every time you opened the app, since the fault is in the provider's archive
+  and does not come and go.
+- **Zapping no longer slows down the Guide, artwork and playlist updates.** Stopping a live channel
+  releases its connections — necessary, because many providers count them — but everything else in the
+  app was sharing those connections and had to reconnect from scratch. Playback now has its own pool.
+- **Audio Mode really switches the picture off — on both players.** It stopped drawing the video but
+  kept decoding every frame, so it saved neither power nor heat. The video track is now switched off at
+  the source on the compatibility player and on the standard player alike, and comes back cleanly when
+  you leave Audio Mode.
+- **On providers that allow one stream at a time, the preview pane now says so** instead of sitting
+  blank, which read as a broken channel. OwnTV also reads the limit straight from the provider's account
+  info when a playlist syncs, so it no longer has to find out by failing a channel first — and the Home
+  screen's own preview stops competing for that single stream too.
+- **Subtitles are drawn in the small docked player.** They only ever appeared full-screen, so docking a
+  subtitled film silently dropped the dialogue. They are sized to the docked window.
+- **The audio/video sync nudge is available on live channels** in compatibility mode, not just on films.
+  A live feed can arrive with the provider's own drift baked in, and mpv can correct it.
+- **Volume boost above 100% now works on Live TV too**, up to 150%, like films and series. Live TV
+  stopped at 100% because its player cannot amplify by itself; the boost now comes from the system's own
+  audio effect. A TV whose audio hardware refuses the effect simply stays at 100%.
+- **…and above 100% now works on films and episodes that play on the standard player.** The same limit
+  applied there for the same reason: only the compatibility player can amplify by itself, so a film the
+  app had handed to the standard player quietly stopped getting louder at 100%. Both now use the
+  system's audio effect, so 150% means 150% wherever the video ends up playing.
+- **Your preferred audio and subtitle languages now apply on the standard player as well.** They only
+  ever reached the compatibility player, so a live channel — which normally uses the standard player —
+  and any film or episode that ended up there started on whichever track the provider happened to list
+  first. Both settings are honoured now on Live TV, films and episodes, they follow a change made while
+  something is playing, and when a subtitle track is picked for you the Subtitles button correctly shows
+  as on.
+- **Default zoom now applies to Live TV, and zoom no longer carries over between channels.** The setting
+  was read by the compatibility player only, so live channels always started at Fit no matter what you
+  had chosen; and a zoom you set on one channel stayed on the next one you zapped to. Every channel now
+  starts at your default, and a per-channel zoom lasts only for that channel.
+- **Auto frame rate is respected for films and episodes on the standard player.** Turning it off did not
+  stop that player from asking the TV to change refresh rate part-way through a file — the black flash
+  the setting exists to prevent. With it off, the refresh rate is now left alone; with it on, the change
+  only happens when the TV can do it without blanking.
+- **Switching to Audio Mode during a slow start no longer shows "video could not be rendered".** The
+  no-picture watchdog kept running after you had deliberately switched the picture off, so on a file
+  that was still opening it fired and reported a decoding failure that had not happened — and could
+  drop the rest of the session onto a slower decoding path.
+- **A live channel left in Audio Mode no longer reconnects on a loop.** The compatibility player's
+  no-picture watchdog counted an intentionally switched-off picture as a dead stream and kept
+  reopening the channel, which on a provider that allows one connection could lock you out of it.
+- **The Home screen's background preview follows Hardware decoding and per-item headers.** It ignored
+  the Hardware decoding setting, so a TV whose decoder mishandles a stream still met that decoder on the
+  home screen; and it dropped the per-channel User-Agent/Referer from an M3U playlist, so those items
+  showed a black panel instead of a preview.
+- **Detailed logging now records from the moment the app starts.** The switch only took effect once Live
+  TV had been opened, so a diagnostics file sent after a session spent in Movies or Series came back
+  empty or partial — exactly when it was needed.
+- **HDR and Audio sync now say which player they apply to.** Both only ever affect the compatibility
+  player: the standard player hands HDR straight to the TV and cannot shift audio against video at all.
+  The rows say so instead of implying they apply everywhere.
+- **Coming back from Audio Mode no longer drops the picture to a few frames a second.** On the standard
+  player, going back to full screen from the now-playing bar switched the video on again a moment before
+  the screen it draws into existed, so the decoder was set up against a stand-in and then re-pointed at
+  the real one — which several TV chipsets survive only by rendering at a crawl. The picture now waits
+  for the real screen and comes back at full speed. The compatibility player was never affected.
+- **Prefer HLS no longer breaks the odd channel that has no HLS version.** The setting asks for every
+  channel of a playlist in the HLS format, but a provider does not necessarily offer it for *every*
+  channel — and those few came up black, or sat on a spinner that never cleared, after working perfectly
+  before the setting was turned on. OwnTV now spots that and reopens just that channel in its original
+  format, remembering it for the session, while every other channel keeps using HLS.
+- **A live channel that never opens no longer spins forever.** If the standard player neither started
+  playing nor reported an error — a stream that connects, and then simply never sends any video — nothing
+  ever timed out, so the spinner stayed up until you pressed Back. There is now a time limit, after which
+  the channel is handed to the compatibility player like any other failure.
+- **A live channel that starts and then freezes for good is handed over too.** Every automatic switch to
+  the compatibility player used to be decided in the first seconds; after that, a channel that died was
+  left to the reconnect ladder, which is deliberately patient — over two minutes of frozen picture behind
+  a spinner before it admits the connection is lost, and the other player, which often plays that very
+  channel, never got a turn. A stall that lasts half a minute now switches players. Ordinary re-buffering
+  is untouched: only a stall that does not recover counts.
+- **A channel that loads video but never starts playing is now spotted in seconds.** Some streams — traced
+  on a 4K channel in HLS whose provider mixes up its audio and video timing — fill the buffer completely and
+  still produce no picture, because the player has plenty of data and nothing it can actually play at that
+  moment. Everything OwnTV watched for was armed by the first frame, which is precisely what never arrived,
+  so the spinner stayed. It is now detected about four seconds in and treated as a failure straight away, so
+  the channel goes on to its original format or the compatibility player instead of holding the screen. A
+  related case is covered too: one HLS stream part that cannot be lined up with the rest used to stall the
+  player indefinitely, and now times out like any other loading problem.
+- **A channel that can't fill the "Pre-buffer" opens anyway instead of spinning.** The setting asks the
+  standard player to collect a few seconds of video before starting, but a live stream can only be loaded as
+  far ahead as its provider publishes — and a heavy 4K channel on a short window may never get there. The
+  wait then had no end: either a spinner that stayed up, or a picture that started and stopped several times
+  a second, which no stall detection could see because every restart looked like a recovery. OwnTV now
+  watches whether the buffer is still growing and, if it has stopped short, reopens that one channel without
+  the pre-buffer and remembers it for the session. Every other channel keeps its pre-buffer, and the memory
+  the setting is allowed now grows with it instead of being quietly capped.
+- **Live TV gives up on a stuck channel sooner.** A channel that never opens is handed on after twelve
+  seconds rather than twenty-five, plus whatever pre-buffer you asked for — the slow opens that needed that
+  much blanket patience are the ones the two fixes above now identify properly.
+- **A channel that won't play now works its way through all four combinations before giving up.** There are
+  two players and, with "Prefer HLS" on, two stream formats — and a channel that one pairing cannot play is
+  often perfectly fine on another. Until now only some of those steps existed and they ran in no particular
+  order: the compatibility player had no failure detection of its own at all, so a channel it could not open
+  simply spun; and once the standard player had established that a channel has no working HLS version, the
+  compatibility player was pushed onto the original format too — losing the one combination that would have
+  worked. A failed channel now walks a fixed ladder, each step tried at most once, starting from whichever
+  player it opened on: standard+HLS → standard+original → compatibility+HLS → compatibility+original, or
+  the same list led by the compatibility player if that is where it started. With "Prefer HLS" off, or on a
+  channel whose playlist has no HLS version, the HLS steps are simply skipped, so it is just one player to
+  the other. What each player learns about a channel is now kept separately, so neither one's failure
+  disqualifies the other.
+- **Switching to the standard player by hand no longer strands you on a spinner.** Choosing it from the
+  channel menu turned off the automatic checks entirely — deliberately, so that a manual choice was not
+  immediately undone — which meant a channel it genuinely cannot play sat there with no picture and no
+  retry. The checks now stay on for a manual choice as well, so that channel falls through the ladder like
+  any other and ends up somewhere that plays.
+
 ## v4.1.6 — 2026-08-01
 
 ### ✏️ Bulk editing — rename channels, movies and series in bulk (#86)
@@ -165,7 +464,7 @@
   every number and ignores the number keys during playback; your playlist's numbers are untouched, so
   turning it back on restores them immediately.
 
-### 📶 Prefer HLS for Live TV — per source, with format auto-detection (community PR #97 by @codeVerine)
+### 📶 Prefer HLS for Live TV — per source, with format auto-detection (community PR #97 by @pt5pnzghm6-sys)
 
 - **Xtream sources have a new "Prefer HLS for Live TV" option.** Xtream panels can serve a live channel
   two ways: as a raw MPEG-TS stream, or as an HLS playlist. OwnTV asked for MPEG-TS; some panels are

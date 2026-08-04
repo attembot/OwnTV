@@ -31,7 +31,12 @@ import tv.own.owntv.features.settings.data.SubtitleStyle
  * and this overlay renders it Netflix-style. Inactive (empty) in GL mode, where mpv draws its own.
  */
 @Composable
-fun SubtitleOverlay(player: OwnTVPlayer, modifier: Modifier = Modifier) {
+fun SubtitleOverlay(
+    player: OwnTVPlayer,
+    modifier: Modifier = Modifier,
+    /** Shrinks text and insets so the same overlay fits the docked mini-player (F19b); 1f = full screen. */
+    sizeScale: Float = 1f,
+) {
     val text by player.subText.collectAsStateWithLifecycle()
     val settings = koinInject<SettingsRepository>()
     // Subtitle appearance (#96) — every option left on its own "Default" (and everything, while the
@@ -71,7 +76,10 @@ fun SubtitleOverlay(player: OwnTVPlayer, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 40.dp, vertical = if (anchor.isTop) 40.dp else 56.dp),
+            .padding(
+                horizontal = 40.dp * sizeScale,
+                vertical = (if (anchor.isTop) 40.dp else 56.dp) * sizeScale,
+            ),
         contentAlignment = alignment,
     ) {
         Text(
@@ -79,16 +87,16 @@ fun SubtitleOverlay(player: OwnTVPlayer, modifier: Modifier = Modifier) {
             textAlign = textAlign,
             style = TextStyle(
                 color = textColor,
-                fontSize = (24 * textScale).sp,
-                lineHeight = (30 * textScale).sp,
+                fontSize = (24 * textScale * sizeScale).sp,
+                lineHeight = (30 * textScale * sizeScale).sp,
                 fontWeight = FontWeight.Medium,
                 shadow = Shadow(color = Color.Black, offset = Offset(0f, 2f), blurRadius = 6f),
             ),
             modifier = Modifier
-                .widthIn(max = 1100.dp)
+                .widthIn(max = 1100.dp * sizeScale)
                 .clip(RoundedCornerShape(8.dp))
                 .background(boxColor)
-                .padding(horizontal = 16.dp, vertical = 6.dp),
+                .padding(horizontal = 16.dp * sizeScale, vertical = 6.dp * sizeScale),
         )
     }
 }

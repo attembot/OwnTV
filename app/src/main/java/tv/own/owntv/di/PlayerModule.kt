@@ -12,13 +12,17 @@ val playerModule = module {
     single { tv.own.owntv.player.PlayerDiagnostics() }
     // Per-item VOD engine pins made with the player's gear toggle (VOD counterpart of ForceMpvStore).
     single { tv.own.owntv.core.player.VodEngineStore(androidContext()) }
-    // context, settings, connectivity, okHttpClient (ExoPlayer image-sub handoff), diagnostics, proxyHolder, vodEngineStore
+    // context, settings, connectivity, streamingHttp (ExoPlayer image-sub handoff), diagnostics, proxyHolder, vodEngineStore
     single { OwnTVPlayer(androidContext(), get(), get(), get(), get(), get(), get()) }
     // ExoPlayer engine for the fast Live preview pane (mpv stays the full/fullscreen player).
-    // context, okHttpClient, diagnostics, settings, connectivity (auto-resume when the network returns)
+    // context, streamingHttp, diagnostics, settings, connectivity (auto-resume when the network returns)
     single { LivePreviewEngine(androidContext(), get(), get(), get(), get()) }
-    // Muted ExoPlayer engine for the Home hero preview.
-    single { HeroPreviewEngine(androidContext(), get()) }
+    // Muted ExoPlayer engine for the Home hero preview. The last argument lets it ask whether mpv is
+    // already streaming, so a one-session provider isn't locked out by the hero preview (F19d).
+    // Resolved lazily inside the lambda to keep this free of a construction-order dependency.
+    single { HeroPreviewEngine(androidContext(), get(), get(), streamInUse = { get<OwnTVPlayer>().hasActiveStream }) }
+    // Audio focus (duck-don't-pause) + the system MediaSession, driven by whichever engine is playing.
+    single { tv.own.owntv.player.PlaybackSession(androidContext()) }
     // Second, independent ExoPlayer for the picture-in-picture corner (true PiP — a different stream
     // alongside the main one). Separate decoder/surface/audio from the preview engine above so both play.
     single { tv.own.owntv.player.SecondaryLivePlayer(androidContext(), get(), get()) }

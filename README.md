@@ -61,9 +61,11 @@ Scan to join from your phone:
 
 ### 🎬 Playback
 - **Dual engine** — libmpv (FFmpeg) for max compatibility + ExoPlayer for instant Live TV; per-channel toggle and automatic VOD fallback between them
-- Zero-copy **4K HDR** direct rendering · opt-in **auto frame rate** (off by default; 24/25/50/60 fps display matching) · context-aware channel zapping (D-pad/CH± stays in Favorites, History, All or the opened category) · surround sound + 150% volume boost
+- Zero-copy **4K HDR** direct rendering · opt-in **auto frame rate** (off by default; 24/25/50/60 fps display matching, with the rate measured when a live stream doesn't declare one) · **live buffering you control** (Live latency drives the real buffer, plus a Pre-buffer gate that can be set per playlist) · context-aware channel zapping (D-pad/CH± stays in Favorites, History, All or the opened category) · **self-correcting surround sound** (Auto/Stereo only/Surround, with an audio-output watchdog that falls back to stereo if your TV or soundbar can't actually play it) + 150% volume boost
 - **Subtitles** — text (SRT/ASS), image (PGS/VOBSUB/DVB), closed captions, plus OpenSubtitles search & local files with timing adjust; customisable size, colour, position and background transparency
 - Resume prompts, next-episode auto-play, mini-player/PiP, **audio-only mode**, and a live codec/resolution/HDR stream-info overlay
+- **Behaves like a TV app** — remote/headset/assistant transport keys via a system media session, and audio focus that ducks for a notification instead of pausing your film
+- **Diagnostics you can send** — a playback log of failures *and* events, "Report this stream" from the info overlay, optional detailed trace, and a one-press export you can `adb pull` off the TV
 
 ### 🧭 Browse
 - **Continue Watching** home with TMDB-enriched previews; Live / Movies / Series / Downloads / Guide sections
@@ -74,14 +76,16 @@ Scan to join from your phone:
 ### 📥 Sources & EPG
 - **Xtream**, **M3U** (typed playlists), and **Stalker/Ministra** MAC portals; add a source from your phone over LAN (QR + PIN)
 - XMLTV **TV Guide** grid, **Catch-up TV** (up to 7 days) + live rewind, auto EPG matching, multiple guide sources
+- **Guide time offset** — correct a guide published in another time zone, globally or per channel
 - Optional **guide channel logos** — per EPG source, use that feed's own logos instead of your playlist's
+- M3U extras honoured: per-item HTTP headers on live, movie and series entries (`#EXTVLCOPT` / `#EXTHTTP` / `#KODIPROP` / URL suffix) and the `append` / `shift` / `flussonic` / `xc` catch-up styles
 
 ### 👥 Profiles & Downloads
 - Multiple profiles with own favorites/history/resume, PIN locks, kids flag, "Who's watching?" gate
 - Offline movies & episodes — pause/resume/retry, queue groups + storage bar, live poster status strip
 
 ### 🎨 Settings & Robustness
-- Material 3 theming & accent, **Liquid Glass** frosted look over your own background photo, searchable settings, sidebar/category customization, external player, weather chip
+- Material 3 theming & accent, **Liquid Glass** frosted look over your own background photo, searchable settings, sidebar/category customization, adjustable panel widths, external player, weather chip
 - **Backup & Restore** locally or over Wi-Fi — a single `.own` file carrying your background image, optionally encrypted end to end with your own password (older `.json` backups still restore); in-app updates; memory-safe buffers, no-ANR threading, auto-reconnect, resilient imports & offline detection
 
 📖 Full details: **[player reference →](extras/player.html)** · **[user guide →](extras/USER_GUIDE.md)**

@@ -98,6 +98,7 @@ fun VideoPlayerSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier)
     val hw by vm.hwDecoding.collectAsStateWithLifecycle()
     val vodExo by vm.vodPreferExo.collectAsStateWithLifecycle()
     val measuredStats by vm.measuredStreamStats.collectAsStateWithLifecycle()
+    val detailedDiagnostics by vm.detailedDiagnostics.collectAsStateWithLifecycle()
     val directTune by vm.directTune.collectAsStateWithLifecycle()
     val externalLive by vm.externalPlayerLive.collectAsStateWithLifecycle()
     val externalMovies by vm.externalPlayerMovies.collectAsStateWithLifecycle()
@@ -114,6 +115,10 @@ fun VideoPlayerSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier)
     val resumeMode by vm.resumeMode.collectAsStateWithLifecycle()
     val liveLatency by vm.liveLatencyMode.collectAsStateWithLifecycle()
     val liveCustomSecs by vm.liveLatencyCustomSecs.collectAsStateWithLifecycle()
+    val livePreroll by vm.livePrerollSecs.collectAsStateWithLifecycle()
+    val sources by vm.sources.collectAsStateWithLifecycle()
+    // The playlist whose per-playlist "Pre-buffer" override is being edited.
+    var prerollSource by remember { mutableStateOf<tv.own.owntv.core.database.entity.SourceEntity?>(null) }
     // Low-latency acknowledgement popup (shown for "Low latency" and below-Balanced custom values).
     // First lambda runs on "I understand", second on "Cancel".
     var lowWarning by remember { mutableStateOf<Pair<() -> Unit, () -> Unit>?>(null) }
@@ -153,7 +158,12 @@ fun VideoPlayerSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier)
     LaunchedEffect(dialog, lowWarning) {
         if (dialog != Dialog.NONE) {
             // The custom-seconds dialog has no row of its own — it belongs to the Live latency row.
-            val returnRow = if (dialog == Dialog.LIVE_CUSTOM) Dialog.LIVE_LATENCY else dialog
+            val returnRow = when (dialog) {
+                Dialog.LIVE_CUSTOM -> Dialog.LIVE_LATENCY
+                // The per-playlist value picker belongs to the playlist row that opened it.
+                Dialog.LIVE_PREROLL_SOURCE -> Dialog.LIVE_PREROLL_SOURCES
+                else -> dialog
+            }
             dialogReturn = dialogRowFocus.getValue(returnRow)
         } else if (lowWarning != null) {
             // The warning popup has no row of its own — it always returns to the Live latency row.
@@ -287,7 +297,9 @@ fun VideoPlayerSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier)
         )
         Row2(
             icon = OwnTVIcon.AUDIO, title = "Audio sync",
-            desc = "Shift audio earlier or later to match the video.",
+            // F15: only mpv can shift audio against video (`audio-delay`); ExoPlayer has no equivalent,
+            // so PlaybackEngine.audioDelayAvailable() is false there. Name the player in the row.
+            desc = "Shift audio earlier or later to match the video (mpv player).",
             chip = "%+d ms".format(audioDelay), chevron = true,
             modifier = Modifier.focusRequester(dialogRowFocus.getValue(Dialog.AUDIO_SYNC)),
             onClick = { savedScroll = scrollState.value; dialog = Dialog.AUDIO_SYNC },
@@ -304,6 +316,32 @@ fun VideoPlayerSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier)
             modifier = Modifier.focusRequester(dialogRowFocus.getValue(Dialog.LIVE_LATENCY)),
             onClick = { savedScroll = scrollState.value; dialog = Dialog.LIVE_LATENCY },
         )
+        Row2(
+            icon = OwnTVIcon.LIVE_TV, title = "Pre-buffer live streams",
+            desc = "Collect this much video before a live channel starts playing — and again after a " +
+                "stutter — instead of starting the moment there is a frame. It is an amount of video, " +
+                "not a countdown: a fast provider delivers 10s of video in well under a second, so the " +
+                "channel still starts instantly and that is correct. On a provider that hiccups every " +
+                "few seconds it holds the picture until there is enough to play through. Off keeps the " +
+                "fastest possible start.",
+            chip = tv.own.owntv.features.settings.data.LiveBuffer.prerollLabel(livePreroll),
+            primaryChip = livePreroll > 0,
+            chevron = true,
+            modifier = Modifier.focusRequester(dialogRowFocus.getValue(Dialog.LIVE_PREROLL)),
+            onClick = { savedScroll = scrollState.value; dialog = Dialog.LIVE_PREROLL },
+        )
+        if (sources.isNotEmpty()) {
+            Row2(
+                icon = OwnTVIcon.LIVE_TV, title = "Pre-buffer per playlist",
+                desc = "Override the setting above for one playlist. A provider that stutters on a " +
+                    "fixed period is that provider's problem — this keeps your other playlists fast.",
+                chip = sources.count { it.livePrerollSecs >= 0 }.let { if (it == 0) "Off" else "$it set" },
+                primaryChip = sources.any { it.livePrerollSecs >= 0 },
+                chevron = true,
+                modifier = Modifier.focusRequester(dialogRowFocus.getValue(Dialog.LIVE_PREROLL_SOURCES)),
+                onClick = { savedScroll = scrollState.value; dialog = Dialog.LIVE_PREROLL_SOURCES },
+            )
+        }
         Row2(
             icon = OwnTVIcon.LIVE_TV, title = "Channel numbers",
             desc = "Show your provider's channel number beside the name in the Live TV list, the " +
@@ -324,6 +362,14 @@ fun VideoPlayerSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier)
                 "low-end TV stutters — it never affects the actual video, only the diagnostic numbers.",
             chip = if (measuredStats) "On" else "Off", primaryChip = measuredStats,
             onClick = { vm.setMeasuredStreamStats(!measuredStats) },
+        )
+        Row2(
+            icon = OwnTVIcon.INFO, title = "Detailed playback logging",
+            desc = "Keep a full trace of what the live engine does — every tune, fallback and reconnect — " +
+                "in Logcat and in the exported report. Leave it off unless you are chasing a problem; " +
+                "it never changes playback, only how much is written down.",
+            chip = if (detailedDiagnostics) "On" else "Off", primaryChip = detailedDiagnostics,
+            onClick = { vm.setDetailedDiagnostics(!detailedDiagnostics) },
         )
     }
 
@@ -415,6 +461,46 @@ fun VideoPlayerSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier)
                 }
             },
         )
+        Dialog.LIVE_PREROLL -> PickerDialog(
+            title = "Pre-buffer live streams",
+            options = tv.own.owntv.features.settings.data.LiveBuffer.PREROLL_CHOICES.map {
+                it.toString() to tv.own.owntv.features.settings.data.LiveBuffer.prerollValueLabel(it)
+            },
+            selected = livePreroll.toString(),
+            onSelect = { vm.setLivePrerollSecs(it.toIntOrNull() ?: 0); dialog = Dialog.NONE },
+            onDismiss = { dialog = Dialog.NONE },
+        )
+        Dialog.LIVE_PREROLL_SOURCES -> PickerDialog(
+            title = "Which playlist?",
+            options = sources.map { src ->
+                val value = if (src.livePrerollSecs >= 0) {
+                    tv.own.owntv.features.settings.data.LiveBuffer.prerollValueLabel(src.livePrerollSecs)
+                } else {
+                    "Follow setting"
+                }
+                src.id.toString() to "${src.name}  ·  $value"
+            },
+            selected = prerollSource?.id?.toString() ?: "",
+            onSelect = { id ->
+                prerollSource = sources.firstOrNull { it.id.toString() == id }
+                dialog = if (prerollSource != null) Dialog.LIVE_PREROLL_SOURCE else Dialog.NONE
+            },
+            onDismiss = { dialog = Dialog.NONE },
+        )
+        Dialog.LIVE_PREROLL_SOURCE -> PickerDialog(
+            title = prerollSource?.name ?: "Playlist",
+            options = listOf("-1" to "Follow setting") +
+                tv.own.owntv.features.settings.data.LiveBuffer.PREROLL_CHOICES.map {
+                    it.toString() to tv.own.owntv.features.settings.data.LiveBuffer.prerollValueLabel(it)
+                },
+            selected = (prerollSource?.livePrerollSecs ?: -1).toString(),
+            onSelect = { value ->
+                prerollSource?.let { vm.setSourcePreroll(it.id, value.toIntOrNull() ?: -1) }
+                prerollSource = null
+                dialog = Dialog.NONE
+            },
+            onDismiss = { prerollSource = null; dialog = Dialog.NONE },
+        )
         Dialog.EXTERNAL_PLAYER -> ExternalPlayerDialog(
             live = externalLive, movies = externalMovies, series = externalSeries,
             onToggle = { section, enabled -> vm.setExternalPlayer(section, enabled) },
@@ -461,7 +547,7 @@ private fun LiveLatencyWarningDialog(onConfirm: () -> Unit, onCancel: () -> Unit
     }
 }
 
-private enum class Dialog { NONE, ZOOM, SUB_STYLE, SUB_LANG, AUDIO_LANG, AUDIO_SYNC, RESUME, LIVE_LATENCY, LIVE_CUSTOM, EXTERNAL_PLAYER }
+private enum class Dialog { NONE, ZOOM, SUB_STYLE, SUB_LANG, AUDIO_LANG, AUDIO_SYNC, RESUME, LIVE_LATENCY, LIVE_CUSTOM, LIVE_PREROLL, LIVE_PREROLL_SOURCES, LIVE_PREROLL_SOURCE, EXTERNAL_PLAYER }
 
 /** Row chip for the External player row: "Off", "On" (all three), or the sections that are on. */
 private fun externalPlayerChip(live: Boolean, movies: Boolean, series: Boolean): String {

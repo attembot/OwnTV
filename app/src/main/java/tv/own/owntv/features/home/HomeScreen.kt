@@ -380,7 +380,7 @@ fun HomeScreen(
         if (focusedHeroIndex != scheduledIndex || expandedHeroIndex != scheduledIndex) return@LaunchedEffect
         if (scheduledHero != state.heroItems.getOrNull(state.activeHeroIndex)) return@LaunchedEffect
 
-        heroPreviewEngine.play(scheduledHero.streamUrl, scheduledHero.seekToMs)
+        vm.startPreview(scheduledHero)
     }
 }
 

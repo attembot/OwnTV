@@ -107,10 +107,16 @@ fun SubtitleSearchScreen(
                         )
                         SubtitleSearchViewModel.UiState.Loading ->
                             Centered { OwnTVSpinner(); Spacer(Modifier.height(12.dp)); Text("Working…", color = OwnTVTheme.colors.onSurfaceVariant) }
-                        SubtitleSearchViewModel.UiState.Empty -> Message(
-                            "No matching subtitles were found.",
+                        is SubtitleSearchViewModel.UiState.Empty -> Message(
+                            if (s.showingAllLanguages) {
+                                "No matching subtitles were found. Try editing the search title."
+                            } else {
+                                "No matching subtitles were found in your chosen language."
+                            },
                             primary = "Edit search", onPrimary = { editing = true },
-                            secondary = "Show all languages", onSecondary = vm::showAllLanguages,
+                            // Only worth offering when a language filter actually narrowed the search.
+                            secondary = "Show all languages".takeIf { !s.showingAllLanguages },
+                            onSecondary = vm::showAllLanguages,
                             tertiary = "Close", onTertiary = onDismiss,
                         )
                         is SubtitleSearchViewModel.UiState.Error -> Message(

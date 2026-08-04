@@ -235,9 +235,15 @@ or **narrow the whole app to just one**.
   the engine that's **actually playing** (teal while on mpv, whether you pinned it or OwnTV auto‑switched), and
   **one tap always flips** the engine — a small "Switched to MPV/ExoPlayer" note confirms it. It's **remembered
   per channel**, so that one channel always uses mpv while everything else stays fast.
-  Picking **ExoPlayer** on a channel that had auto‑switched to mpv is treated as your decision: the automatic
-  fallback stops interfering with that channel until you tune elsewhere, so it can no longer flip straight back
-  to mpv. If ExoPlayer genuinely can't play it, press the toggle again to return to mpv.
+  Picking **ExoPlayer** on a channel that had auto‑switched to mpv is treated as your decision, and OwnTV
+  gives it a real try in both stream formats. If ExoPlayer genuinely can't play that channel at all, it ends
+  up back on mpv rather than leaving you on a spinner — press the toggle again whenever you want to retry.
+  **A channel that won't play is worked through every combination.** With two engines and (when **Prefer HLS**
+  is on) two stream formats there are four ways to open a channel, and one that defeats a given pairing is
+  often fine on another. A failing channel now steps through them in a fixed order, each tried once, starting
+  from whichever engine it opened on: ExoPlayer+HLS → ExoPlayer+TS → mpv+HLS → mpv+TS, or the same list led by
+  mpv. With Prefer HLS off — or on a channel your playlist has no HLS version of — the HLS steps drop out and
+  it is simply one engine to the other. Turn on **Detailed playback logging** to see each step it took.
 - 📶 **Prefer HLS for Live TV (Xtream only)**: Xtream panels can serve a live channel either as raw MPEG‑TS or
   as an HLS playlist. OwnTV asks for **MPEG‑TS**, which is what most panels serve best — but if your provider's
   live channels are unstable, turn on **Prefer HLS for Live TV** when adding the source, or later in
@@ -289,6 +295,12 @@ or **narrow the whole app to just one**.
   programme's details. Favourites apply everywhere — Live TV, Search, and the Home Favourites rail.
 - **Auto‑match EPG**: the guide can smart‑match your channels to guide data; you can also fix one channel
   manually via the long‑press channel menu.
+- 🕰️ **Guide time offset** — if the whole guide sits a few hours away from what is actually on screen
+  (a provider publishing its XMLTV in another time zone), set **Settings → EPG → Guide time offset**
+  (−12 h to +14 h, 15‑minute steps). For a single channel that is wrong on its own — typically an
+  East/West feed sharing one guide — use the **long‑press channel menu** in Live TV or the Guide and set
+  an offset just for it; that overrides the global one. The correction shows up everywhere the guide is
+  used (grid, Now/Next, "On now" rows, catch‑up), and a resync never undoes it.
 - 🙈 **Hidden categories stay hidden**: categories you hide via long‑press → Customize are excluded
   from the Guide too — the "Category" dropdown and the guide rows both respect them (category
   renames and manual order carry over from Live TV as well).
@@ -343,7 +355,10 @@ or **narrow the whole app to just one**.
   external app (VLC, MX Player, …) — one‑off, regardless of the global **External player** setting.
 - 🔧 **Two playback engines with automatic fallback**: movies/episodes play on **mpv** by default (or
   **ExoPlayer** if you switched the **Movies & Series player** setting). If the chosen engine can't play an
-  item, the **other engine is tried automatically** before any error. You can also switch the **current**
+  item, the **other engine is tried automatically** before any error. Each engine is given both its
+  hardware and its software decoder before the other is tried, so a video gets four chances in all. If an
+  item keeps failing on your preferred engine for a decoding reason, it is remembered and opens on the
+  other one from then on. You can also switch the **current**
   movie/episode manually: bring up the controls and press the **engine toggle (the ⇄ MPV/EXO pill)** — it
   flips between mpv and ExoPlayer at the same position (the pill shows the active engine; teal while on
   ExoPlayer, and a small "Switched to MPV/ExoPlayer" note confirms it). Handy when one engine doesn't show a
@@ -460,15 +475,24 @@ Bring up the controls in any full‑screen player (press OK / a direction). The 
 | Button | What it does |
 |---|---|
 | **Subtitles** | Pick a subtitle track (incl. **image subtitles**) and set **subtitle delay**. Live channels with **embedded closed captions (CC)** — common on US channels — show a CC track on both engines; on mpv, selecting it briefly switches the channel to software decoding (≤1080p) and hardware decoding returns when CC is turned off. On raw `.ts` channels the CC entry always appears, even when the channel carries no captions. |
-| **Audio** | Pick an audio track, and **A/V sync** (audio delay, **±50 ms** steps) — use this if surround makes lips drift. |
-| **Info** (ⓘ) | Toggle the **stream info overlay**: codec · resolution · fps · HDR · bitrate · decoder · audio · buffer. |
+| **Audio** | Pick an audio track, and **A/V sync** (audio delay, **±50 ms** steps) — use this if surround makes lips drift. Available on movies/series and on live channels in **compatibility mode** (the standard live player can't shift audio, so it isn't offered there). |
+| **Info** (ⓘ) | Toggle the **stream info overlay**: codec · resolution · fps · HDR · bitrate · decoder · audio · **audio out** · buffer. **Audio out** tells you whether your TV/receiver is decoding the sound (*passthrough*) or OwnTV is (*decoded in app*), whether surround is currently allowed, and why it fell back to stereo if it did. While it's open, a **share** button appears next to it: **Report this stream** saves that whole readout into the playback log, ready to export (see Settings). |
 | **Favorite** (♥) | Add or remove what you're watching from **Favorites** without leaving the stream — a live channel, a movie, or a series (an episode favorites its parent show). The heart fills when it's already a favorite. |
 | **Speed** | Playback speed (VOD). |
 | **MPV/EXO (⇄)** | Live: **compatibility mode** — pin the channel to mpv. Movies/Series: **switch this item between mpv and ExoPlayer** (shows the active engine; teal on the non‑default one). Flipping it briefly confirms "Switched to MPV/ExoPlayer" at the bottom. |
-| **Aspect/Zoom** | Change aspect ratio / zoom (works in every render mode). |
+| **Aspect/Zoom** | Change aspect ratio / zoom (works in every render mode). Each channel/film starts from **Settings → Default zoom**; a zoom you set here applies to what's playing and doesn't carry over to the next channel. |
 | **PiP** | Picture‑in‑picture for live. |
 | **Headphones** | **Audio Mode** — see below. |
-| **Volume** | mpv VODs/channels can be **boosted to 150%** for quiet streams. |
+| **Volume** | Quiet streams can be **boosted to 150%** — movies, series and Live TV alike, whichever player they end up on (where the player can't amplify by itself the boost comes from your TV's own audio effect; a TV that doesn't support it stays at 100%). |
+
+A few things that need no button:
+
+- **Remote transport keys work** — play/pause, next and previous from the remote, a headset or a voice
+  assistant reach the player. Next/previous move between episodes in a series. With the player closed
+  they do nothing to OwnTV.
+- **A notification or a system sound won't pause your film** — the sound dips for a moment and comes
+  back. Only another app taking the audio for good pauses playback.
+- **Subtitles show in the docked mini‑player too**, sized to the small window.
 
 ---
 
@@ -595,6 +619,16 @@ For **movies and series episodes** (streamed or downloaded), the player's **Subt
     top bar, cards, mini‑player — or all at once. Turning everything off turns glass off.
   - The frost (blur) needs a background image and **Android 12+**; otherwise panels are simply
     translucent. All glass settings are kept in backups.
+- **Settings → Panel Width Adjustment**: set how wide the three browse panels are — the **category rail**,
+  the **item list/grid** and the **preview/poster** pane — separately for **Live TV**, **Movies** and
+  **Series**.
+  - Each section opens a popup with **Customize panel On/Off** and a **−/+** control per panel. The values
+    are **shares of the screen and must add up to 100%**: a **Total size** line shows the running total, and
+    pressing **Okay** while it isn't 100% shows a note in red instead of saving, so you always take from one
+    panel to give to another.
+  - **Reset** returns a section to the standard widths; leaving a section **Off** keeps today's layout.
+    Movie and series posters re‑flow automatically, so a narrower list just shows fewer per row. Saved in
+    backups.
 - **Settings → Animations**: turn interface motion **off** for a snappier feel on lower‑end TV boxes.
 - **Profiles** (Settings → Profiles): multiple viewers, a **Kids mode**, and **PIN locks**.
 
@@ -620,19 +654,39 @@ For **movies and series episodes** (streamed or downloaded), the player's **Subt
   the top — with Live TV also restoring the last focused channel. These are independent of **App startup
   → Last channel**.
 - 🌈 **HDR** — use HDR output when the video and TV support it. Turn on for HDR/Dolby Vision content.
+  It steers the **compatibility (mpv) player** only; the standard player hands HDR straight to your TV,
+  which decides for itself.
 - 🎞️ **Auto frame rate** (Playback, off by default) — in full screen, asks the TV to switch to a refresh rate matching
   the video (24/25/30/50/60 fps) and hands the display back on exit, so 24fps films and 25/50fps
   broadcasts stop juddering on a 60Hz panel. Works for Live TV and VOD on both engines, and never
-  changes resolution. Enable it only if your TV or receiver switches refresh rates cleanly without a
+  changes resolution. Streams that don't declare a frame rate (most live channels) are now **measured**,
+  so it works there too; if a channel judders while the setting is off and your TV has a suitable mode,
+  OwnTV offers to turn it on — once ever. Enable it only if your TV or receiver switches refresh rates cleanly without a
   visible HDMI re-handshake. The v4.1.6 update resets it to Off once for existing users; changing it
   afterward is remembered normally, and Off disables both ExoPlayer and mpv frame-rate requests.
 - 🧩 **Hardware decoder** (Video Player Settings) — hardware decoding is on for smooth 4K; switch to software
-  only if a specific codec misbehaves.
+  only if a specific codec misbehaves. Turning it **off** now applies to **both players** (it used to
+  reach only the compatibility one, which left normal Live TV on the hardware decoder anyway). The
+  hardware decoder stays available as a backstop, so nothing that played before can stop playing —
+  expect slower decoding and, on some devices, a resolution ceiling. Stream info's **Decoder** row shows
+  which one is really in use.
 - 📡 **Live latency** (Video Player Settings) — how close to the live edge Live TV plays, trading latency
   against stability: **Low latency**, **Balanced** (default), **Stable**, or a **Custom** buffer in seconds.
-  It applies on the next channel open, to live streams only, on both engines. **Balanced** changes nothing
-  (so it can't regress a working stream); picking **Low latency** or a below‑Balanced custom value warns
-  first that a smaller buffer can stutter on weaker connections.
+  It applies on the next channel open, to live streams only, on both engines, and it now sizes the real
+  buffer on both (it used to be little more than a hint the standard player's stream type ignored).
+  **Balanced** changes nothing (so it can't regress a working stream); picking **Low latency** or a
+  below‑Balanced custom value warns first that a smaller buffer can stutter on weaker connections.
+- ⏱️ **Pre-buffer live streams** (Video Player Settings → Live TV, off by default) — collect this much
+  video (2 / 5 / 10 s) before a channel starts, and again after a stutter, instead of starting on the
+  first frame. It is an **amount of video, not a wait**: a fast provider delivers 10s of video in well
+  under a second, so the channel still starts instantly. Use it on a provider that freezes every few
+  seconds. **Pre-buffer per playlist** right below it lets one troublesome playlist differ from the rest.
+  Stream info's **Live buffer** row shows what the player actually applied. Some channels can't supply that
+  much video at once (a 4K feed on a provider with a short live window) — OwnTV notices after a few seconds
+  and reopens just that channel without the pre-buffer, for the rest of the session. Separately, a channel
+  that loads plenty of video but still never shows a picture (a provider-side timing fault, most often seen
+  with **Prefer HLS** on) is now given up on after a few seconds rather than spinning, so it moves on to its
+  original format or the compatibility player.
 - 🪟 **Mini‑player** (Settings → Playback) — set the docked live‑PiP window's **size** (percentage of screen
   width) and **screen position** (four corners plus top/bottom centre). Both are also adjustable **on the
   fly** from the mini‑player's own resize / move controls, and the window scales with your TV size and UI zoom.
@@ -646,6 +700,10 @@ For **movies and series episodes** (streamed or downloaded), the player's **Subt
   player's **info overlay** measures live fps, bitrate and dropped frames for streams that don't
   declare them (most Xtream live TV). Turn it **off** only if a low‑end TV ever stutters — it affects
   the diagnostic numbers only, never the actual video.
+- 🗣️ **Preferred audio / subtitle language** (Video Player Settings) — when a stream carries several
+  tracks, the one in this language is selected for you instead of whatever the provider listed first.
+  It applies on **both players** now, so it works on Live TV as well as movies and episodes, and a
+  change takes effect on what's already playing.
 - 💬 **Subtitle appearance** (Video Player Settings) — a menu with a preview, a **Customize subtitles**
   switch, and then **Size**, **Text color**, **Position** (six anchors: top/bottom × left/center/right)
   and **Background transparency** (None → Solid in 10% steps). **Each one starts at "Default", and
@@ -666,14 +724,31 @@ For **movies and series episodes** (streamed or downloaded), the player's **Subt
 - 🌦️ **Weather** — its own submenu: **Show weather** (top‑bar chip on/off), **Custom location** (city or
   "lat,lon"; blank = auto‑detect — set this if a VPN shows the wrong city), and **Temperature unit**
   (**°C / °F**).
-- 🔊 **Surround sound** — ⚠️ **off by default, opt‑in.** Turn it on **only if you have a real 5.1/7.1
-  receiver**. On TV speakers or a stereo soundbar it can make **audio lag behind video (lip‑sync drift)** —
-  if you enable it and see drift, fix it live with the player's **Audio → A/V sync** nudge. Most people
-  should leave this off.
-- 🩺 **Playback error log** (Playback) — the last ~10 playback failures with their plain‑English
-  reason, stream details and device info. If a channel or movie errored and you dismissed the
-  message, open this to read (or clear) exactly what happened — perfect for bug reports, no computer
-  needed.
+- 🔊 **Surround sound** — three choices, answering *who decodes Dolby/DTS*. Press OK to cycle.
+  - **Auto** (default, recommended) — try surround, and switch back to stereo automatically if your TV
+    or soundbar turns out not to play it properly.
+  - **Stereo only** — OwnTV decodes everything and sends plain stereo. The right answer for **TV
+    speakers or a stereo soundbar**, and the one to pick if sound ever lags behind the picture.
+  - **Surround** — send Dolby/DTS to a **real 5.1/7.1 receiver** to decode.
+
+  Whichever you pick, OwnTV watches the audio output: if your equipment accepts the sound and then goes
+  silent, errors, or keeps stuttering, it **falls back to stereo on its own**, tells you, and gets sound
+  back in a few seconds. That safety net runs in **all three modes** and can't be switched off. Once it
+  has fired it stays on stereo for the rest of the session (so channel or player switches can't lose the
+  sound again) — restart the app, or change this setting, to give your equipment another try.
+
+  Applies to **Live TV, Movies and Series on both players**. Changing it re-opens whatever is playing.
+  If sound and picture still drift, nudge it live with the player's **Audio → A/V sync**.
+- 🩺 **Playback log** (Playback) — the last 25 playback entries with their plain‑English reason, stream
+  details and device info. It records **failures**, **events** (a decode rescue, a switch between
+  players, the stereo safety net firing, a provider that only allows one stream) and any **report** you
+  saved from the player's info overlay. If a channel or movie errored and you dismissed the message,
+  open this to read exactly what happened — perfect for bug reports, no computer needed. **Export**
+  writes everything to a file and shows the path, so it can be pulled off the TV:
+  `adb pull /sdcard/Android/data/tv.own.owntv/files/owntv-playback-report.txt`.
+- 🔍 **Detailed playback logging** (Video Player Settings → Diagnostics, off by default) — turn this on
+  when you're chasing a playback problem, then reproduce it and **Export** the log: the report will
+  include the full live‑playback trace. It only changes what is written down, never playback itself.
 - 🔄 **Check updates on startup** — get notified when a newer version is on GitHub Releases.
 - 💾 **Backup & Restore** — export/restore your profiles, sources, customizations, favorites, history,
   resume positions, **manual Move positions** and app settings. Export starts by asking **which
@@ -754,8 +829,27 @@ http://your-server/live/bbc1.ts
 ```
 
 > `url-tvg="…"` on the `#EXTM3U` header line is picked up as the playlist's EPG source automatically if
-> you haven't set one. Catch-up attributes (`catchup="default"`, `catchup-source="…"`, `catchup-days="7"`)
-> are also read on live entries.
+> you haven't set one. Catch-up attributes (`catchup="…"`, `catchup-source="…"`, `catchup-days="7"`)
+> are also read on live entries — the `append`, `shift`, `flussonic` and `xc` styles are all supported,
+> and `{utc}` / `{lutc}` / `{now}` / date tokens in `catchup-source` are filled in.
+
+**Per-item HTTP options** are supported too, for an entry whose server needs its own User-Agent or
+Referer. They work on live, movie and series entries alike, and are sent by both players and by an
+external player. Any of these forms works, on the lines just after `#EXTINF` (or as a suffix on the
+URL):
+
+```
+#EXTINF:-1 group-title="UK Channels",Some Restream
+#EXTVLCOPT:http-user-agent=MyPlayer/1.0
+#EXTVLCOPT:http-referrer=http://example.com/
+http://your-server/live/restream.ts
+
+#EXTINF:-1 group-title="UK Channels",Another Restream
+http://your-server/live/other.ts|User-Agent=MyPlayer/1.0&Referer=http://example.com/
+```
+
+`#EXTHTTP:{"cookie":"…"}` and `#KODIPROP:inputstream.adaptive.stream_headers=…` are read as well. A
+per-item User-Agent wins over the playlist-wide one set in **Manage sources**.
 
 ### Movies example
 

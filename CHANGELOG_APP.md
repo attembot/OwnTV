@@ -9,6 +9,61 @@
 > (e.g. `(community PR #40 by @codeVerine)`). Issue numbers that are part of a title (e.g. `(#57)`) are
 > fine; explanatory parentheticals are not. Descriptions belong in CHANGELOG.md, never here.
 
+## v4.1.7 — 2026-08-04
+
+### ✨ New features
+
+- **📐 Panel Width Adjustment — set how wide the categories, list and preview panels are**
+- **🔊 Surround sound rebuilt — Auto, Stereo only, Surround, and it can no longer leave you in silence**
+- **⏱️ Live latency really changes the buffer now — and a new Pre-buffer control, per playlist**
+- **🎞️ Auto frame rate works out the frame rate by itself — and offers itself when 25 fps judders**
+- **🗓️ Guide time offset — for a guide that is hours out, globally or for one channel**
+- **🎧 Sound behaves like a TV app now — and the remote's transport keys work**
+- **🩺 Diagnostics you can actually send**
+- **🧩 M3U playlists: per-item headers, and catch-up that actually builds a URL**
+
+### 🐛 Fixes
+
+- **4K movies that failed to play on some TVs now get a real rescue instead of a wrong error**
+- **A film or episode now gets every decoding option before it gives up, whichever player you prefer**
+- **A file that repeatedly defeats your preferred player stops re-trying it**
+- **The Home screen's background preview no longer holds a channel open on a dead stream**
+- **Channels found in Search now play exactly like channels opened from Live TV**
+- **Prefer HLS also applies in the TV Guide and to catch-up**
+- **Retry on a movie retries the movie**
+- **Long films on portal (Stalker) playlists survive their link expiring**
+- **Providers that allow one stream at a time recover in the compatibility player too**
+- **"Hardware decoding: Off" now applies to the standard player too**
+- **Live TV channels that only allow one stream at a time no longer lock themselves out**
+- **Audio and video no longer drift apart on live channels in compatibility mode**
+- **Faster switch to the compatibility player when a provider refuses the standard player's stream URLs**
+- **A provider that refuses playback outright is no longer hammered with the identical request**
+- **Catch-up recordings that opened with sound but no picture now recover by themselves**
+- **Zapping no longer slows down the Guide, artwork and playlist updates**
+- **Audio Mode really switches the picture off — on both players**
+- **On providers that allow one stream at a time, the preview pane now says so**
+- **Subtitles are drawn in the small docked player**
+- **The audio/video sync nudge is available on live channels**
+- **Volume boost above 100% now works on Live TV too**
+- **…and on films and episodes that play on the standard player**
+- **Your preferred audio and subtitle languages now apply on the standard player as well**
+- **Default zoom now applies to Live TV, and zoom no longer carries over between channels**
+- **Auto frame rate is respected for films and episodes on the standard player**
+- **Switching to Audio Mode during a slow start no longer shows "video could not be rendered"**
+- **A live channel left in Audio Mode no longer reconnects on a loop**
+- **The Home screen's background preview follows Hardware decoding and per-item headers**
+- **Detailed logging now records from the moment the app starts**
+- **HDR and Audio sync now say which player they apply to**
+- **Coming back from Audio Mode no longer drops the picture to a few frames a second**
+- **Prefer HLS no longer breaks the odd channel that has no HLS version**
+- **A live channel that never opens no longer spins forever**
+- **A live channel that starts and then freezes for good is handed over to the other player**
+- **A channel that loads video but never starts playing is now spotted in seconds**
+- **A channel that can't fill the Pre-buffer opens anyway instead of spinning**
+- **Live TV gives up on a stuck channel sooner**
+- **A channel that won't play now works its way through all four combinations before giving up**
+- **Switching to the standard player by hand no longer strands you on a spinner**
+
 ## v4.1.6 — 2026-08-01
 
 ### ✨ New features
@@ -27,7 +82,7 @@
 ### ✨ New features
 
 - **💬 Subtitle appearance — size, colour, position and background, each optional (#96)**
-- **📶 Prefer HLS for Live TV — per source, with format auto-detection** (community PR #97 by @codeVerine)
+- **📶 Prefer HLS for Live TV — per source, with format auto-detection** (community PR #97 by @pt5pnzghm6-sys)
 - **🆕 Date added — sort Movies and Series by what arrived most recently** (community PR #94 by @cotol1985)
 - **↕️ Series sorting — season and episode order, set per show** (community PR #94 by @cotol1985)
 - **📺 Channel numbers — type a number on the remote to tune in Live TV**
