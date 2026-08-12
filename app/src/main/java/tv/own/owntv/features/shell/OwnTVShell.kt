@@ -48,6 +48,7 @@ import tv.own.owntv.features.home.HomeScreen
 import tv.own.owntv.features.home.HomeViewModel
 import tv.own.owntv.features.live.LiveScreen
 import tv.own.owntv.features.live.LiveViewModel
+import tv.own.owntv.features.live.displayLabel
 import tv.own.owntv.features.movies.MoviesScreen
 import tv.own.owntv.features.movies.MovieViewModel
 import tv.own.owntv.features.search.SearchScreen
@@ -334,12 +335,15 @@ fun OwnTVShell(
     // Browse categories for the PiP/MultiView channel pickers: "Recent" + the live rail's All and folder
     // categories (each loads its channels on demand). Favorites/History stay in the main guide.
     val railItems by liveVm.railItems.collectAsStateWithLifecycle()
-    val browseCategories = remember(railItems, recentChannels) {
+    // Built-in rails (Favorites/History/All) carry a null title since v4.2.0 and localize through
+    // displayLabel() — resolve here in composition, since the remember block below isn't composable.
+    val railLabels = railItems.map { it.displayLabel() }
+    val browseCategories = remember(railItems, recentChannels, railLabels) {
         buildList {
             add(tv.own.owntv.ui.components.ChannelCategory("Recent") { recentChannels })
             // Every live-rail category (Favorites, History, All, and each folder) in the order the guide shows.
-            railItems.forEach { item ->
-                add(tv.own.owntv.ui.components.ChannelCategory(item.title) { liveVm.channelsFor(item.key) })
+            railItems.forEachIndexed { i, item ->
+                add(tv.own.owntv.ui.components.ChannelCategory(railLabels[i]) { liveVm.channelsFor(item.key) })
             }
         }
     }
