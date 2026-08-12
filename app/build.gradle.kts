@@ -41,6 +41,11 @@ android {
 
     defaultConfig {
         applicationId = "tv.own.owntv"
+        // Personal fork: a distinct application id so this build installs ALONGSIDE an official
+        // OwnTV (no signature-mismatch conflict). The matching versionNameSuffix makes the fork
+        // obvious in the About screen. Drop both lines to track upstream's package id exactly.
+        applicationIdSuffix = ".fork"
+        versionNameSuffix = "-fork"
         minSdk = 26
         targetSdk = 36
         // CI injects these from the git tag (see .github/workflows/android.yml) so releases never
@@ -77,6 +82,9 @@ android {
         )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // (The fork's old defaultConfig arm-only abiFilters is gone: upstream's `standard` flavor below
+        // now ships exactly those two ARM ABIs, and defaultConfig filters would UNION into the x86_64
+        // emulator flavor, bloating it with arm libs it never loads.)
     }
 
     // ABI split via product flavors: real Android TV / Fire TV hardware is arm (arm64-v8a covers

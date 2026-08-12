@@ -23,7 +23,8 @@ enum class OwnTVIcon {
     PERSON, ADD, SETTINGS, PALETTE, THEME, ZOOM, PLAYLIST, EPG, VIDEO, SHARE, CHEVRON, FAVORITE,
     PAUSE, REWIND, FORWARD, AUDIO, SUBTITLE, SKIP_NEXT, SKIP_PREVIOUS,
     BACK, VOLUME_HIGH, VOLUME_LOW, VOLUME_MUTE, ASPECT, FULLSCREEN, FULLSCREEN_EXIT, PIP, CLOSE,
-    SORT, SWAP, HEADPHONES, EXPAND,
+    SORT, SWAP, MOVE, MINUS,
+    HEADPHONES, EXPAND,
     IMAGE, INFO, LANGUAGE,
 }
 
@@ -166,6 +167,9 @@ fun OwnTVIcon(
                 drawLineStroke(p(12f, 5f), p(12f, 19f), tint, stroke)
                 drawLineStroke(p(5f, 12f), p(19f, 12f), tint, stroke)
             }
+            OwnTVIcon.MINUS -> {
+                drawLineStroke(p(5f, 12f), p(19f, 12f), tint, stroke)
+            }
             OwnTVIcon.SETTINGS -> {
                 // "tune" sliders — clearer than a gear at small sizes
                 drawLineStroke(p(4f, 8f), p(20f, 8f), tint, stroke)
@@ -248,6 +252,20 @@ fun OwnTVIcon(
             OwnTVIcon.FORWARD -> {
                 drawPath(triangle(p(4f, 6f), p(11f, 12f), p(4f, 18f)), tint, style = Fill)
                 drawPath(triangle(p(13f, 6f), p(20f, 12f), p(13f, 18f)), tint, style = Fill)
+            }
+            // (SWAP is drawn below — upstream added its own ⇄ glyph in v4.0.2; we keep theirs.)
+            OwnTVIcon.MOVE -> {
+                // Four-way arrows — "reposition the window".
+                drawLineStroke(p(12f, 4f), p(12f, 20f), tint, stroke)
+                drawLineStroke(p(4f, 12f), p(20f, 12f), tint, stroke)
+                drawLineStroke(p(9f, 7f), p(12f, 4f), tint, stroke)
+                drawLineStroke(p(15f, 7f), p(12f, 4f), tint, stroke)
+                drawLineStroke(p(9f, 17f), p(12f, 20f), tint, stroke)
+                drawLineStroke(p(15f, 17f), p(12f, 20f), tint, stroke)
+                drawLineStroke(p(7f, 9f), p(4f, 12f), tint, stroke)
+                drawLineStroke(p(7f, 15f), p(4f, 12f), tint, stroke)
+                drawLineStroke(p(17f, 9f), p(20f, 12f), tint, stroke)
+                drawLineStroke(p(17f, 15f), p(20f, 12f), tint, stroke)
             }
             OwnTVIcon.SKIP_NEXT -> {
                 // play-to-bar: ▶|

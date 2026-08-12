@@ -112,9 +112,11 @@ fun LiveScreen(
     restoreFocus: Boolean = false,
     onRestored: () -> Unit = {},
     onContentScrolled: (Boolean) -> Unit = {},
+    onOpenMultiView: (ChannelEntity) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val vm: LiveViewModel = koinViewModel()
+    val pip = org.koin.compose.koinInject<tv.own.owntv.features.multiview.PipController>()
     val railItems by vm.railItems.collectAsStateWithLifecycle()
     val selectedKey by vm.selectedKey.collectAsStateWithLifecycle()
     val count by vm.count.collectAsStateWithLifecycle()
@@ -623,6 +625,8 @@ fun LiveScreen(
                 contextChannel = null
             },
             onRemoveFromHistory = { vm.removeFromHistory(ch.id); contextChannel = null },
+            onWatchInCorner = { pip.openCorner(ch); contextChannel = null },
+            onMultiView = { contextChannel = null; onOpenMultiView(ch) },
             onDismiss = { contextChannel = null },
         )
     }
@@ -761,6 +765,8 @@ private fun ChannelContextMenu(
     // "Move to category…" (issue #87): send this channel into a user's combined category.
     onMoveToCategory: () -> Unit,
     onRemoveFromHistory: () -> Unit,
+    onWatchInCorner: () -> Unit,
+    onMultiView: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val colors = OwnTVTheme.colors
@@ -794,6 +800,12 @@ private fun ChannelContextMenu(
             // Always offered, regardless of the Live TV external-player default — this is the per-channel
             // escape hatch for a stream neither in-app engine can open (same as Movies/Series/Downloads).
             ChannelMenuAction(stringResource(R.string.content_play_external_short), onPlayExternal, OwnTVIcon.PLAY, Modifier.fillMaxWidth())
+
+            // Fork: second-stream entries. True PiP keeps this channel in a corner window; MultiView
+            // opens it as the first of up to four tiles.
+            ChannelMenuDivider()
+            ChannelMenuAction("Picture-in-picture", onWatchInCorner, OwnTVIcon.PIP, Modifier.fillMaxWidth())
+            ChannelMenuAction("MultiView", onMultiView, OwnTVIcon.PIP, Modifier.fillMaxWidth())
 
             if (canMove) {
                 ChannelMenuDivider()

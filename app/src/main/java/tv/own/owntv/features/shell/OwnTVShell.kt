@@ -88,6 +88,30 @@ private enum class ShellLayer { SIDEBAR, RAIL, CONTENT }
 /** Player presentation: hidden, fullscreen, docked mini-player, or audio-only now-playing bar. */
 private enum class PlayerMode { NONE, FULLSCREEN, MINI, AUDIO }
 
+/** Which screen corner the PiP window sits in. [next] cycles them: top-right → top-left → bottom-left →
+ *  bottom-right → top-right. A new PiP always (re)starts at [TOP_END]. */
+private enum class CornerPos {
+    TOP_END, TOP_START, BOTTOM_START, BOTTOM_END;
+
+    fun next(): CornerPos = when (this) {
+        TOP_END -> TOP_START
+        TOP_START -> BOTTOM_START
+        BOTTOM_START -> BOTTOM_END
+        BOTTOM_END -> TOP_END
+    }
+}
+
+/** PiP window sizing: the base 320×180 dp (the original fixed size) scaled by a user-adjustable
+ *  percentage. Size +/− steps by [CORNER_SCALE_STEP]; clamped to [CORNER_SCALE_MIN]% (the base — no
+ *  smaller) … [CORNER_SCALE_MAX]% (640×360 dp, which still fits every corner position with its 24 dp
+ *  margin on a 960×540 dp TV canvas). Remembered for the session (unlike the position, which resets
+ *  to top-right on each open). dp-based, so it additionally scales with the global UI-zoom density. */
+private const val CORNER_BASE_W = 320
+private const val CORNER_BASE_H = 180
+private const val CORNER_SCALE_MIN = 100
+private const val CORNER_SCALE_MAX = 200
+private const val CORNER_SCALE_STEP = 10
+
 /**
  * The MD3 shell: a fixed navigation panel (Layer 1) plus the active destination. Settings is a
  * single-pane sectioned screen; browse sections keep the Folder Rail → Content → Preview layout.
@@ -168,6 +192,29 @@ fun OwnTVShell(
     val movieVm = org.koin.androidx.compose.koinViewModel<MovieViewModel>()
     val seriesVm = org.koin.androidx.compose.koinViewModel<SeriesViewModel>()
     val searchVm = org.koin.androidx.compose.koinViewModel<SearchViewModel>()
+    // True picture-in-picture: a second, independent stream in a corner window, mounted at the shell's top
+    // level so it persists across the browse UI <-> full-screen. Audio belongs to one window at a time —
+    // by default the main stream, until the user hands sound to the corner (audioOnCorner).
+    val pip = koinInject<tv.own.owntv.features.multiview.PipController>()
+    val cornerActive by pip.active.collectAsStateWithLifecycle()
+    val cornerChannel by pip.channel.collectAsStateWithLifecycle()
+    var audioOnCorner by remember { mutableStateOf(false) }
+    // True while the channel switcher for the PiP corner is open (retune the corner without closing it).
+    var cornerBrowsing by remember { mutableStateOf(false) }
+    // True while picking the SECOND stream to open in the corner from the full-screen player (true PiP entry).
+    var pipPicking by remember { mutableStateOf(false) }
+    // True while picking a new channel for the FULL-SCREEN window from the PiP row (corner keeps playing).
+    var mainPicking by remember { mutableStateOf(false) }
+    // Which screen corner the PiP window sits in. Resets to TOP_END each time a corner is (re)opened.
+    var cornerPos by remember { mutableStateOf(CornerPos.TOP_END) }
+    // PiP window scale (percent of the 320×180 base) — Size +/− steps it, remembered for the session.
+    var cornerScalePct by remember { androidx.compose.runtime.mutableIntStateOf(CORNER_SCALE_MIN) }
+    val cornerGrow = { cornerScalePct = (cornerScalePct + CORNER_SCALE_STEP).coerceAtMost(CORNER_SCALE_MAX) }
+    val cornerShrink = { cornerScalePct = (cornerScalePct - CORNER_SCALE_STEP).coerceAtLeast(CORNER_SCALE_MIN) }
+    // Bumped whenever either window is retuned out-of-band (zap, Change main/PiP, swap) so the audio
+    // arbitration below re-applies its plan — retuning unmutes/mutes engines without changing any of the
+    // arbitration's other keys, which previously left both windows audible (or both silent).
+    var audioTick by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     // Same activity-scoped instances the Live/Guide screens use — lets the fullscreen HUD zap channels
     // up/down (CH+/CH-). Guide tunes start through LiveViewModel too (they set zapSource = LIVE_TV), so
     // there is exactly ONE zap path: liveVm's. The Guide keeps its own EpgViewModel only for the grid.
@@ -280,6 +327,23 @@ fun OwnTVShell(
         if (selectedSection != MainSection.EPG) { tv.own.owntv.Perf.stamp("epg-preload"); epgVm.load() }
     }
 
+    // MultiView (PR #2): up to four live tiles. Channels to add come from the recently-watched list.
+    val mv = koinInject<tv.own.owntv.features.multiview.MultiViewController>()
+    val mvActive by mv.active.collectAsStateWithLifecycle()
+    val recentChannels by liveVm.recentlyWatched.collectAsStateWithLifecycle()
+    // Browse categories for the PiP/MultiView channel pickers: "Recent" + the live rail's All and folder
+    // categories (each loads its channels on demand). Favorites/History stay in the main guide.
+    val railItems by liveVm.railItems.collectAsStateWithLifecycle()
+    val browseCategories = remember(railItems, recentChannels) {
+        buildList {
+            add(tv.own.owntv.ui.components.ChannelCategory("Recent") { recentChannels })
+            // Every live-rail category (Favorites, History, All, and each folder) in the order the guide shows.
+            railItems.forEach { item ->
+                add(tv.own.owntv.ui.components.ChannelCategory(item.title) { liveVm.channelsFor(item.key) })
+            }
+        }
+    }
+
     // Opening content from a browse screen goes fullscreen — UNLESS the player is already docked as a
     // mini-player, in which case it stays docked and just swaps to the newly-selected stream (the VM
     // already started it), so picking a channel updates the PiP window in place (#6).
@@ -380,6 +444,94 @@ fun OwnTVShell(
             }
         }
     }
+    // --- True PiP corner: audio arbitration + window gestures -------------------------------------
+    // Mute/unmute the main stream regardless of which engine owns it (promoted-live ExoPlayer vs mpv).
+    val setMainMuted: (Boolean) -> Unit = { muted ->
+        if (liveOnExo) liveVm.previewEngine.setMuted(muted) else player.setMuted(muted)
+    }
+    val closeCorner = {
+        setMainMuted(false) // hand the sound back to the main window
+        audioOnCorner = false
+        pip.closeCorner()
+        Unit
+    }
+    val toggleCornerAudio = { audioOnCorner = !audioOnCorner }
+    // Full-screen swap (live main only): exchange the corner stream with the main one.
+    val swapCorner = {
+        val cornerCh = cornerChannel
+        val mainCh = liveVm.previewChannel.value
+        if (cornerCh != null && mainCh != null) {
+            pip.openCorner(mainCh)         // old main → corner (starts muted)
+            zapSource = MainSection.LIVE_TV
+            liveVm.ensurePlaying(cornerCh) // old corner → main window
+            audioOnCorner = false          // sound follows the (new) main window
+            audioTick++                    // retune changed engine mutes out-of-band — re-apply the plan
+        }
+        Unit
+    }
+    // Enter MultiView seeded with [channel] (plus the PiP corner channel, if one is up). Stops the single-
+    // stream players so ONLY MultiView's tile engines run — no main decoder competing with the tiles.
+    val enterMultiView: (tv.own.owntv.core.database.entity.ChannelEntity) -> Unit = { channel ->
+        val seed = buildList {
+            add(channel)
+            cornerChannel?.let { if (it.id != channel.id) add(it) }
+        }
+        pip.closeCorner(); audioOnCorner = false
+        liveVm.clearLiveOnExo() // stop the live ExoPlayer (preview/main)
+        player.stop()           // stop mpv (VOD), if it was the main
+        playerMode = PlayerMode.NONE
+        mv.enter(seed)
+    }
+    val exitMultiView = {
+        mv.exit()
+        restoreFocus = true
+        runCatching { sidebarFocus.requestFocus() }
+        Unit
+    }
+    // Browse: promote the corner channel to full-screen, closing the corner.
+    val expandCorner = {
+        cornerChannel?.let { ch ->
+            audioOnCorner = false
+            pip.closeCorner()
+            zapSource = MainSection.LIVE_TV
+            onSelectSection(MainSection.LIVE_TV)
+            liveVm.watchFullscreen(ch, listOf(ch))
+            playerMode = PlayerMode.FULLSCREEN
+        }
+        Unit
+    }
+    // Only one window is audible at a time. The decision is a pure function (PipAudio) so it's unit-tested;
+    // a null plan (no corner) leaves both engines untouched, so normal playback never has its mute changed.
+    // audioTick re-runs the plan after any retune (zap / Change main / Change PiP / swap) — those calls set
+    // engine mutes out-of-band (ensurePlaying unmutes the main, openCorner re-mutes the corner) without
+    // changing the other keys, which used to leave both windows audible or both silent.
+    LaunchedEffect(cornerActive, audioOnCorner, playerMode, liveOnExo, audioTick) {
+        val plan = tv.own.owntv.features.multiview.PipAudio.plan(
+            cornerActive = cornerActive,
+            mainPresent = playerMode != PlayerMode.NONE,
+            audioOnCorner = audioOnCorner,
+        ) ?: return@LaunchedEffect
+        plan.muteMain?.let { setMainMuted(it) }
+        pip.engine.setMuted(plan.muteCorner)
+    }
+
+    // Per-source user-agents for the corner/tile engines (providers with a custom UA otherwise 403 in
+    // PiP/MultiView while playing fine full-screen).
+    LaunchedEffect(Unit) {
+        pip.uaResolver = { sourceId -> liveVm.uaFor(sourceId) }
+        mv.uaResolver = { sourceId -> liveVm.uaFor(sourceId) }
+    }
+
+    // If the corner closes by any path (close, swap-to-fullscreen, entering MultiView), drop its switcher too.
+    // Also silence the in-pane preview while a corner is up — in browse mode the corner is the audible
+    // window, and with the "preview audio" setting on the preview would otherwise play a second soundtrack.
+    LaunchedEffect(cornerActive) {
+        liveVm.setPreviewAudioSuppressed(cornerActive)
+        if (cornerActive) cornerPos = CornerPos.TOP_END // every new PiP starts in the top-right
+        else cornerBrowsing = false
+    }
+
+    LaunchedEffect(Unit) { runCatching { sidebarFocus.requestFocus() } }
 
     // Stop a leftover live preview when you leave the Live section (but never while fullscreen/mini plays).
     LaunchedEffect(selectedSection, playerMode) {
@@ -415,8 +567,9 @@ fun OwnTVShell(
 
     CompositionLocalProvider(LocalContentScrolled provides contentScrolled) {
     Box(modifier = modifier.fillMaxSize().background(shellBase)) {
-      // Browse UI — hidden while the player is fullscreen (stays visible behind the docked mini-player).
-      if (playerMode != PlayerMode.FULLSCREEN) {
+      // Browse UI — hidden while the player is fullscreen (stays visible behind the docked mini-player) and
+      // while MultiView owns the screen (so its hidden Live preview decoder doesn't run behind the tiles).
+      if (playerMode != PlayerMode.FULLSCREEN && !mvActive) {
         Column(modifier = Modifier.fillMaxSize()) {
           if (isOffline) OfflineBanner()
           Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
@@ -640,6 +793,7 @@ fun OwnTVShell(
                             restoreFocus = restoreFocus,
                             onRestored = { restoreFocus = false },
                             onContentScrolled = { contentScrolled = it },
+                            onOpenMultiView = enterMultiView, // fork: enter MultiView seeded with this channel
                             modifier = Modifier.fillMaxSize(),
                         )
 
@@ -813,7 +967,11 @@ fun OwnTVShell(
                 val isLiveStream = liveOnExo || player.isLiveContent
                 val zap: ((Int) -> Unit)? = when {
                     !isLiveStream -> null
-                    zapSource == MainSection.LIVE_TV && liveCanZap -> liveVm::zap
+                    // Zapping retunes the main out-of-band (ensurePlaying unmutes it); bump audioTick so the
+                    // audio arbitration re-applies its plan while a PiP corner holds the sound.
+                    // (v4.1.7 deleted the EPG zap branch upstream — it was unreachable, and EpgViewModel.zap
+                    // is gone now that LiveViewModel is the only live-start path.)
+                    zapSource == MainSection.LIVE_TV && liveCanZap -> ({ d -> liveVm.zap(d); audioTick++ })
                     else -> null
                 }
                 // Live rewind controls apply to a Live-TV channel (live OR its timeshift archive).
@@ -840,11 +998,23 @@ fun OwnTVShell(
                 PlayerHud(
                     player = if (liveOnExo) liveVm.previewEngine else mpvEngine, // HUD drives the active engine
                     onBack = exitPlayer,
-                    onPip = dockPlayer, // PiP/dock works for live on either engine now
+                    // PiP button: for LIVE, true PiP — pick a SECOND stream for the corner while this one
+                    // stays full-screen (hidden once a corner is up; the PiP row takes over). For VOD there
+                    // is no live corner equivalent, so it keeps upstream's behavior: dock to the mini-player
+                    // and browse while the movie keeps playing.
+                    onPip = when {
+                        cornerActive -> null
+                        isLiveChannel -> ({ pipPicking = true })
+                        else -> dockPlayer
+                    },
+                    // MultiView: drop into the grid seeded with this channel (live only); add more from inside.
+                    onMultiView = if (isLiveChannel) ({ liveVm.previewChannel.value?.let { enterMultiView(it) } }) else null,
                     onAudioMode = toAudioMode,
-                    // The channel-list overlay draws ABOVE the HUD; while it's open the HUD goes inert so
-                    // its hide/error focus grabs can't yank D-pad focus off the overlay.
-                    inert = showChannelList || showHistoryList || showCategoryBrowser || showSubtitleSearch || showLocalSubPicker,
+                    // Go inert while ANY overlay is open over the player — our channel pickers AND upstream's
+                    // overlays (channel/history lists, category browser, subtitle pickers) — so the HUD's
+                    // hide/error focus grabs can't yank D-pad focus off the overlay.
+                    inert = pipPicking || mainPicking || cornerBrowsing ||
+                        showChannelList || showHistoryList || showCategoryBrowser || showSubtitleSearch || showLocalSubPicker,
                     onChannelUp = zap?.let { z -> { z(-1) } },
                     onChannelDown = zap?.let { z -> { z(1) } },
                     onOpenChannelList = if (isTunedLive && liveCanZap) { { showChannelList = true } } else null,
@@ -854,12 +1024,31 @@ fun OwnTVShell(
                     onGoToLive = if (isTunedLive) liveVm::goToLive else null,
                     onScrubLive = if (isTunedLive && canRewindLive) liveVm::scrubLive else null,
                     timeshiftOffsetSec = if (isTunedLive) timeshiftOffset else null,
-                    onTuneToNumber = if (directTuneEnabled && isTunedLive && isLiveStream && timeshiftOffset == null && previewChannel != null) liveVm::tuneByNumber else null,
+                    // Fork: bump audioTick after the tune resolves — a number-tune retunes the main engine
+                    // out-of-band, and the corner may own the sound (same rule as zap / Change main / swap).
+                    onTuneToNumber = if (directTuneEnabled && isTunedLive && isLiveStream && timeshiftOffset == null && previewChannel != null) {
+                        { n -> liveVm.tuneByNumber(n).also { audioTick++ } }
+                    } else null,
                     directTuneContextKey = previewChannel?.id ?: 0L,
                     // Show the ACTUAL running engine (mpv when pinned OR auto-fallen-back), not just the pin —
                     // otherwise an auto-fallback to mpv still read "EXO". true = on mpv (pill shows MPV, teal).
                     compatMode = if (isTunedLive) !liveOnExo else null,
                     onToggleCompatMode = if (isTunedLive) liveVm::toggleForceMpv else null,
+                    // True PiP corner controls — present only while a second stream is in the corner.
+                    // Swap is offered only when the main stream is a promoted live channel (both ExoPlayer),
+                    // so the exchange is clean; audio/close are always available with a corner up.
+                    onCornerSwap = if (cornerActive && liveOnExo) swapCorner else null,
+                    onCornerAudio = if (cornerActive) toggleCornerAudio else null,
+                    onCornerMove = if (cornerActive) ({ cornerPos = cornerPos.next() }) else null,
+                    onCornerGrow = if (cornerActive) cornerGrow else null,
+                    onCornerShrink = if (cornerActive) cornerShrink else null,
+                    onCornerClose = if (cornerActive) closeCorner else null,
+                    // Explicit per-window channel pickers, so it's never ambiguous which window retunes:
+                    // "Change main" = the full-screen stream, "Change PiP" = the corner. Both keep the
+                    // other window playing untouched.
+                    onChangeMain = if (cornerActive && isLiveChannel) ({ mainPicking = true }) else null,
+                    onChangeCorner = if (cornerActive) ({ cornerBrowsing = true }) else null,
+                    cornerAudioOn = audioOnCorner,
                     // VOD engine toggle (movies/series only — live and catch-up channels keep their own
                     // engine handling above): flip the current item between mpv and ExoPlayer.
                     vodOnExo = if (!isLiveStream && !isTunedLive) vodExoActive else null,
@@ -934,7 +1123,7 @@ fun OwnTVShell(
                             nowPlaying = overlayNowPlaying,
                             title = zapOverlayTitle,
                             showNumbers = directTuneEnabled,
-                            onSelect = { liveVm.ensurePlaying(it); showChannelList = false },
+                            onSelect = { liveVm.ensurePlaying(it); audioTick++; showChannelList = false },
                             onDismiss = { showChannelList = false },
                             onOpenCategories = { liveVm.showCategories() },
                             modifier = Modifier.fillMaxSize(),
@@ -950,7 +1139,7 @@ fun OwnTVShell(
                         title = stringResource(R.string.content_history),
                         showNumbers = directTuneEnabled,
                         alignEnd = true,
-                        onSelect = { liveVm.ensurePlaying(it); showHistoryList = false },
+                        onSelect = { liveVm.ensurePlaying(it); audioTick++; showHistoryList = false },
                         onDismiss = { showHistoryList = false },
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -967,6 +1156,94 @@ fun OwnTVShell(
                 )
             }
         }
+      }
+
+      // MultiView — up to four live tiles, full-screen above everything. The single-stream players were
+      // stopped on entry, so only the tile engines run; exiting releases them all.
+      if (mvActive) {
+        tv.own.owntv.features.multiview.MultiViewScreen(
+            controller = mv,
+            categories = browseCategories,
+            searchChannels = { q -> liveVm.browseChannels(q) },
+            onExit = exitMultiView,
+            modifier = Modifier.fillMaxSize(),
+        )
+      }
+
+      // True picture-in-picture corner — a second, independent stream drawn over both the browse UI and the
+      // full-screen player (its SurfaceView is z-ordered above the main surface). The user can cycle it through
+      // the four screen corners (cornerPos); it always (re)opens top-right. While full-screen the player HUD
+      // owns the corner's controls, so the window itself is video-only then.
+      if (cornerActive) {
+        val cornerAlign = when (cornerPos) {
+            CornerPos.TOP_END -> Alignment.TopEnd
+            CornerPos.TOP_START -> Alignment.TopStart
+            CornerPos.BOTTOM_START -> Alignment.BottomStart
+            CornerPos.BOTTOM_END -> Alignment.BottomEnd
+        }
+        Box(
+            modifier = Modifier.align(cornerAlign).padding(24.dp)
+                .size(width = (CORNER_BASE_W * cornerScalePct / 100).dp, height = (CORNER_BASE_H * cornerScalePct / 100).dp),
+        ) {
+            tv.own.owntv.player.PipCornerWindow(
+                engine = pip.engine,
+                showControls = playerMode != PlayerMode.FULLSCREEN,
+                audioOnCorner = audioOnCorner,
+                onToggleAudio = toggleCornerAudio,
+                onBrowse = { cornerBrowsing = true }, // retune the corner from the playlist, live
+                onMove = { cornerPos = cornerPos.next() }, // cycle through the four corners
+                onGrow = cornerGrow,     // +10% (capped at 200% of the base size)
+                onShrink = cornerShrink, // −10% (never below the 320×180 base)
+                onSwap = expandCorner, // window's expand button promotes the corner channel to full-screen
+                onClose = closeCorner,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+      }
+
+      // Channel switcher for the PiP corner — pick from the playlist (search included) and the corner retunes
+      // in place, without closing or stealing the main window's sound.
+      if (cornerActive && cornerBrowsing) {
+        tv.own.owntv.ui.components.ChannelSwitcher(
+            title = "Change the PiP channel — the small window",
+            categories = browseCategories,
+            search = { q -> liveVm.browseChannels(q) },
+            onPick = { ch -> pip.openCorner(ch); audioTick++; cornerBrowsing = false },
+            onDismiss = { cornerBrowsing = false },
+            modifier = Modifier.fillMaxSize(),
+        )
+      }
+
+      // Channel switcher for the MAIN window while PiP is up — retunes the full-screen stream; the corner
+      // keeps playing untouched (its engine is independent).
+      if (mainPicking) {
+        tv.own.owntv.ui.components.ChannelSwitcher(
+            title = "Change the main channel — the full screen",
+            categories = browseCategories,
+            search = { q -> liveVm.browseChannels(q) },
+            onPick = { ch ->
+                zapSource = MainSection.LIVE_TV
+                liveVm.ensurePlaying(ch)
+                audioTick++ // ensurePlaying unmuted the main — re-apply the audio plan (corner may own sound)
+                mainPicking = false
+            },
+            onDismiss = { mainPicking = false },
+            modifier = Modifier.fillMaxSize(),
+        )
+      }
+
+      // True PiP entry from the full-screen player: pick a SECOND stream to open in the corner. The current
+      // full-screen stream keeps playing as the main; the corner opens muted. (Two streams = two provider
+      // connections — a provider that allows only one will 509 the corner; that's a plan limit, not a bug.)
+      if (pipPicking) {
+        tv.own.owntv.ui.components.ChannelSwitcher(
+            title = "Add a stream to the corner",
+            categories = browseCategories,
+            search = { q -> liveVm.browseChannels(q) },
+            onPick = { ch -> pip.openCorner(ch); audioTick++; pipPicking = false },
+            onDismiss = { pipPicking = false },
+            modifier = Modifier.fillMaxSize(),
+        )
       }
 
         if (showExit) {

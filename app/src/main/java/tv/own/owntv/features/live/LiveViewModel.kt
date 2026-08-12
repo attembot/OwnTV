@@ -475,6 +475,33 @@ class LiveViewModel(
         }
     }
 
+    /**
+     * One-shot channel browse for the in-overlay switcher (PiP / MultiView): the active sources' channels,
+     * filtered by [query] when it's non-blank, as a bounded list (no paging — the overlay shows a scroll of
+     * the first [limit]). Lets the user retune a corner/tile from the whole playlist without leaving playback.
+     */
+    suspend fun browseChannels(query: String, limit: Int = 100): List<ChannelEntity> = withContext(Dispatchers.IO) {
+        val ids = ctx.value.sourceIds
+        if (ids.isEmpty()) return@withContext emptyList()
+        val q = query.trim()
+        if (q.isEmpty()) channelDao.allForSources(ids, limit) else channelDao.searchList(q, ids, limit)
+    }
+
+    /** One-shot channels for a browse [key] (All / Favorites / History / a Folder / a custom category)
+     *  — backs the browse picker. */
+    suspend fun channelsFor(key: LiveKey, limit: Int = 300): List<ChannelEntity> = withContext(Dispatchers.IO) {
+        val c = ctx.value
+        if (c.sourceIds.isEmpty()) return@withContext emptyList()
+        when (key) {
+            LiveKey.All -> channelDao.allForSources(c.sourceIds, limit)
+            LiveKey.Favorites -> channelDao.listFavorites(c.profileId, limit)
+            LiveKey.History -> channelDao.listHistory(c.profileId, limit)
+            is LiveKey.Folder -> channelDao.listByCategory(key.id, limit)
+            // v4.1.6 added user-created combined categories; the corner/tile picker browses them too.
+            is LiveKey.Custom -> customCategoryDao.snapshotChannels(c.profileId, key.id, c.sourceIds, limit)
+        }
+    }
+
     val count: StateFlow<Int> = combine(_selected, ctx, hiddenCategoryIds) { key, c, hidden -> Triple(key, c, hidden) }
         .flatMapLatest { (key, c, hidden) -> countFlow(key, c, hidden).throttleLatest() } // C2: cap live COUNT re-runs during bulk sync
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
@@ -612,13 +639,13 @@ class LiveViewModel(
         if (previewEngine.currentUrl == targetUrl &&
             previewEngine.state.value != tv.own.owntv.player.LivePreviewEngine.State.ERROR
         ) {
-            previewEngine.setMuted(!livePreviewAudio.value)
+            previewEngine.setMuted(!previewAudioOn())
             return
         }
         stalkerPreviewCmd = null
         setStalkerReconnect(null) // non-Stalker: URLs are stable, replay on reconnect
         previewEngine.play(
-            targetUrl, muted = !livePreviewAudio.value,
+            targetUrl, muted = !previewAudioOn(),
             meta = tv.own.owntv.player.MediaMeta(title = channel.name, subtitle = channelNumberLabel(channel), logoUrl = channel.displayLogoUrl),
             userAgent = sourceUaMap[channel.sourceId],
             prerollSecsOverride = prerollFor(channel.sourceId),
@@ -626,13 +653,28 @@ class LiveViewModel(
         )
     }
 
+    // While a PiP corner is up, the in-pane preview must stay silent even with the "preview audio" setting
+    // on — otherwise browsing plays TWO soundtracks (the corner is the audible window in browse mode).
+    private var previewAudioSuppressed = false
+    private fun previewAudioOn(): Boolean = livePreviewAudio.value && !previewAudioSuppressed
+
+    /** Shell calls this with the PiP corner's active state; applies to the current preview immediately. */
+    fun setPreviewAudioSuppressed(suppressed: Boolean) {
+        previewAudioSuppressed = suppressed
+        if (!_liveOnExo.value && previewEngine.currentUrl != null) previewEngine.setMuted(!previewAudioOn())
+    }
+
+    /** Per-source custom user-agent — the corner/tile engines need the same UA the main engine uses. */
+    fun uaFor(sourceId: Long): String? = sourceUaMap[sourceId]
+
     /** Stalker preview: same "already-previewing → just re-mute" shortcut keyed by the cmd, else
-     *  resolve the cmd to a real URL (create_link) and load it. Async because resolution is a network call. */
+     *  resolve the cmd to a real URL (create_link) and load it. Async because resolution is a network call.
+     *  (Fork: mute goes through previewAudioOn() so the PiP-corner suppression covers Stalker too.) */
     private fun playPreviewStalker(channel: ChannelEntity, source: tv.own.owntv.core.database.entity.SourceEntity) {
         if (stalkerPreviewCmd == channel.streamUrl &&
             previewEngine.state.value != tv.own.owntv.player.LivePreviewEngine.State.ERROR
         ) {
-            previewEngine.setMuted(!livePreviewAudio.value)
+            previewEngine.setMuted(!previewAudioOn())
             return
         }
         stalkerPreviewJob?.cancel()
@@ -649,7 +691,7 @@ class LiveViewModel(
             stalkerPreviewCmd = channel.streamUrl
             setStalkerReconnect(channel.streamUrl) // C-3: re-resolve on reconnect if the URL expires
             previewEngine.play(
-                url, muted = !livePreviewAudio.value,
+                url, muted = !previewAudioOn(),
                 meta = tv.own.owntv.player.MediaMeta(title = channel.name, subtitle = channelNumberLabel(channel), logoUrl = channel.displayLogoUrl),
                 userAgent = source.userAgent,
                 prerollSecsOverride = prerollFor(channel.sourceId),
@@ -790,8 +832,9 @@ class LiveViewModel(
     // starts inline during construction and must not touch a property initialized further down the class.
     init {
         viewModelScope.launch {
-            livePreviewAudio.collect { on ->
-                if (!_liveOnExo.value && previewEngine.currentUrl != null) previewEngine.setMuted(!on)
+            livePreviewAudio.collect {
+                // Fork: previewAudioOn() (not the raw setting) so PiP-corner suppression still holds here.
+                if (!_liveOnExo.value && previewEngine.currentUrl != null) previewEngine.setMuted(!previewAudioOn())
             }
         }
     }

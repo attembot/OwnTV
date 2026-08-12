@@ -7,7 +7,8 @@ name: Android CI
 #           they only get the test/lint verdict.
 on:
   push:
-    branches: [ main ]
+    # Fork: `personal` added — pushes there are this fork's compile check (no local Android SDK).
+    branches: [ main, personal ]
     tags: [ "v*" ]
   pull_request:
     branches: [ main ]

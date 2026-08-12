@@ -175,6 +175,7 @@ fun PlayerHud(
     player: PlaybackEngine,
     onBack: () -> Unit,
     onPip: (() -> Unit)? = null,
+    onMultiView: (() -> Unit)? = null, // enter MultiView seeded with this channel (live only)
     // Switch to audio-only mode (stops video decode, surfaces the top-bar now-playing bar). Null hides it.
     onAudioMode: (() -> Unit)? = null,
     // True while the shell draws an overlay ABOVE the HUD (e.g. the channel-list overlay). The HUD goes
@@ -204,6 +205,17 @@ fun PlayerHud(
     // streams ExoPlayer can't handle). null = not a live channel; true = currently pinned to mpv.
     compatMode: Boolean? = null,
     onToggleCompatMode: (() -> Unit)? = null,
+    // True picture-in-picture corner controls — shown only while a second (corner) stream is running.
+    // onCornerClose non-null = a corner is active; cornerAudioOn = the corner currently has the sound.
+    onCornerSwap: (() -> Unit)? = null,   // swap the corner stream into the main window (and vice versa)
+    onCornerAudio: (() -> Unit)? = null,  // move the audio between the main and corner windows
+    onCornerMove: (() -> Unit)? = null,   // cycle the corner window through the four screen corners
+    onCornerGrow: (() -> Unit)? = null,   // grow the corner window +10% (capped)
+    onCornerShrink: (() -> Unit)? = null, // shrink the corner window -10% (never below the base size)
+    onCornerClose: (() -> Unit)? = null,  // close the corner window
+    onChangeMain: (() -> Unit)? = null,   // pick a new channel for the FULL-SCREEN window (corner untouched)
+    onChangeCorner: (() -> Unit)? = null, // pick a new channel for the PiP corner (main untouched)
+    cornerAudioOn: Boolean = false,
     // VOD engine toggle: switch THIS movie/episode between mpv and ExoPlayer (e.g. to reach tracks only
     // one engine exposes, or to try the other engine on a problem file). null = not a VOD;
     // true = currently playing on ExoPlayer.
@@ -591,7 +603,10 @@ fun PlayerHud(
                         engineFlash++
                     },
                     favorite = favorite, onToggleFavorite = onToggleFavorite,
-                    onOpenDialog = { dialog = it }, onPip = onPip, onAudioMode = onAudioMode, onBack = onBack,
+                    onOpenDialog = { dialog = it }, onPip = onPip, onMultiView = onMultiView, onAudioMode = onAudioMode, onBack = onBack,
+                    onCornerSwap = onCornerSwap, onCornerAudio = onCornerAudio, onCornerMove = onCornerMove, onCornerGrow = onCornerGrow, onCornerShrink = onCornerShrink, onCornerClose = onCornerClose,
+                    onChangeMain = onChangeMain, onChangeCorner = onChangeCorner,
+                    cornerAudioOn = cornerAudioOn,
                     modifier = Modifier.align(Alignment.BottomStart),
                 )
             }
@@ -979,9 +994,45 @@ private fun BottomBar(
     vodOnExo: Boolean?, onToggleVodEngine: (() -> Unit)?,
     onInfo: (() -> Unit)? = null, infoOn: Boolean = false, onReport: (() -> Unit)? = null,
     favorite: Boolean = false, onToggleFavorite: (() -> Unit)? = null,
-    onOpenDialog: (HudDialog) -> Unit, onPip: (() -> Unit)?, onAudioMode: (() -> Unit)?, onBack: () -> Unit, modifier: Modifier = Modifier,
+    onOpenDialog: (HudDialog) -> Unit, onPip: (() -> Unit)?, onMultiView: (() -> Unit)? = null, onAudioMode: (() -> Unit)?, onBack: () -> Unit,
+    onCornerSwap: (() -> Unit)? = null, onCornerAudio: (() -> Unit)? = null, onCornerMove: (() -> Unit)? = null, onCornerGrow: (() -> Unit)? = null, onCornerShrink: (() -> Unit)? = null, onCornerClose: (() -> Unit)? = null,
+    onChangeMain: (() -> Unit)? = null, onChangeCorner: (() -> Unit)? = null,
+    cornerAudioOn: Boolean = false,
+    modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 20.dp)) {
+        // Dedicated PiP row (only while a corner stream is up) — its own labeled strip so it's obvious
+        // which window each action touches: "Change main" retunes the full-screen stream, "Change PiP"
+        // retunes the inset. Kept separate from the media controls so neither row overflows.
+        if (onCornerClose != null) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color.Black.copy(alpha = 0.45f))
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                    .focusGroup(),
+            ) {
+                OwnTVIcon(OwnTVIcon.PIP, tint = TEAL, filled = true, modifier = Modifier.size(16.dp))
+                Text(
+                    "PiP",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = TEAL,
+                    modifier = Modifier.padding(start = 2.dp, end = 8.dp),
+                )
+                if (onChangeMain != null) CtrlButton(OwnTVIcon.LIVE_TV, label = "Change main") { onChangeMain() }
+                if (onChangeCorner != null) CtrlButton(OwnTVIcon.PLAYLIST, label = "Change PiP") { onChangeCorner() }
+                if (onCornerSwap != null) CtrlButton(OwnTVIcon.FULLSCREEN, label = "Swap windows") { onCornerSwap() }
+                // Swap-arrows icon on Sound (not a mute glyph): it MOVES the audio between the two windows.
+                if (onCornerAudio != null) CtrlButton(OwnTVIcon.SWAP, active = cornerAudioOn, label = "Sound") { onCornerAudio() }
+                if (onCornerMove != null) CtrlButton(OwnTVIcon.MOVE, label = "Move") { onCornerMove() }
+                if (onCornerGrow != null) CtrlButton(OwnTVIcon.ADD, label = "Size +") { onCornerGrow() }
+                if (onCornerShrink != null) CtrlButton(OwnTVIcon.MINUS, label = "Size -") { onCornerShrink() }
+                CtrlButton(OwnTVIcon.CLOSE, label = "Close") { onCornerClose() }
+            }
+            Spacer(Modifier.height(10.dp))
+        }
         when {
             // Catch-up live channel → a scrubbable live timeline (last LIVE_WINDOW up to the live edge).
             onScrubLive != null -> {
@@ -1022,7 +1073,9 @@ private fun BottomBar(
                 // Aspect/zoom works in every mode now — direct mode resizes the surface view itself
                 // (see MpvVideoSurface), GL mode scales internally.
                 CtrlButton(OwnTVIcon.ASPECT, active = zoomMode != ZoomMode.FIT) { onOpenDialog(HudDialog.ZOOM) }
-                if (onPip != null) CtrlButton(OwnTVIcon.PIP) { onPip() }
+                // (The corner/PiP controls live in their own labeled row above — see the top of this Column.)
+                if (onPip != null) CtrlButton(OwnTVIcon.PIP, label = "PiP") { onPip() }
+                if (onMultiView != null) CtrlButton(OwnTVIcon.VIDEO, label = "MultiView") { onMultiView() } // enter the multi-stream grid
                 if (onAudioMode != null) CtrlButton(OwnTVIcon.HEADPHONES) { onAudioMode() }
                 // Stream technical info (codec/res/HDR/bitrate/decoder/audio/buffer) — toggles the overlay.
                 // Parked at the far right, where the redundant exit-fullscreen button used to sit (Back
@@ -1164,25 +1217,36 @@ private fun EngineToggle(label: String, active: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun CtrlButton(icon: OwnTVIcon, badge: Int? = null, active: Boolean = false, onClick: () -> Unit) {
+private fun CtrlButton(icon: OwnTVIcon, badge: Int? = null, active: Boolean = false, label: String? = null, onClick: () -> Unit) {
     FocusableSurface(
         onClick = onClick,
-        modifier = Modifier.size(44.dp),
+        // Icon-only buttons stay a 44dp square; labeled ones grow into a pill so the text fits.
+        modifier = if (label == null) Modifier.size(44.dp) else Modifier.height(44.dp),
         shape = RoundedCornerShape(12.dp),
         focusedContainerColor = Color.White.copy(alpha = 0.16f),
         unfocusedContainerColor = Color.Transparent,
         selectedContainerColor = Color.Transparent,
         contentAlignment = Alignment.Center,
     ) { focused ->
-        Box(contentAlignment = Alignment.Center) {
-            OwnTVIcon(icon, tint = if (active) TEAL else if (focused) Color.White else Color.White.copy(alpha = 0.78f), filled = true, modifier = Modifier.size(22.dp))
-            if (badge != null) {
-                Box(
-                    Modifier.align(Alignment.TopEnd).size(15.dp).clip(CircleShape).background(TEAL),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(stringResource(R.string.common_number_grouped, badge), style = MaterialTheme.typography.labelSmall, color = Color(0xFF003730), fontWeight = FontWeight.Bold)
+        val tint = if (active) TEAL else if (focused) Color.White else Color.White.copy(alpha = 0.78f)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            modifier = if (label == null) Modifier else Modifier.padding(horizontal = 14.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                OwnTVIcon(icon, tint = tint, filled = true, modifier = Modifier.size(22.dp))
+                if (badge != null) {
+                    Box(
+                        Modifier.align(Alignment.TopEnd).size(15.dp).clip(CircleShape).background(TEAL),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(stringResource(R.string.common_number_grouped, badge), style = MaterialTheme.typography.labelSmall, color = Color(0xFF003730), fontWeight = FontWeight.Bold)
+                    }
                 }
+            }
+            if (label != null) {
+                Text(label, style = MaterialTheme.typography.labelLarge, color = tint, maxLines = 1)
             }
         }
     }
