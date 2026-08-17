@@ -708,7 +708,9 @@ fun OwnTVShell(
                             val isLiveStream = liveOnExo || player.isLiveContent
                             val zapFn: ((Int) -> Unit)? = when {
                                 !isLiveStream -> null
-                                zapSource == MainSection.LIVE_TV && liveCanZap -> liveVm::zap
+                                // Same audioTick rule as the HUD zap below: a retune resets the main
+                                // engine's mute, so the corner's audio claim must be re-arbitrated.
+                                zapSource == MainSection.LIVE_TV && liveCanZap -> ({ d -> liveVm.zap(d); audioTick++ })
                                 else -> null
                             }
                             val audioEngine = if (liveOnExo) liveVm.previewEngine else mpvEngine

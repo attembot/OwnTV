@@ -1,6 +1,3 @@
-// focusProperties { exit = ... } — the picker's D-pad focus trap — is still experimental in Compose UI.
-@file:OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
-
 package tv.own.owntv.ui.components
 
 import androidx.activity.compose.BackHandler
@@ -30,7 +27,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -97,11 +93,16 @@ fun ChannelSwitcher(
             // without this, Left/Up off the picker's edge lands on invisible HUD buttons behind the scrim
             // (the HUD is inert and won't reclaim focus) — OK could then trigger a hidden Exit. Back dismisses.
             //
-            // ORDER MATTERS: focusProperties must come BEFORE focusGroup() so `exit` binds to the group's
-            // own focus target (the picker boundary). Placed after, it propagates to every focusable INSIDE
+            // Upstream's shared modal trap (ui/components/FocusTrap.kt), which every other overlay uses.
+            // It replaced this fork's hand-rolled `focusProperties { exit = ... }`: same behaviour on the
+            // stable onExit/cancelFocusChange() API instead of the experimental one, and its imePadding()
+            // is what a modal with a search field wants anyway.
+            //
+            // ORDER STILL MATTERS: the trap must come BEFORE focusGroup() so it binds to the group's own
+            // focus target (the picker boundary). Placed after, it propagates to every focusable INSIDE
             // the picker instead — each row then cancels any move away from itself, freezing the D-pad
-            // entirely (couldn't move from categories to channels).
-            .focusProperties { exit = { FocusRequester.Cancel } }
+            // entirely (couldn't move from categories to channels). That was a real on-device bug.
+            .trapAllFocusExit()
             .focusGroup(),
         contentAlignment = Alignment.Center,
     ) {
