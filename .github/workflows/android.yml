@@ -133,6 +133,9 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          # Shared secret for the default metadata Worker's edge rule. Forks have no secret and
+          # resolve "" — the app then falls back to the unprotected workers.dev base URL.
+          OWNTV_EDGE_KEY: ${{ secrets.OWNTV_EDGE_KEY }}
         run: |
           chmod +x ./gradlew
           if [ -n "$KEYSTORE_FILE" ]; then

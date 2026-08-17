@@ -130,7 +130,9 @@ fun CustomizeItemsScreen(
     val rowFocusers = remember(items.itemCount) { List(items.itemCount) { FocusRequester() } }
     // Focus the row that opened a dialog (rename / move) when it closes (a dialog close can land
     // focus on the screen's first focusable otherwise).
-    var dialogReturn by remember { mutableStateOf<FocusRequester?>(null) }
+    var dialogReturn by tv.own.owntv.ui.components.rememberDialogFocusRestore(
+        anyDialogOpen = renaming != null || rangeEnd != null || movingItem != null || creatingCategory,
+    )
     // Focus the first row once the screen opens (rows arrive via paging, so wait for them).
     var firstLanding by remember { mutableStateOf(true) }
 
@@ -147,15 +149,6 @@ fun CustomizeItemsScreen(
             // owner while Paging is empty (and the first row takes over later if data arrives).
             kotlinx.coroutines.delay(60)
             runCatching { backFocus.requestFocus() }
-        }
-    }
-    LaunchedEffect(renaming, rangeEnd, movingItem, creatingCategory) {
-        if (renaming == null && rangeEnd == null && movingItem == null && !creatingCategory) {
-            dialogReturn?.let { opener ->
-                kotlinx.coroutines.delay(60)
-                runCatching { opener.requestFocus() }
-            }
-            dialogReturn = null
         }
     }
 

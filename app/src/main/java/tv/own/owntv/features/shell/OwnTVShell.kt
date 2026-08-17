@@ -46,6 +46,7 @@ import tv.own.owntv.features.downloads.DownloadsScreen
 import tv.own.owntv.features.epg.EpgScreen
 import tv.own.owntv.features.home.HomeScreen
 import tv.own.owntv.features.home.HomeViewModel
+import tv.own.owntv.features.live.LiveKey
 import tv.own.owntv.features.live.LiveScreen
 import tv.own.owntv.features.live.LiveViewModel
 import tv.own.owntv.features.live.displayLabel
@@ -184,6 +185,20 @@ fun OwnTVShell(
     // Local subtitle-file picker (plan §7) — the same TV-safe in-app browser local M3U import uses.
     var showLocalSubPicker by remember { mutableStateOf(false) }
     val localSubToast = tv.own.owntv.ui.components.rememberInAppToast()
+    // Metadata allowance: tell the user ONCE per app start that their daily share of the shared
+    // metadata service is gone, rather than letting posters and plots quietly stop appearing. Lives in
+    // the shell because it can happen on any screen, and the shell is the one toast that is always
+    // composed. `remember` (not rememberSaveable) is the once-per-launch scope we want.
+    val metadataBudget = koinInject<tv.own.owntv.core.metadata.MetadataBudget>()
+    val budgetRefusedAt by metadataBudget.refusedAt.collectAsStateWithLifecycle()
+    var budgetNoticeShown by remember { mutableStateOf(false) }
+    val budgetNotice = androidx.compose.ui.res.stringResource(tv.own.owntv.R.string.settings_metadata_limit_reached)
+    LaunchedEffect(budgetRefusedAt) {
+        if (budgetRefusedAt > 0L && !budgetNoticeShown) {
+            budgetNoticeShown = true
+            localSubToast.show(budgetNotice)
+        }
+    }
     val mpvEngine = remember(player) { tv.own.owntv.player.MpvPlaybackEngine(player) }
     // Audio focus + MediaSession (F27). This is the only place that knows which engine currently owns
     // the speaker, so it hands that engine over and takes it back when the player closes.
@@ -224,6 +239,11 @@ fun OwnTVShell(
     val liveCanZap by liveVm.canZap.collectAsStateWithLifecycle()
     // Full-screen is running on the ExoPlayer engine (a promoted Live preview) rather than mpv.
     val liveOnExo by liveVm.liveOnExo.collectAsStateWithLifecycle()
+    // Fork: v4.2.1 (8bf43f1) defers a CH+/CH- tune by ZAP_TUNE_DELAY_MS (500ms) via zapTo(), so the
+    // audioTick bump at the zap call site now fires BEFORE the retune happens — and the retune's
+    // startOnExo() unmutes the main engine, undoing the corner's audio claim. Key the arbitration on
+    // the live engine actually (re)opening a stream, which is the event that resets the mute.
+    val liveEngineState by liveVm.previewEngine.state.collectAsStateWithLifecycle()
     // A catch-up archive programme is playing (Guide "Watch from start" or the Live TV catch-up picker)
     // rather than the live stream — the HUD swaps live-only controls for the VOD ones.
     val catchupActive by liveVm.catchupActive.collectAsStateWithLifecycle()
@@ -261,7 +281,14 @@ fun OwnTVShell(
     var showHistoryList by remember { mutableStateOf(false) }
     val zapChannels by liveVm.zapChannels.collectAsStateWithLifecycle()
     val zapListTitle by liveVm.zapListTitle.collectAsStateWithLifecycle()
-    val zapOverlayTitle = zapListTitle ?: stringResource(R.string.content_category_all_channels)
+    val zapListKey by liveVm.zapListKey.collectAsStateWithLifecycle()
+    // Favorites and History have no provider name to show — their labels are UI strings, so the overlay
+    // used to head both of them "All channels".
+    val zapOverlayTitle = zapListTitle ?: when (zapListKey) {
+        LiveKey.Favorites -> stringResource(R.string.content_category_favorites)
+        LiveKey.History -> stringResource(R.string.content_category_history)
+        else -> stringResource(R.string.content_category_all_channels)
+    }
     val showCategoryBrowser by liveVm.showCategoryBrowser.collectAsStateWithLifecycle()
     val browserCategories by liveVm.browserCategories.collectAsStateWithLifecycle()
     val previewChannel by liveVm.previewChannel.collectAsStateWithLifecycle()
@@ -337,10 +364,12 @@ fun OwnTVShell(
     val railItems by liveVm.railItems.collectAsStateWithLifecycle()
     // Built-in rails (Favorites/History/All) carry a null title since v4.2.0 and localize through
     // displayLabel() — resolve here in composition, since the remember block below isn't composable.
+    // The fork's own "Recent" label is resolved here for the same reason.
     val railLabels = railItems.map { it.displayLabel() }
-    val browseCategories = remember(railItems, recentChannels, railLabels) {
+    val recentLabel = stringResource(R.string.fork_category_recent)
+    val browseCategories = remember(railItems, recentChannels, railLabels, recentLabel) {
         buildList {
-            add(tv.own.owntv.ui.components.ChannelCategory("Recent") { recentChannels })
+            add(tv.own.owntv.ui.components.ChannelCategory(recentLabel) { recentChannels })
             // Every live-rail category (Favorites, History, All, and each folder) in the order the guide shows.
             railItems.forEachIndexed { i, item ->
                 add(tv.own.owntv.ui.components.ChannelCategory(railLabels[i]) { liveVm.channelsFor(item.key) })
@@ -377,6 +406,11 @@ fun OwnTVShell(
     // The mini-player's own expand button always maximizes.
     val expandPlayer = { resumeVideo(); restoreFocus = false; playerMode = PlayerMode.FULLSCREEN }
     val exitPlayer = {
+        // Flush the resume position BEFORE the stream is torn down — stop() drops the loaded item's
+        // identity, after which neither view model can tell the position was theirs. Both calls are
+        // no-ops unless the player is on that section's item.
+        movieVm.saveProgressNow()
+        seriesVm.saveEpisodeProgressNow()
         resumeVideo() // restore mpv `vid=auto` before stop so the next played item isn't left video-less
         playerMode = PlayerMode.NONE
         showChannelList = false
@@ -509,7 +543,7 @@ fun OwnTVShell(
     // audioTick re-runs the plan after any retune (zap / Change main / Change PiP / swap) — those calls set
     // engine mutes out-of-band (ensurePlaying unmutes the main, openCorner re-mutes the corner) without
     // changing the other keys, which used to leave both windows audible or both silent.
-    LaunchedEffect(cornerActive, audioOnCorner, playerMode, liveOnExo, audioTick) {
+    LaunchedEffect(cornerActive, audioOnCorner, playerMode, liveOnExo, liveEngineState, audioTick) {
         val plan = tv.own.owntv.features.multiview.PipAudio.plan(
             cornerActive = cornerActive,
             mainPresent = playerMode != PlayerMode.NONE,
@@ -934,6 +968,17 @@ fun OwnTVShell(
             } else {
                 MpvVideoSurface(player = player, modifier = Modifier.fillMaxSize(), autoFrameRate = isFull && autoFrameRate)
             }
+            // The item has no video track of its own (a radio channel, a music-only "movie"). Playing it is
+            // correct — but a black screen with sound reads as a broken player, so name what is happening.
+            // Read from whichever engine is on screen; only ever composed when there is no video to lose.
+            val audioOnlyMedia by if (liveOnExo) {
+                liveVm.previewEngine.audioOnlyMedia.collectAsStateWithLifecycle()
+            } else {
+                player.audioOnlyMedia.collectAsStateWithLifecycle()
+            }
+            if (audioOnlyMedia) {
+                tv.own.owntv.player.AudioOnlyBadge(modifier = Modifier.fillMaxSize(), compact = !isFull)
+            }
             // Direct render mode: mpv can't draw subtitles on the decoder-owned surface — the app does.
             // Also drawn docked (F19b): the mini-player is a real watching mode for a subtitled film, and
             // dropping the only line of dialogue there made subtitles look broken. Scaled to the box.
@@ -959,7 +1004,14 @@ fun OwnTVShell(
                     fps = activeFps,
                     afrEnabled = autoFrameRate,
                     alreadyPrompted = afrPrompted,
-                    onEnable = { scope.launch { settingsRepo.setAutoFrameRate(true) } },
+                    // Mark it answered on BOTH paths. Enabling only set the setting, so a user who later
+                    // turned Auto frame rate back off was offered the "once ever" suggestion all over again.
+                    onEnable = {
+                        scope.launch {
+                            settingsRepo.setAutoFrameRate(true)
+                            settingsRepo.setAutoFrameRatePrompted()
+                        }
+                    },
                     onDismiss = { scope.launch { settingsRepo.setAutoFrameRatePrompted() } },
                 )
             }
@@ -1037,7 +1089,10 @@ fun OwnTVShell(
                     // Show the ACTUAL running engine (mpv when pinned OR auto-fallen-back), not just the pin —
                     // otherwise an auto-fallback to mpv still read "EXO". true = on mpv (pill shows MPV, teal).
                     compatMode = if (isTunedLive) !liveOnExo else null,
-                    onToggleCompatMode = if (isTunedLive) liveVm::toggleForceMpv else null,
+                    // Hidden while rewound into the archive (same `timeshiftOffset == null` rule direct
+                    // tune follows above): switching engine restarts the channel at the live edge, which
+                    // threw the user out of the rewind with the HUD still counting "behind live".
+                    onToggleCompatMode = if (isTunedLive && timeshiftOffset == null) liveVm::toggleForceMpv else null,
                     // True PiP corner controls — present only while a second stream is in the corner.
                     // Swap is offered only when the main stream is a promoted live channel (both ExoPlayer),
                     // so the exchange is clean; audio/close are always available with a corner up.
@@ -1209,7 +1264,7 @@ fun OwnTVShell(
       // in place, without closing or stealing the main window's sound.
       if (cornerActive && cornerBrowsing) {
         tv.own.owntv.ui.components.ChannelSwitcher(
-            title = "Change the PiP channel — the small window",
+            title = stringResource(R.string.fork_pip_picker_corner_title),
             categories = browseCategories,
             search = { q -> liveVm.browseChannels(q) },
             onPick = { ch -> pip.openCorner(ch); audioTick++; cornerBrowsing = false },
@@ -1222,7 +1277,7 @@ fun OwnTVShell(
       // keeps playing untouched (its engine is independent).
       if (mainPicking) {
         tv.own.owntv.ui.components.ChannelSwitcher(
-            title = "Change the main channel — the full screen",
+            title = stringResource(R.string.fork_pip_picker_main_title),
             categories = browseCategories,
             search = { q -> liveVm.browseChannels(q) },
             onPick = { ch ->
@@ -1241,7 +1296,7 @@ fun OwnTVShell(
       // connections — a provider that allows only one will 509 the corner; that's a plan limit, not a bug.)
       if (pipPicking) {
         tv.own.owntv.ui.components.ChannelSwitcher(
-            title = "Add a stream to the corner",
+            title = stringResource(R.string.fork_pip_picker_add_title),
             categories = browseCategories,
             search = { q -> liveVm.browseChannels(q) },
             onPick = { ch -> pip.openCorner(ch); audioTick++; pipPicking = false },

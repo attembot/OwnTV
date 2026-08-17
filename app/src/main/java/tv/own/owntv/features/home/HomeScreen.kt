@@ -1038,7 +1038,7 @@ private fun TrendingHomeItem.toDetailsUi(meta: MetadataCacheEntity?, tmdbWins: B
         metaLine = listOfNotNull(snapshot.year?.toString(), snapshot.rating?.let { stringResource(R.string.content_rating, it) }).joinToString(" · "),
         genres = trendingJsonList(meta?.genresJson),
         plot = if (tmdbWins) tmdbPlot ?: providerPlot else providerPlot ?: tmdbPlot,
-        cast = trendingJsonList(meta?.castJson),
+        cast = tv.own.owntv.core.metadata.MetadataCast.parse(meta?.castJson),
     )
 }
 

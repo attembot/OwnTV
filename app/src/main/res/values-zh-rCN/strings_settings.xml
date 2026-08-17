@@ -95,8 +95,19 @@
     <string name="settings_metadata_tmdb_only_description">所有字段优先使用 TMDB；仅当 TMDB 没有信息时才回退到播放列表。</string>
     <string name="settings_selected">已选择</string>
     <string name="settings_active_tmdb_source">当前 TMDB 源：<xliff:g id="tier">%1$s</xliff:g></string>
+    <string name="settings_metadata_allowance">每日额度</string>
+    <string name="settings_metadata_allowance_row"><xliff:g id="window">%1$s</xliff:g>：剩余 <xliff:g id="remaining">%2$d</xliff:g>/<xliff:g id="total">%3$d</xliff:g></string>
+    <string name="settings_metadata_window_minute">每分钟</string>
+    <string name="settings_metadata_window_hour">每小时</string>
+    <string name="settings_metadata_window_day">今日</string>
+    <plurals name="settings_metadata_allowance_left">
+        <item quantity="other">今日剩余 <xliff:g id="remaining">%1$d</xliff:g>/<xliff:g id="total">%2$d</xliff:g> 次</item>
+    </plurals>
+    <string name="settings_metadata_allowance_resets">将于 <xliff:g id="time">%1$s</xliff:g> 恢复</string>
+    <string name="settings_metadata_fair_share">内置元数据服务由所有 OwnTV 用户共享，因此每台设备每天都有自己的额度。用完额度后，海报和简介会暂停显示，直到额度恢复；播放列表自带的信息不受影响。添加你自己的 TMDB API 密钥或服务器即可取消此限制：它是免费的，而且个人密钥几乎没有限制。</string>
+    <string name="settings_metadata_limit_reached">今日元数据额度已用完 — 在“设置 → 元数据”中添加你自己的 TMDB 密钥即可取消此限制。</string>
     <string name="settings_metadata_language">元数据语言</string>
-    <string name="settings_metadata_language_description">TMDB 中剧情简介、类型和标题所使用的语言。TMDB 尚未翻译的字段仍会以英语显示。更改此设置会清除已缓存的详细信息，以便重新获取。</string>
+    <string name="settings_metadata_language_description">TMDB 提供的剧情、类型和标题的语言。TMDB 未翻译的字段将保持英文。详细信息按语言分别缓存，因此切换回来是即时的。</string>
     <string name="settings_advanced_options">高级选项</string>
     <string name="settings_advanced_metadata_description">使用你自己的 TMDB API 密钥或自托管服务器，而不是默认的共享服务。</string>
     <string name="settings_metadata_server_description">两项均留空即可使用内置共享服务器（无需初始设置）。输入你自己的 TMDB API 密钥可直接调用 TMDB，或输入自托管服务器 URL 以使用自己的代理/镜像。URL 的优先级高于密钥。</string>
@@ -350,11 +361,43 @@
     <string name="settings_decoding">解码</string>
     <string name="settings_hardware_decoding">硬件解码</string>
     <string name="settings_hardware_decoding_description">使用电视的硬件解码器。如果部分流媒体出现卡顿或画面伪影，请关闭此功能。</string>
+    <!-- Translators: Setting label for deinterlacing of interlaced broadcast video. -->
+    <string name="settings_deinterlace">去隔行</string>
+    <!-- Translators: Description of the deinterlacing setting. -->
+    <string name="settings_deinterlace_description">平滑某些老旧标清频道在画面移动时出现的梳状条纹。仅在 mpv 自行绘制画面时生效，因此如果没有变化，请关闭硬件解码。</string>
     <string name="settings_movies_series_player">电影和剧集播放器</string>
     <string name="settings_reset_player_choices">重置已保存的播放器选择</string>
     <string name="settings_external_player">外部播放器</string>
     <string name="settings_default_zoom">默认缩放</string>
     <string name="settings_default_zoom_description">播放开始时应用的宽高比/缩放设置。</string>
+    <!-- Translators: Setting label for the volume level playback starts at. -->
+    <string name="settings_default_volume">默认音量</string>
+    <!-- Translators: Description of the default volume setting. -->
+    <string name="settings_default_volume_description">播放开始时应用的音量。超过 100%% 时，声音较小的流会被放大。</string>
+    <!-- Translators: Settings-row title for forgetting the zoom saved for individual items. -->
+    <string name="settings_reset_saved_zoom">重置已保存的缩放</string>
+    <!-- Translators: Description of the reset-saved-zoom setting row. -->
+    <string name="settings_reset_saved_zoom_description">在播放器中更改缩放后，该设置会为对应的频道、电影或剧集保存下来。重置后，所有内容将重新遵循默认缩放。</string>
+    <!-- Translators: Confirmation dialog title before forgetting the saved per-item zoom. -->
+    <string name="settings_reset_saved_zoom_confirm">要重置已保存的缩放吗？</string>
+    <!-- Translators: Confirmation dialog body before forgetting the saved per-item zoom. -->
+    <string name="settings_reset_saved_zoom_confirm_description">所有频道、电影和剧集将恢复为默认缩放。已保存的音量会保留。你随时可以在播放器中再次单独设置某一项。</string>
+    <!-- Translators: Settings-row title for forgetting the volume saved for individual items. -->
+    <string name="settings_reset_saved_volume">重置已保存的音量</string>
+    <!-- Translators: Description of the reset-saved-volume setting row. -->
+    <string name="settings_reset_saved_volume_description">在播放器中更改音量后，该设置会为对应的频道、电影或剧集保存下来。重置后，所有内容将重新遵循默认音量。</string>
+    <!-- Translators: Confirmation dialog title before forgetting the saved per-item volume. -->
+    <string name="settings_reset_saved_volume_confirm">要重置已保存的音量吗？</string>
+    <!-- Translators: Confirmation dialog body before forgetting the saved per-item volume. -->
+    <string name="settings_reset_saved_volume_confirm_description">所有频道、电影和剧集将恢复为默认音量。已保存的缩放设置会保留。你随时可以在播放器中再次单独设置某一项。</string>
+    <!-- Translators: Setting label for how far rewind/forward jumps in a movie or episode. -->
+    <string name="settings_seek_step">快进步长</string>
+    <!-- Translators: Description of the seek step setting. -->
+    <string name="settings_seek_step_description">在电影或剧集中，快退和快进一次移动的时长。</string>
+    <!-- Translators: Setting label for how far rewind/forward jumps inside a live channel's archive. -->
+    <string name="settings_live_rewind_step">直播回看步长</string>
+    <!-- Translators: Description of the live rewind step setting. -->
+    <string name="settings_live_rewind_step_description">在直播频道的回看存档中，快退和快进一次移动的时长。</string>
     <string name="settings_resume_playback">继续播放</string>
     <string name="settings_resume_playback_description">电影或剧集存在已保存的播放位置时要执行的操作。</string>
     <string name="settings_subtitles">字幕</string>
@@ -369,7 +412,7 @@
     <string name="settings_audio">音频</string>
     <string name="settings_preferred_audio_language">首选音频语言</string>
     <string name="settings_audio_sync">音视频同步</string>
-    <string name="settings_audio_sync_description">将音频提前或延后，使其与视频匹配。</string>
+    <string name="settings_audio_sync_description">将音频提前或延后，使其与视频匹配。仅适用于 mpv 引擎。</string>
     <string name="settings_live_tv">直播电视</string>
     <string name="settings_live_latency_description">设置播放位置与直播的接近程度。数值越低，越接近直播，但缓冲区也越小，因此信号较弱的流可能更容易卡顿或重新连接。此设置将在您下次打开频道时生效。</string>
     <string name="settings_channel_numbers">频道编号</string>

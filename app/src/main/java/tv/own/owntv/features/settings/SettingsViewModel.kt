@@ -76,11 +76,13 @@ class SettingsViewModel(
     private val okHttpClient: okhttp3.OkHttpClient,
     private val metadataProvider: tv.own.owntv.core.metadata.MetadataProvider,
     private val metadataRepository: tv.own.owntv.core.metadata.MetadataRepository,
+    private val metadataBudget: tv.own.owntv.core.metadata.MetadataBudget,
     private val stalkerAuth: tv.own.owntv.core.stalker.StalkerAuthManager,
     private val stalkerClient: tv.own.owntv.core.stalker.StalkerClient,
     private val xtreamClient: tv.own.owntv.core.parser.XtreamClient,
     private val companion: tv.own.owntv.core.companion.CompanionController,
     private val vodEngineStore: tv.own.owntv.core.player.VodEngineStore,
+    private val playbackPrefs: tv.own.owntv.core.player.PlaybackPrefsStore,
 ) : ViewModel() {
     companion object {
         private const val TAG = "OwnTVHome"
@@ -303,8 +305,10 @@ class SettingsViewModel(
         viewModelScope.launch { settings.setAutoPlayNext(enabled) }
     }
 
+    // Seeded with the repository's own default (DEVICE). MANUAL here made the chip open reading "Manual"
+    // for a frame before the stored value arrived — on a setting the user had never touched.
     val catchupTimezone: StateFlow<SettingsRepository.CatchupTimezone> = settings.catchupTimezone
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsRepository.CatchupTimezone.MANUAL)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsRepository.CatchupTimezone.DEVICE)
 
     val catchupOffsetMinutes: StateFlow<Int> = settings.catchupOffsetMinutes
         .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
@@ -391,6 +395,35 @@ class SettingsViewModel(
      *  again. Also the escape hatch for pins older builds wrote automatically after a decode failure —
      *  those are stored identically to the user's own, so they can only be cleared wholesale. */
     fun clearVodEnginePins() { viewModelScope.launch { vodEngineStore.clearAll() } }
+
+    /** Volume every item starts at, before any per-item value the player remembered. */
+    val defaultVolume: StateFlow<Int> = settings.defaultVolume.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 100)
+    fun setDefaultVolume(percent: Int) { viewModelScope.launch { settings.setDefaultVolume(percent) } }
+
+    /** How many individual channels/films/episodes have a remembered zoom, and how many a volume.
+     *  Counted and reset separately — wanting every film back at the default aspect is not a request
+     *  to lose the levels set on the quiet ones. */
+    val savedZoomCount: StateFlow<Int> =
+        playbackPrefs.observeZoomCount().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    val savedVolumeCount: StateFlow<Int> =
+        playbackPrefs.observeVolumeCount().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    fun clearSavedZoom() { viewModelScope.launch { playbackPrefs.clearZoom() } }
+
+    fun clearSavedVolume() { viewModelScope.launch { playbackPrefs.clearVolume() } }
+
+    /** Rewind/forward step in a movie or episode, and the separate one for a live archive. */
+    val seekStepSec: StateFlow<Int> = settings.seekStepSec
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.features.settings.data.SeekSteps.DEFAULT_SEEK_STEP_SEC)
+    fun setSeekStepSec(seconds: Int) { viewModelScope.launch { settings.setSeekStepSec(seconds) } }
+
+    val liveRewindStepSec: StateFlow<Int> = settings.liveRewindStepSec
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.features.settings.data.SeekSteps.DEFAULT_LIVE_REWIND_STEP_SEC)
+    fun setLiveRewindStepSec(seconds: Int) { viewModelScope.launch { settings.setLiveRewindStepSec(seconds) } }
+
+    val deinterlace: StateFlow<Boolean> = settings.deinterlace.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    fun setDeinterlace(enabled: Boolean) { viewModelScope.launch { settings.setDeinterlace(enabled) } }
 
     val measuredStreamStats: StateFlow<Boolean> = settings.measuredStreamStats.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
     fun setMeasuredStreamStats(enabled: Boolean) { viewModelScope.launch { settings.setMeasuredStreamStats(enabled) } }
@@ -1368,6 +1401,26 @@ class SettingsViewModel(
         settings.metadataConfigFlow
             .map { it.tier }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.core.metadata.MetadataConfig.Tier.DEFAULT_WORKER)
+
+    /**
+     * This install's remaining metadata allowance, for the status row on the Metadata screen. Only
+     * meaningful on the shared default-Worker tier; the screen hides the row on the other two, which
+     * are the user's own resource and are never metered.
+     *
+     * Refreshed when the screen asks ([refreshMetadataBudget]) rather than continuously — it is a
+     * DataStore read and the number only moves while the user is browsing, not while they sit in
+     * Settings.
+     */
+    private val _metadataBudgetStatus =
+        MutableStateFlow<tv.own.owntv.core.metadata.MetadataBudgetStatus?>(null)
+    val metadataBudgetStatus: StateFlow<tv.own.owntv.core.metadata.MetadataBudgetStatus?> =
+        _metadataBudgetStatus.asStateFlow()
+
+    fun refreshMetadataBudget() {
+        viewModelScope.launch {
+            _metadataBudgetStatus.value = runCatching { metadataBudget.status() }.getOrNull()
+        }
+    }
 
     sealed interface MetadataTestState {
         data object Idle : MetadataTestState

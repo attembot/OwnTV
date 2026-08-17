@@ -34,10 +34,12 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import kotlinx.coroutines.delay
+import tv.own.owntv.R
 import tv.own.owntv.core.database.entity.ChannelEntity
 import tv.own.owntv.ui.theme.OwnTVTheme
 
@@ -111,7 +113,7 @@ fun ChannelSwitcher(
         ) {
             Text(title, style = MaterialTheme.typography.titleLarge, color = OwnTVTheme.colors.onSurface)
             Spacer(Modifier.height(14.dp))
-            SearchBar(query = query, onQueryChange = { query = it }, placeholder = "Search all channels…")
+            SearchBar(query = query, onQueryChange = { query = it }, placeholder = stringResource(R.string.fork_switcher_search_hint))
             Spacer(Modifier.height(16.dp))
 
             Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -151,7 +153,7 @@ fun ChannelSwitcher(
                 if (list.isEmpty()) {
                     Box(Modifier.fillMaxHeight().weight(0.66f), contentAlignment = Alignment.Center) {
                         Text(
-                            if (searching) "No channels match “$query”." else "No channels in this category.",
+                            if (searching) stringResource(R.string.fork_switcher_no_match, query) else stringResource(R.string.fork_switcher_empty_category),
                             style = MaterialTheme.typography.bodyMedium,
                             color = OwnTVTheme.colors.onSurfaceVariant,
                         )
@@ -178,7 +180,7 @@ fun ChannelSwitcher(
 
             Spacer(Modifier.height(12.dp))
             Text(
-                "Browse categories on the left, channels on the right · type above to search · Back to cancel",
+                stringResource(R.string.fork_switcher_hint),
                 style = MaterialTheme.typography.labelSmall,
                 color = OwnTVTheme.colors.onSurfaceVariant,
             )

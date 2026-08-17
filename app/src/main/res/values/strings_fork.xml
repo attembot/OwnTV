@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Fork-only user-visible text: true picture-in-picture, MultiView, and the shared channel picker.
+
+  Kept in its own file (upstream has no strings_fork.xml) so that upstream syncs never conflict here,
+  and so the fork's Kotlin never depends on an upstream string key a later release might rename.
+
+  Every value is pure ASCII with \uXXXX escapes for punctuation, matching the style upstream already
+  uses (common_search_hint, common_move_instructions). That is deliberate: tooling has double-encoded
+  UTF-8 in this repo before, and an escaped file cannot be corrupted that way. The escapes below are
+  the exact codepoints the hardcoded literals used, so no on-screen text changes:
+  \u00b7 middle dot, \u2014 em dash, \u2026 ellipsis, \u201c/\u201d curly quotes.
+-->
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+
+    <!-- ===== Entry points (live channel context menu, player HUD) ===== -->
+
+    <!-- Translators: Action that starts a SECOND live stream in a small corner window while the current
+         channel keeps playing full screen. "Picture-in-picture" is the standard TV term. -->
+    <string name="fork_action_picture_in_picture">Picture-in-picture</string>
+    <!-- Translators: Action that opens a grid showing several live channels at once. Product feature name. -->
+    <string name="fork_action_multiview">MultiView</string>
+
+    <!-- ===== MultiView: the multi-stream grid ===== -->
+
+    <!-- Translators: Button that switches the grid to equal-sized tiles. -->
+    <string name="fork_multiview_layout_grid">Grid</string>
+    <!-- Translators: Button that switches the grid to one large stream with smaller ones beside it. -->
+    <string name="fork_multiview_layout_dominant">Dominant</string>
+    <!-- Translators: Button that adds another live channel to the grid. -->
+    <string name="fork_multiview_add_stream">Add stream</string>
+    <!-- Translators: Button that leaves MultiView and returns to the previous screen. -->
+    <string name="fork_multiview_exit">Exit</string>
+    <!-- Translators: On-screen remote-control hint. "OK" is the confirm button on a TV remote; "hold OK"
+         means press and hold it. The separator is a middle dot. -->
+    <string name="fork_multiview_hint">OK changes the focused stream \u00b7 hold OK to enlarge it</string>
+    <!-- Translators: Title of the channel picker when adding a new stream to the grid. -->
+    <string name="fork_multiview_picker_add_title">Add a stream</string>
+    <!-- Translators: Title of the channel picker when replacing the channel in an existing grid tile. -->
+    <string name="fork_multiview_picker_change_title">Change this stream</string>
+    <!-- Translators: Error shown inside a grid tile whose stream failed to start. -->
+    <string name="fork_multiview_playback_failed">Couldn\'t play this stream</string>
+
+    <!-- ===== Picture-in-picture: the corner window and its HUD control row ===== -->
+
+    <!-- Translators: Error shown inside the small corner window when its stream failed to start. -->
+    <string name="fork_corner_playback_failed">Couldn\'t play</string>
+    <!-- Translators: Label of the player control row that acts on the picture-in-picture corner window.
+         Also the label of the button that opens picture-in-picture. Abbreviation of "picture-in-picture". -->
+    <string name="fork_pip_label">PiP</string>
+    <!-- Translators: Button that picks a new channel for the FULL-SCREEN window; the corner is untouched. -->
+    <string name="fork_pip_change_main">Change main</string>
+    <!-- Translators: Button that picks a new channel for the small CORNER window; full screen is untouched. -->
+    <string name="fork_pip_change_corner">Change PiP</string>
+    <!-- Translators: Button that exchanges the two streams, so the corner stream becomes full screen. -->
+    <string name="fork_pip_swap_windows">Swap windows</string>
+    <!-- Translators: Button that moves the audio between the full-screen and corner windows, i.e. chooses
+         which of the two streams you hear. -->
+    <string name="fork_pip_sound">Sound</string>
+    <!-- Translators: Button that moves the corner window to the next screen corner. -->
+    <string name="fork_pip_move">Move</string>
+    <!-- Translators: Button that makes the corner window bigger. Ends with a plus sign. -->
+    <string name="fork_pip_size_increase">Size +</string>
+    <!-- Translators: Button that makes the corner window smaller. Ends with a hyphen-minus sign. -->
+    <string name="fork_pip_size_decrease">Size -</string>
+    <!-- Translators: Button that closes the corner window; the full-screen stream keeps playing. -->
+    <string name="fork_pip_close">Close</string>
+    <!-- Translators: Title of the channel picker that retunes the small corner window. The em dash
+         introduces an explanation of which of the two windows is meant. -->
+    <string name="fork_pip_picker_corner_title">Change the PiP channel \u2014 the small window</string>
+    <!-- Translators: Title of the channel picker that retunes the full-screen window. -->
+    <string name="fork_pip_picker_main_title">Change the main channel \u2014 the full screen</string>
+    <!-- Translators: Title of the channel picker that starts a second stream in the corner. -->
+    <string name="fork_pip_picker_add_title">Add a stream to the corner</string>
+
+    <!-- ===== Shared channel picker ===== -->
+
+    <!-- Translators: Category in the channel picker listing recently watched channels. -->
+    <string name="fork_category_recent">Recent</string>
+    <!-- Translators: Placeholder in the picker's search field. Ends with an ellipsis. -->
+    <string name="fork_switcher_search_hint">Search all channels\u2026</string>
+    <!-- Translators: Remote-control hint under the picker. "Back" is the back button on a TV remote.
+         Middle dots separate the three hints. -->
+    <string name="fork_switcher_hint">Browse categories on the left, channels on the right \u00b7 type above to search \u00b7 Back to cancel</string>
+    <!-- Translators: Shown when the selected category contains no channels. -->
+    <string name="fork_switcher_empty_category">No channels in this category.</string>
+    <!-- Translators: Shown when a search returns nothing. "query" is the text the user typed, wrapped in
+         curly double quotation marks. -->
+    <string name="fork_switcher_no_match">No channels match \u201c<xliff:g id="query">%1$s</xliff:g>\u201d.</string>
+
+</resources>

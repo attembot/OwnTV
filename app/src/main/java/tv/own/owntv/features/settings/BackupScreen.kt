@@ -115,6 +115,10 @@ fun BackupScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     // Dialog-close focus return: closing the section picker / file browser refocuses the button
     // that opened it. The restore crosses INTO this group from the dialog, so onEnter intercepts
     // it — it consults dialogReturn first (and clears it) instead of hijacking.
+    // Deliberately NOT tv.own.owntv.ui.components.rememberDialogFocusRestore: the onEnter below also
+    // reads and clears this, and the shared helper clears it right after its own restore. Which of the
+    // two wins would come down to whether onEnter runs inside requestFocus(), and this screen's restore
+    // is not worth betting on that ordering.
     var dialogReturn by remember { mutableStateOf<FocusRequester?>(null) }
     val anyDialogOpen = showBrowser || showExportPicker || showProfilePicker || pendingFolderBrowser || exportFolder != null ||
         showRestoreChooser || showRemoteRestore || showExportChooser || showRemoteExportPassword || showRemoteExport ||

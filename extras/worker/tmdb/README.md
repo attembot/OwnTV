@@ -1,11 +1,12 @@
 # OwnTV TMDB caching proxy (Cloudflare Worker)
 
-This is the source of OwnTV's **default metadata server** — a tiny Cloudflare Worker that
-proxies TMDB `/3/...` API calls, injects a server-side TMDB API key, and edge-caches the JSON
-responses so a large user base costs only a handful of real TMDB calls.
+A tiny Cloudflare Worker that proxies TMDB `/3/...` API calls, injects a server-side TMDB API
+key, and edge-caches the JSON responses so a large user base costs only a handful of real TMDB
+calls. This is the same proxy logic OwnTV's built-in default metadata server runs.
 
-OwnTV's built-in default points at the maintainer's deployment of exactly this code. You can
-run your **own free copy in about 10 minutes** and point OwnTV at it — no programming needed.
+You can run your **own free copy in about 10 minutes** and point OwnTV at it — no programming
+needed. A personal copy serves only your own devices, so it needs none of the abuse-protection
+the public deployment carries (see [`../README.md`](../README.md)).
 
 ## What you need (both free)
 

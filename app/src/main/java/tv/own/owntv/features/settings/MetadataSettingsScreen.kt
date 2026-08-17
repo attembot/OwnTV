@@ -23,6 +23,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -172,6 +174,39 @@ fun MetadataSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         Header(stringResource(R.string.settings_metadata), onBack)
         Spacer(Modifier.height(8.dp))
 
+        // Allowance first: it is status, not a setting, so it belongs at the top rather than buried
+        // between two settings. Shown ONLY on the shared default tier — an own key or a self-hosted
+        // server is the user's own resource and is never metered, so the row would be a lie there.
+        if (tier == MetadataConfig.Tier.DEFAULT_WORKER && mode.enrich) {
+            val budget by vm.metadataBudgetStatus.collectAsStateWithLifecycle()
+            LaunchedEffect(Unit) { vm.refreshMetadataBudget() }
+            GroupLabel(stringResource(R.string.settings_metadata_allowance))
+            budget?.let { b ->
+                AllowanceRow(stringResource(R.string.settings_metadata_window_minute), b.remainingMinute, b.limitMinute)
+                AllowanceRow(stringResource(R.string.settings_metadata_window_hour), b.remainingHour, b.limitHour)
+                AllowanceRow(stringResource(R.string.settings_metadata_window_day), b.remainingDay, b.limitDay)
+                // Device clock format, so a 12-hour locale sees "2:32 PM" without a translated pattern.
+                val context = LocalContext.current
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    stringResource(
+                        R.string.settings_metadata_allowance_resets,
+                        android.text.format.DateFormat.getTimeFormat(context)
+                            .format(java.util.Date(b.resetAtMs)),
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.onSurfaceVariant,
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                stringResource(R.string.settings_metadata_fair_share),
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(18.dp))
+        }
+
         GroupLabel(stringResource(R.string.settings_metadata_source))
         Text(
             stringResource(R.string.settings_metadata_source_description),
@@ -204,6 +239,7 @@ fun MetadataSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             color = colors.primary,
         )
 
+
         Spacer(Modifier.height(16.dp))
         Row2(
             icon = OwnTVIcon.SUBTITLE,
@@ -230,12 +266,19 @@ fun MetadataSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 color = colors.onSurfaceVariant,
             )
             Spacer(Modifier.height(12.dp))
+            // A text field swallows the Down key to move its own cursor, so the default search
+            // walked straight past Save to the Test section below. Point Down explicitly at the next
+            // field and then at Save, so key -> URL -> Save is the order the user actually sees.
+            val urlFieldFocus = remember { FocusRequester() }
+            val saveFocus = remember { FocusRequester() }
             OwnTVTextField(
                 value = key,
                 onValueChange = { key = it },
                 label = stringResource(R.string.settings_tmdb_api_key),
                 placeholder = stringResource(R.string.settings_metadata_optional),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusProperties { down = urlFieldFocus },
             )
             Spacer(Modifier.height(12.dp))
             OwnTVTextField(
@@ -243,10 +286,13 @@ fun MetadataSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 onValueChange = { url = it },
                 label = stringResource(R.string.settings_self_host_url),
                 placeholder = "https://your-worker.example.workers.dev",
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(urlFieldFocus)
+                    .focusProperties { down = saveFocus },
             )
             Spacer(Modifier.height(16.dp))
-            OwnTVButton(stringResource(R.string.common_save), onClick = {
+            OwnTVButton(stringResource(R.string.common_save), modifier = Modifier.focusRequester(saveFocus), onClick = {
                 vm.setTmdbApiKey(key)
                 vm.setMetadataServerUrl(url)
                 vm.resetMetadataTest()
@@ -336,4 +382,15 @@ private fun MetadataTestLabel(state: SettingsViewModel.MetadataTestState) {
     if (text != null) {
         Text(text, style = MaterialTheme.typography.bodyMedium, color = color)
     }
+}
+
+/** One "Per minute: 38 of 40 left" line in the allowance list. Turns red once that window is spent. */
+@Composable
+private fun AllowanceRow(window: String, remaining: Int, limit: Int) {
+    val colors = OwnTVTheme.colors
+    Text(
+        stringResource(R.string.settings_metadata_allowance_row, window, remaining, limit),
+        style = MaterialTheme.typography.bodyMedium,
+        color = if (remaining <= 0) colors.favorite else colors.onSurfaceVariant,
+    )
 }

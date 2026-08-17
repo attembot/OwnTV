@@ -62,21 +62,8 @@ fun SubtitleOverlay(
     // Font customization is UI-only. Subtitles keep their dedicated size control and system family.
     val uiFontCompensation = 1f / LocalUiFontScaleFactor.current
 
-    // Same six anchors the SubtitleView path uses, so a channel sits in the same place whether it
-    // plays on mpv or ExoPlayer. Default keeps the historical bottom-centre placement.
-    val alignment = when {
-        anchor.isTop && anchor.isLeft -> Alignment.TopStart
-        anchor.isTop && anchor.isRight -> Alignment.TopEnd
-        anchor.isTop -> Alignment.TopCenter
-        anchor.isLeft -> Alignment.BottomStart
-        anchor.isRight -> Alignment.BottomEnd
-        else -> Alignment.BottomCenter
-    }
-    val textAlign = when {
-        anchor.isLeft -> TextAlign.Start
-        anchor.isRight -> TextAlign.End
-        else -> TextAlign.Center
-    }
+    val alignment = anchor.alignment()
+    val textAlign = anchor.textAlign()
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -104,4 +91,29 @@ fun SubtitleOverlay(
                 .padding(horizontal = 16.dp * sizeScale, vertical = 6.dp * sizeScale),
         )
     }
+}
+
+/**
+ * The one derivation of a subtitle anchor into Compose layout — used by this overlay and by both
+ * previews in Settings, so the picker cannot show a corner the player then renders somewhere else.
+ *
+ * Six fixed anchors; anything unrecognised keeps the historical bottom-centre placement. The Media3
+ * `Cue` path in [MpvVideoSurface] expresses the same six positions in Media3's own line/position
+ * fraction geometry rather than in Compose types, so it necessarily stays a separate mapping — but it
+ * reads the same [SubtitleStyle.Position] flags, and there is nowhere else these are derived.
+ */
+internal fun SubtitleStyle.Position.alignment(): Alignment = when {
+    isTop && isLeft -> Alignment.TopStart
+    isTop && isRight -> Alignment.TopEnd
+    isTop -> Alignment.TopCenter
+    isLeft -> Alignment.BottomStart
+    isRight -> Alignment.BottomEnd
+    else -> Alignment.BottomCenter
+}
+
+/** Text alignment matching [alignment] — a left-anchored block reads ragged-right, and vice versa. */
+internal fun SubtitleStyle.Position.textAlign(): TextAlign = when {
+    isLeft -> TextAlign.Start
+    isRight -> TextAlign.End
+    else -> TextAlign.Center
 }

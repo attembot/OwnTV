@@ -804,8 +804,8 @@ private fun ChannelContextMenu(
             // Fork: second-stream entries. True PiP keeps this channel in a corner window; MultiView
             // opens it as the first of up to four tiles.
             ChannelMenuDivider()
-            ChannelMenuAction("Picture-in-picture", onWatchInCorner, OwnTVIcon.PIP, Modifier.fillMaxWidth())
-            ChannelMenuAction("MultiView", onMultiView, OwnTVIcon.PIP, Modifier.fillMaxWidth())
+            ChannelMenuAction(stringResource(R.string.fork_action_picture_in_picture), onWatchInCorner, OwnTVIcon.PIP, Modifier.fillMaxWidth())
+            ChannelMenuAction(stringResource(R.string.fork_action_multiview), onMultiView, OwnTVIcon.PIP, Modifier.fillMaxWidth())
 
             if (canMove) {
                 ChannelMenuDivider()

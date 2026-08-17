@@ -95,8 +95,20 @@
     <string name="settings_metadata_tmdb_only_description">প্রতিটি ক্ষেত্রের জন্য TMDB-কে অগ্রাধিকার দিন; TMDB-তে কিছু না থাকলেই শুধু প্লেলিস্টের তথ্য ব্যবহার করুন।</string>
     <string name="settings_selected">নির্বাচিত</string>
     <string name="settings_active_tmdb_source">সক্রিয় TMDB উৎস: <xliff:g id="tier">%1$s</xliff:g></string>
+    <string name="settings_metadata_allowance">আপনার দৈনিক ভাগ</string>
+    <string name="settings_metadata_allowance_row"><xliff:g id="window">%1$s</xliff:g>: <xliff:g id="total">%3$d</xliff:g>-এর মধ্যে <xliff:g id="remaining">%2$d</xliff:g> বাকি</string>
+    <string name="settings_metadata_window_minute">প্রতি মিনিটে</string>
+    <string name="settings_metadata_window_hour">প্রতি ঘণ্টায়</string>
+    <string name="settings_metadata_window_day">আজ</string>
+    <plurals name="settings_metadata_allowance_left">
+        <item quantity="one">আজ <xliff:g id="total">%2$d</xliff:g>-এর মধ্যে <xliff:g id="remaining">%1$d</xliff:g>টি বাকি</item>
+        <item quantity="other">আজ <xliff:g id="total">%2$d</xliff:g>-এর মধ্যে <xliff:g id="remaining">%1$d</xliff:g>টি বাকি</item>
+    </plurals>
+    <string name="settings_metadata_allowance_resets"><xliff:g id="time">%1$s</xliff:g>-এ আবার ভরবে</string>
+    <string name="settings_metadata_fair_share">অন্তর্নির্মিত মেটাডেটা পরিষেবাটি OwnTV ব্যবহারকারী সবাই ভাগ করে নেন, তাই প্রতিটি ডিভাইস প্রতিদিন নিজের ভাগ পায়। ভাগ শেষ হয়ে গেলে পোস্টার ও বিবরণ আবার ভরা পর্যন্ত থেমে থাকে — আপনার নিজের প্লেলিস্টের তথ্য স্বাভাবিকভাবেই চলতে থাকে। নিজের TMDB API কী বা সার্ভার যোগ করলে এই সীমা উঠে যায়: এটি বিনামূল্যে, আর ব্যক্তিগত কী-তে কার্যত কোনো সীমা নেই।</string>
+    <string name="settings_metadata_limit_reached">আজকের মেটাডেটার ভাগ শেষ — এই সীমা তুলতে সেটিংস → মেটাডেটা-তে নিজের TMDB কী যোগ করুন।</string>
     <string name="settings_metadata_language">মেটাডেটার ভাষা</string>
-    <string name="settings_metadata_language_description">TMDB থেকে আসা কাহিনি, ধরন ও শিরোনামের ভাষা। TMDB যে ক্ষেত্রগুলো অনুবাদ করেনি, সেগুলো ইংরেজিতেই থাকবে। এটি পরিবর্তন করলে ক্যাশে রাখা বিস্তারিত তথ্য মুছে আবার আনা হবে।</string>
+    <string name="settings_metadata_language_description">TMDB থেকে আসা কাহিনি, ধরন ও শিরোনামের ভাষা। TMDB যেসব ক্ষেত্র অনুবাদ করেনি সেগুলি ইংরেজিতেই থাকবে। বিবরণ প্রতিটি ভাষার জন্য আলাদা ক্যাশ হয়, তাই ফিরে যাওয়া তাৎক্ষণিক।</string>
     <string name="settings_advanced_options">উন্নত বিকল্প</string>
     <string name="settings_advanced_metadata_description">শেয়ার করা ডিফল্টের বদলে নিজের TMDB API কী বা স্ব-হোস্ট করা সার্ভার ব্যবহার করুন।</string>
     <string name="settings_metadata_server_description">বিল্ট-ইন শেয়ার করা সার্ভার ব্যবহার করতে দুটিই ফাঁকা রাখুন (সেটআপের প্রয়োজন নেই)। সরাসরি TMDB-তে কল করতে নিজের TMDB API কী লিখুন, অথবা নিজের প্রক্সি/মিরর ব্যবহার করতে স্ব-হোস্ট করা সার্ভারের URL লিখুন। কী-এর চেয়ে URL অগ্রাধিকার পাবে।</string>
@@ -351,11 +363,43 @@
     <string name="settings_decoding">ডিকোডিং</string>
     <string name="settings_hardware_decoding">হার্ডওয়্যার ডিকোডিং</string>
     <string name="settings_hardware_decoding_description">TV-এর হার্ডওয়্যার ডিকোডার ব্যবহার করুন। কিছু স্ট্রিম আটকে গেলে বা বিকৃত ছবি দেখালে এটি বন্ধ করুন।</string>
+    <!-- Translators: Setting label for deinterlacing of interlaced broadcast video. -->
+    <string name="settings_deinterlace">ডিইন্টারলেসিং</string>
+    <!-- Translators: Description of the deinterlacing setting. -->
+    <string name="settings_deinterlace_description">কিছু পুরোনো SD চ্যানেলে নড়াচড়ার সময় দেখা চিরুনির মতো দাগ মসৃণ করে। mpv ইঞ্জিন নিজে ছবি আঁকার সময় এটি প্রযোজ্য, তাই কোনো পার্থক্য না হলে হার্ডওয়্যার ডিকোডিং বন্ধ করুন।</string>
     <string name="settings_movies_series_player">সিনেমা ও সিরিজের প্লেয়ার</string>
     <string name="settings_reset_player_choices">সংরক্ষিত প্লেয়ার পছন্দ রিসেট করুন</string>
     <string name="settings_external_player">বাহ্যিক প্লেয়ার</string>
     <string name="settings_default_zoom">ডিফল্ট জুম</string>
     <string name="settings_default_zoom_description">প্লেব্যাক শুরু হলে প্রয়োগ করা অ্যাসপেক্ট/জুম।</string>
+    <!-- Translators: Setting label for the volume level playback starts at. -->
+    <string name="settings_default_volume">ডিফল্ট ভলিউম</string>
+    <!-- Translators: Description of the default volume setting. -->
+    <string name="settings_default_volume_description">প্লেব্যাক শুরু হলে প্রয়োগ করা ভলিউম। ১০০%%-এর উপরে কম শব্দের স্ট্রিম বাড়িয়ে দেওয়া হয়।</string>
+    <!-- Translators: Settings-row title for forgetting the zoom saved for individual items. -->
+    <string name="settings_reset_saved_zoom">সংরক্ষিত জুম রিসেট করুন</string>
+    <!-- Translators: Description of the reset-saved-zoom setting row. -->
+    <string name="settings_reset_saved_zoom_description">প্লেয়ারে জুম বদলালে তা সেই চ্যানেল, সিনেমা বা পর্বের জন্য সংরক্ষিত হয়। রিসেট করলে সবকিছু আবার ডিফল্ট জুম অনুসরণ করবে।</string>
+    <!-- Translators: Confirmation dialog title before forgetting the saved per-item zoom. -->
+    <string name="settings_reset_saved_zoom_confirm">সংরক্ষিত জুম রিসেট করবেন?</string>
+    <!-- Translators: Confirmation dialog body before forgetting the saved per-item zoom. -->
+    <string name="settings_reset_saved_zoom_confirm_description">প্রতিটি চ্যানেল, সিনেমা ও পর্ব আবার ডিফল্ট জুমে ফিরে যাবে। সংরক্ষিত ভলিউমগুলি অপরিবর্তিত থাকবে। প্লেয়ার থেকে যেকোনো সময় আলাদা একটি আইটেম আবার সেট করতে পারবেন।</string>
+    <!-- Translators: Settings-row title for forgetting the volume saved for individual items. -->
+    <string name="settings_reset_saved_volume">সংরক্ষিত ভলিউম রিসেট করুন</string>
+    <!-- Translators: Description of the reset-saved-volume setting row. -->
+    <string name="settings_reset_saved_volume_description">প্লেয়ারে ভলিউম বদলালে তা সেই চ্যানেল, সিনেমা বা পর্বের জন্য সংরক্ষিত হয়। রিসেট করলে সবকিছু আবার ডিফল্ট ভলিউম অনুসরণ করবে।</string>
+    <!-- Translators: Confirmation dialog title before forgetting the saved per-item volume. -->
+    <string name="settings_reset_saved_volume_confirm">সংরক্ষিত ভলিউম রিসেট করবেন?</string>
+    <!-- Translators: Confirmation dialog body before forgetting the saved per-item volume. -->
+    <string name="settings_reset_saved_volume_confirm_description">প্রতিটি চ্যানেল, সিনেমা ও পর্ব আবার ডিফল্ট ভলিউমে ফিরে যাবে। সংরক্ষিত জুম সেটিংগুলি অপরিবর্তিত থাকবে। প্লেয়ার থেকে যেকোনো সময় আলাদা একটি আইটেম আবার সেট করতে পারবেন।</string>
+    <!-- Translators: Setting label for how far rewind/forward jumps in a movie or episode. -->
+    <string name="settings_seek_step">সিক ধাপ</string>
+    <!-- Translators: Description of the seek step setting. -->
+    <string name="settings_seek_step_description">সিনেমা বা পর্বে রিওয়াইন্ড ও ফরওয়ার্ড কতটা লাফ দেবে।</string>
+    <!-- Translators: Setting label for how far rewind/forward jumps inside a live channel's archive. -->
+    <string name="settings_live_rewind_step">লাইভ রিওয়াইন্ড ধাপ</string>
+    <!-- Translators: Description of the live rewind step setting. -->
+    <string name="settings_live_rewind_step_description">লাইভ চ্যানেলের ক্যাচ-আপ আর্কাইভে রিওয়াইন্ড ও ফরওয়ার্ড কতটা সরবে।</string>
     <string name="settings_resume_playback">প্লেব্যাক চালিয়ে যান</string>
     <string name="settings_resume_playback_description">কোনো সিনেমা বা পর্বের সংরক্ষিত অবস্থান থাকলে কী করা হবে।</string>
     <string name="settings_subtitles">সাবটাইটেল</string>
@@ -370,7 +414,7 @@
     <string name="settings_audio">অডিও</string>
     <string name="settings_preferred_audio_language">পছন্দের অডিও ভাষা</string>
     <string name="settings_audio_sync">অডিও সিঙ্ক</string>
-    <string name="settings_audio_sync_description">ভিডিওর সঙ্গে মেলাতে অডিও আগে বা পরে সরান।</string>
+    <string name="settings_audio_sync_description">ভিডিওর সঙ্গে মেলাতে অডিও আগে বা পরে সরান। শুধুমাত্র mpv ইঞ্জিনে প্রযোজ্য।</string>
     <string name="settings_live_tv">লাইভ টিভি</string>
     <string name="settings_live_latency_description">লাইভ সম্প্রচারের কত কাছাকাছি চালানো হবে। মান কম হলে লাইভের কাছাকাছি থাকবে, তবে বাফার ছোট হবে—তাই দুর্বল স্ট্রিমে বেশি আটকে যেতে বা পুনরায় সংযোগ হতে পারে। পরবর্তী যে চ্যানেলটি খুলবেন, সেটিতে এটি প্রযোজ্য হবে।</string>
     <string name="settings_channel_numbers">চ্যানেল নম্বর</string>

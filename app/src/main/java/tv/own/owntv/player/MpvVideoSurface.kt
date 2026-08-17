@@ -6,7 +6,6 @@ import android.view.SurfaceHolder
 import android.view.SurfaceView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -164,9 +163,10 @@ fun ExoPreviewSurface(
         // which drops this SurfaceView and builds a new one. Some hardware decoders only ever accept one
         // 4K codec per Surface — see LivePreviewEngine.recreateSurface.
         val surfaceGeneration by engine.surfaceGeneration.collectAsStateWithLifecycle()
+        val viewModifier = Modifier.videoZoom(zoom, aspect, videoSize, maxWidth, maxHeight)
         key(surfaceGeneration) {
             AndroidView(
-                modifier = Modifier.videoZoom(zoom, aspect, videoSize, maxWidth, maxHeight),
+                modifier = viewModifier,
                 factory = { ctx ->
                     SurfaceView(ctx).apply {
                         holder.addCallback(object : SurfaceHolder.Callback {
@@ -180,10 +180,14 @@ fun ExoPreviewSurface(
             )
         }
         // Subtitle overlay — mounted ONLY while subs are on, so 4K live keeps its direct hardware-overlay path.
+        // Sized like the video, not like the screen (F17): at any zoom other than Fit the two differ, and
+        // mounting this full-screen put the same subtitle in a different place depending on which engine
+        // happened to be running. The picture is the reference, so a line stays inside the frame the user
+        // is actually looking at.
         val subOn by engine.subtitleOn.collectAsStateWithLifecycle()
         val cues by engine.cues.collectAsStateWithLifecycle()
         if (subOn) {
-            StyledSubtitleView(cues = cues, modifier = Modifier.fillMaxSize())
+            StyledSubtitleView(cues = cues, modifier = viewModifier)
         }
     }
 }

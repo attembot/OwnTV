@@ -9,6 +9,49 @@
 > (e.g. `(community PR #40 by @codeVerine)`). Issue numbers that are part of a title (e.g. `(#57)`) are
 > fine; explanatory parentheticals are not. Descriptions belong in CHANGELOG.md, never here.
 
+## v4.2.1 — 2026-08-15
+
+### ✨ New features
+
+- **🎭 Cast photos in TMDB details**
+- **🏷️ A fair daily share of the built-in metadata service**
+- **🎧 "Audio only" — sound with no picture is now labelled, not mistaken for a fault**
+- **🔊 Zoom and volume are now remembered per item**
+- **Seek step**
+- **Live rewind step**
+- **Deinterlacing**
+
+### 🐛 Fixes
+
+- **Your resume position is saved reliably again — and never lands in someone else's profile**
+- **A dying live channel now ends with a message instead of reconnecting forever**
+- **Channels that need a custom User-Agent or Referer survive Retry and the screensaver**
+- **Live rewind no longer leaves a phantom "behind live" counter running**
+- **The Home screen poster no longer sticks on a spinner**
+- **Catch-up you watch inside OwnTV now appears in History**
+- **Opening a channel full screen from a catch-up programme keeps CH+/CH− working**
+- **Cancelling Move mode restores your sort order**
+- **Retrying a live channel keeps everything the first attempt had**
+- **Subtitle fixes**
+- **"Stay signed in" now covers subtitle downloads**
+- **A subtitle search that fails now falls back to a title search**
+- **Catch-up URLs build correctly for playlists that already carry a token**
+- **Auto frame rate no longer leaves the previous item's refresh rate on the display**
+- **The playback error log survives a corrupt file**
+- **Audio focus is released while you are paused**
+- **Settings → Audio sync now covers the same ±5 seconds the player does**
+- **Custom DNS resolves IPv6-only hosts**
+- **One channel refusing a request no longer sends a whole provider down the slow path**
+- **Holding CH+ or CH− changes channel once**
+- **Subtitles stay on the picture when you zoom**
+- **A catch-up programme that never opens moves on instead of spinning**
+- **The "Match EPG" picker responds as you type**
+- **Audio sync moves in 25 ms steps**
+- **The volume dialog no longer traps the remote at 0%**
+- **Rename, move and delete in Customize return focus to the row you were on**
+- **A film or recorded programme that won't start on the hardware decoder recovers more reliably**
+- **Smaller player fixes**
+
 ## v4.2.0 — 2026-08-12
 
 ### ✨ New features

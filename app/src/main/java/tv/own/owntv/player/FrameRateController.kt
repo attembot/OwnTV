@@ -2,7 +2,6 @@ package tv.own.owntv.player
 
 import android.app.Activity
 import android.content.Context
-import android.content.ContextWrapper
 import android.os.Build
 import android.util.Log
 import android.view.Display
@@ -10,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
+import tv.own.owntv.core.ui.findActivity
 import kotlin.math.abs
 
 /**
@@ -101,10 +101,13 @@ object FrameRateController {
      */
     fun apply(activity: Activity, fps: Float) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || fps <= 0f) return
-        cancelPendingReset()
         cancelPendingApply()
         runCatching {
+            // The pending reset is cancelled only once a mode is actually going to be requested. Cancelling
+            // up front killed the restore-to-default even when nothing matched this item's frame rate — so
+            // leaving a 24p film for something the panel has no mode for kept the display at 24Hz.
             val target = pickMode(activity, fps) ?: return
+            cancelPendingReset()
             if (target.modeId == activity.window.attributes.preferredDisplayModeId) return
             val waitMs = MODE_CHANGE_COOLDOWN_MS - (android.os.SystemClock.uptimeMillis() - lastChangeAtMs)
             if (lastChangeAtMs != 0L && waitMs > 0) {
@@ -264,11 +267,3 @@ fun AutoFrameRateEffect(fps: Float?, enabled: Boolean) {
     }
 }
 
-private fun Context.findActivity(): Activity? {
-    var ctx: Context? = this
-    while (ctx is ContextWrapper) {
-        if (ctx is Activity) return ctx
-        ctx = ctx.baseContext
-    }
-    return null
-}

@@ -8,6 +8,8 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -66,7 +68,7 @@ data class MediaDetailsUi(
     val metaLine: String = "",          // "2026 · ★ 7.6 · 2h 10m"
     val genres: List<String> = emptyList(),
     val plot: String? = null,
-    val cast: List<String> = emptyList(),
+    val cast: List<tv.own.owntv.core.metadata.CastMember> = emptyList(),
 )
 
 /**
@@ -183,11 +185,74 @@ fun MediaDetailsScreen(details: MediaDetailsUi, onExit: () -> Unit, modifier: Mo
                 if (details.cast.isNotEmpty()) {
                     Column {
                         Text(stringResource(R.string.content_media_cast), style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
-                        Spacer(Modifier.height(6.dp))
-                        Text(details.cast.joinToString(", "), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+                        Spacer(Modifier.height(10.dp))
+                        CastGrid(details.cast)
                     }
                 }
                 Text(stringResource(R.string.content_media_press_back), style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+/**
+ * Cast as photo + name cards that wrap onto as many lines as needed.
+ *
+ * Non-focusable by design: this window is deliberately scroll-only with no inner focus targets (the card
+ * itself owns focus and turns Up/Down into a scroll), so a focusable horizontal row would break its D-pad
+ * model. Wrapping instead of scrolling sideways means every credited actor is reachable with the same
+ * Up/Down that scrolls the rest of the window.
+ *
+ * The photos come straight from TMDB's image CDN, which needs no API key and does not touch the metadata
+ * service, so showing them costs nothing against anyone's allowance.
+ */
+@Composable
+private fun CastGrid(cast: List<tv.own.owntv.core.metadata.CastMember>) {
+    val colors = OwnTVTheme.colors
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        cast.forEach { member ->
+            Column(
+                modifier = Modifier.width(88.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                val photo = tv.own.owntv.core.metadata.MetadataImages.profile(member.profilePath)
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .clip(RoundedCornerShape(36.dp))
+                        .background(colors.surfaceContainerHigh),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (photo != null) {
+                        coil3.compose.AsyncImage(
+                            model = photo,
+                            contentDescription = null,
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else {
+                        // Plenty of credited actors have no TMDB photo; initials read better than a gap.
+                        Text(
+                            member.name.split(' ').mapNotNull { it.firstOrNull() }.take(2)
+                                .joinToString("").uppercase(),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = colors.onSurfaceVariant,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    member.name,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    maxLines = 2,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                )
             }
         }
     }

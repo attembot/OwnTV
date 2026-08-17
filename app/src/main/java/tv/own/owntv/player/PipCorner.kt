@@ -31,12 +31,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import kotlinx.coroutines.delay
+import tv.own.owntv.R
 import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.OwnTVIcon
 
@@ -115,7 +117,7 @@ fun PipCornerWindow(
     ) {
         if (state == CornerState.ERROR) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Couldn't play", style = MaterialTheme.typography.labelMedium, color = Color.White)
+                Text(stringResource(R.string.fork_corner_playback_failed), style = MaterialTheme.typography.labelMedium, color = Color.White)
             }
         } else {
             SecondaryVideoSurface(engine = engine, modifier = Modifier.fillMaxSize())

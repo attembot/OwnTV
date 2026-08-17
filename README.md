@@ -246,22 +246,6 @@ project's player-only, bring-your-own-source positioning, and match the existing
 If your language is already available, contribute interface translations across OwnTV's six Android resource components on [Hosted Weblate](https://hosted.weblate.org/projects/owntv/). If it is not listed, [open a language request ticket](https://github.com/ahXN00/OwnTV/issues/new?template=feature_request.yml&title=%5BLanguage%5D%20Add%20) first. A maintainer will review the request, register the locale, and prepare its base translation files on Hosted Weblate. Once the language appears on Hosted Weblate, you can start translating it there. See the [language contributor guide](tools/i18n/README.md) for identifiers, validation, and promotion policy.
 <!-- i18n-contribution:end -->
 
-## 💛 Support the project
-
-OwnTV is — and will **always be** — completely **free, 100% open-source, and ad-free. Forever.** ❤️ No
-paywalls, no "Pro" tier, no catch.
-
-It's a passion project built in my spare time. If it's made your TV a little nicer and you'd like to say
-thanks or **buy me a coffee**, a small **PayPal** tip is hugely appreciated — but it's **100% optional**, the
-app stays free for everyone no matter what. 🙂
-
-### ☕ [paypal.me/AshiqHasan](https://paypal.me/AshiqHasan)
-
-Scan to donate from your phone:
-
-<a href="https://paypal.me/AshiqHasan"><img src="extras/paypal_qr.jpg" alt="Scan to donate via PayPal" width="170"></a>
-
-Thank you for using OwnTV! 🙏
 
 ## 🙏 Credits
 

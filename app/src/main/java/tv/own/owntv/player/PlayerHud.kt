@@ -1,36 +1,16 @@
 package tv.own.owntv.player
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.focusGroup
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -45,9 +25,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
@@ -62,35 +39,29 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.style.TextDirection
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.AsyncImage
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import tv.own.owntv.R
 import tv.own.owntv.core.i18n.HorizontalDirection
 import tv.own.owntv.core.i18n.horizontalDirection
-import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.OwnTVButton
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.OwnTVSpinner
-import tv.own.owntv.ui.components.displayText
-import tv.own.owntv.ui.components.displayLabel
-import tv.own.owntv.ui.components.dialogPanel
-import tv.own.owntv.ui.theme.GlassSurface
+import tv.own.owntv.ui.components.displayText // PlayerFailureReason.displayText, for the error overlay
 import tv.own.owntv.ui.theme.LocalActionSurface
-import tv.own.owntv.ui.theme.OwnTVTheme
-import tv.own.owntv.ui.format.localizedDecimal
 
-private val SPEEDS = listOf(0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0)
-private val TEAL = Color(0xFF52DBC8)
+/**
+ * The full-screen player HUD. This file owns the HUD's STATE — visibility, direct tune, the dialog the
+ * user has open, the zap/engine flashes — and composes the pieces that draw it. Those pieces live in
+ * sibling files: [PlayerHudChrome] (top bar, OSD cards, transport, bottom bar), [PlayerHudControls]
+ * (buttons, seek bars, shared formatters) and [PlayerHudDialogs] (every dialog the HUD opens).
+ */
 
 @Composable
 internal fun MediaSpec.displayText(): String {
@@ -122,45 +93,20 @@ internal fun MediaSpec.displayText(): String {
 }
 
 @Composable
-private fun PlaybackFailure.displayText(): String = when (this) {
-    PlaybackFailure.Channel -> stringResource(R.string.player_error_channel)
-    PlaybackFailure.LostConnection -> stringResource(R.string.player_error_lost_connection)
-    PlaybackFailure.StreamLink -> stringResource(R.string.player_error_stream_link)
-    PlaybackFailure.NotStreaming -> stringResource(R.string.player_error_not_streaming)
-    PlaybackFailure.AudioNoVideo -> stringResource(R.string.player_error_audio_no_video)
-    PlaybackFailure.FileCorrupt -> stringResource(R.string.player_error_file_corrupt)
-    PlaybackFailure.MultipleVideos -> stringResource(R.string.player_error_multiple_videos)
-    PlaybackFailure.DecoderBusy -> stringResource(R.string.player_error_decoder_busy)
-    PlaybackFailure.NoInternet -> stringResource(R.string.player_error_no_internet)
-    PlaybackFailure.Surround -> stringResource(R.string.player_error_surround)
-    PlaybackFailure.ImageSubtitleAudio -> stringResource(R.string.player_error_image_subtitle_audio)
-    PlaybackFailure.ImageFormat -> stringResource(R.string.player_error_image_format)
-    PlaybackFailure.ImageShow -> stringResource(R.string.player_error_image_show)
-    PlaybackFailure.BothEnginesExoFirst -> stringResource(R.string.player_error_both_engines_exo_first)
-    is PlaybackFailure.BothEnginesMpvFirst -> stringResource(
-        R.string.player_error_both_engines_mpv_first,
-        exoError.displayText(),
-    )
-    is PlaybackFailure.ExoDecode -> stringResource(R.string.player_error_exo_decode, code)
-    is PlaybackFailure.ExoPlay -> stringResource(R.string.player_error_exo_play, code)
-    is PlaybackFailure.HardwareFallback -> stringResource(R.string.player_error_hardware_fallback, resolution)
-    is PlaybackFailure.HardwareDisabled -> stringResource(R.string.player_error_hardware_disabled, resolution)
-    is PlaybackFailure.HardwareFormat -> stringResource(R.string.player_error_hardware_format, resolution, codec)
-    is PlaybackFailure.StreamUnavailable -> stringResource(
-        R.string.player_error_stream_unavailable,
-        if (customUserAgentHint) stringResource(R.string.player_error_custom_user_agent) else "",
-    )
-    PlaybackFailure.MpvOpenDecode -> stringResource(R.string.player_error_mpv_open_decode)
-    PlaybackFailure.MpvStreamNeverStarted -> stringResource(R.string.player_error_mpv_stream_never_started)
-    is PlaybackFailure.Raw -> message
+private fun PlaybackFailure.displayText(): String {
+    // Resolved through the same [describe] mapping the toast renderer uses. LocalConfiguration is read
+    // so a language change still recomposes this, exactly as stringResource would.
+    androidx.compose.ui.platform.LocalConfiguration.current
+    val resources = androidx.compose.ui.platform.LocalContext.current.resources
+    return describe { id, args -> resources.getString(id, *args.toTypedArray()) }
 }
 
-private const val DIRECT_TUNE_TIMEOUT_MS = 2_000L
+internal const val DIRECT_TUNE_TIMEOUT_MS = 2_000L
 private const val DIRECT_TUNE_FEEDBACK_MS = 1_500L
 private const val DIRECT_TUNE_PLAYBACK_WAIT_MS = 8_000L
 private const val MAX_DIRECT_TUNE_DIGITS = 5
 
-private enum class HudDialog { NONE, AUDIO, SUBS, SPEED, ZOOM, VOLUME, SUB_TIMING }
+internal enum class HudDialog { NONE, AUDIO, SUBS, SPEED, ZOOM, VOLUME, SUB_TIMING }
 
 /** What the top-left channel OSD shows for direct tune: the digits being typed, the channel a number
  *  resolved to, or a failure message. All three render as the same card as the channel OSD. */
@@ -408,6 +354,9 @@ fun PlayerHud(
     // Back cancels digit entry before it hides/exits controls.
     BackHandler(enabled = digitsActive) { digitBuffer = ""; tuneOsd = null }
 
+    // Only for the "report this stream" button, whose readout is now gathered off the main thread.
+    val hudScope = androidx.compose.runtime.rememberCoroutineScope()
+
     LaunchedEffect(forceShow) { if (forceShow) controlsVisible = true }
     LaunchedEffect(controlsVisible, player) { if (controlsVisible) player.refreshStreamChips() }
     DisposableEffect(showInfo, player) {
@@ -588,17 +537,22 @@ fun PlayerHud(
                     onInfo = { showInfo = !showInfo }, infoOn = showInfo,
                     onReport = {
                         val meta = player.currentMeta.value
-                        val snapshot = buildString {
-                            appendLine(player.streamInfo().joinToString("\n") { (k, v) -> "  $k: $v" })
-                            appendLine("  position: $reportPosition${reportDuration?.let { " / $it" }.orEmpty()}")
+                        // The readout is gathered on the player's own thread now (A-F2), so the report is
+                        // written from a coroutine. The confirmation still flashes immediately — the user
+                        // pressed a button and must see it acknowledged.
+                        hudScope.launch {
+                            val snapshot = buildString {
+                                appendLine(player.streamInfo().joinToString("\n") { (k, v) -> "  $k: $v" })
+                                appendLine("  position: $reportPosition${reportDuration?.let { " / $it" }.orEmpty()}")
+                            }
+                            PlaybackErrorLog.report(
+                                context = reportContext,
+                                engine = engineChip ?: "?",
+                                live = isLive,
+                                title = meta.title,
+                                snapshot = snapshot,
+                            )
                         }
-                        PlaybackErrorLog.report(
-                            context = reportContext,
-                            engine = engineChip ?: "?",
-                            live = isLive,
-                            title = meta.title,
-                            snapshot = snapshot,
-                        )
                         engineMsg = reportSavedMessage
                         engineFlash++
                     },
@@ -732,937 +686,8 @@ fun PlayerHud(
         }
         HudDialog.SUB_TIMING -> SubtitleTimingDialog(player, onDismiss = { dialog = HudDialog.NONE })
         HudDialog.SPEED -> SpeedDialog(current = speed, onSelect = { player.setSpeed(it); dialog = HudDialog.NONE }, onDismiss = { dialog = HudDialog.NONE })
-        HudDialog.ZOOM -> ZoomDialog(current = zoomMode, onSelect = { player.setZoomMode(it); dialog = HudDialog.NONE }, onDismiss = { dialog = HudDialog.NONE })
+        HudDialog.ZOOM -> ZoomDialog(current = zoomMode, onSelect = { player.setZoomModeByUser(it); dialog = HudDialog.NONE }, onDismiss = { dialog = HudDialog.NONE })
         HudDialog.VOLUME -> VolumeDialog(player, onDismiss = { dialog = HudDialog.NONE })
         HudDialog.NONE -> Unit
     }
-}
-
-// ---------------- Top bar ----------------
-
-@Composable
-private fun TopBar(
-    player: PlaybackEngine, isLive: Boolean, chips: List<String>, duration: Long,
-    onBack: () -> Unit, modifier: Modifier = Modifier,
-    // Live only: the Now/Next guide, rendered at the far end of the same strip.
-    trailing: (@Composable () -> Unit)? = null,
-) {
-    // Reactive meta so the title row updates instantly on a channel zap (the plain vars aren't observed).
-    val meta by player.currentMeta.collectAsStateWithLifecycle()
-    val displayTitle = meta.title?.takeIf { it.isNotBlank() }
-        ?: meta.episodeNumber?.let { stringResource(R.string.player_episode_number, it) }
-        ?: ""
-    val localizedSubtitle = meta.localizedSubtitle()
-    val vodSubtitle = if (isLive) {
-        meta.subtitle
-    } else {
-        buildList {
-            localizedSubtitle?.takeIf { it.isNotBlank() }?.let(::add)
-            meta.seasonNumber?.let { add(stringResource(R.string.player_season_number, it)) }
-        }.joinToString(stringResource(R.string.content_metadata_separator)).ifBlank { null }
-    }
-    Row(modifier = modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
-        CircleButton(OwnTVIcon.BACK, size = 40, onClick = onBack)
-        Spacer(Modifier.width(14.dp))
-        // Live: the channel logo sits with the channel NAME (identity), not with the programme — so the
-        // whole "which channel am I on" group reads as one unit however wide the TV is.
-        if (isLive) {
-            ChannelLogo(meta.logoUrl, displayTitle, size = 46)
-            Spacer(Modifier.width(14.dp))
-        }
-        Column(Modifier.weight(1f)) {
-            val chipRow: @Composable () -> Unit = {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    val durMin = (duration / 60000)
-                    val parts = buildList {
-                        meta.year?.takeIf { it.isNotBlank() }?.let { add(it) }
-                        if (!isLive && durMin > 0) add(stringResource(R.string.player_duration_minutes, durMin))
-                        addAll(chips) // aspect · resolution · fps · audio
-                    }
-                    parts.forEachIndexed { i, label ->
-                        if (i > 0) Box(Modifier.size(3.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.3f)))
-                        Text(label, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.5f))
-                    }
-                    if (isLive) {
-                        if (parts.isNotEmpty()) Box(Modifier.size(3.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.3f)))
-                        LiveBadge()
-                    }
-                }
-            }
-            // Live stacks the technical chips ABOVE the channel name; VOD keeps title-then-chips.
-            if (isLive) {
-                chipRow()
-                Spacer(Modifier.height(2.dp))
-                // Channel number ahead of the name — this is where you look to learn the number of a
-                // channel you arrived at by zapping. meta.subtitle carries it ("#123") only while the
-                // "Channel numbers" setting is on, so an off setting leaves the name alone.
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    meta.subtitle?.takeIf { it.isNotBlank() }?.let {
-                        Text(
-                            it,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = Color.White.copy(alpha = 0.45f),
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Spacer(Modifier.width(10.dp))
-                    }
-                    Text(displayTitle, style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            } else {
-                vodSubtitle?.let {
-                    Text(it, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.45f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                Text(displayTitle, style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Spacer(Modifier.height(2.dp))
-                chipRow()
-            }
-        }
-        if (trailing != null) {
-            Spacer(Modifier.width(28.dp))
-            trailing()
-        }
-    }
-}
-
-/** The channel logo tile, falling back to the first letters of the channel name. */
-@Composable
-private fun ChannelLogo(logoUrl: String?, title: String?, size: Int, modifier: Modifier = Modifier) {
-    Box(
-        modifier.size(size.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFF004F46)),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (!logoUrl.isNullOrBlank()) AsyncImage(model = logoUrl, contentDescription = null, modifier = Modifier.fillMaxSize())
-        else Text((title ?: "?").take(3).uppercase(), style = MaterialTheme.typography.labelMedium, color = Color(0xFF6FF8E4), fontWeight = FontWeight.Bold)
-    }
-}
-
-@Composable
-private fun LiveBadge() {
-    Row(
-        modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(Color(0xCCDC3232)).padding(horizontal = 8.dp, vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Box(Modifier.size(6.dp).clip(CircleShape).background(Color.White))
-        Text(stringResource(R.string.player_live), style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
-    }
-}
-
-/** The player's channel OSD: channel logo beside its name and number. */
-@Composable
-private fun ChannelOsdCard(
-    title: String?,
-    subtitle: String?,
-    logoUrl: String?,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier.widthIn(max = 340.dp).clip(RoundedCornerShape(14.dp)).background(Color.Black.copy(alpha = 0.55f)).padding(14.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Box(Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFF004F46)), contentAlignment = Alignment.Center) {
-            if (!logoUrl.isNullOrBlank()) AsyncImage(model = logoUrl, contentDescription = null, modifier = Modifier.fillMaxSize())
-            else Text((title ?: "?").take(3).uppercase(), style = MaterialTheme.typography.labelMedium, color = Color(0xFF6FF8E4), fontWeight = FontWeight.Bold)
-        }
-        Column {
-            Text(title ?: "", style = MaterialTheme.typography.titleSmall, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            subtitle?.takeIf { it.isNotBlank() }?.let {
-                Text(it, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
-    }
-}
-
-@Composable
-private fun ChannelCard(player: PlaybackEngine, modifier: Modifier = Modifier) {
-    // Collect the reactive meta so the card refreshes the instant a zap changes the channel.
-    val meta by player.currentMeta.collectAsStateWithLifecycle()
-    val displayTitle = meta.title?.takeIf { it.isNotBlank() }
-        ?: meta.episodeNumber?.let { stringResource(R.string.player_episode_number, it) }
-        ?: ""
-    ChannelOsdCard(title = displayTitle, subtitle = meta.localizedSubtitle(), logoUrl = meta.logoUrl, modifier = modifier)
-}
-
-/** Direct-tune entry OSD: the number as it's typed, on the same surface (position, radius, scrim) the
- *  channel card uses, so a resolved number simply becomes that card. A blinking caret says "still
- *  accepting digits" and the bar along the bottom drains over the auto-submit window, so the wait is
- *  visible instead of mysterious. [error] turns it into the failure readout for the same number. */
-@Composable
-private fun ChannelNumberCard(digits: String, error: String? = null, modifier: Modifier = Modifier) {
-    val caret = rememberInfiniteTransition(label = "tuneCaret")
-    val caretAlpha by caret.animateFloat(
-        initialValue = 1f, targetValue = 0f,
-        animationSpec = infiniteRepeatable(tween(600, easing = LinearEasing), RepeatMode.Reverse),
-        label = "tuneCaretAlpha",
-    )
-    val countdown = remember { Animatable(0f) }
-    LaunchedEffect(digits, error) {
-        if (error != null) { countdown.snapTo(0f); return@LaunchedEffect }
-        countdown.snapTo(1f)
-        countdown.animateTo(0f, tween(DIRECT_TUNE_TIMEOUT_MS.toInt(), easing = LinearEasing))
-    }
-    Column(
-        modifier.widthIn(min = 148.dp, max = 340.dp).clip(RoundedCornerShape(14.dp)).background(Color.Black.copy(alpha = 0.55f))
-            // Painted, not laid out: a real bar would fillMaxWidth and stretch the card to its max width.
-            .drawWithContent {
-                drawContent()
-                val barHeight = 3.dp.toPx()
-                val top = Offset(0f, size.height - barHeight)
-                drawRect(Color.White.copy(alpha = 0.08f), topLeft = top, size = Size(size.width, barHeight))
-                drawRect(TEAL, topLeft = top, size = Size(size.width * countdown.value, barHeight))
-            }
-            .padding(bottom = 3.dp),
-    ) {
-        Column(Modifier.padding(start = 16.dp, end = 20.dp, top = 12.dp, bottom = 12.dp)) {
-            Text(
-                stringResource(R.string.player_channel_label),
-                style = MaterialTheme.typography.labelSmall, color = TEAL, fontWeight = FontWeight.Bold,
-                letterSpacing = 2.sp,
-            )
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    digits,
-                    style = MaterialTheme.typography.headlineSmall, color = Color.White, fontWeight = FontWeight.Bold,
-                    letterSpacing = 3.sp,
-                )
-                if (error == null) {
-                    Box(
-                        Modifier.padding(start = 4.dp, bottom = 4.dp).width(3.dp).height(22.dp)
-                            .clip(RoundedCornerShape(2.dp)).background(TEAL.copy(alpha = caretAlpha)),
-                    )
-                }
-            }
-            error?.let {
-                Text(it, style = MaterialTheme.typography.labelMedium, color = Color(0xFFFF8A80), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
-    }
-}
-
-// ---------------- Center transport ----------------
-
-@Composable
-private fun CenterControls(
-    player: PlaybackEngine, nav: NavState, isPlaying: Boolean, isLive: Boolean,
-    onRewindLive: (() -> Unit)?, onForwardLive: (() -> Unit)?, onGoToLive: (() -> Unit)?, timeshiftOffsetSec: Int?,
-    playFocus: FocusRequester, modifier: Modifier = Modifier,
-) {
-    val rewindMode = onRewindLive != null // this is a catch-up-capable Live channel
-    val timeshifting = timeshiftOffsetSec != null
-    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        if (timeshifting) {
-            // Counts down as the archive catches up to the live edge; grows if you pause.
-            Text(
-                if (timeshiftOffsetSec <= 1) stringResource(R.string.player_at_live_edge) else stringResource(R.string.player_behind_live, mmss(timeshiftOffsetSec)),
-                style = MaterialTheme.typography.labelLarge,
-                color = OwnTVTheme.colors.accent,
-            )
-            Spacer(Modifier.height(12.dp))
-        }
-        Row(Modifier.focusGroup(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-            if (nav.hasPrev) CircleButton(OwnTVIcon.SKIP_PREVIOUS, size = 52) { player.previous() }
-            when {
-                rewindMode -> CircleButton(OwnTVIcon.REWIND, size = 52) { onRewindLive() } // step back into the archive
-                !isLive -> CircleButton(OwnTVIcon.REWIND, size = 52) { player.seekBy(-10_000) }
-            }
-            CircleButton(if (isPlaying) OwnTVIcon.PAUSE else OwnTVIcon.PLAY, size = 72, primary = true, modifier = Modifier.focusRequester(playFocus)) { player.togglePlayPause() }
-            when {
-                rewindMode && timeshifting -> CircleButton(OwnTVIcon.FORWARD, size = 52) { onForwardLive!!() } // toward live
-                !isLive && !rewindMode -> CircleButton(OwnTVIcon.FORWARD, size = 52) { player.seekBy(10_000) }
-            }
-            if (rewindMode && timeshifting && onGoToLive != null) {
-                CircleButton(OwnTVIcon.LIVE_TV, size = 52, primary = true) { onGoToLive() } // jump to the live edge
-            }
-            if (nav.hasNext) CircleButton(OwnTVIcon.SKIP_NEXT, size = 52) { player.next() }
-        }
-    }
-}
-
-/** mm:ss for a seconds offset (e.g. 150 → "2:30"). */
-@Composable
-private fun mmss(sec: Int): String = stringResource(R.string.player_track_seconds, sec / 60, sec % 60)
-
-// ---------------- Bottom bar ----------------
-
-@Composable
-private fun BottomBar(
-    player: PlaybackEngine, isLive: Boolean, position: Long, duration: Long,
-    volume: Int, audioCount: Int, subCount: Int, zoomMode: ZoomMode, speedLabel: String,
-    onScrubLive: ((Int) -> Unit)?, timeshiftOffsetSec: Int?,
-    compatMode: Boolean?, onToggleCompatMode: (() -> Unit)?,
-    vodOnExo: Boolean?, onToggleVodEngine: (() -> Unit)?,
-    onInfo: (() -> Unit)? = null, infoOn: Boolean = false, onReport: (() -> Unit)? = null,
-    favorite: Boolean = false, onToggleFavorite: (() -> Unit)? = null,
-    onOpenDialog: (HudDialog) -> Unit, onPip: (() -> Unit)?, onMultiView: (() -> Unit)? = null, onAudioMode: (() -> Unit)?, onBack: () -> Unit,
-    onCornerSwap: (() -> Unit)? = null, onCornerAudio: (() -> Unit)? = null, onCornerMove: (() -> Unit)? = null, onCornerGrow: (() -> Unit)? = null, onCornerShrink: (() -> Unit)? = null, onCornerClose: (() -> Unit)? = null,
-    onChangeMain: (() -> Unit)? = null, onChangeCorner: (() -> Unit)? = null,
-    cornerAudioOn: Boolean = false,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier = modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 20.dp)) {
-        // Dedicated PiP row (only while a corner stream is up) — its own labeled strip so it's obvious
-        // which window each action touches: "Change main" retunes the full-screen stream, "Change PiP"
-        // retunes the inset. Kept separate from the media controls so neither row overflows.
-        if (onCornerClose != null) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Color.Black.copy(alpha = 0.45f))
-                    .padding(horizontal = 10.dp, vertical = 4.dp)
-                    .focusGroup(),
-            ) {
-                OwnTVIcon(OwnTVIcon.PIP, tint = TEAL, filled = true, modifier = Modifier.size(16.dp))
-                Text(
-                    "PiP",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = TEAL,
-                    modifier = Modifier.padding(start = 2.dp, end = 8.dp),
-                )
-                if (onChangeMain != null) CtrlButton(OwnTVIcon.LIVE_TV, label = "Change main") { onChangeMain() }
-                if (onChangeCorner != null) CtrlButton(OwnTVIcon.PLAYLIST, label = "Change PiP") { onChangeCorner() }
-                if (onCornerSwap != null) CtrlButton(OwnTVIcon.FULLSCREEN, label = "Swap windows") { onCornerSwap() }
-                // Swap-arrows icon on Sound (not a mute glyph): it MOVES the audio between the two windows.
-                if (onCornerAudio != null) CtrlButton(OwnTVIcon.SWAP, active = cornerAudioOn, label = "Sound") { onCornerAudio() }
-                if (onCornerMove != null) CtrlButton(OwnTVIcon.MOVE, label = "Move") { onCornerMove() }
-                if (onCornerGrow != null) CtrlButton(OwnTVIcon.ADD, label = "Size +") { onCornerGrow() }
-                if (onCornerShrink != null) CtrlButton(OwnTVIcon.MINUS, label = "Size -") { onCornerShrink() }
-                CtrlButton(OwnTVIcon.CLOSE, label = "Close") { onCornerClose() }
-            }
-            Spacer(Modifier.height(10.dp))
-        }
-        when {
-            // Catch-up live channel → a scrubbable live timeline (last LIVE_WINDOW up to the live edge).
-            onScrubLive != null -> {
-                LiveTimelineBar(offsetSec = timeshiftOffsetSec ?: 0, onScrub = onScrubLive)
-                Spacer(Modifier.height(10.dp))
-            }
-            !isLive && duration > 0 -> {
-                SeekBar(positionMs = position, durationMs = duration, onSeek = { player.seekBy(it) })
-                Spacer(Modifier.height(6.dp))
-                Row(Modifier.fillMaxWidth()) {
-                    Text(formatTime(position), style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.7f))
-                    Spacer(Modifier.weight(1f))
-                    Text(formatTime(duration), style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.7f))
-                }
-                Spacer(Modifier.height(10.dp))
-            }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().focusGroup()) {
-            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                CtrlButton(volumeIcon(volume)) { onOpenDialog(HudDialog.VOLUME) }
-                SpeedButton(label = speedLabel, active = speedLabel != stringResource(R.string.player_speed_normal_short)) { onOpenDialog(HudDialog.SPEED) }
-                CtrlButton(OwnTVIcon.SUBTITLE, badge = subCount.takeIf { it > 0 }) { onOpenDialog(HudDialog.SUBS) }
-                CtrlButton(OwnTVIcon.AUDIO, badge = audioCount.takeIf { it > 1 }) { onOpenDialog(HudDialog.AUDIO) }
-                // Favorite the current channel/movie/series without leaving the stream (teal heart = on).
-                if (onToggleFavorite != null) CtrlButton(OwnTVIcon.FAVORITE, active = favorite) { onToggleFavorite() }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                // Live "compatibility mode" (Live TV + channels opened from the Guide): pin this channel
-                // to mpv. The pill shows the active engine and flips on click (teal while pinned to mpv).
-                if (onToggleCompatMode != null) {
-                    EngineToggle(label = stringResource(if (compatMode == true) R.string.player_engine_mpv else R.string.player_engine_exo), active = compatMode == true) { onToggleCompatMode() }
-                }
-                // VOD engine toggle (Movies/Series): flip THIS movie/episode between mpv and ExoPlayer.
-                // The pill shows the active engine (teal while ExoPlayer owns playback).
-                if (onToggleVodEngine != null) {
-                    EngineToggle(label = stringResource(if (vodOnExo == true) R.string.player_engine_exo else R.string.player_engine_mpv), active = vodOnExo == true) { onToggleVodEngine() }
-                }
-                // Aspect/zoom works in every mode now — direct mode resizes the surface view itself
-                // (see MpvVideoSurface), GL mode scales internally.
-                CtrlButton(OwnTVIcon.ASPECT, active = zoomMode != ZoomMode.FIT) { onOpenDialog(HudDialog.ZOOM) }
-                // (The corner/PiP controls live in their own labeled row above — see the top of this Column.)
-                if (onPip != null) CtrlButton(OwnTVIcon.PIP, label = "PiP") { onPip() }
-                if (onMultiView != null) CtrlButton(OwnTVIcon.VIDEO, label = "MultiView") { onMultiView() } // enter the multi-stream grid
-                if (onAudioMode != null) CtrlButton(OwnTVIcon.HEADPHONES) { onAudioMode() }
-                // Stream technical info (codec/res/HDR/bitrate/decoder/audio/buffer) — toggles the overlay.
-                // Parked at the far right, where the redundant exit-fullscreen button used to sit (Back
-                // already leaves the player, so that button never did anything the remote couldn't).
-                if (onInfo != null) CtrlButton(OwnTVIcon.INFO, active = infoOn) { onInfo() }
-                // "Report this stream": copies the readout the user is looking at into the playback log,
-                // so a "this channel judders" complaint carries the codec/decoder/bitrate that caused it.
-                // Only offered while the info overlay is open — there is nothing to report otherwise, and
-                // the bar stays as short as it was for everyone who never needs this.
-                if (infoOn && onReport != null) CtrlButton(OwnTVIcon.SHARE) { onReport() }
-            }
-        }
-    }
-}
-
-private fun volumeIcon(volume: Int): OwnTVIcon = when {
-    volume == 0 -> OwnTVIcon.VOLUME_MUTE
-    volume < 50 -> OwnTVIcon.VOLUME_LOW
-    else -> OwnTVIcon.VOLUME_HIGH
-}
-
-// ---------------- Buttons ----------------
-
-@Composable
-private fun CircleButton(icon: OwnTVIcon, size: Int, primary: Boolean = false, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    FocusableSurface(
-        onClick = onClick,
-        modifier = modifier.size(size.dp),
-        shape = CircleShape,
-        focusedScale = 1.1f,
-        focusedContainerColor = if (primary) Color.White else Color.White.copy(alpha = 0.22f),
-        unfocusedContainerColor = if (primary) Color.White.copy(alpha = 0.95f) else Color.White.copy(alpha = 0.10f),
-        selectedContainerColor = Color.White.copy(alpha = 0.10f),
-        contentAlignment = Alignment.Center,
-    ) { _ ->
-        OwnTVIcon(icon, tint = if (primary) Color(0xFF0E1513) else Color.White, filled = true, modifier = Modifier.size((size * 0.42f).dp))
-    }
-}
-
-@Composable
-private fun SpeedButton(label: String, active: Boolean, onClick: () -> Unit) {
-    FocusableSurface(
-        onClick = onClick,
-        modifier = Modifier.heightIn(min = 44.dp),
-        shape = RoundedCornerShape(12.dp),
-        focusedContainerColor = Color.White.copy(alpha = 0.16f),
-        unfocusedContainerColor = Color.Transparent,
-        selectedContainerColor = Color.Transparent,
-        contentAlignment = Alignment.Center,
-    ) { focused ->
-        // The rate itself is the icon — the extra ">>" glyph read as a seek control next to the real
-        // rewind/forward buttons, and "1.0x" already says everything the button does.
-        Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(label, style = MaterialTheme.typography.labelLarge, color = if (active) TEAL else if (focused) Color.White else Color.White.copy(alpha = 0.78f), fontWeight = FontWeight.SemiBold)
-        }
-    }
-}
-
-@Composable
-private fun formatSpeed(speed: Double): String = if (speed == 1.0) {
-    stringResource(R.string.player_speed_normal_short)
-} else {
-    stringResource(R.string.player_speed, localizedDecimal(speed))
-}
-
-/** Next-episode countdown card: "Next episode in Ns" + title, with Play now / Cancel. Play now advances
- *  immediately; Cancel suppresses the automatic advance for the current item. */
-@Composable
-private fun NextEpisodeCard(
-    seconds: Int,
-    title: String,
-    playFocus: FocusRequester,
-    onPlayNow: () -> Unit,
-    onCancel: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val colors = OwnTVTheme.colors
-    Column(
-        modifier = modifier
-            .widthIn(max = 360.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(Color.Black.copy(alpha = 0.82f))
-            .padding(horizontal = 18.dp, vertical = 14.dp),
-    ) {
-        Text(
-            stringResource(R.string.player_next_episode, seconds),
-            style = MaterialTheme.typography.labelLarge,
-            color = colors.primary,
-            fontWeight = FontWeight.Bold,
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            title,
-            style = MaterialTheme.typography.titleSmall,
-            color = Color.White,
-            maxLines = 1,
-            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-        )
-        Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            OwnTVButton(
-                stringResource(R.string.player_play_now),
-                onClick = onPlayNow,
-                icon = OwnTVIcon.PLAY,
-                modifier = Modifier.focusRequester(playFocus),
-            )
-            OwnTVButton(
-                stringResource(R.string.common_cancel),
-                onClick = onCancel,
-                icon = OwnTVIcon.CLOSE,
-                style = tv.own.owntv.ui.components.OwnTVButtonStyle.SECONDARY,
-            )
-        }
-    }
-}
-
-/** The MPV/EXO engine toggle: a one-line pill showing the active engine, flipped on click. Teal while on
- *  the non-default engine (ExoPlayer for VOD; mpv "compatibility" pin for Live). Mirrors [SpeedButton]. */
-@Composable
-private fun EngineToggle(label: String, active: Boolean, onClick: () -> Unit) {
-    FocusableSurface(
-        onClick = onClick,
-        modifier = Modifier.heightIn(min = 44.dp),
-        shape = RoundedCornerShape(12.dp),
-        focusedContainerColor = Color.White.copy(alpha = 0.16f),
-        unfocusedContainerColor = Color.Transparent,
-        selectedContainerColor = Color.Transparent,
-        contentAlignment = Alignment.Center,
-    ) { focused ->
-        Row(
-            Modifier.padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            OwnTVIcon(OwnTVIcon.SWAP, tint = if (active) TEAL else if (focused) Color.White else Color.White.copy(alpha = 0.78f), filled = true, modifier = Modifier.size(16.dp))
-            Text(label, style = MaterialTheme.typography.labelLarge, color = if (active) TEAL else if (focused) Color.White else Color.White.copy(alpha = 0.78f), fontWeight = FontWeight.SemiBold)
-        }
-    }
-}
-
-@Composable
-private fun CtrlButton(icon: OwnTVIcon, badge: Int? = null, active: Boolean = false, label: String? = null, onClick: () -> Unit) {
-    FocusableSurface(
-        onClick = onClick,
-        // Icon-only buttons stay a 44dp square; labeled ones grow into a pill so the text fits.
-        modifier = if (label == null) Modifier.size(44.dp) else Modifier.height(44.dp),
-        shape = RoundedCornerShape(12.dp),
-        focusedContainerColor = Color.White.copy(alpha = 0.16f),
-        unfocusedContainerColor = Color.Transparent,
-        selectedContainerColor = Color.Transparent,
-        contentAlignment = Alignment.Center,
-    ) { focused ->
-        val tint = if (active) TEAL else if (focused) Color.White else Color.White.copy(alpha = 0.78f)
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(7.dp),
-            modifier = if (label == null) Modifier else Modifier.padding(horizontal = 14.dp),
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                OwnTVIcon(icon, tint = tint, filled = true, modifier = Modifier.size(22.dp))
-                if (badge != null) {
-                    Box(
-                        Modifier.align(Alignment.TopEnd).size(15.dp).clip(CircleShape).background(TEAL),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(stringResource(R.string.common_number_grouped, badge), style = MaterialTheme.typography.labelSmall, color = Color(0xFF003730), fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-            if (label != null) {
-                Text(label, style = MaterialTheme.typography.labelLarge, color = tint, maxLines = 1)
-            }
-        }
-    }
-}
-
-// ---------------- Seekbar ----------------
-
-@Composable
-private fun SeekBar(positionMs: Long, durationMs: Long, onSeek: (Long) -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
-    val focused by interaction.collectIsFocusedAsState()
-    val frac = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
-    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-    Box(
-        modifier = Modifier.fillMaxWidth().height(24.dp)
-            .onKeyEvent { e ->
-                // Physical by design: left rewinds and right advances media time in every locale.
-                if (e.type == KeyEventType.KeyDown) when (e.key) {
-                    Key.DirectionLeft -> { onSeek(-10_000); true }
-                    Key.DirectionRight -> { onSeek(10_000); true }
-                    else -> false
-                } else false
-            }
-            .focusable(interactionSource = interaction),
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        Box(Modifier.fillMaxWidth().height(if (focused) 6.dp else 4.dp).clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = if (focused) 0.4f else 0.22f))) {
-            Box(Modifier.fillMaxWidth(frac).fillMaxHeight().clip(RoundedCornerShape(50)).background(TEAL))
-        }
-        if (focused) {
-            Box(Modifier.fillMaxWidth(frac), contentAlignment = Alignment.CenterEnd) {
-                Box(Modifier.size(14.dp).clip(CircleShape).background(TEAL))
-            }
-            // Time-remaining bubble above the thumb (elapsed is shown at the bar's left, total at the right,
-            // so the bubble shows what's LEFT: "-12:34"). Uses a negative offset (not bottom padding) so it
-            // floats clear above the 24dp-tall bar — padding can't lift it out of the height-constrained parent.
-            Box(Modifier.fillMaxWidth(frac), contentAlignment = Alignment.CenterEnd) {
-                Box(
-                    Modifier.offset(y = (-32).dp).clip(RoundedCornerShape(8.dp)).background(Color.Black.copy(alpha = 0.9f)).padding(horizontal = 8.dp, vertical = 3.dp),
-                ) {
-                    Text(
-                        stringResource(R.string.player_time_remaining, formatTime((durationMs - positionMs).coerceAtLeast(0))),
-                        style = MaterialTheme.typography.labelMedium.copy(textDirection = TextDirection.Content),
-                        color = Color.White,
-                    )
-                }
-            }
-        }
-    }
-    }
-}
-
-private const val LIVE_WINDOW_SEC = 2 * 3600   // the live timeline shows the last 2 hours up to the edge
-private const val LIVE_SCRUB_STEP_SEC = 60     // per Left/Right press (hold to scrub fast); buttons stay 30 s
-
-/** Scrubbable live timeline for a catch-up channel: spans the last [LIVE_WINDOW_SEC] up to the live edge.
- *  Left = back in time, Right = toward live; the thumb is the watched point and the gap to the red LIVE dot
- *  on the right is how far behind live you are. Holding a key scrubs freely; the archive loads when you
- *  settle (the VM debounces). Going past the window keeps working via the ⏪ button — the bar just pins left. */
-@Composable
-private fun LiveTimelineBar(offsetSec: Int, onScrub: (Int) -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
-    val focused by interaction.collectIsFocusedAsState()
-    val frac = (1f - offsetSec.toFloat() / LIVE_WINDOW_SEC).coerceIn(0f, 1f) // 1 = live edge, 0 = far edge
-    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-    Box(
-        modifier = Modifier.fillMaxWidth().height(24.dp)
-            .onKeyEvent { e ->
-                // Physical by design: left moves away from live; right moves toward the live edge.
-                if (e.type == KeyEventType.KeyDown) when (e.key) {
-                    Key.DirectionLeft -> { onScrub(LIVE_SCRUB_STEP_SEC); true }    // back in time
-                    Key.DirectionRight -> { onScrub(-LIVE_SCRUB_STEP_SEC); true }  // toward live
-                    else -> false
-                } else false
-            }
-            .focusable(interactionSource = interaction),
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        Box(Modifier.fillMaxWidth().height(if (focused) 6.dp else 4.dp).clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = if (focused) 0.4f else 0.22f))) {
-            Box(Modifier.fillMaxWidth(frac).fillMaxHeight().clip(RoundedCornerShape(50)).background(TEAL))
-        }
-        // Live-edge marker (red dot) at the far right.
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-            Box(Modifier.size(8.dp).clip(CircleShape).background(Color(0xFFFF4D4D)))
-        }
-        if (focused) {
-            Box(Modifier.fillMaxWidth(frac), contentAlignment = Alignment.CenterEnd) {
-                Box(Modifier.size(14.dp).clip(CircleShape).background(TEAL))
-            }
-            Box(Modifier.fillMaxWidth(frac), contentAlignment = Alignment.CenterEnd) {
-                Box(Modifier.padding(bottom = 30.dp).clip(RoundedCornerShape(8.dp)).background(Color.Black.copy(alpha = 0.9f)).padding(horizontal = 8.dp, vertical = 3.dp)) {
-                    Text(
-                        if (offsetSec <= 1) stringResource(R.string.player_live) else stringResource(R.string.player_live_offset, mmss(offsetSec)),
-                        style = MaterialTheme.typography.labelMedium.copy(textDirection = TextDirection.Content),
-                        color = Color.White,
-                    )
-                }
-            }
-        }
-    }
-    }
-}
-
-// ---------------- Dialogs ----------------
-
-@Composable
-private fun TrackDialog(
-    title: String,
-    tracks: List<TrackOption>,
-    onSelect: (TrackOption) -> Unit,
-    onOff: (() -> Unit)?,
-    onDismiss: () -> Unit,
-    audioDelayMs: Int? = null,                 // non-null on the Audio dialog (VOD) → show the A/V-sync nudge
-    onAdjustAudioDelay: ((Int) -> Unit)? = null,
-    // Non-null on the Subtitles dialog for a movie/episode → an "ADD SUBTITLES" row that opens the
-    // OpenSubtitles search (subtitle plan §4). Absent for Live TV and when no item context exists.
-    onSearchSubtitles: (() -> Unit)? = null,
-    // Non-null on the Subtitles dialog for a movie/episode → "Select local subtitle file" (plan §7).
-    onSelectLocalSubtitle: (() -> Unit)? = null,
-    // Non-null on the Subtitles dialog when timing adjustment applies to the active track (plan §8) →
-    // an "ADJUST" section with a "Subtitle timing" row.
-    onSubtitleTiming: (() -> Unit)? = null,
-) {
-    val colors = OwnTVTheme.colors
-    val focus = remember { FocusRequester() }
-    BackHandler { onDismiss() }
-    // Open with focus on the CURRENTLY-selected track (so re-opening to change it lands on the right row),
-    // else the "Off" row if nothing's selected, else the first track. The requestFocus must run from
-    // INSIDE the target row (below) — a top-level LaunchedEffect fires before the LazyColumn has composed
-    // that row, so requestFocus would throw "not initialized" and focus would fall back to the first item.
-    val selectedIndex = tracks.indexOfFirst { it.selected }
-    val focusOff = onOff != null && selectedIndex < 0
-    // Safety net: the per-row one-shot requestFocus below can fire while the dialog window is still
-    // mid-transition (seen on HDR/HDR10/DTS streams, whose surface re-layout delays window focus) or
-    // before the engine has reported the tracks at all — leaving the dialog with NO focused row and
-    // the D-pad locked out. Retry over a few frames, and re-run whenever the track list (re)arrives.
-    // The selected row can sit beyond the LazyColumn viewport (e.g. subtitle 11 of 20): it never
-    // composes, its focusRequester never attaches, and focus falls back to the first row ("Off").
-    // Scroll it into view before requesting focus.
-    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
-    LaunchedEffect(tracks.size, focusOff) {
-        val target = if (selectedIndex >= 0) selectedIndex + (if (onOff != null) 1 else 0) else 0
-        repeat(10) {
-            androidx.compose.runtime.withFrameNanos { }
-            if (selectedIndex >= 0) runCatching { listState.scrollToItem(target) }
-            if (runCatching { focus.requestFocus() }.isSuccess) return@LaunchedEffect
-            delay(50)
-        }
-    }
-    DialogScaffold(title = title, onDismiss = onDismiss, state = listState) {
-        if (tracks.isEmpty() && onOff == null) {
-            item { Text(stringResource(R.string.player_no_tracks), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, modifier = Modifier.padding(16.dp)) }
-        }
-        if (onOff != null) {
-            item {
-                if (focusOff) LaunchedEffect(Unit) { androidx.compose.runtime.withFrameNanos {}; runCatching { focus.requestFocus() } }
-                OptionRow(label = stringResource(R.string.common_off), selected = selectedIndex < 0, modifier = if (focusOff) Modifier.focusRequester(focus) else Modifier, onClick = onOff)
-            }
-        }
-        items(tracks.size) { index ->
-            val track = tracks[index]
-            val focusThis = index == selectedIndex || (selectedIndex < 0 && onOff == null && index == 0)
-            if (focusThis) LaunchedEffect(Unit) { androidx.compose.runtime.withFrameNanos {}; runCatching { focus.requestFocus() } }
-            OptionRow(
-                // Image-based subs (PGS/VOBSUB/DVB) play via the ExoPlayer handoff on VOD — mark them so
-                // it's clear they're a different kind of track, but they're fully selectable.
-                label = if (!track.image) track.displayLabel() else stringResource(R.string.player_image_track, track.displayLabel()),
-                selected = track.selected,
-                modifier = if (focusThis) Modifier.focusRequester(focus) else Modifier,
-                onClick = { onSelect(track) },
-            )
-        }
-        // ADD SUBTITLES (subtitles dialog, movie/episode only) — OpenSubtitles search + local file (§4/§7).
-        if (onSearchSubtitles != null || onSelectLocalSubtitle != null) {
-            item {
-                Text(
-                    stringResource(R.string.player_add_subtitles),
-                    style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(start = 16.dp, top = 10.dp, bottom = 2.dp),
-                )
-            }
-            if (onSearchSubtitles != null) {
-                item { OptionRow(label = stringResource(R.string.player_search_subtitles), selected = false, onClick = onSearchSubtitles) }
-            }
-            if (onSelectLocalSubtitle != null) {
-                item { OptionRow(label = stringResource(R.string.player_select_local_subtitle), selected = false, onClick = onSelectLocalSubtitle) }
-            }
-        }
-        // ADJUST (subtitles dialog): timing panel for the active subtitle (plan §8).
-        if (onSubtitleTiming != null) {
-            item {
-                Text(
-                    stringResource(R.string.player_adjust),
-                    style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(start = 16.dp, top = 10.dp, bottom = 2.dp),
-                )
-            }
-            item { OptionRow(label = stringResource(R.string.player_subtitle_timing), selected = false, onClick = onSubtitleTiming) }
-        }
-        // A/V-sync nudge (audio dialog, VOD only) — fixes a badly-muxed file where audio leads/lags the video.
-        if (onAdjustAudioDelay != null) {
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Text(stringResource(R.string.player_av_sync), style = MaterialTheme.typography.titleSmall, color = colors.onSurface, modifier = Modifier.weight(1f))
-                    StepButton(stringResource(R.string.common_minus), enabled = (audioDelayMs ?: 0) > -5_000) { onAdjustAudioDelay(-50) }
-                    Text(
-                        formatDelay(audioDelayMs ?: 0),
-                        style = MaterialTheme.typography.bodyMedium, color = colors.primary,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        modifier = Modifier.widthIn(min = 78.dp, max = 140.dp),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    StepButton(stringResource(R.string.common_plus), enabled = (audioDelayMs ?: 0) < 5_000) { onAdjustAudioDelay(50) }
-                }
-            }
-        }
-    }
-}
-
-/**
- * Requests [focus] with retries: dialog-window content composes a frame or two after the calling
- * effect starts, so a one-shot requestFocus can fire before the target row exists and silently fail.
- */
-private suspend fun requestFocusRetrying(focus: FocusRequester) {
-    repeat(10) {
-        androidx.compose.runtime.withFrameNanos {}
-        if (runCatching { focus.requestFocus() }.isSuccess) return
-        delay(50)
-    }
-}
-
-@Composable
-private fun formatDelay(ms: Int): String = when {
-    ms == 0 -> stringResource(R.string.player_delay_zero)
-    ms > 0 -> stringResource(R.string.player_delay_positive, ms)
-    else -> stringResource(R.string.player_delay_negative, ms)
-}
-
-@Composable
-private fun SpeedDialog(current: Double, onSelect: (Double) -> Unit, onDismiss: () -> Unit) {
-    val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { requestFocusRetrying(focus) }
-    BackHandler { onDismiss() }
-    val selectedIndex = SPEEDS.indexOfFirst { kotlin.math.abs(it - current) < 0.01 }.coerceAtLeast(0)
-    DialogScaffold(title = stringResource(R.string.settings_playback_speed), onDismiss = onDismiss) {
-        items(SPEEDS.size) { index ->
-            val speed = SPEEDS[index]
-            OptionRow(
-                label = if (speed == 1.0) stringResource(R.string.player_speed_normal) else stringResource(R.string.player_speed, localizedDecimal(speed)),
-                selected = kotlin.math.abs(speed - current) < 0.01,
-                modifier = if (index == selectedIndex) Modifier.focusRequester(focus) else Modifier,
-                onClick = { onSelect(speed) },
-            )
-        }
-    }
-}
-
-@Composable
-private fun ZoomDialog(current: ZoomMode, onSelect: (ZoomMode) -> Unit, onDismiss: () -> Unit) {
-    val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { requestFocusRetrying(focus) }
-    BackHandler { onDismiss() }
-    // Land focus on the current mode (not always the first row) so re-opening starts on your selection.
-    val selectedIndex = ZoomMode.entries.indexOf(current).coerceAtLeast(0)
-    DialogScaffold(title = stringResource(R.string.settings_player_zoom), onDismiss = onDismiss) {
-        items(ZoomMode.entries.size) { index ->
-            val mode = ZoomMode.entries[index]
-            OptionRow(label = stringResource(mode.labelRes), selected = mode == current, modifier = if (index == selectedIndex) Modifier.focusRequester(focus) else Modifier, onClick = { onSelect(mode) })
-        }
-    }
-}
-
-@Composable
-private fun VolumeDialog(player: PlaybackEngine, onDismiss: () -> Unit) {
-    val colors = OwnTVTheme.colors
-    val volume by player.volume.collectAsStateWithLifecycle()
-    val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { requestFocusRetrying(focus) }
-    // Real dialog window for the same focus isolation as DialogScaffold (see there).
-    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)), contentAlignment = Alignment.Center) {
-            Column(Modifier.dialogPanel(padding = 28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(stringResource(R.string.player_volume), style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
-                Spacer(Modifier.height(20.dp))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                    StepButton(stringResource(R.string.common_minus), enabled = volume > 0, modifier = Modifier.focusRequester(focus)) { player.adjustVolume(-5) }
-                    Text(stringResource(R.string.player_percent, volume), style = MaterialTheme.typography.headlineLarge, color = TEAL, modifier = Modifier.width(120.dp), textAlign = TextAlign.Center)
-                    StepButton(stringResource(R.string.common_plus), enabled = volume < 150) { player.adjustVolume(5) }
-                }
-                Spacer(Modifier.height(22.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OwnTVButton(stringResource(if (volume == 0) R.string.player_unmute else R.string.player_mute), onClick = { player.toggleMute() }, style = tv.own.owntv.ui.components.OwnTVButtonStyle.SECONDARY)
-                    Spacer(Modifier.weight(1f))
-                    OwnTVButton(stringResource(R.string.common_done), onClick = onDismiss)
-                }
-            }
-        }
-    }
-}
-
-/**
- * Subtitle-timing panel (subtitle plan §8.2/§8.3): 100 ms and 500 ms steps + Reset, applied live while
- * the video keeps playing behind (the backdrop is NOT dimmed so speech and text can be compared).
- * Positive = subtitles shown later; the direction is always spelled out. Back keeps the value.
- */
-@Composable
-private fun SubtitleTimingDialog(player: PlaybackEngine, onDismiss: () -> Unit) {
-    val colors = OwnTVTheme.colors
-    val delay by player.subDelayMs.collectAsStateWithLifecycle()
-    val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { requestFocusRetrying(focus) }
-    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
-        tv.own.owntv.ui.theme.PopupFontTheme {
-            Box(Modifier.fillMaxSize().padding(bottom = 56.dp), contentAlignment = Alignment.BottomCenter) {
-                Column(Modifier.dialogPanel(width = 560.dp, padding = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(stringResource(R.string.player_subtitle_timing), style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
-                    Spacer(Modifier.height(10.dp))
-                    Text(formatSubDelay(delay), style = MaterialTheme.typography.headlineLarge, color = TEAL)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        when {
-                            delay > 0 -> stringResource(R.string.player_subtitles_later)
-                            delay < 0 -> stringResource(R.string.player_subtitles_earlier)
-                            else -> stringResource(R.string.player_no_offset)
-                        },
-                        style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(18.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        OwnTVButton(stringResource(R.string.player_subtitle_delay_negative, 0.5), onClick = { player.adjustSubtitleDelay(-500) }, style = tv.own.owntv.ui.components.OwnTVButtonStyle.SECONDARY)
-                        OwnTVButton(stringResource(R.string.player_subtitle_delay_negative, 0.1), onClick = { player.adjustSubtitleDelay(-100) }, style = tv.own.owntv.ui.components.OwnTVButtonStyle.SECONDARY)
-                        OwnTVButton(stringResource(R.string.common_reset), onClick = { player.resetSubtitleDelay() }, modifier = Modifier.focusRequester(focus))
-                        OwnTVButton(stringResource(R.string.player_subtitle_delay_positive, 0.1), onClick = { player.adjustSubtitleDelay(100) }, style = tv.own.owntv.ui.components.OwnTVButtonStyle.SECONDARY)
-                        OwnTVButton(stringResource(R.string.player_subtitle_delay_positive, 0.5), onClick = { player.adjustSubtitleDelay(500) }, style = tv.own.owntv.ui.components.OwnTVButtonStyle.SECONDARY)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun formatSubDelay(ms: Int): String = when {
-    ms == 0 -> stringResource(R.string.player_subtitle_delay_zero)
-    ms > 0 -> stringResource(R.string.player_subtitle_delay_positive, ms / 1000.0)
-    else -> stringResource(R.string.player_subtitle_delay_negative, -ms / 1000.0)
-}
-
-@Composable
-private fun StepButton(label: String, enabled: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    FocusableSurface(onClick = onClick, enabled = enabled, modifier = modifier.size(64.dp), shape = RoundedCornerShape(18.dp), contentAlignment = Alignment.Center, surface = GlassSurface.DIALOGS) { _ ->
-        Text(label, style = MaterialTheme.typography.headlineMedium, color = if (enabled) OwnTVTheme.colors.onSurface else OwnTVTheme.colors.outline)
-    }
-}
-
-@Composable
-private fun DialogScaffold(
-    title: String,
-    onDismiss: () -> Unit,
-    state: androidx.compose.foundation.lazy.LazyListState = androidx.compose.foundation.lazy.rememberLazyListState(),
-    content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
-) {
-    val colors = OwnTVTheme.colors
-    // A REAL dialog window, not an in-place overlay: it owns the D-pad focus scope, so nothing in the
-    // HUD behind it (play button, catch-all focusable, stream-info chips) can compete for or steal
-    // focus — which is what intermittently locked the subtitle/audio pickers out of focus on
-    // codec-heavy (HDR/DTS) streams. Back is handled by the window itself via onDismissRequest.
-    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
-        // Compact glass popup matching the storage picker: smaller font + narrow box.
-        tv.own.owntv.ui.theme.PopupFontTheme(fontScale = 0.72f) {
-            Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)), contentAlignment = Alignment.Center) {
-                // Glass effect panel (same translucent chrome as the volume/timing dialogs) — the
-                // inner LazyColumn manages its own scroll, so scroll = false.
-                Column(modifier = Modifier.dialogPanel(width = 260.dp, corner = 16.dp, padding = 14.dp, scroll = false)) {
-                    Text(title, style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
-                    Spacer(Modifier.height(8.dp))
-                    // Cap to the screen (minus dialog chrome) so all rows stay reachable on small screens.
-                    val listMax = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp - 160.dp).coerceIn(140.dp, 240.dp)
-                    LazyColumn(state = state, modifier = Modifier.heightIn(max = listMax), verticalArrangement = Arrangement.spacedBy(4.dp), content = content)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun OptionRow(label: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    val colors = OwnTVTheme.colors
-    FocusableSurface(
-        onClick = onClick, modifier = modifier.fillMaxWidth(), selected = selected, shape = RoundedCornerShape(12.dp),
-        selectedContainerColor = colors.primaryContainer, contentAlignment = Alignment.CenterStart,
-        surface = GlassSurface.DIALOGS,
-    ) { focused ->
-        Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(label, style = MaterialTheme.typography.bodyMedium, color = if (selected) colors.onPrimaryContainer else if (focused) colors.primary else colors.onSurface)
-            if (selected) {
-                Spacer(Modifier.weight(1f))
-                OwnTVIcon(OwnTVIcon.STAR, tint = colors.onPrimaryContainer, filled = true, modifier = Modifier.size(14.dp))
-            }
-        }
-    }
-}
-
-@Composable
-private fun formatTime(ms: Long): String {
-    val totalSec = (ms.coerceAtLeast(0L) / 1000).toInt()
-    val h = totalSec / 3600
-    val m = (totalSec % 3600) / 60
-    val s = totalSec % 60
-    return if (h > 0) stringResource(R.string.player_track_hours, h, m, s)
-    else stringResource(R.string.player_track_seconds, m, s)
 }

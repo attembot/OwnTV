@@ -29,6 +29,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import kotlinx.coroutines.delay
 import tv.own.owntv.R
+import tv.own.owntv.core.ui.findActivity
 import tv.own.owntv.ui.components.OwnTVButton
 import tv.own.owntv.ui.components.OwnTVButtonStyle
 import tv.own.owntv.ui.components.dialogPanel
@@ -79,7 +80,7 @@ fun AutoFrameRatePrompt(
         if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S) return@LaunchedEffect
         val rate = fps ?: return@LaunchedEffect
         if (rate <= 0f) return@LaunchedEffect
-        val activity = context.findActivityForPrompt() ?: return@LaunchedEffect
+        val activity = context.findActivity() ?: return@LaunchedEffect
         val target = FrameRateController.betterRefreshRateFor(activity, rate) ?: return@LaunchedEffect
         val current = FrameRateController.currentRefreshRate(activity) ?: return@LaunchedEffect
         delay(SETTLE_MS) // cancelled by any fps change, so zapping never triggers it
@@ -118,11 +119,3 @@ fun AutoFrameRatePrompt(
     }
 }
 
-private fun android.content.Context.findActivityForPrompt(): android.app.Activity? {
-    var ctx: android.content.Context? = this
-    while (ctx is android.content.ContextWrapper) {
-        if (ctx is android.app.Activity) return ctx
-        ctx = ctx.baseContext
-    }
-    return null
-}

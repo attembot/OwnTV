@@ -1,4 +1,7 @@
+import java.io.ByteArrayOutputStream
 import java.util.Properties
+import javax.inject.Inject
+import org.gradle.process.ExecOperations
 
 // Packaged locale qualifiers are read from tools/i18n/locales.json entries where packaged = true.
 // The build consumes the ``resourceQualifier`` field specifically (NOT languageTag, NOT weblateCode): a
@@ -80,6 +83,16 @@ android {
                     ) == "true"
                 ).toString(),
         )
+
+        // Shared secret the default metadata Worker's edge rule requires (`x-owntv-key`). NEVER in the
+        // repo: env var (how CI injects the GitHub secret) > Gradle property > the out-of-repo properties
+        // file, exactly like the signing values below. Fork CI and fresh clones resolve "" and keep
+        // working — a blank key makes the app fall back to the unprotected workers.dev base URL.
+        val edgeKey = System.getenv("OWNTV_EDGE_KEY")
+            ?: providers.gradleProperty("owntv.edgeKey").orNull
+            ?: localSigningProps.getProperty("owntv.edgeKey")
+            ?: ""
+        buildConfigField("String", "TMDB_EDGE_KEY", "\"${edgeKey.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // (The fork's old defaultConfig arm-only abiFilters is gone: upstream's `standard` flavor below
@@ -252,6 +265,92 @@ baselineProfile {
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
+
+// --- hardcoded-literal gate ----------------------------------------------------------------
+//
+// The same check CI runs, moved onto the developer's own machine. CI is still the enforcing gate —
+// this only makes the failure arrive seconds after writing the string instead of minutes after
+// pushing it, which matters most for work done here on main, where a hardcoded string used to reach
+// a release build with nothing objecting.
+//
+// Deliberately NOT offered: any flag that records the literal and turns the build green. A red build
+// means the string moves to strings_*.xml or is declared technical — those are the only two exits.
+abstract class VerifyI18nLiterals : DefaultTask() {
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val kotlinSources: ConfigurableFileCollection
+
+    /** The checker and its two reviewed manifests: edit any of them and the verdict may change. */
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val toolInputs: ConfigurableFileCollection
+
+    @get:Internal
+    abstract val repoRoot: DirectoryProperty
+
+    @get:OutputFile
+    abstract val stamp: RegularFileProperty
+
+    @get:Inject
+    abstract val execOps: ExecOperations
+
+    private fun interpreter(): String? = listOf("python", "python3").firstOrNull { candidate ->
+        runCatching {
+            execOps.exec {
+                commandLine(candidate, "--version")
+                isIgnoreExitValue = true
+                standardOutput = ByteArrayOutputStream()
+                errorOutput = ByteArrayOutputStream()
+            }.exitValue == 0
+        }.getOrDefault(false)
+    }
+
+    @TaskAction
+    fun verify() {
+        val python = interpreter()
+        if (python == null) {
+            // Failing here would block anyone without Python from building at all. Warn loudly
+            // instead — CI still enforces it, so the worst case is a late failure, not a missed one.
+            logger.warn(
+                "\n  WARNING: Python was not found, so the hardcoded-text check did not run." +
+                    "\n  Install Python 3 to catch untranslatable text before pushing; CI will still catch it.\n",
+            )
+            stamp.get().asFile.writeText("skipped: no python interpreter\n")
+            return
+        }
+        val output = ByteArrayOutputStream()
+        val result = execOps.exec {
+            workingDir = repoRoot.get().asFile
+            commandLine(python, "tools/i18n/check_hardcoded_strings.py", "verify", "--bootstrap")
+            environment("PYTHONIOENCODING", "utf-8")
+            isIgnoreExitValue = true
+            standardOutput = output
+            errorOutput = output
+        }
+        if (result.exitValue != 0) {
+            logger.error(output.toString(Charsets.UTF_8))
+            throw GradleException("Hardcoded text check failed — see the report above.")
+        }
+        stamp.get().asFile.writeText("ok\n")
+    }
+}
+
+val verifyI18nLiterals = tasks.register<VerifyI18nLiterals>("verifyI18nLiterals") {
+    group = "verification"
+    description = "Fails the build on user-visible text left hardcoded in Kotlin."
+    kotlinSources.from(fileTree("src/main/java") { include("**/*.kt") })
+    toolInputs.from(
+        rootProject.file("tools/i18n/check_hardcoded_strings.py"),
+        rootProject.file("tools/i18n/hardcoded_baseline.txt"),
+        rootProject.file("tools/i18n/safe_literals.txt"),
+    )
+    repoRoot.set(rootProject.layout.projectDirectory)
+    stamp.set(layout.buildDirectory.file("i18n/literal-inventory.txt"))
+}
+
+// preBuild fronts every variant, so debug compile checks and release assembles are both covered.
+// Inputs are declared above, so an unchanged source tree makes this UP-TO-DATE and free.
+tasks.named("preBuild") { dependsOn(verifyI18nLiterals) }
 
 dependencies {
     // Core

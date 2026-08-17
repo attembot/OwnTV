@@ -1,5 +1,183 @@
 # Changelog
 
+## v4.2.1 — 2026-08-15
+
+### 🎧 "Audio only" — sound with no picture is now labelled, not mistaken for a fault
+
+- **A radio channel, or a music-only file filed under Movies, now says so on screen.** These items have
+  no picture at all, which is perfectly normal — but sound over a black screen looks exactly like a
+  broken player, so it was reported as one. The player now draws a small **Audio only** plate in the
+  middle with a one-line explanation, and it stays there for as long as the item plays: a message that
+  disappears after a few seconds leaves the same black screen behind it for whoever looks next. Docked
+  in the mini-player it shrinks to just the music icon. It appears on every engine and on Live TV, so a
+  radio station in a TV playlist is covered as well as a movie.
+- **A music-only movie no longer fails at about six seconds.** OwnTV used to watch for "loaded, but no
+  picture" and treat it as a broken file. That check now stands down once it can see the item genuinely
+  has no video track and the sound is playing — the same rule Live TV already used for radio channels.
+
+### 🔊 Zoom and volume are now remembered per item
+
+- **A zoom or a volume you set is kept for that film, episode or channel.** Stretch a 4:3 channel to
+  fill the screen, or push a quiet film up to 130%, and it opens that way every time from then on. It
+  is remembered per profile, and only for the item you changed — the channel next to it is untouched.
+  Only a change *you* make counts: the player lowering its own volume for a notification, or moving a
+  stream to the other engine, never teaches it a preference. Mute is deliberately not remembered, so a
+  channel can never open silent.
+- **Settings → Video player → Default volume** sets the starting level (0–150%) for everything you
+  haven't adjusted individually — useful if a whole provider runs quiet.
+- **Two separate resets, right below it.** **Reset saved zoom** and **Reset saved volume** each show how
+  many items they will clear and ask before clearing, and each leaves the other list alone.
+- Both lists are carried in **backup and restore**.
+
+### 🎭 Cast photos in TMDB details
+
+- **Cast is now shown as photos, not just a list of names.** The full-screen TMDB details window
+  now shows each credited actor as a portrait with their name underneath, wrapping onto as many
+  rows as needed so the whole cast is reachable with the same up/down scrolling as the rest of the
+  window. Actors TMDB has no photo for show their initials instead of an empty box. The photos come
+  from TMDB's image server, which needs no API key and does not touch the shared metadata service,
+  so this costs nothing against anyone's allowance and adds no extra lookups — the photo
+  addresses were already arriving with the details the app downloads and were simply being discarded.
+
+### 🏷️ A fair daily share of the built-in metadata service
+
+- **Each device now has its own daily allowance, and can see it.** The built-in metadata service is
+  shared by everyone using OwnTV, and previously nothing stopped a single device consuming all of it.
+  Each installation now gets its own allowance, shown under **Settings → Metadata** along with the
+  time it refills. The row appears only when you are using the built-in service — your own TMDB
+  API key or your own server is your resource and is never counted.
+- **Running out now tells you, instead of failing silently.** If the allowance is used up, a message
+  appears once per app start explaining what happened and pointing at Settings → Metadata. Posters
+  and descriptions from your own playlist keep working exactly as before; only the extra TMDB
+  information pauses until the allowance refills.
+- **Far fewer lookups in the first place.** Scrolling through a grid no longer fires a lookup for
+  almost every card it passes — the app now waits until you settle on something. Downloaded details
+  are kept for 180 days instead of 60. And changing the metadata language no longer throws the whole
+  cache away: details are now stored per language, so switching language, or switching back, is
+  instant and costs no re-downloads at all.
+
+### ✨ New features
+
+- **Seek step** (Settings → Video player) — how far the rewind/forward buttons and the seek bar move in
+  a film or episode: 5, 10, 15, 30 or 60 seconds. Default 10 seconds, exactly as before.
+- **Live rewind step** (Settings → Video player) — the same choice for the catch-up archive buttons on a
+  live channel: 10, 15, 30, 60 or 120 seconds. Default 30 seconds, as before. They are two separate
+  settings because stepping through a film and stepping back through a live archive are different jobs.
+- **Deinterlacing** (Settings → Video player, Off by default) — smooths the comb-shaped lines some old
+  interlaced channels show on movement. It only has an effect when OwnTV draws the picture itself
+  (hardware decoding off, or after a software fallback); on the normal direct-to-screen path the video
+  goes to the TV untouched and no filter can run. The setting says so where you turn it on.
+
+### 🐛 Fixes
+
+- **Your resume position is saved reliably again — and never lands in someone else's profile.** OwnTV
+  matched "what is playing" against a web address. That broke in three ways: open a different series
+  while an episode plays and it quietly stopped saving; on Stalker/MAC portals the address is minted
+  fresh on every play, so those movies never saved a position at all; and switching profile mid-item
+  wrote your position into the *new* profile's Continue Watching. Playback identity is now pinned when
+  you press Play, so none of that can happen. Your place is also saved the moment you pause and when
+  you leave the player, not only every ten seconds.
+- **A dying live channel now ends with a message instead of reconnecting forever.** A channel that
+  dropped mid-programme reconnected without any limit, behind a spinner, with nothing on screen ever
+  explaining why — Back was the only way out. It now gets the same bounded number of attempts as every
+  other recovery path and then says the connection was lost. A film that is cut off mid-stream gets one
+  silent retry from where it stopped and then an honest error, where before the picture simply froze.
+- **Channels that need a custom User-Agent or Referer survive Retry and the screensaver.** The first
+  open sent those details; pressing Retry, or coming back from the screensaver, re-opened the channel
+  with the address only — so the provider refused exactly the channels that needed them most. Both
+  paths now replay the full request. The same applies to a movie restored after the screensaver,
+  including Stalker items, which can now mint a fresh link instead of replaying an expired one.
+- **Live rewind no longer leaves a phantom "behind live" counter running.** Rewinding into a channel's
+  archive and then changing the playback engine threw you back to the live edge while the counter kept
+  ticking upward against a stream that was no longer the archive. Compatibility mode is now hidden
+  while you are rewound (matching how channel-number tuning already behaved), the rewind state is
+  cleared whenever the channel restarts at the live edge, and leaving full screen stops the counter.
+- **The Home screen poster no longer sticks on a spinner.** A hero preview that connected but never
+  produced a picture disarmed its own timeout, so the spinner stayed over the poster indefinitely.
+- **Catch-up you watch inside OwnTV now appears in History.** Only the external-player path recorded it,
+  so replaying a programme in the app left the channel out of History and Recently watched.
+- **Opening a channel full screen from a catch-up programme keeps CH+/CH− working.** That route started
+  playback with no channel list behind it, leaving the zapping keys and the channel-list button dead
+  until the next ordinary tune. The in-player list also names **Favorites** and **History** properly
+  instead of calling both "All channels".
+- **Cancelling Move mode restores your sort order.** Starting a manual reorder switched the list to
+  playlist order — and Cancel left it there, silently changing a setting you never touched. Applies to
+  Live TV, Movies and Series.
+- **Retrying a live channel keeps everything the first attempt had.** Four of the retry paths never
+  re-armed the "opened but never started" timeout, so a stalled retry could hang with no error; a
+  decoder rebuild came back without your audio/subtitle language preferences and with the picture
+  re-enabled behind Audio Mode; a re-tune of the same channel dropped its volume boost; and stopping a
+  channel left the previous one's resolution badge on screen.
+- **Subtitle fixes.** Rejecting a bitmap subtitle (the audio format can't be handed over) no longer
+  reports your working text subtitle as switched off; picking a bitmap subtitle on Live TV, where it
+  cannot be drawn, now says so instead of showing it as selected and displaying nothing; clearing a
+  preferred audio or subtitle language now actually clears it instead of applying until restart; and a
+  subtitle picked on one engine is no longer silently replaced with an arbitrary one in another
+  language when the track lists don't line up.
+- **"Stay signed in" now covers subtitle downloads.** An expired OpenSubtitles token failed the download
+  with "session expired" even when the stored password could renew it. Deleting all subtitles for
+  Movies no longer removes the same file from Series, and a failed search no longer writes the title
+  and file fingerprint into the device log.
+- **A subtitle search that fails now falls back to a title search.** Only an *empty* result did, so a
+  network blip on the id lookup showed "no subtitles" for a title that has them.
+- **Catch-up URLs build correctly for playlists that already carry a token.** A catch-up template
+  appended without its own `?` was joined straight onto the existing address, producing a malformed
+  URL the archive answered with "not found".
+- **Auto frame rate no longer leaves the previous item's refresh rate on the display,** and the
+  one-time "Auto frame rate would help here" suggestion no longer returns after you enable it and
+  later turn it back off.
+- **The playback error log survives a corrupt file.** One unreadable entry silenced all further logging
+  for good; clearing the log could also race an entry being written. Exporting the report on Android
+  8–9 without storage permission now saves to the app's own folder and names that location, instead of
+  failing with nothing to show.
+- **Audio focus is released while you are paused,** so other apps are no longer left ducked for as long
+  as the player sits paused, and a volume change made while OwnTV was ducked by another app is kept
+  instead of being undone.
+- **Settings → Audio sync now covers the same ±5 seconds the player does** (it stopped at ±2), the
+  guide time-zone chip no longer flashes "Manual" before your real setting loads, and backing out of
+  the **Custom** live-latency dialog no longer leaves you on Custom with a value you never chose.
+- **Custom DNS resolves IPv6-only hosts,** which the plain-DNS path could not (it asked for IPv4
+  records only, while DNS-over-HTTPS asked for both), and each query now carries a random, verified
+  identifier instead of a fixed one.
+- **One channel refusing a request no longer sends a whole provider down the slow path.** When a panel
+  answered "too many requests" during quick channel-hopping, OwnTV read that as "this channel has no
+  HLS version" and wrote it down — and after three channels it had condemned the entire playlist to the
+  slower format for the rest of the session. A refusal is now understood as a refusal: it never becomes
+  a lesson about the format, and what OwnTV *does* learn about a channel now stays with that channel.
+- **Holding CH+ or CH− changes channel once.** A held key repeated about six times a second and every
+  repeat opened a stream — thirteen channels opened in under four seconds, measured. Steps are now
+  gathered up and only the channel you land on is opened.
+- **Subtitles stay on the picture when you zoom.** On a zoomed live channel they were positioned against
+  the whole screen instead of against the video, so they drifted away from the image. Both players now
+  anchor them the same way.
+- **A catch-up programme that never opens moves on instead of spinning.** If the archive stalled without
+  ever actually failing, the spinner stayed indefinitely; the programme is now handed to the other
+  player, which is what every other stall already did.
+- **The "Match EPG" picker responds as you type.** On a large guide each keystroke took about two
+  seconds to produce a list; it is now immediate.
+- **Audio sync moves in 25 ms steps** in both the player and Settings — 50 ms could bracket a small
+  mismatch but never land on it. The setting now also states that it applies to the compatibility
+  player only, which was always true but never said.
+- **The volume dialog no longer traps the remote at 0%.** Muting from the dialog disabled the "−" button
+  while focus was still sitting on it, leaving the D-pad stuck there. Focus now moves to "+".
+- **Rename, move and delete in Customize return focus to the row you were on** instead of jumping back
+  to the top of the list.
+- **A film or recorded programme that won't start on the hardware decoder recovers more reliably.** Two
+  of the fallback paths reopened the item before the switch to software had actually taken effect — so
+  they retried on exactly the setup that had just failed.
+- **Smaller player fixes.** The still frame held over a player switch is released afterwards instead of
+  kept (tens of megabytes on a 4K stream), the live buffer readout no longer measures itself on the
+  interface thread, and now-playing information is only republished when it actually changes.
+
+### Internal
+
+- Playback identity, request headers and recovery state are now carried on the restore records rather
+  than rebuilt per layer — the structural cause behind most of the fixes above.
+- New `playback_prefs` table (database 31 → 32) holding the per-item zoom and volume above, keyed by the
+  same stable content key the engine pins use, so a re-sync doesn't lose them.
+- The player HUD and the Live TV screen are split into smaller files, the three mpv decode-rescue paths
+  now share one implementation, and a round of dead code and stale comments was removed.
+
 ## v4.2.0 — 2026-08-12
 
 ### 🫧 Complete interface and Glass Effect upgrade — unified panels, clearer presets, cleaner focus

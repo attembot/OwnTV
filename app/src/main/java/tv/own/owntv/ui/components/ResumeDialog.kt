@@ -68,10 +68,16 @@ fun ResumeDialog(
     }
 }
 
-/** 0:42 / 23:45 / 1:23:45 style timestamp. */
+/**
+ * 0:42 / 23:45 / 1:23:45 style timestamp — the app's one duration format.
+ *
+ * Used for a resume position, the player's elapsed/remaining readout and the audio bar alike. The
+ * player used to carry two private copies of this arithmetic against a duplicate pair of string
+ * resources (`player_track_*`), which were byte-identical to these in every locale.
+ */
 @Composable
 fun formatTimestamp(ms: Long): String {
-    val totalSec = ms / 1000
+    val totalSec = ms.coerceAtLeast(0L) / 1000
     val h = totalSec / 3600
     val m = (totalSec % 3600) / 60
     val s = totalSec % 60

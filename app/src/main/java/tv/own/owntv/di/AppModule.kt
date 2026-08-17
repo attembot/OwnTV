@@ -85,11 +85,13 @@ val appModule = module {
             okHttpClient = get(),
             metadataProvider = get(),
             metadataRepository = get(),
+            metadataBudget = get(),
             stalkerAuth = get(),
             stalkerClient = get(),
             xtreamClient = get(),
             companion = get(),
             vodEngineStore = get(),
+            playbackPrefs = get(),
         )
     }
     viewModelOf(::HomeSettingsViewModel)

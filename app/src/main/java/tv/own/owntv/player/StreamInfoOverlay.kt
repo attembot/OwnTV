@@ -39,7 +39,9 @@ import tv.own.owntv.ui.theme.OwnTVTheme
  */
 @Composable
 fun StreamInfoOverlay(player: PlaybackEngine, modifier: Modifier = Modifier) {
-    var rows by remember { mutableStateOf(player.streamInfo()) }
+    // Starts empty and is filled by the effect below: the mpv read now happens on the player's own
+    // executor, so there is nothing to read synchronously during composition (A-F2).
+    var rows by remember { mutableStateOf(emptyList<StreamInfoRow>()) }
     LaunchedEffect(player) {
         while (true) {
             rows = player.streamInfo()

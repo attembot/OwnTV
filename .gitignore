@@ -28,6 +28,15 @@ signing.properties
 
 # Internal planning documents — kept local, never committed
 future-plan/
+audit/
+
+# The PRODUCTION Cloudflare Workers — kept local, never committed.
+#
+# These are the deployments OwnTV's built-in defaults point at, so they carry abuse protection
+# (per-client access checks, request budgets, rate limits) that must not be public: publishing it
+# would only tell an abuser exactly how to get around it. Root-scoped so `extras/worker/` — the
+# public, unprotected self-host copy users are told to deploy — is NOT caught by this.
+/worker/
 
 # i18n seed tool run state (batch inputs, IDs, raw results) — never committed
 /runs/

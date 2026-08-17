@@ -117,7 +117,10 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     var itemsReturnKey by remember { mutableStateOf<String?>(null) }
     // Opener row for whichever dialog (new-category picker, rename) is open — restored on close so
     // focus doesn't always jump back to the Live TV section chip.
-    var dialogReturn by remember { mutableStateOf<FocusRequester?>(null) }
+    var dialogReturn by tv.own.owntv.ui.components.rememberDialogFocusRestore(
+        anyDialogOpen = showNewCatPicker || showSortPicker || renaming != null || creatingCategory ||
+            deletingCategory != null || rangeEnd != null || editingPin != null,
+    )
 
     // CH+- key paging for the category list (same as Live/Movies/Series browse). The modifier consumes
     // the CH keys and moves focus itself, so it can never leak focus out of the list.
@@ -173,16 +176,6 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     // Restore focus to the row that opened a dialog (new-category picker / rename / new-category
     // prompt / delete confirm) when it closes — previously closing either always landed on the Live
     // TV section chip (firstFocus).
-    LaunchedEffect(showNewCatPicker, showSortPicker, renaming, creatingCategory, deletingCategory, rangeEnd, editingPin) {
-        if (showNewCatPicker || showSortPicker || renaming != null || creatingCategory ||
-            deletingCategory != null || rangeEnd != null || editingPin != null
-        ) return@LaunchedEffect
-        dialogReturn?.let { opener ->
-            kotlinx.coroutines.delay(60)
-            runCatching { opener.requestFocus() }
-        }
-        dialogReturn = null
-    }
     // The category list is disposed while its item screen is open. Back recreates the row, so
     // explicitly return to the same category name instead of letting focus escape to Settings.
     LaunchedEffect(selectedCategory, rows) {

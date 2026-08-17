@@ -13,11 +13,12 @@ val playerModule = module {
     // Per-item VOD engine pins made with the player's gear toggle (VOD counterpart of ForceMpvStore).
     single { tv.own.owntv.core.player.VodEngineStore(androidContext()) }
     // context, settings, connectivity, streamingHttp (ExoPlayer image-sub handoff), diagnostics,
-    // proxyHolder, vodEngineStore, localeStore
-    single { OwnTVPlayer(androidContext(), get(), get(), get(), get(), get(), get(), get()) }
+    // proxyHolder, vodEngineStore, localeStore, playbackPrefs (per-item zoom/volume)
+    single { OwnTVPlayer(androidContext(), get(), get(), get(), get(), get(), get(), get(), get()) }
     // ExoPlayer engine for the fast Live preview pane (mpv stays the full/fullscreen player).
-    // context, streamingHttp, diagnostics, settings, connectivity (auto-resume when the network returns)
-    single { LivePreviewEngine(androidContext(), get(), get(), get(), get()) }
+    // context, streamingHttp, diagnostics, settings, connectivity (auto-resume when the network
+    // returns), playbackPrefs (per-channel zoom/volume)
+    single { LivePreviewEngine(androidContext(), get(), get(), get(), get(), get()) }
     // Muted ExoPlayer engine for the Home hero preview. The last argument lets it ask whether mpv is
     // already streaming, so a one-session provider isn't locked out by the hero preview (F19d).
     // Resolved lazily inside the lambda to keep this free of a construction-order dependency.

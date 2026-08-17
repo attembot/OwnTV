@@ -897,7 +897,7 @@ private fun MovieDetailsPane(
             Spacer(Modifier.height(12.dp))
             Text(plot, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, maxLines = 6, overflow = TextOverflow.Ellipsis)
         }
-        val cast = jsonList(meta?.castJson)
+        val cast = tv.own.owntv.core.metadata.MetadataCast.names(meta?.castJson)
         if (cast.isNotEmpty()) {
             Spacer(Modifier.height(12.dp))
             Text(stringResource(R.string.content_media_cast), style = MaterialTheme.typography.labelMedium, color = colors.onSurface)
@@ -953,7 +953,7 @@ private fun buildMovieDetails(
         metaLine = metaLine(movie, meta, tmdbWins),
         genres = jsonList(meta?.genresJson),
         plot = plot,
-        cast = jsonList(meta?.castJson),
+        cast = tv.own.owntv.core.metadata.MetadataCast.parse(meta?.castJson),
     )
 }
 

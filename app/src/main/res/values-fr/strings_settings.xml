@@ -95,8 +95,21 @@
     <string name="settings_metadata_tmdb_only_description">Privilégier TMDB pour chaque champ ; utiliser votre liste de lecture uniquement lorsque TMDB ne contient aucune information.</string>
     <string name="settings_selected">Sélectionné</string>
     <string name="settings_active_tmdb_source">Source TMDB active : <xliff:g id="tier">%1$s</xliff:g></string>
+    <string name="settings_metadata_allowance">Votre part quotidienne</string>
+    <string name="settings_metadata_allowance_row"><xliff:g id="window">%1$s</xliff:g> : <xliff:g id="remaining">%2$d</xliff:g> sur <xliff:g id="total">%3$d</xliff:g> restants</string>
+    <string name="settings_metadata_window_minute">Par minute</string>
+    <string name="settings_metadata_window_hour">Par heure</string>
+    <string name="settings_metadata_window_day">Aujourd’hui</string>
+    <plurals name="settings_metadata_allowance_left">
+        <item quantity="one">Il reste <xliff:g id="remaining">%1$d</xliff:g> recherche sur <xliff:g id="total">%2$d</xliff:g> aujourd’hui</item>
+        <item quantity="many">Il reste <xliff:g id="remaining">%1$d</xliff:g> recherches sur <xliff:g id="total">%2$d</xliff:g> aujourd’hui</item>
+        <item quantity="other">Il reste <xliff:g id="remaining">%1$d</xliff:g> recherches sur <xliff:g id="total">%2$d</xliff:g> aujourd’hui</item>
+    </plurals>
+    <string name="settings_metadata_allowance_resets">Renouvellement à <xliff:g id="time">%1$s</xliff:g></string>
+    <string name="settings_metadata_fair_share">Le service de métadonnées intégré est partagé par tous les utilisateurs d’OwnTV : chaque appareil dispose donc chaque jour de sa propre part. Si vous épuisez la vôtre, les affiches et les descriptions sont suspendues jusqu’à son renouvellement — les informations de votre propre playlist continuent de fonctionner normalement. Ajouter votre propre clé API TMDB ou votre serveur supprime cette limite : c’est gratuit, et une clé personnelle n’a pratiquement aucune limite.</string>
+    <string name="settings_metadata_limit_reached">Part quotidienne de métadonnées épuisée — ajoutez votre propre clé TMDB dans Paramètres → Métadonnées pour supprimer cette limite.</string>
     <string name="settings_metadata_language">Langue des métadonnées</string>
-    <string name="settings_metadata_language_description">Langue des synopsis, genres et titres provenant de TMDB. Les champs que TMDB n’a pas traduits restent en anglais. La modification de cette option efface les informations mises en cache afin de les récupérer à nouveau.</string>
+    <string name="settings_metadata_language_description">Langue des synopsis, genres et titres provenant de TMDB. Les champs que TMDB n’a pas traduits restent en anglais. Les détails sont mis en cache par langue, le retour en arrière est donc immédiat.</string>
     <string name="settings_advanced_options">Options avancées</string>
     <string name="settings_advanced_metadata_description">Utilisez votre propre clé API TMDB ou un serveur auto-hébergé au lieu du serveur partagé par défaut.</string>
     <string name="settings_metadata_server_description">Laissez les deux champs vides pour utiliser le serveur partagé intégré (aucune configuration requise). Saisissez votre propre clé API TMDB pour interroger directement TMDB, ou l’URL d’un serveur auto-hébergé pour utiliser votre propre proxy/miroir. Une URL est prioritaire sur une clé.</string>
@@ -352,11 +365,43 @@
     <string name="settings_decoding">Décodage</string>
     <string name="settings_hardware_decoding">Décodage matériel</string>
     <string name="settings_hardware_decoding_description">Utiliser le décodeur matériel du téléviseur. Désactivez cette option si certains flux saccadent ou présentent des artefacts.</string>
+    <!-- Translators: Setting label for deinterlacing of interlaced broadcast video. -->
+    <string name="settings_deinterlace">Désentrelacement</string>
+    <!-- Translators: Description of the deinterlacing setting. -->
+    <string name="settings_deinterlace_description">Lisse les lignes en peigne que certaines vieilles chaînes SD affichent lors des mouvements. S’applique au moteur mpv lorsqu’il dessine lui-même l’image ; si rien ne change, désactivez le décodage matériel.</string>
     <string name="settings_movies_series_player">Lecteur pour les films et les séries</string>
     <string name="settings_reset_player_choices">Réinitialiser les choix de lecteur enregistrés</string>
     <string name="settings_external_player">Lecteur externe</string>
     <string name="settings_default_zoom">Zoom par défaut</string>
     <string name="settings_default_zoom_description">Format d’image/zoom appliqué au démarrage de la lecture.</string>
+    <!-- Translators: Setting label for the volume level playback starts at. -->
+    <string name="settings_default_volume">Volume par défaut</string>
+    <!-- Translators: Description of the default volume setting. -->
+    <string name="settings_default_volume_description">Volume appliqué au démarrage de la lecture. Au-delà de 100 %%, les flux peu sonores sont amplifiés.</string>
+    <!-- Translators: Settings-row title for forgetting the zoom saved for individual items. -->
+    <string name="settings_reset_saved_zoom">Réinitialiser le zoom enregistré</string>
+    <!-- Translators: Description of the reset-saved-zoom setting row. -->
+    <string name="settings_reset_saved_zoom_description">Modifier le zoom dans le lecteur l’enregistre pour cette chaîne, ce film ou cet épisode. La réinitialisation fait de nouveau suivre le zoom par défaut.</string>
+    <!-- Translators: Confirmation dialog title before forgetting the saved per-item zoom. -->
+    <string name="settings_reset_saved_zoom_confirm">Réinitialiser le zoom enregistré ?</string>
+    <!-- Translators: Confirmation dialog body before forgetting the saved per-item zoom. -->
+    <string name="settings_reset_saved_zoom_confirm_description">Chaque chaîne, film et épisode revient au zoom par défaut. Les volumes enregistrés sont conservés. Vous pouvez à tout moment régler un élément précis depuis le lecteur.</string>
+    <!-- Translators: Settings-row title for forgetting the volume saved for individual items. -->
+    <string name="settings_reset_saved_volume">Réinitialiser le volume enregistré</string>
+    <!-- Translators: Description of the reset-saved-volume setting row. -->
+    <string name="settings_reset_saved_volume_description">Modifier le volume dans le lecteur l’enregistre pour cette chaîne, ce film ou cet épisode. La réinitialisation fait de nouveau suivre le volume par défaut.</string>
+    <!-- Translators: Confirmation dialog title before forgetting the saved per-item volume. -->
+    <string name="settings_reset_saved_volume_confirm">Réinitialiser le volume enregistré ?</string>
+    <!-- Translators: Confirmation dialog body before forgetting the saved per-item volume. -->
+    <string name="settings_reset_saved_volume_confirm_description">Chaque chaîne, film et épisode revient au volume par défaut. Les réglages de zoom enregistrés sont conservés. Vous pouvez à tout moment régler un élément précis depuis le lecteur.</string>
+    <!-- Translators: Setting label for how far rewind/forward jumps in a movie or episode. -->
+    <string name="settings_seek_step">Pas d’avance</string>
+    <!-- Translators: Description of the seek step setting. -->
+    <string name="settings_seek_step_description">De combien le retour et l’avance sautent dans un film ou un épisode.</string>
+    <!-- Translators: Setting label for how far rewind/forward jumps inside a live channel's archive. -->
+    <string name="settings_live_rewind_step">Pas de retour en direct</string>
+    <!-- Translators: Description of the live rewind step setting. -->
+    <string name="settings_live_rewind_step_description">De combien le retour et l’avance se déplacent dans l’archive d’une chaîne en direct.</string>
     <string name="settings_resume_playback">Reprendre la lecture</string>
     <string name="settings_resume_playback_description">Que faire lorsqu’une position est enregistrée pour un film ou un épisode.</string>
     <string name="settings_subtitles">Sous-titres</string>
@@ -371,7 +416,7 @@
     <string name="settings_audio">Audio</string>
     <string name="settings_preferred_audio_language">Langue audio préférée</string>
     <string name="settings_audio_sync">Synchronisation audio</string>
-    <string name="settings_audio_sync_description">Avancer ou retarder l’audio pour le synchroniser avec la vidéo.</string>
+    <string name="settings_audio_sync_description">Avancer ou retarder l’audio pour le synchroniser avec la vidéo. S’applique uniquement au moteur mpv.</string>
     <string name="settings_live_tv">TV en direct</string>
     <string name="settings_live_latency_description">Détermine la proximité de la lecture avec la diffusion en direct. Une valeur plus faible rapproche du direct, mais réduit la mémoire tampon : les flux instables peuvent donc s’interrompre ou se reconnecter plus souvent. S’applique à la prochaine chaîne que vous ouvrez.</string>
     <string name="settings_channel_numbers">Numéros des chaînes</string>

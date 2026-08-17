@@ -347,11 +347,4 @@ private fun AudioBtn(
 }
 
 @Composable
-private fun fmtTime(ms: Long): String {
-    val total = (ms / 1000).coerceAtLeast(0)
-    val h = total / 3600
-    val m = (total % 3600) / 60
-    val s = total % 60
-    return if (h > 0) stringResource(R.string.player_track_hours, h, m, s)
-    else stringResource(R.string.player_track_seconds, m, s)
-}
+private fun fmtTime(ms: Long): String = tv.own.owntv.ui.components.formatTimestamp(ms)

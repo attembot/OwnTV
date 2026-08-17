@@ -32,11 +32,13 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import kotlinx.coroutines.delay
+import tv.own.owntv.R
 import tv.own.owntv.core.database.entity.ChannelEntity
 import tv.own.owntv.player.CornerState
 import tv.own.owntv.player.SecondaryVideoSurface
@@ -114,7 +116,7 @@ fun MultiViewScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    "OK changes the focused stream · hold OK to enlarge it",
+                    stringResource(R.string.fork_multiview_hint),
                     style = MaterialTheme.typography.labelMedium,
                     color = Color.White.copy(alpha = 0.75f),
                 )
@@ -128,11 +130,11 @@ fun MultiViewScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     val gridMode = layout == MultiLayout.GRID
-                    BarButton(OwnTVIcon.ASPECT, if (gridMode) "Grid" else "Dominant") { controller.toggleLayout() }
+                    BarButton(OwnTVIcon.ASPECT, stringResource(if (gridMode) R.string.fork_multiview_layout_grid else R.string.fork_multiview_layout_dominant)) { controller.toggleLayout() }
                     if (tiles.size < controller.maxTiles) {
-                        BarButton(OwnTVIcon.ADD, "Add stream") { switchTarget = ADD_TILE }
+                        BarButton(OwnTVIcon.ADD, stringResource(R.string.fork_multiview_add_stream)) { switchTarget = ADD_TILE }
                     }
-                    BarButton(OwnTVIcon.CLOSE, "Exit") { onExit() }
+                    BarButton(OwnTVIcon.CLOSE, stringResource(R.string.fork_multiview_exit)) { onExit() }
                 }
             }
         }
@@ -141,7 +143,7 @@ fun MultiViewScreen(
             val target = switchTarget
             val adding = target == ADD_TILE
             ChannelSwitcher(
-                title = if (adding) "Add a stream" else "Change this stream",
+                title = stringResource(if (adding) R.string.fork_multiview_picker_add_title else R.string.fork_multiview_picker_change_title),
                 categories = categories,
                 search = searchChannels,
                 onPick = { ch ->
@@ -306,7 +308,7 @@ private fun Tile(
     ) {
         if (state == CornerState.ERROR) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Couldn't play this stream", style = MaterialTheme.typography.labelMedium, color = Color.White)
+                Text(stringResource(R.string.fork_multiview_playback_failed), style = MaterialTheme.typography.labelMedium, color = Color.White)
             }
         } else {
             SecondaryVideoSurface(engine = engine, modifier = Modifier.fillMaxSize())

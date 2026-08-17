@@ -587,7 +587,7 @@ private fun SeriesGrid(
                 val rating = if (tmdbWins) meta?.rating?.takeIf { it > 0 } ?: s.rating?.takeIf { it > 0 }
                     else s.rating?.takeIf { it > 0 } ?: meta?.rating?.takeIf { it > 0 }
                 val genres = jsonStringList(meta?.genresJson)
-                val cast = jsonStringList(meta?.castJson)
+                val cast = tv.own.owntv.core.metadata.MetadataCast.names(meta?.castJson)
                 // Outer details Box carries the rounded panel (glass-aware); no clip/background here,
                 // mirroring MovieDetailsPane so the PreviewPanelFill glass shows through.
                 Column(
@@ -817,7 +817,7 @@ private fun buildSeriesDetails(
         metaLine = metaLine,
         genres = jsonStringList(meta?.genresJson),
         plot = plot,
-        cast = jsonStringList(meta?.castJson),
+        cast = tv.own.owntv.core.metadata.MetadataCast.parse(meta?.castJson),
     )
 }
 

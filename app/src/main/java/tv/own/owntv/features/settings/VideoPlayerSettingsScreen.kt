@@ -52,6 +52,7 @@ import androidx.tv.material3.Text
 import tv.own.owntv.R
 import tv.own.owntv.features.settings.data.SubtitleStyle
 import tv.own.owntv.player.ZoomMode
+import tv.own.owntv.player.alignment
 import tv.own.owntv.ui.components.FocusableSurface
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -123,6 +124,12 @@ fun VideoPlayerSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier)
     val hw by vm.hwDecoding.collectAsStateWithLifecycle()
     val vodExo by vm.vodPreferExo.collectAsStateWithLifecycle()
     val enginePins by vm.vodEnginePinCount.collectAsStateWithLifecycle()
+    val defaultVolume by vm.defaultVolume.collectAsStateWithLifecycle()
+    val savedZoom by vm.savedZoomCount.collectAsStateWithLifecycle()
+    val savedVolume by vm.savedVolumeCount.collectAsStateWithLifecycle()
+    val seekStep by vm.seekStepSec.collectAsStateWithLifecycle()
+    val liveRewindStep by vm.liveRewindStepSec.collectAsStateWithLifecycle()
+    val deinterlace by vm.deinterlace.collectAsStateWithLifecycle()
     val measuredStats by vm.measuredStreamStats.collectAsStateWithLifecycle()
     val detailedDiagnostics by vm.detailedDiagnostics.collectAsStateWithLifecycle()
     val directTune by vm.directTune.collectAsStateWithLifecycle()
@@ -164,6 +171,9 @@ fun VideoPlayerSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier)
     }
 
     var dialog by remember { mutableStateOf(Dialog.NONE) }
+    /** Whether the Custom-latency stepper actually set a value this time round — the mode switch to
+     *  Custom, and the low-latency acknowledgement, both hang off that rather than off merely opening it. */
+    var customCommitted by remember { mutableStateOf(false) }
     val firstFocus = remember { FocusRequester() }
     // Kick focus into the group; the group's onEnter (below) decides the actual target — first row on
     // a fresh open, or the OpenSubtitles row when we're returning from that sub-screen.
@@ -251,6 +261,13 @@ fun VideoPlayerSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier)
             onClick = { vm.setHwDecoding(!hw) },
         )
         Row2(
+            icon = OwnTVIcon.VIDEO, title = stringResource(R.string.settings_deinterlace),
+            desc = stringResource(R.string.settings_deinterlace_description),
+            chip = if (deinterlace) stringResource(R.string.settings_auto) else stringResource(R.string.common_off),
+            primaryChip = deinterlace,
+            onClick = { vm.setDeinterlace(!deinterlace) },
+        )
+        Row2(
             icon = OwnTVIcon.PLAY, title = stringResource(R.string.settings_movies_series_player),
             desc = stringResource(R.string.settings_movies_player_description),
             chip = stringResource(if (vodExo) R.string.settings_player_exoplayer else R.string.settings_player_mpv), primaryChip = !vodExo,
@@ -282,6 +299,45 @@ fun VideoPlayerSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier)
             chip = stringResource(zoomMode.labelRes), chevron = true,
             modifier = Modifier.focusRequester(dialogRowFocus.getValue(Dialog.ZOOM)),
             onClick = { savedScroll = scrollState.value; dialog = Dialog.ZOOM },
+        )
+        Row2(
+            icon = OwnTVIcon.ASPECT, title = stringResource(R.string.settings_reset_saved_zoom),
+            desc = stringResource(R.string.settings_reset_saved_zoom_description),
+            chip = if (savedZoom == 0) stringResource(R.string.settings_reset_player_choices_none)
+            else pluralStringResource(R.plurals.settings_reset_player_choices_count, savedZoom, savedZoom),
+            primaryChip = savedZoom > 0,
+            modifier = Modifier.focusRequester(dialogRowFocus.getValue(Dialog.RESET_SAVED_ZOOM)),
+            onClick = { savedScroll = scrollState.value; dialog = Dialog.RESET_SAVED_ZOOM },
+        )
+        Row2(
+            icon = OwnTVIcon.VOLUME_HIGH, title = stringResource(R.string.settings_default_volume),
+            desc = stringResource(R.string.settings_default_volume_description),
+            chip = stringResource(R.string.player_percent, defaultVolume), chevron = true,
+            modifier = Modifier.focusRequester(dialogRowFocus.getValue(Dialog.VOLUME)),
+            onClick = { savedScroll = scrollState.value; dialog = Dialog.VOLUME },
+        )
+        Row2(
+            icon = OwnTVIcon.VOLUME_HIGH, title = stringResource(R.string.settings_reset_saved_volume),
+            desc = stringResource(R.string.settings_reset_saved_volume_description),
+            chip = if (savedVolume == 0) stringResource(R.string.settings_reset_player_choices_none)
+            else pluralStringResource(R.plurals.settings_reset_player_choices_count, savedVolume, savedVolume),
+            primaryChip = savedVolume > 0,
+            modifier = Modifier.focusRequester(dialogRowFocus.getValue(Dialog.RESET_SAVED_VOLUME)),
+            onClick = { savedScroll = scrollState.value; dialog = Dialog.RESET_SAVED_VOLUME },
+        )
+        Row2(
+            icon = OwnTVIcon.FORWARD, title = stringResource(R.string.settings_seek_step),
+            desc = stringResource(R.string.settings_seek_step_description),
+            chip = stringResource(R.string.settings_live_buffer_seconds, seekStep), chevron = true,
+            modifier = Modifier.focusRequester(dialogRowFocus.getValue(Dialog.SEEK_STEP)),
+            onClick = { savedScroll = scrollState.value; dialog = Dialog.SEEK_STEP },
+        )
+        Row2(
+            icon = OwnTVIcon.REWIND, title = stringResource(R.string.settings_live_rewind_step),
+            desc = stringResource(R.string.settings_live_rewind_step_description),
+            chip = stringResource(R.string.settings_live_buffer_seconds, liveRewindStep), chevron = true,
+            modifier = Modifier.focusRequester(dialogRowFocus.getValue(Dialog.LIVE_REWIND_STEP)),
+            onClick = { savedScroll = scrollState.value; dialog = Dialog.LIVE_REWIND_STEP },
         )
         Row2(
             icon = OwnTVIcon.PLAY, title = stringResource(R.string.settings_resume_playback),
@@ -438,7 +494,11 @@ fun VideoPlayerSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier)
         )
         Dialog.AUDIO_SYNC -> StepperDialog(
             title = stringResource(R.string.settings_audio_sync),
-            value = audioDelay, step = 50, min = -2000, max = 2000,
+            // ±5s, matching what the player itself accepts. The narrower ±2s here meant a delay set in the
+            // HUD could not be reproduced — or corrected — from Settings.
+            // 25 ms steps: the offset being corrected here is the TV's own picture-processing delay, which
+            // lands in the tens of milliseconds — a 50 ms step could only bracket it, never hit it.
+            value = audioDelay, step = 25, min = -5000, max = 5000,
             format = { stringResource(R.string.settings_audio_delay, it) },
             onSet = { vm.setAudioDelayMs(it) },
             onReset = { vm.setAudioDelayMs(0) },
@@ -455,9 +515,11 @@ fun VideoPlayerSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier)
                     // "Low latency" — warn before applying; Cancel leaves the current choice untouched.
                     tv.own.owntv.features.settings.data.LiveLatency.LOW ->
                         lowWarning = Pair({ vm.setLiveLatencyMode(mode) }, {})
-                    // "Custom" — enter the seconds; the below-Balanced warning fires when that dialog closes.
+                    // "Custom" — enter the seconds first. The mode is committed by the stepper itself, not
+                    // here: switching on open meant backing out of the number dialog still left the user on
+                    // Custom, with a value they never chose.
                     tv.own.owntv.features.settings.data.LiveLatency.CUSTOM -> {
-                        vm.setLiveLatencyMode(mode)
+                        customCommitted = false
                         dialog = Dialog.LIVE_CUSTOM
                     }
                     else -> vm.setLiveLatencyMode(mode)
@@ -472,12 +534,20 @@ fun VideoPlayerSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier)
             min = tv.own.owntv.features.settings.data.LiveBuffer.CUSTOM_MIN,
             max = tv.own.owntv.features.settings.data.LiveBuffer.CUSTOM_MAX,
             format = { stringResource(R.string.settings_live_buffer_seconds, it) },
-            onSet = { vm.setLiveLatencyCustomSecs(it) },
-            onReset = { vm.setLiveLatencyCustomSecs(tv.own.owntv.features.settings.data.LiveBuffer.CUSTOM_DEFAULT) },
+            onSet = {
+                vm.setLiveLatencyCustomSecs(it)
+                vm.setLiveLatencyMode(tv.own.owntv.features.settings.data.LiveLatency.CUSTOM)
+                customCommitted = true
+            },
+            onReset = {
+                vm.setLiveLatencyCustomSecs(tv.own.owntv.features.settings.data.LiveBuffer.CUSTOM_DEFAULT)
+                vm.setLiveLatencyMode(tv.own.owntv.features.settings.data.LiveLatency.CUSTOM)
+                customCommitted = true
+            },
             onDismiss = {
                 dialog = Dialog.NONE
                 // A below-Balanced custom value gets the same acknowledgement; Cancel reverts to Balanced.
-                if (tv.own.owntv.features.settings.data.LiveBuffer.isLowLatency(liveCustomSecs)) {
+                if (customCommitted && tv.own.owntv.features.settings.data.LiveBuffer.isLowLatency(liveCustomSecs)) {
                     lowWarning = Pair({}, { vm.setLiveLatencyMode(tv.own.owntv.features.settings.data.LiveLatency.BALANCED) })
                 }
             },
@@ -527,8 +597,50 @@ fun VideoPlayerSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier)
             onToggle = { section, enabled -> vm.setExternalPlayer(section, enabled) },
             onDismiss = { dialog = Dialog.NONE },
         )
-        Dialog.RESET_PINS -> ResetPlayerChoicesDialog(
+        Dialog.RESET_PINS -> ConfirmResetDialog(
+            title = stringResource(R.string.settings_reset_player_choices_confirm),
+            description = stringResource(R.string.settings_reset_player_choices_confirm_description),
             onConfirm = { vm.clearVodEnginePins(); dialog = Dialog.NONE },
+            onCancel = { dialog = Dialog.NONE },
+        )
+        Dialog.VOLUME -> StepperDialog(
+            title = stringResource(R.string.settings_default_volume),
+            // The same 0–150 range and 5% step the player's own volume dialog uses, so a level found
+            // there can be set as the default here without landing between two values.
+            value = defaultVolume, step = 5, min = 0, max = 150,
+            format = { stringResource(R.string.player_percent, it) },
+            onSet = { vm.setDefaultVolume(it) },
+            onReset = { vm.setDefaultVolume(100) },
+            onDismiss = { dialog = Dialog.NONE },
+        )
+        Dialog.SEEK_STEP -> PickerDialog(
+            title = stringResource(R.string.settings_seek_step),
+            options = tv.own.owntv.features.settings.data.SeekSteps.SEEK_CHOICES.map {
+                it.toString() to stringResource(R.string.settings_live_buffer_seconds, it)
+            },
+            selected = seekStep.toString(),
+            onSelect = { vm.setSeekStepSec(it.toIntOrNull() ?: tv.own.owntv.features.settings.data.SeekSteps.DEFAULT_SEEK_STEP_SEC); dialog = Dialog.NONE },
+            onDismiss = { dialog = Dialog.NONE },
+        )
+        Dialog.LIVE_REWIND_STEP -> PickerDialog(
+            title = stringResource(R.string.settings_live_rewind_step),
+            options = tv.own.owntv.features.settings.data.SeekSteps.LIVE_REWIND_CHOICES.map {
+                it.toString() to stringResource(R.string.settings_live_buffer_seconds, it)
+            },
+            selected = liveRewindStep.toString(),
+            onSelect = { vm.setLiveRewindStepSec(it.toIntOrNull() ?: tv.own.owntv.features.settings.data.SeekSteps.DEFAULT_LIVE_REWIND_STEP_SEC); dialog = Dialog.NONE },
+            onDismiss = { dialog = Dialog.NONE },
+        )
+        Dialog.RESET_SAVED_ZOOM -> ConfirmResetDialog(
+            title = stringResource(R.string.settings_reset_saved_zoom_confirm),
+            description = stringResource(R.string.settings_reset_saved_zoom_confirm_description),
+            onConfirm = { vm.clearSavedZoom(); dialog = Dialog.NONE },
+            onCancel = { dialog = Dialog.NONE },
+        )
+        Dialog.RESET_SAVED_VOLUME -> ConfirmResetDialog(
+            title = stringResource(R.string.settings_reset_saved_volume_confirm),
+            description = stringResource(R.string.settings_reset_saved_volume_confirm_description),
+            onConfirm = { vm.clearSavedVolume(); dialog = Dialog.NONE },
             onCancel = { dialog = Dialog.NONE },
         )
         Dialog.NONE -> Unit
@@ -570,11 +682,11 @@ private fun LiveLatencyWarningDialog(onConfirm: () -> Unit, onCancel: () -> Unit
     }
 }
 
-/** Confirmation before forgetting every per-item engine pin. Focus starts on Cancel — the row that
- *  opens this is one press away from the engine setting, so a mis-press must not wipe the user's own
- *  per-item choices. */
+/** Confirmation before forgetting a whole set of remembered per-item choices (engine pins, zoom and
+ *  volume). Focus starts on Cancel — the row that opens this is one press away from an ordinary
+ *  setting, so a mis-press must not wipe choices the user made deliberately. */
 @Composable
-private fun ResetPlayerChoicesDialog(onConfirm: () -> Unit, onCancel: () -> Unit) {
+private fun ConfirmResetDialog(title: String, description: String, onConfirm: () -> Unit, onCancel: () -> Unit) {
     val colors = OwnTVTheme.colors
     val firstFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
@@ -584,15 +696,9 @@ private fun ResetPlayerChoicesDialog(onConfirm: () -> Unit, onCancel: () -> Unit
         contentAlignment = Alignment.Center,
     ) {
         Column(modifier = Modifier.dialogPanel(width = 500.dp, padding = 28.dp)) {
-            Text(
-                stringResource(R.string.settings_reset_player_choices_confirm),
-                style = MaterialTheme.typography.titleLarge, color = colors.onSurface,
-            )
+            Text(title, style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
             Spacer(Modifier.height(12.dp))
-            Text(
-                stringResource(R.string.settings_reset_player_choices_confirm_description),
-                style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant,
-            )
+            Text(description, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
             Spacer(Modifier.height(20.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OwnTVButton(
@@ -606,7 +712,7 @@ private fun ResetPlayerChoicesDialog(onConfirm: () -> Unit, onCancel: () -> Unit
     }
 }
 
-private enum class Dialog { NONE, ZOOM, SUB_STYLE, SUB_LANG, AUDIO_LANG, AUDIO_SYNC, RESUME, LIVE_LATENCY, LIVE_CUSTOM, LIVE_PREROLL, LIVE_PREROLL_SOURCES, LIVE_PREROLL_SOURCE, EXTERNAL_PLAYER, RESET_PINS }
+private enum class Dialog { NONE, ZOOM, VOLUME, RESET_SAVED_ZOOM, RESET_SAVED_VOLUME, SEEK_STEP, LIVE_REWIND_STEP, SUB_STYLE, SUB_LANG, AUDIO_LANG, AUDIO_SYNC, RESUME, LIVE_LATENCY, LIVE_CUSTOM, LIVE_PREROLL, LIVE_PREROLL_SOURCES, LIVE_PREROLL_SOURCE, EXTERNAL_PLAYER, RESET_PINS }
 
 /** Row chip for the External player row: "Off", "On" (all three), or the sections that are on. */
 @Composable
@@ -859,17 +965,9 @@ internal fun StepperDialog(
     onDismiss: () -> Unit,
 ) {
     val colors = OwnTVTheme.colors
-    val frPlus = remember { FocusRequester() }
-    val frMinus = remember { FocusRequester() }
     val plusEnabled = value < max
     val minusEnabled = value > min
-    // "+" is the natural landing spot, but at [max] it is disabled and so cannot take focus. Focus is
-    // trapped inside this dialog, so silently failing to focus anything left the D-pad dead with only
-    // Back working — the reported "+/- unreachable" at the top of the range. Land on whichever stepper
-    // is usable, and hand focus over if the one holding it becomes disabled mid-adjustment.
-    LaunchedEffect(Unit) { runCatching { (if (plusEnabled) frPlus else frMinus).requestFocus() } }
-    LaunchedEffect(plusEnabled) { if (!plusEnabled && minusEnabled) runCatching { frMinus.requestFocus() } }
-    LaunchedEffect(minusEnabled) { if (!minusEnabled && plusEnabled) runCatching { frPlus.requestFocus() } }
+    val steppers = tv.own.owntv.ui.components.rememberStepperFocus(plusEnabled, minusEnabled)
     BackHandler { onDismiss() }
     tv.own.owntv.ui.theme.PopupFontTheme {
     Box(Modifier.fillMaxSize().modalScrim().trapAllFocusExit().focusGroup(), contentAlignment = Alignment.Center) {
@@ -884,7 +982,7 @@ internal fun StepperDialog(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                StepBtn("–", enabled = minusEnabled, modifier = Modifier.focusRequester(frMinus)) { onSet((value - step).coerceAtLeast(min)) }
+                StepBtn("–", enabled = minusEnabled, modifier = Modifier.focusRequester(steppers.minus)) { onSet((value - step).coerceAtLeast(min)) }
                 Text(
                     format(value),
                     style = MaterialTheme.typography.titleMedium,
@@ -894,7 +992,7 @@ internal fun StepperDialog(
                     overflow = TextOverflow.Ellipsis,
                     textAlign = TextAlign.Center,
                 )
-                StepBtn("+", enabled = plusEnabled, modifier = Modifier.focusRequester(frPlus)) { onSet((value + step).coerceAtMost(max)) }
+                StepBtn("+", enabled = plusEnabled, modifier = Modifier.focusRequester(steppers.plus)) { onSet((value + step).coerceAtMost(max)) }
             }
             Spacer(Modifier.height(14.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1302,14 +1400,7 @@ private fun PositionCell(
             Column(Modifier.fillMaxSize().padding(6.dp)) {
                 Box(
                     modifier = Modifier.fillMaxWidth().weight(1f),
-                    contentAlignment = when {
-                        position.isTop && position.isLeft -> Alignment.TopStart
-                        position.isTop && position.isRight -> Alignment.TopEnd
-                        position.isTop -> Alignment.TopCenter
-                        position.isLeft -> Alignment.BottomStart
-                        position.isRight -> Alignment.BottomEnd
-                        else -> Alignment.BottomCenter
-                    },
+                    contentAlignment = position.alignment(),
                 ) {
                     Box(
                         Modifier.width(28.dp).height(4.dp).clip(RoundedCornerShape(2.dp))
@@ -1340,18 +1431,12 @@ private fun SubtitleTransparencyDialog(
     onDismiss: () -> Unit,
 ) {
     val colors = OwnTVTheme.colors
-    val frPlus = remember { FocusRequester() }
-    val frMinus = remember { FocusRequester() }
     val isDefault = !SubtitleStyle.hasOpacity(bgOpacity)
     // From "Default" either button adopts the mid value first, so neither is ever a dead end.
     val effective = if (isDefault) SubtitleStyle.OPACITY_START else bgOpacity
     val minusEnabled = isDefault || effective > SubtitleStyle.OPACITY_MIN
     val plusEnabled = isDefault || effective < SubtitleStyle.OPACITY_MAX
-    LaunchedEffect(Unit) { runCatching { (if (plusEnabled) frPlus else frMinus).requestFocus() } }
-    // Focus must never be left on a stepper that goes disabled: focus is trapped in the dialog, so
-    // that leaves the D-pad dead with only Back working (the same guard [StepperDialog] carries).
-    LaunchedEffect(plusEnabled) { if (!plusEnabled && minusEnabled) runCatching { frMinus.requestFocus() } }
-    LaunchedEffect(minusEnabled) { if (!minusEnabled && plusEnabled) runCatching { frPlus.requestFocus() } }
+    val steppers = tv.own.owntv.ui.components.rememberStepperFocus(plusEnabled, minusEnabled)
     BackHandler { onDismiss() }
     tv.own.owntv.ui.theme.PopupFontTheme {
         Box(
@@ -1376,7 +1461,7 @@ private fun SubtitleTransparencyDialog(
                 )
                 Spacer(Modifier.height(14.dp))
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    StepBtn("–", enabled = minusEnabled, modifier = Modifier.focusRequester(frMinus)) {
+                    StepBtn("–", enabled = minusEnabled, modifier = Modifier.focusRequester(steppers.minus)) {
                         onSet(
                             if (isDefault) SubtitleStyle.OPACITY_START
                             else (effective - SubtitleStyle.OPACITY_STEP).coerceAtLeast(SubtitleStyle.OPACITY_MIN),
@@ -1386,7 +1471,7 @@ private fun SubtitleTransparencyDialog(
                         subOpacityLabel(bgOpacity), style = MaterialTheme.typography.titleMedium,
                         color = colors.primary, modifier = Modifier.width(100.dp), textAlign = TextAlign.Center,
                     )
-                    StepBtn("+", enabled = plusEnabled, modifier = Modifier.focusRequester(frPlus)) {
+                    StepBtn("+", enabled = plusEnabled, modifier = Modifier.focusRequester(steppers.plus)) {
                         onSet(
                             if (isDefault) SubtitleStyle.OPACITY_START
                             else (effective + SubtitleStyle.OPACITY_STEP).coerceAtMost(SubtitleStyle.OPACITY_MAX),
@@ -1438,14 +1523,7 @@ private fun SubtitlePreview(
                     listOf(Color(0xFF2E4A6B), Color(0xFF7A5C3E), Color(0xFF3B6B4A)),
                 ),
             ),
-        contentAlignment = when {
-            anchor.isTop && anchor.isLeft -> Alignment.TopStart
-            anchor.isTop && anchor.isRight -> Alignment.TopEnd
-            anchor.isTop -> Alignment.TopCenter
-            anchor.isLeft -> Alignment.BottomStart
-            anchor.isRight -> Alignment.BottomEnd
-            else -> Alignment.BottomCenter
-        },
+        contentAlignment = anchor.alignment(),
     ) {
         Text(
             stringResource(R.string.settings_subtitle_preview_sample),
