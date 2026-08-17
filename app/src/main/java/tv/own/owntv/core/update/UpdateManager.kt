@@ -203,11 +203,13 @@ class UpdateManager(
 
         // Fork: check THIS fork's releases, not upstream's. Upstream's APKs could never install here
         // anyway — different signing key and a different application id (tv.own.owntv.fork) — and
-        // because the fork versions as 99.x, upstream's 4.x tag never compares newer, so pointing at
-        // upstream made the updater silently answer "up to date" forever.
+        // because the fork versions ahead of upstream, upstream's 4.x tag never compares newer, so
+        // pointing at upstream made the updater silently answer "up to date" forever.
         //
         // The fork's release CI publishes the same asset layout this manager expects
-        // (OwnTV-v99.x.y.apk for arm, OwnTV-x86_64-v99.x.y.apk), so ABI selection below is unchanged.
+        // (OwnTV-v<version>.apk for arm, OwnTV-x86_64-v<version>.apk), so ABI selection below is
+        // unchanged. Versions are dated (v2026.08.17[.n]); isNewer's segment-wise numeric compare
+        // handles them as-is, and every dated version outranks the fork's older 99.x releases.
         const val REPO = "attembot/OwnTV"
     }
 }

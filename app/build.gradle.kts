@@ -51,15 +51,20 @@ android {
         versionNameSuffix = "-fork"
         minSdk = 26
         targetSdk = 36
-        // CI injects these from the git tag (see .github/workflows/android.yml) so releases never
-        // need a manual edit here. The fallbacks are only used for local/debug builds — pinned HIGH
-        // (99999, mirroring versionName 99.99.99) so a local/debug APK is always "newer" than any
-        // published release and installs straight over it (no INSTALL_FAILED_VERSION_DOWNGRADE).
-        versionCode = (System.getenv("VERSION_CODE") ?: "99999").toInt()
-        // CI injects VERSION_NAME from the git tag for releases. The fallback is only ever used by
-        // LOCAL builds (i.e. debug), so we pin it to 99.99.99 — that way a dev build is always "newer"
-        // than any published release and the in-app updater never offers an "update" while developing.
-        versionName = System.getenv("VERSION_NAME") ?: "99.99.99"
+        // The fork versions by DATE (CalVer): tag v2026.08.17 -> versionName "2026.08.17", so the
+        // About screen and the updater dialog say when the build was cut instead of leaving a
+        // meaningless 99.x to decode. A same-day rebuild appends an ordinal: v2026.08.17.1.
+        // The matching versionCode is YYYYMMDD * 10 + that ordinal (2026-08-17 -> 202608170), which
+        // is monotonic by construction, leaves room for ten builds a day, and stays an Int well past
+        // year 2099 (209912319). It is also far above the old 99.x codes (v99.5.0 was 990500), so a
+        // dated APK installs straight over an already-installed 99.x fork.
+        //
+        // CI injects both from the git tag (see .github/workflows/android.yml) so releases never need
+        // a manual edit here. The fallbacks are only used for local/debug builds — pinned HIGH so a
+        // dev APK is always "newer" than any published release, installs straight over it (no
+        // INSTALL_FAILED_VERSION_DOWNGRADE), and never sees the in-app updater offer an "update".
+        versionCode = (System.getenv("VERSION_CODE") ?: "999999999").toInt()
+        versionName = System.getenv("VERSION_NAME") ?: "9999.12.31"
 
         // Opt-in local diagnostic APKs keep the rolling playback trace enabled even when they are
         // release-signed (so they can update an installed production build without changing its data).

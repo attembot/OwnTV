@@ -95,16 +95,31 @@ jobs:
         id: ver
         run: |
           if [ "$IS_TAG" = "true" ]; then
-            NAME="${GITHUB_REF_NAME#v}"                 # tag v1.2.0 -> 1.2.0
-            IFS='.' read -r MA MI PA <<< "$NAME"
-            CODE=$(( ${MA:-0} * 10000 + ${MI:-0} * 100 + ${PA:-0} ))   # 1.2.0 -> 10200
-            [ "$CODE" -gt 0 ] || CODE=1
+            NAME="${GITHUB_REF_NAME#v}"                 # tag v2026.08.17 -> 2026.08.17
+            IFS='.' read -r A B C D <<< "$NAME"
+            # 10# forces base 10: "08" is an invalid OCTAL literal and would abort the build.
+            A=$((10#${A:-0})); B=$((10#${B:-0})); C=$((10#${C:-0})); D=$((10#${D:-0}))
+            if [ "$A" -ge 2000 ]; then
+              # CalVer (the fork's scheme): YYYY.MM.DD[.n] -> YYYYMMDD * 10 + n.
+              # 2026.08.17 -> 202608170, 2026.08.17.1 -> 202608171. Monotonic, ten builds a day,
+              # still an Int in 2099 (209912319), and above every old 99.x code (v99.5.0 = 990500).
+              if [ "$B" -lt 1 ] || [ "$B" -gt 12 ] || [ "$C" -lt 1 ] || [ "$C" -gt 31 ] || [ "$D" -gt 9 ]; then
+                echo "::error::Tag $GITHUB_REF_NAME is not a valid vYYYY.MM.DD[.n] version."
+                exit 1
+              fi
+              CODE=$(( (A * 10000 + B * 100 + C) * 10 + D ))
+            else
+              # Legacy semver tags (v4.x upstream, the fork's old v99.x) — kept so an old tag can
+              # still be rebuilt. 1.2.0 -> 10200.
+              CODE=$(( A * 10000 + B * 100 + C ))
+              [ "$CODE" -gt 0 ] || CODE=1
+            fi
           else
             # Dev (non-tag) builds mirror the local-build fallback in app/build.gradle.kts:
             # pinned HIGH so a dev APK always installs over any published release
             # (no INSTALL_FAILED_VERSION_DOWNGRADE) and the in-app updater stays quiet.
-            NAME="99.99.99"
-            CODE=99999
+            NAME="9999.12.31"
+            CODE=999999999
           fi
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
           echo "code=$CODE" >> "$GITHUB_OUTPUT"

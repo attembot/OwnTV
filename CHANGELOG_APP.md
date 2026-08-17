@@ -9,6 +9,30 @@
 > (e.g. `(community PR #40 by @codeVerine)`). Issue numbers that are part of a title (e.g. `(#57)`) are
 > fine; explanatory parentheticals are not. Descriptions belong in CHANGELOG.md, never here.
 
+## v2026.08.17 — 2026-08-17
+
+### ✨ New features
+
+- **📅 Version numbers are now the build date**
+- **⬇️ In-app updates work on this build — no more sideloading**
+- **🎭 Cast photos in TMDB details**
+- **🎧 "Audio only" — sound with no picture is now labelled, not mistaken for a fault**
+- **🔊 Zoom and volume are now remembered per item**
+- **Seek step, live rewind step and deinterlacing**
+
+### 🐛 Fixes
+
+- **Picture-in-picture keeps the sound to itself when you press CH+ or CH−**
+- **The channel picker's D-pad navigation no longer reaches the controls behind it**
+- **Your resume position is saved reliably again**
+- **A dying live channel now ends with a message instead of reconnecting forever**
+- **Channels that need a custom User-Agent or Referer survive Retry and the screensaver**
+- **Holding CH+ or CH− changes channel once**
+- **Subtitles stay on the picture when you zoom**
+- **Custom DNS resolves IPv6-only hosts**
+- **Audio focus is released while you are paused**
+- **Many smaller player, subtitle and catch-up fixes**
+
 ## v4.2.1 — 2026-08-15
 
 ### ✨ New features
