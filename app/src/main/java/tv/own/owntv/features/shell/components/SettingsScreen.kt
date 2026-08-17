@@ -1257,7 +1257,10 @@ private fun AccentPaletteDialog(
 }
 
 
-private const val GITHUB_REPO = "github.com/ahXN00/OwnTV"
+// Fork: this build's own source and releases. It sits next to the GPL line, so it should point at the
+// source of THIS binary (which carries upstream's history in full) rather than at upstream's repo,
+// and it matches where the in-app updater now looks. See UpdateManager.REPO.
+private const val GITHUB_REPO = "github.com/attembot/OwnTV"
 private const val TELEGRAM_LINK = "t.me/owntvplayer"
 
 /** About OwnTV: version, license, author and project link — all readable on screen (no TV browser). */

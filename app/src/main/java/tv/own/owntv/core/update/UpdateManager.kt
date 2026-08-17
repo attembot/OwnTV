@@ -200,6 +200,14 @@ class UpdateManager(
 
     companion object {
         private const val TAG = "UpdateManager"
-        const val REPO = "ahXN00/OwnTV"
+
+        // Fork: check THIS fork's releases, not upstream's. Upstream's APKs could never install here
+        // anyway — different signing key and a different application id (tv.own.owntv.fork) — and
+        // because the fork versions as 99.x, upstream's 4.x tag never compares newer, so pointing at
+        // upstream made the updater silently answer "up to date" forever.
+        //
+        // The fork's release CI publishes the same asset layout this manager expects
+        // (OwnTV-v99.x.y.apk for arm, OwnTV-x86_64-v99.x.y.apk), so ABI selection below is unchanged.
+        const val REPO = "attembot/OwnTV"
     }
 }
