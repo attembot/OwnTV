@@ -94,17 +94,32 @@
     <string name="settings_metadata_provider_tmdb_description">നിങ്ങളുടെ പ്ലേലിസ്റ്റിലെ വിവരങ്ങൾക്ക് മുൻഗണന നൽകും; ഒഴിവുകൾ TMDB നികത്തുകയും അഭിനേതാക്കൾ, ശൈലികൾ, പശ്ചാത്തല ചിത്രങ്ങൾ എന്നിവ ചേർക്കുകയും ചെയ്യും.</string>
     <string name="settings_metadata_tmdb_only_description">എല്ലാ ഫീൽഡുകൾക്കും TMDB-യ്ക്ക് മുൻഗണന നൽകുക; TMDB-യിൽ ഒന്നുമില്ലെങ്കിൽ മാത്രം നിങ്ങളുടെ പ്ലേലിസ്റ്റ് ഉപയോഗിക്കുക.</string>
     <string name="settings_selected">തിരഞ്ഞെടുത്തത്</string>
-    <string name="settings_active_tmdb_source">സജീവ TMDB ഉറവിടം: <xliff:g id="tier">%1$s</xliff:g></string>
     <string name="settings_metadata_allowance">നിങ്ങളുടെ ദൈനംദിന വിഹിതം</string>
-    <string name="settings_metadata_allowance_row"><xliff:g id="window">%1$s</xliff:g>: <xliff:g id="total">%3$d</xliff:g>-ൽ <xliff:g id="remaining">%2$d</xliff:g> ബാക്കി</string>
-    <string name="settings_metadata_window_minute">മിനിറ്റിൽ</string>
-    <string name="settings_metadata_window_hour">മണിക്കൂറിൽ</string>
-    <string name="settings_metadata_window_day">ഇന്ന്</string>
-    <plurals name="settings_metadata_allowance_left">
-        <item quantity="one">ഇന്ന് <xliff:g id="total">%2$d</xliff:g>-ൽ <xliff:g id="remaining">%1$d</xliff:g> ബാക്കി</item>
-        <item quantity="other">ഇന്ന് <xliff:g id="total">%2$d</xliff:g>-ൽ <xliff:g id="remaining">%1$d</xliff:g> ബാക്കി</item>
+    <string name="settings_metadata_reset_automatic">സ്വയമേവ പുനഃസജ്ജമാകുന്നു</string>
+    <string name="settings_metadata_library_details">ലൈബ്രറി വിവരങ്ങൾ</string>
+    <string name="settings_metadata_test_connection">നിലവിലുള്ള കണക്ഷൻ പരീക്ഷിക്കുക</string>
+    <string name="settings_allowance_available">ലഭ്യം</string>
+    <string name="settings_allowance_refills"><xliff:g id="time">%1$s</xliff:g> റീഫിൽ ചെയ്യും</string>
+    <string name="settings_allowance_minute">മിനിറ്റ്</string>
+    <string name="settings_allowance_hour">മണിക്കൂർ</string>
+    <string name="settings_allowance_day">ദിവസം</string>
+    <plurals name="settings_allowance_value">
+        <item quantity="one"><xliff:g id="remaining">%1$d</xliff:g> / <xliff:g id="limit">%2$d</xliff:g> ശേഷിക്കുന്നു</item>
+        <item quantity="other"><xliff:g id="remaining">%1$d</xliff:g> / <xliff:g id="limit">%2$d</xliff:g> ശേഷിക്കുന്നു</item>
     </plurals>
-    <string name="settings_metadata_allowance_resets"><xliff:g id="time">%1$s</xliff:g>-ന് വീണ്ടും നിറയും</string>
+    <string name="settings_metadata_active_source">സജീവ ഉറവിടം</string>
+    <string name="settings_metadata_shared_worker_description">OwnTV Worker · സജ്ജീകരണം വേണ്ട</string>
+    <string name="settings_metadata_connection">കണക്ഷൻ</string>
+    <string name="settings_metadata_remote_advanced">വിപുലമായ TMDB വിവരങ്ങൾ നേടുക</string>
+    <string name="settings_metadata_remote_advanced_description">പങ്കിട്ട ഡിഫോൾട്ടിനു പകരം നിങ്ങളുടെ സ്വന്തം TMDB API കീ അല്ലെങ്കിൽ സ്വയം ഹോസ്റ്റ് ചെയ്ത Worker ഉപയോഗിക്കുക.</string>
+    <string name="settings_metadata_usage_label">ഉപയോഗം</string>
+    <string name="settings_metadata_usage_value"><xliff:g id="min_used">%1$d</xliff:g>/<xliff:g id="min_total">%2$d</xliff:g> മിനിറ്റ് · <xliff:g id="hr_used">%3$d</xliff:g>/<xliff:g id="hr_total">%4$d</xliff:g> മണിക്കൂർ · <xliff:g id="day_used">%5$d</xliff:g>/<xliff:g id="day_total">%6$d</xliff:g> ദിവസം</string>
+    <string name="settings_metadata_source_label">ഉറവിടം</string>
+    <string name="settings_metadata_key_label">കീ</string>
+    <string name="settings_metadata_server_label">സെർവർ</string>
+    <string name="settings_metadata_refills_label">വീണ്ടും നിറയും</string>
+    <string name="settings_metadata_clear_advanced_title">സ്വന്തം കീ ഉപയോഗിക്കുന്നത് നിർത്തണോ?</string>
+    <string name="settings_metadata_clear_advanced_message">നിങ്ങളുടെ TMDB API കീയും സെർവർ വിലാസവും ഈ ഉപകരണത്തിൽ നിന്ന് ഇല്ലാതാക്കും, കൂടാതെ OwnTV ദൈനംദിന വിഹിതമുള്ള അന്തർനിർമ്മിത പങ്കിട്ട സേവനത്തിലേക്ക് മടങ്ങും.</string>
     <string name="settings_metadata_fair_share">അന്തർനിർമ്മിത മെറ്റാഡാറ്റ സേവനം OwnTV ഉപയോഗിക്കുന്ന എല്ലാവരും പങ്കിടുന്നു, അതിനാൽ ഓരോ ഉപകരണത്തിനും ഓരോ ദിവസവും സ്വന്തം വിഹിതം ലഭിക്കും. വിഹിതം തീർന്നാൽ പോസ്റ്ററുകളും വിവരണങ്ങളും അത് വീണ്ടും നിറയുന്നതുവരെ താൽക്കാലികമായി നിർത്തും — നിങ്ങളുടെ പ്ലേലിസ്റ്റിലെ വിവരങ്ങൾ പതിവുപോലെ പ്രവർത്തിക്കും. സ്വന്തം TMDB API കീയോ സെർവറോ ചേർത്താൽ ഈ പരിധി ഇല്ലാതാകും: അത് സൗജന്യമാണ്, വ്യക്തിഗത കീയ്ക്ക് പ്രായോഗികമായി പരിധിയില്ല.</string>
     <string name="settings_metadata_limit_reached">ഇന്നത്തെ മെറ്റാഡാറ്റ വിഹിതം തീർന്നു — ഈ പരിധി നീക്കാൻ ക്രമീകരണങ്ങൾ → മെറ്റാഡാറ്റയിൽ സ്വന്തം TMDB കീ ചേർക്കുക.</string>
     <string name="settings_metadata_language">മെറ്റാഡാറ്റ ഭാഷ</string>
@@ -112,6 +127,9 @@
     <string name="settings_advanced_options">വിപുലമായ ഓപ്ഷനുകൾ</string>
     <string name="settings_advanced_metadata_description">പങ്കിട്ട ഡിഫോൾട്ടിന് പകരം നിങ്ങളുടെ സ്വന്തം TMDB API കീയോ സ്വയം ഹോസ്റ്റ് ചെയ്ത സെർവറോ ഉപയോഗിക്കുക.</string>
     <string name="settings_metadata_server_description">അന്തർനിർമ്മിത പങ്കിട്ട സെർവർ ഉപയോഗിക്കാൻ രണ്ടും ശൂന്യമായി വിടുക (സജ്ജീകരണം ആവശ്യമില്ല). TMDB-യെ നേരിട്ട് വിളിക്കാൻ നിങ്ങളുടെ സ്വന്തം TMDB API കീ നൽകുക, അല്ലെങ്കിൽ സ്വന്തം പ്രോക്സി/മിറർ ഉപയോഗിക്കാൻ സ്വയം ഹോസ്റ്റ് ചെയ്ത സെർവർ URL നൽകുക. കീയേക്കാൾ URL-ന് മുൻഗണന ലഭിക്കും.</string>
+    <string name="settings_metadata_key_from_phone">മറ്റൊരു ഉപകരണത്തിൽ നിന്ന് കീ നേടുക</string>
+    <string name="settings_metadata_key_from_phone_desc">ഫോൺ, ടാബ്‌ലെറ്റ് അല്ലെങ്കിൽ കമ്പ്യൂട്ടർ ഉപയോഗിച്ച് കോഡ് സ്കാൻ ചെയ്ത്, അവിടെ TMDB-യിൽ സൈൻ ഇൻ ചെയ്ത് കീ അയയ്ക്കുക. റിമോട്ടിൽ ഒന്നും ടൈപ്പ് ചെയ്യേണ്ട.</string>
+    <string name="settings_metadata_key_received">TMDB കീ ലഭിച്ചു</string>
     <string name="settings_tmdb_api_key">TMDB API കീ (v3)</string>
     <string name="settings_self_host_url">സ്വയം ഹോസ്റ്റ് ചെയ്ത സെർവർ URL</string>
     <string name="settings_test">പരിശോധന</string>
@@ -176,6 +194,15 @@
     <string name="settings_theme_description">ലൈറ്റ്, ഡാർക്ക്, അല്ലെങ്കിൽ സിസ്റ്റത്തെ പിന്തുടരുക</string>
     <string name="settings_accent">ആക്സന്റ് നിറം</string>
     <string name="settings_accent_description">ഇന്റർഫേസിന് നിറം നൽകുക — പ്രീസെറ്റുകൾ, പാലറ്റ്, അല്ലെങ്കിൽ ഹെക്സ് കോഡ്</string>
+    <string name="settings_focus_highlight">ഫോക്കസ് ഹൈലൈറ്റ്</string>
+    <string name="settings_focus_highlight_description">തിരഞ്ഞെടുത്ത ഇനത്തിനു ചുറ്റുമുള്ള ബോർഡറിന്റെ നിറവും കനവും</string>
+    <string name="settings_focus_highlight_chip"><xliff:g id="color">%1$s</xliff:g> · <xliff:g id="thickness">%2$s</xliff:g></string>
+    <string name="settings_focus_thickness">കനം</string>
+    <string name="settings_focus_width_thin">നേർത്തത്</string>
+    <string name="settings_focus_width_normal">സാധാരണം</string>
+    <string name="settings_focus_width_thick">കട്ടിയുള്ളത്</string>
+    <string name="settings_focus_width_extra">അധികം കട്ടിയുള്ളത്</string>
+    <string name="settings_focus_highlight_sample">ഫോക്കസിൽ</string>
     <string name="settings_glass_effect">ഗ്ലാസ് ഇഫക്റ്റ്</string>
     <string name="settings_glass_description">അർദ്ധസുതാര്യമായ മങ്ങിയ പാനലുകൾ, പശ്ചാത്തല ചിത്രം, സുതാര്യത</string>
     <string name="settings_ui_zoom">UI സൂം</string>
@@ -225,6 +252,8 @@
     <string name="settings_startup_home">ഹോം</string>
     <string name="settings_startup_last_channel">അവസാന ചാനൽ</string>
     <string name="settings_startup_favorites">തത്സമയം · പ്രിയപ്പെട്ടവ</string>
+    <string name="settings_startup_specific_channel">നിർദ്ദിഷ്ട ചാനൽ</string>
+    <string name="settings_startup_channel_unavailable">സ്റ്റാർട്ടപ്പ് ചാനൽ ലഭ്യമല്ല. ഹോം തുറന്നു.</string>
     <string name="settings_all_history">മുഴുവൻ ചരിത്രവും</string>
     <string name="settings_choose_history">ഈ പ്രൊഫൈലിൽ നിന്ന് നീക്കം ചെയ്യേണ്ടവ തിരഞ്ഞെടുക്കുക. പ്ലേലിസ്റ്റുകൾ, പ്രിയപ്പെട്ടവ, ഡൗൺലോഡുകൾ എന്നിവയെ ഇത് ബാധിക്കില്ല.</string>
     <string name="settings_clear_history_confirm"><xliff:g id="scope">%1$s</xliff:g> ചരിത്രം മായ്ക്കണോ?</string>
@@ -295,6 +324,7 @@
     <string name="settings_search_keywords_history">അടുത്തിടെ കണ്ടവ തുടരുക നീക്കംചെയ്യുക</string>
     <string name="settings_search_keywords_theme">ലൈറ്റ് ഡാർക്ക് സിസ്റ്റം</string>
     <string name="settings_search_keywords_accent">നിറം പാലറ്റ് ഹെക്സ് പ്രീസെറ്റ്</string>
+    <string name="settings_search_keywords_focus">ഫോക്കസ് ബോർഡർ അതിർ തിരഞ്ഞെടുപ്പ് കഴ്‌സർ രൂപരേഖ</string>
     <string name="settings_search_keywords_zoom">സ്കെയിൽ ഇന്റർഫേസ് വലുപ്പം</string>
     <string name="settings_search_keywords_animation">ചലനം വേഗത പ്രകടനം</string>
     <string name="settings_search_keywords_weather">മുകളിലെ ബാർ ചിപ്പ് സ്ഥലം സെൽഷ്യസ് ഫാരൻഹീറ്റ്</string>
@@ -368,6 +398,10 @@
     <!-- Translators: Description of the deinterlacing setting. -->
     <string name="settings_deinterlace_description">ചില പഴയ SD ചാനലുകൾ ചലനത്തിൽ കാണിക്കുന്ന ചീർപ്പുപോലുള്ള വരകൾ മയപ്പെടുത്തുന്നു. mpv സ്വയം ചിത്രം വരയ്ക്കുമ്പോൾ മാത്രമേ ഇത് ബാധകമാകൂ, അതിനാൽ വ്യത്യാസമില്ലെങ്കിൽ ഹാർഡ്‌വെയർ ഡീകോഡിംഗ് ഓഫാക്കുക.</string>
     <string name="settings_movies_series_player">സിനിമകളുടെയും സീരീസിന്റെയും പ്ലെയർ</string>
+    <string name="settings_live_tv_player">തത്സമയ ടിവിയുടെ പ്ലെയർ</string>
+    <string name="settings_engine_order"><xliff:g id="first">%1$s</xliff:g>, പിന്നെ <xliff:g id="second">%2$s</xliff:g></string>
+    <string name="settings_engine_only"><xliff:g id="engine">%1$s</xliff:g> മാത്രം</string>
+    <string name="settings_engine_default"><xliff:g id="option">%1$s</xliff:g> (ഡിഫോൾട്ട്)</string>
     <string name="settings_reset_player_choices">സേവ് ചെയ്ത പ്ലെയർ തിരഞ്ഞെടുപ്പുകൾ പുനഃസജ്ജമാക്കുക</string>
     <string name="settings_external_player">ബാഹ്യ പ്ലെയർ</string>
     <string name="settings_default_zoom">ഡിഫോൾട്ട് സൂം</string>
@@ -410,7 +444,22 @@
     <string name="settings_preferred_subtitle_language">മുൻഗണനയുള്ള സബ്‌ടൈറ്റിൽ ഭാഷ</string>
     <string name="settings_preferred_language_description">ലഭ്യമാകുമ്പോൾ ഈ സബ്‌ടൈറ്റിൽ ട്രാക്ക് സ്വയമേവ തിരഞ്ഞെടുക്കുക.</string>
     <string name="settings_open_subtitles">OpenSubtitles</string>
+    <string name="settings_open_subtitles_connected">കണക്റ്റ് ചെയ്തു</string>
+    <string name="settings_open_subtitles_reset_in"><xliff:g id="hours">%1$d</xliff:g> മ <xliff:g id="minutes">%2$d</xliff:g> മി-ൽ</string>
     <string name="settings_open_subtitles_description">സബ്‌ടൈറ്റിലുകൾ തിരയാനും ഡൗൺലോഡ് ചെയ്യാനും ഡൗൺലോഡ് ചെയ്ത സബ്‌ടൈറ്റിലുകൾ നിയന്ത്രിക്കാനും സൈൻ ഇൻ ചെയ്യുക. ഓരോ പ്രൊഫൈലിനും പ്രത്യേകം; സൗജന്യ opensubtitles.com അക്കൗണ്ട് ആവശ്യമാണ്.</string>
+    <string name="settings_open_subtitles_advanced">വിപുലമായ ഓപ്ഷനുകൾ</string>
+    <string name="settings_open_subtitles_advanced_description">നിങ്ങളുടെ സ്വന്തം ആപ്ലിക്കേഷൻ API കീ അല്ലെങ്കിൽ സ്വയം ഹോസ്റ്റ് ചെയ്ത OpenSubtitles Worker ഉപയോഗിക്കുക.</string>
+    <string name="settings_open_subtitles_setup_title">OpenSubtitles സജ്ജീകരിക്കുക</string>
+    <string name="settings_open_subtitles_setup_description">നിങ്ങളുടെ OpenSubtitles അക്കൗണ്ട് ഉപയോഗിച്ച് സൈൻ ഇൻ ചെയ്യുക.</string>
+    <string name="settings_open_subtitles_setup_remote">വിദൂരമായി</string>
+    <string name="settings_open_subtitles_setup_remote_description">ഒരേ Wi-Fi-യിലുള്ള മറ്റൊരു ഉപകരണത്തിന്റെ — ഫോൺ, ടാബ്‌ലെറ്റ് അല്ലെങ്കിൽ കമ്പ്യൂട്ടർ — ബ്രൗസറിൽ നിങ്ങളുടെ വിവരങ്ങൾ നൽകുക.</string>
+    <string name="settings_open_subtitles_setup_local">ഇവിടെ നൽകുക</string>
+    <string name="settings_open_subtitles_setup_local_description">റിമോട്ട് ഉപയോഗിച്ച് ഈ ടിവിയിൽത്തന്നെ നിങ്ങളുടെ വിവരങ്ങൾ നൽകുക.</string>
+    <string name="settings_open_subtitles_api_key">OpenSubtitles ആപ്ലിക്കേഷൻ API കീ</string>
+    <string name="settings_worker_server_url">Worker / സെർവർ URL</string>
+    <string name="settings_shared">പങ്കിട്ടത്</string>
+    <string name="settings_open_subtitles_access_priority">OwnTV-യുടെ പങ്കിട്ട Worker ഉപയോഗിക്കാൻ രണ്ടും ശൂന്യമായി വിടുക. കസ്റ്റം Worker URL-ന് നേരിട്ടുള്ള API കീയേക്കാൾ മുൻഗണനയുണ്ട്. അക്കൗണ്ട് സെഷനുകൾ പ്രൊഫൈൽ പ്രത്യേകമായി തുടരും.</string>
+    <string name="settings_remove_custom_access">കസ്റ്റം ആക്‌സസ് നീക്കുക</string>
     <string name="settings_audio">ഓഡിയോ</string>
     <string name="settings_preferred_audio_language">മുൻഗണനയുള്ള ഓഡിയോ ഭാഷ</string>
     <string name="settings_audio_sync">ഓഡിയോ സമന്വയിപ്പിക്കൽ</string>
@@ -442,7 +491,8 @@
     <string name="settings_audio_delay"><xliff:g id="delay">%1$d</xliff:g> ms</string>
     <string name="settings_external_player_description">ഏതൊക്കെ വിഭാഗങ്ങൾ ബാഹ്യ ആപ്പിൽ തുറക്കണമെന്ന് തിരഞ്ഞെടുക്കുക.</string>
     <string name="settings_audio_delay_value"><xliff:g id="delay">%1$d</xliff:g> ms</string>
-    <string name="settings_movies_player_description">mpv-യ്ക്ക് (ശുപാർശ ചെയ്യുന്നത്) ഏറ്റവും വിപുലമായ ഫോർമാറ്റ് പിന്തുണയുണ്ട് — DTS/TrueHD ഓഡിയോ, സാധാരണമല്ലാത്ത ഫയലുകൾ — കൂടാതെ A/V സമന്വയിപ്പിക്കൽ പരിഹാരവും. സിനിമകളോ എപ്പിസോഡുകളോ ആരംഭിക്കുന്നില്ലെങ്കിൽ മാത്രം ExoPlayer-ലേക്ക് മാറുക: ചില ടിവികളിൽ mpv-യ്ക്ക് പ്ലേ ചെയ്യാനാകാത്ത ചില സ്ട്രീമുകൾ ഇതിന് പ്ലേ ചെയ്യാനാകും, എന്നാൽ DTS/TrueHD ഓഡിയോ ഡീകോഡ് ചെയ്യാനാകില്ല, A/V സമന്വയിപ്പിക്കൽ പരിഹാരവുമില്ല. നിങ്ങൾ ഏതെടുത്താലും അത് പരാജയപ്പെട്ടാൽ മറ്റേത് സ്വയമേവ പരീക്ഷിക്കും.</string>
+    <string name="settings_movies_player_description">mpv (ശുപാർശ ചെയ്യുന്നു) ഏറ്റവും വിശാലമായ ഫോർമാറ്റ് പിന്തുണ നൽകുന്നു — DTS/TrueHD ഓഡിയോ, അസാധാരണ ഫയലുകൾ — കൂടാതെ A/V സിങ്ക് തിരുത്തലും. ചില ടിവികളിൽ mpv-ക്ക് തുറക്കാനാകാത്ത സ്ട്രീമുകൾ ExoPlayer പ്ലേ ചെയ്യും, എന്നാൽ അതിന് DTS/TrueHD ഓഡിയോ ഡീകോഡ് ചെയ്യാനാകില്ല, A/V സിങ്ക് തിരുത്തലുമില്ല. സംയുക്ത ഓപ്ഷനുകളിൽ ആദ്യത്തേത് പരാജയപ്പെട്ടാൽ മറ്റേ പ്ലെയർ സ്വയമേവ പരീക്ഷിക്കും; ഒറ്റ പ്ലെയർ ഓപ്ഷനുകളിൽ അത് ഒരിക്കലും സംഭവിക്കില്ല, രണ്ടാമത്തെ പ്ലെയർ നിങ്ങളുടെ ടിവിയിൽ എന്തായാലും പ്രവർത്തിക്കുന്നില്ലെങ്കിൽ ഏതാനും സെക്കൻഡ് കറുത്ത സ്ക്രീൻ ഒഴിവാകും.</string>
+    <string name="settings_live_player_description">ExoPlayer (ശുപാർശ ചെയ്യുന്നു) ചാനലുകൾ വളരെ വേഗത്തിൽ തുറക്കുന്നു, തത്സമയ സബ്ടൈറ്റിലുകൾ ഇതിൽ മാത്രമേയുള്ളൂ. ExoPlayer-ന് പ്ലേ ചെയ്യാനാകാത്ത ചാനലുകൾ, അസാധാരണ ഓഡിയോയുള്ള ചിലത് ഉൾപ്പെടെ, mpv പ്ലേ ചെയ്യും. സംയുക്ത ഓപ്ഷനുകളിൽ ആദ്യത്തേത് പരാജയപ്പെട്ടാൽ മറ്റേ പ്ലെയർ സ്വയമേവ പരീക്ഷിക്കും; ഒറ്റ പ്ലെയർ ഓപ്ഷനുകളിൽ അത് ഒരിക്കലും സംഭവിക്കില്ല, രണ്ടാമത്തെ പ്ലെയർ നിങ്ങളുടെ ടിവിയിൽ എന്തായാലും പ്രവർത്തിക്കുന്നില്ലെങ്കിൽ ഏതാനും സെക്കൻഡ് കറുത്ത സ്ക്രീൻ ഒഴിവാകും. പ്ലെയറിൽ സ്വയം മാറ്റിയ ചാനലിൽ നിങ്ങളുടെ തിരഞ്ഞെടുപ്പ് രണ്ട് സാഹചര്യത്തിലും നിലനിൽക്കും.</string>
     <string name="settings_reset_player_choices_description">പ്ലെയറിൽ ഒരു സിനിമയോ എപ്പിസോഡോ mpv-യ്ക്കും ExoPlayer-നും ഇടയിൽ മാറ്റിയാൽ ആ തിരഞ്ഞെടുപ്പ് അടുത്ത തവണത്തേക്ക് സേവ് ചെയ്യപ്പെടും. പുനഃസജ്ജമാക്കിയാൽ എല്ലാം വീണ്ടും മുകളിലുള്ള ക്രമീകരണം പിന്തുടരും. ലൈവ് ചാനലുകളുടെ സേവ് ചെയ്ത തിരഞ്ഞെടുപ്പുകൾ നിലനിർത്തും.</string>
     <string name="settings_reset_player_choices_none">ഒന്നും സേവ് ചെയ്തിട്ടില്ല</string>
     <plurals name="settings_reset_player_choices_count">
@@ -476,7 +526,7 @@
     <string name="settings_guide_synced">ടിവി ഗൈഡ് സമന്വയിപ്പിച്ചു</string>
     <string name="settings_guide_sync_failed">ടിവി ഗൈഡ് സമന്വയിപ്പിക്കൽ പരാജയപ്പെട്ടു</string>
     <string name="settings_restore_remote_title">മറ്റൊരു ഉപകരണത്തിൽ നിന്ന് പുനഃസ്ഥാപിക്കുക</string>
-    <string name="settings_restore_remote_description">അതേ Wi-Fi-യിലുള്ള ഫോണിലോ ലാപ്‌ടോപ്പിലോ QR സ്കാൻ ചെയ്യുക (അല്ലെങ്കിൽ URL തുറക്കുക), ഈ PIN നൽകുക, നിങ്ങളുടെ OwnTV ബാക്കപ്പ് ഫയൽ തിരഞ്ഞെടുത്ത് Send to TV ടാപ്പ് ചെയ്യുക. തുടർന്ന് ഇവിടെ എന്തൊക്കെ പുനഃസ്ഥാപിക്കണമെന്ന് തിരഞ്ഞെടുക്കാം.</string>
+    <string name="settings_restore_remote_description">അതേ Wi-Fi-യിലുള്ള ഫോണിലോ ടാബ്‌ലെറ്റിലോ കമ്പ്യൂട്ടറിലോ QR സ്കാൻ ചെയ്യുക (അല്ലെങ്കിൽ URL തുറക്കുക), ഈ PIN നൽകുക, നിങ്ങളുടെ OwnTV ബാക്കപ്പ് ഫയൽ തിരഞ്ഞെടുത്ത് Send to TV ടാപ്പ് ചെയ്യുക. തുടർന്ന് ഇവിടെ എന്തൊക്കെ പുനഃസ്ഥാപിക്കണമെന്ന് തിരഞ്ഞെടുക്കാം.</string>
     <string name="settings_opening_server">സെർവർ തുറക്കുന്നു…</string>
     <string name="settings_enter_pin_browser">ബ്രൗസറിൽ ഈ PIN നൽകുക</string>
     <string name="settings_companion_qr">സഹായി URL-നുള്ള QR കോഡ്</string>
@@ -484,7 +534,7 @@
     <string name="settings_try_again">വീണ്ടും ശ്രമിക്കുക</string>
     <string name="settings_new_pin">പുതിയ PIN ഉപയോഗിച്ച് വീണ്ടും ആരംഭിക്കുക</string>
     <string name="settings_download_remote_title">മറ്റൊരു ഉപകരണത്തിൽ ഡൗൺലോഡ് ചെയ്യുക</string>
-    <string name="settings_download_remote_description">അതേ Wi-Fi-യിലുള്ള ഫോണിലോ ലാപ്‌ടോപ്പിലോ QR സ്കാൻ ചെയ്യുക (അല്ലെങ്കിൽ URL തുറക്കുക), ഈ PIN നൽകുക, സുരക്ഷിതമായി സൂക്ഷിക്കാൻ നിങ്ങളുടെ ബാക്കപ്പ് ഫയൽ ഡൗൺലോഡ് ചെയ്യുക.</string>
+    <string name="settings_download_remote_description">അതേ Wi-Fi-യിലുള്ള ഫോണിലോ ടാബ്‌ലെറ്റിലോ കമ്പ്യൂട്ടറിലോ QR സ്കാൻ ചെയ്യുക (അല്ലെങ്കിൽ URL തുറക്കുക), ഈ PIN നൽകുക, സുരക്ഷിതമായി സൂക്ഷിക്കാൻ നിങ്ങളുടെ ബാക്കപ്പ് ഫയൽ ഡൗൺലോഡ് ചെയ്യുക.</string>
     <string name="settings_preparing_backup">ബാക്കപ്പ് തയ്യാറാക്കുന്നു…</string>
     <string name="settings_glass_effect_on">ഗ്ലാസ് ഇഫക്റ്റ്: ഓൺ</string>
     <string name="settings_glass_effect_off">ഗ്ലാസ് ഇഫക്റ്റ്: ഓഫ്</string>
@@ -681,7 +731,7 @@
     <string name="settings_backup_what_backup">ബാക്കപ്പിൽ ഉൾപ്പെടുത്തേണ്ടവ</string>
     <string name="settings_backup_what_restore">പുനഃസ്ഥാപിക്കേണ്ടവ</string>
     <string name="settings_backup_encrypt_title">ഈ ബാക്കപ്പ് എൻക്രിപ്റ്റ് ചെയ്യണോ?</string>
-    <string name="settings_backup_encrypt_message">ഒരു ബാക്കപ്പ് പാസ്‌വേഡ് ഉപയോഗിച്ചാൽ, പ്ലേലിസ്റ്റുകൾ, പ്രൊഫൈലുകൾ, സംരക്ഷിച്ച പാസ്‌വേഡുകൾ എന്നിവ ഉൾപ്പെടെ മുഴുവൻ ഫയലും എൻക്രിപ്റ്റ് ചെയ്യും — ആ പാസ്‌വേഡ് ഇല്ലാതെ അതിലെ ഒന്നും വായിക്കാനാകില്ല. അത് സുരക്ഷിതമായി സൂക്ഷിക്കുക: നഷ്ടപ്പെട്ടാൽ ബാക്കപ്പ് ഒരിക്കലും തുറക്കാനാകില്ല. പാസ്‌വേഡ് ഇല്ലെങ്കിൽ ഫയൽ എൻക്രിപ്റ്റ് ചെയ്യില്ല, സംരക്ഷിച്ച പാസ്‌വേഡുകൾ അതിൽ ഉൾപ്പെടുത്തുകയുമില്ല.</string>
+    <string name="settings_backup_encrypt_message">ഒരു ബാക്കപ്പ് പാസ്‌വേഡ് ഉപയോഗിച്ചാൽ, പ്ലേലിസ്റ്റുകൾ, പ്രൊഫൈലുകൾ, സംരക്ഷിച്ച പാസ്‌വേഡുകൾ എന്നിവ ഉൾപ്പെടെ മുഴുവൻ ഫയലും എൻക്രിപ്റ്റ് ചെയ്യും — ആ പാസ്‌വേഡ് ഇല്ലാതെ അതിലെ ഒന്നും വായിക്കാനാകില്ല. അത് സുരക്ഷിതമായി സൂക്ഷിക്കുക: നഷ്ടപ്പെട്ടാൽ ബാക്കപ്പ് ഒരിക്കലും തുറക്കാനാകില്ല. പാസ്‌വേഡ് ഇല്ലെങ്കിൽ ഫയൽ എൻക്രിപ്റ്റ് ചെയ്യില്ല, സംരക്ഷിച്ച പാസ്‌വേഡുകളും പിന്നുകളും അതിൽ ഉൾപ്പെടുത്തുകയുമില്ല.</string>
     <string name="settings_backup_export_title">ഒരു ബാക്കപ്പ് എക്സ്പോർട്ട് ചെയ്യുക</string>
     <string name="settings_backup_export_message">അതേ Wi-Fi-യിലുള്ള മറ്റൊരു ഉപകരണത്തിലേക്ക് (ഫോൺ അല്ലെങ്കിൽ ലാപ്‌ടോപ്പ്) ബാക്കപ്പ് അയയ്ക്കുക, അല്ലെങ്കിൽ ഈ ഉപകരണത്തിലെ ഒരു ഫയലായി സംരക്ഷിക്കുക.</string>
     <string name="settings_backup_restore_title">ഒരു ബാക്കപ്പ് പുനഃസ്ഥാപിക്കുക</string>
@@ -730,13 +780,13 @@
     <string name="settings_backup_section_settings">ആപ്പ് ക്രമീകരണങ്ങൾ</string>
     <string name="settings_backup_section_settings_desc">തീം, ആക്സന്റ്, പ്ലെയർ, ലേഔട്ട് മുൻഗണനകൾ</string>
     <string name="settings_backup_saved_to"><xliff:g id="path">%1$s</xliff:g>-ൽ സംരക്ഷിച്ചു.</string>
-    <string name="settings_backup_saved_to_without_passwords"><xliff:g id="path">%1$s</xliff:g>-ൽ സംരക്ഷിച്ചു. പാസ്‌വേഡുകൾ ഉൾപ്പെടുത്തിയിട്ടില്ല.</string>
+    <string name="settings_backup_saved_to_without_passwords"><xliff:g id="path">%1$s</xliff:g>-ൽ സംരക്ഷിച്ചു. പാസ്‌വേഡുകളും പിന്നുകളും ഉൾപ്പെടുത്തിയിട്ടില്ല.</string>
     <plurals name="settings_backup_restored">
         <item quantity="one"><xliff:g id="items">%1$d</xliff:g> ഇനം പുനഃസ്ഥാപിച്ചു.</item>
         <item quantity="other"><xliff:g id="items">%1$d</xliff:g> ഇനങ്ങൾ പുനഃസ്ഥാപിച്ചു.</item>
     </plurals>
     <string name="settings_backup_restore_resync">ഉള്ളടക്കം ലോഡ് ചെയ്യാൻ നിങ്ങളുടെ ഉറവിടങ്ങൾ വീണ്ടും സമന്വയിപ്പിക്കുക.</string>
-    <string name="settings_backup_restore_password_note">ഉറവിടങ്ങൾ/പ്രോക്സി എന്നതിൽ സംരക്ഷിച്ചിട്ടുള്ള പാസ്‌വേഡുകൾ വീണ്ടും നൽകുക.</string>
+    <string name="settings_backup_restore_password_note">ഉറവിടങ്ങൾ/പ്രോക്സി എന്നതിൽ സംരക്ഷിച്ചിട്ടുള്ള പാസ്‌വേഡുകളും പ്രൊഫൈൽ പിന്നുകളും വീണ്ടും നൽകുക.</string>
     <plurals name="settings_backup_skipped_sources">
         <item quantity="one">പ്ലേലിസ്റ്റ് തരം പിന്തുണയ്‌ക്കാത്തതിനാൽ <xliff:g id="count">%1$d</xliff:g> ഉറവിടം ഒഴിവാക്കി.</item>
         <item quantity="other">പ്ലേലിസ്റ്റ് തരങ്ങൾ പിന്തുണയ്‌ക്കാത്തതിനാൽ <xliff:g id="count">%1$d</xliff:g> ഉറവിടങ്ങൾ ഒഴിവാക്കി.</item>
@@ -953,6 +1003,8 @@
     <string name="settings_font_preview">വിനോദം കൂടുതൽ ലളിതം.</string>
     <string name="settings_search_keywords_fonts">ഫോണ്ട് ടെക്സ്റ്റ് വലുപ്പം ടൈപ്പ്ഫേസ് പോപ്പപ്പ് വായന ആക്സസിബിലിറ്റി</string>
     <string name="settings_font_system_sans">സിസ്റ്റം സാൻസ്</string>
+    <string name="settings_font_monospace">മോണോസ്പേസ്</string>
+    <string name="settings_subtitle_font">സബ്‌ടൈറ്റിൽ ഫോണ്ട്</string>
     <string name="settings_glass_preset_title">രൂപഭാവ പ്രീസെറ്റ്</string>
     <string name="settings_glass_preset_clear">വ്യക്തം</string>
     <string name="settings_glass_preset_balanced">സമതുലിതം</string>

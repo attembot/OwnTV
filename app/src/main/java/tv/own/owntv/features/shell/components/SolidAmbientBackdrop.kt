@@ -30,9 +30,10 @@ fun SolidAmbientBackdrop(
     modifier: Modifier = Modifier,
 ) {
     val glass = LocalGlass.current
-    if (!glowEnabled || glass.enabled) return
+    val colors = OwnTVTheme.colors
+    if (!glowEnabled || glass.enabled || !colors.isDark) return
 
-    val primary = OwnTVTheme.colors.primary
+    val primary = colors.primary
     val transition = if (pulseEnabled) rememberInfiniteTransition(label = "solidAmbientPulse") else null
     val ringScale = transition?.animateFloat(
         initialValue = 0.92f,
@@ -71,11 +72,13 @@ fun SolidAmbientBackdrop(
             radius = glowRadius,
             center = center,
         )
-        drawCircle(
-            color = primary.copy(alpha = 0.20f * presence),
-            radius = size.minDimension * 0.34f * scale,
-            center = center,
-            style = Stroke(width = 1.dp.toPx()),
-        )
+        if (pulseEnabled) {
+            drawCircle(
+                color = primary.copy(alpha = 0.20f * presence),
+                radius = size.minDimension * 0.34f * scale,
+                center = center,
+                style = Stroke(width = 1.dp.toPx()),
+            )
+        }
     }
 }

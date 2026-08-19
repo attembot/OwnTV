@@ -261,8 +261,16 @@ private fun RailPill(
             .glass(surface = GlassSurface.PANELS, baseFill = ladder.container, shape = shape)
             .then(
                 when {
+                    // Glass mode replaces the ladder outline with a frosted rim. The *focused* pill
+                    // still has to follow the user's focus highlight (#121) — only the selected-idle
+                    // marker keeps the neutral white rim, so the cursor stays the louder of the two.
+                    panelsGlassy && focused -> Modifier.border(
+                        tv.own.owntv.ui.theme.LocalFocusBorderWidth.current,
+                        OwnTVTheme.colors.focusBorder,
+                        shape,
+                    )
                     panelsGlassy && highlighted -> Modifier.border(Dimens.FocusBorderWidth, Color.White.copy(alpha = 0.35f), shape)
-                    ladder.focusBorder != null -> Modifier.border(Dimens.FocusBorderWidth, ladder.focusBorder, shape)
+                    ladder.focusBorder != null -> Modifier.border(tv.own.owntv.ui.theme.LocalFocusBorderWidth.current, ladder.focusBorder, shape)
                     else -> Modifier
                 }
             )

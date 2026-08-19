@@ -22,10 +22,22 @@ import java.io.IOException
 class OpenSubtitlesClient(
     private val okHttpClient: OkHttpClient,
     private val clientId: tv.own.owntv.core.metadata.OwnTVClientId,
+    private val settings: tv.own.owntv.features.settings.data.SettingsRepository,
 ) {
 
     /** Non-2xx from OpenSubtitles. 401 drives the one-shot silent re-login upstream. */
     class ApiException(val code: Int, message: String) : IOException(message)
+
+    /**
+     * Same pool/dispatcher as the shared client, but with connection-failure recovery ON.
+     *
+     * The shared client sets `retryOnConnectionFailure(false)` so SyncManager owns stream retries —
+     * and that flag ALSO disables OkHttp's fall-back to the next resolved address. The Worker host
+     * resolves to both IPv4 and IPv6 records, so on a network that advertises IPv6 but cannot route
+     * it, the first connect fails and sign-in dies instantly while the rest of the TV looks online.
+     * Subtitle calls are small one-shot requests; retrying the other address costs nothing here.
+     */
+    private val http: OkHttpClient = okHttpClient.newBuilder().retryOnConnectionFailure(true).build()
 
     /** Login result: the bearer token plus the account snapshot OpenSubtitles returns with it. */
     data class LoginResult(
@@ -99,30 +111,50 @@ class OpenSubtitlesClient(
         token: String?,
         body: JSONObject? = null,
     ): JSONObject {
+        val customServer = kotlinx.coroutines.runBlocking { settings.currentOpenSubtitlesServerUrl() }.trim().trimEnd('/')
+        val ownKey = kotlinx.coroutines.runBlocking { settings.currentOpenSubtitlesApiKey() }.trim()
+        val direct = customServer.isBlank() && ownKey.isNotBlank()
+        val base = when {
+            customServer.isNotBlank() -> customServer
+            direct -> "https://$host"
+            else -> WORKER_BASE
+        }
         val builder = Request.Builder()
-            .url("$WORKER_BASE/api/v1$pathAndQuery")
-            .header("X-OS-Host", host)
+            .url("$base/api/v1$pathAndQuery")
             .header("Accept", "application/json")
             .header("User-Agent", USER_AGENT)
+        if (!direct) builder.header("X-OS-Host", host)
+        if (direct) builder.header("Api-Key", ownKey)
         if (token != null) builder.header("Authorization", "Bearer $token")
         // Same identity the metadata Worker requires. This Worker sits on *.workers.dev with no WAF
         // in front of it, so the shared secret it checks internally is its only protection — without
         // these headers every subtitle call would come back 403 once the Worker is deployed.
         // Blank on a build with no key (fork/fresh clone); the Worker degrades open for those.
-        if (tv.own.owntv.BuildConfig.TMDB_EDGE_KEY.isNotBlank()) {
+        if (!direct && customServer.isBlank() && tv.own.owntv.BuildConfig.TMDB_EDGE_KEY.isNotBlank()) {
             builder.header("x-owntv-key", tv.own.owntv.BuildConfig.TMDB_EDGE_KEY)
+            // The Worker validates the key per app version, so it needs the version alongside it.
+            builder.header("x-owntv-version", tv.own.owntv.BuildConfig.VERSION_NAME)
             edgeClientId()?.let { builder.header("x-owntv-client", it) }
         }
         val requestBody = body?.toString()?.toRequestBody(JSON_MEDIA_TYPE)
         builder.method(method, requestBody)
 
-        okHttpClient.newCall(builder.build()).execute().use { resp ->
+        val response = try {
+            http.newCall(builder.build()).execute()
+        } catch (e: IOException) {
+            // A transport failure used to leave NOTHING in logcat, so "couldn't reach OpenSubtitles"
+            // was unfalsifiable from a bug report. Cause + host only: never the query (the query
+            // carries the movie title and moviehash) and never the body (credentials).
+            Log.w(TAG, "$method ${pathAndQuery.substringBefore('?')} via $base -> ${e.javaClass.simpleName}: ${e.message}")
+            throw e
+        }
+        response.use { resp ->
             val text = resp.body.string()
             if (!resp.isSuccessful) {
                 // The body may echo credentials on auth endpoints — log only code + path. The QUERY is
                 // dropped too: on a search it carries the movie title and the file's moviehash, which is
                 // the user's viewing history written into logcat.
-                Log.w(TAG, "$method ${pathAndQuery.substringBefore('?')} -> HTTP ${resp.code}")
+                Log.w(TAG, "$method ${pathAndQuery.substringBefore('?')} via $base -> HTTP ${resp.code}")
                 throw ApiException(resp.code, "OpenSubtitles HTTP ${resp.code}")
             }
             return runCatching { JSONObject(text) }.getOrElse {
@@ -142,7 +174,8 @@ class OpenSubtitlesClient(
         vip = user?.optBoolean("vip") ?: false,
         remainingDownloads = user?.optInt("remaining_downloads", -1)?.takeIf { it >= 0 },
         allowedDownloads = user?.optInt("allowed_downloads", -1)?.takeIf { it > 0 },
-        resetTime = user?.optString("reset_time")?.takeIf { it.isNotBlank() },
+        resetTime = user?.optString("reset_time")?.takeIf { it.isNotBlank() }
+            ?: user?.optString("reset_time_utc")?.takeIf { it.isNotBlank() },
     )
 
     companion object {

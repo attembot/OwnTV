@@ -1,6 +1,7 @@
 package tv.own.owntv.features.shell.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +36,10 @@ import tv.own.owntv.features.live.EpgNowNext
 import tv.own.owntv.ui.format.rememberSystemTimeFormatter
 import tv.own.owntv.ui.theme.OwnTVTheme
 
+/** Which pair of slots a [LiveEpgCard] is describing: what is on air now, or what was on air
+ *  at the moment being replayed out of the archive. */
+enum class EpgCardVariant { LIVE, ARCHIVE }
+
 /**
  * Now / Next for the PLAYING live channel, laid out horizontally so it can live in the player's top
  * bar beside the channel identity (the older vertical Before/Now/Next card sat on the right edge,
@@ -42,22 +47,39 @@ import tv.own.owntv.ui.theme.OwnTVTheme
  * when the channel has no guide data — a permanent "no info" block would be noise on every unhide.
  */
 @Composable
-fun LiveEpgCard(epg: EpgNowNext?, modifier: Modifier = Modifier) {
+fun LiveEpgCard(
+    epg: EpgNowNext?,
+    modifier: Modifier = Modifier,
+    // ARCHIVE renders the same two slots for a programme being replayed: different labels, a teal
+    // frame matching the "watching" clock, and progress measured against the replayed instant rather
+    // than against now. Two identically-labelled cards a few pixels apart would be unreadable.
+    variant: EpgCardVariant = EpgCardVariant.LIVE,
+    // ARCHIVE only: the wall-clock instant on screen, which drives the progress bar and "x min left".
+    atMs: Long? = null,
+) {
     if (epg == null || (epg.now == null && epg.next == null)) return
+    val archive = variant == EpgCardVariant.ARCHIVE
     val colors = OwnTVTheme.colors
     val formatTime = rememberSystemTimeFormatter()
     // Drives the "x min left" text and the progress bar; a slow tick is plenty for minute precision.
-    var nowMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(Unit) { while (true) { delay(20_000); nowMs = System.currentTimeMillis() } }
+    var wallNow by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) { while (true) { delay(20_000); wallNow = System.currentTimeMillis() } }
+    // On the archive card every "how far through are we" question is asked about the replayed moment,
+    // not about the present — otherwise a programme from yesterday reads as 100% finished.
+    val nowMs = if (archive) (atMs ?: wallNow) else wallNow
 
     Row(
-        modifier = modifier,
+        modifier = if (!archive) modifier else modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(colors.primary.copy(alpha = 0.09f))
+            .border(1.dp, colors.primary.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         epg.now?.let { entry ->
             Column(Modifier.widthIn(max = 300.dp)) {
-                SlotLabel(stringResource(R.string.content_live_now), colors.primary)
+                SlotLabel(stringResource(if (archive) R.string.content_archive_playing else R.string.content_live_now), colors.primary)
                 Text(
                     entry.title,
                     style = MaterialTheme.typography.titleSmall,
@@ -108,7 +130,7 @@ fun LiveEpgCard(epg: EpgNowNext?, modifier: Modifier = Modifier) {
         }
         epg.next?.let { entry ->
             Column(Modifier.widthIn(max = 240.dp)) {
-                SlotLabel(stringResource(R.string.content_live_next), Color.White.copy(alpha = 0.45f))
+                SlotLabel(stringResource(if (archive) R.string.content_archive_then else R.string.content_live_next), Color.White.copy(alpha = 0.45f))
                 Text(
                     entry.title,
                     style = MaterialTheme.typography.bodyMedium,

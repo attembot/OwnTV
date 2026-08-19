@@ -90,6 +90,9 @@ class ProfilesViewModel(
                 else -> Pin.hash(pin)
             }
             profileDao.update(profile.copy(name = name.ifBlank { profile.name }, avatarId = avatarId, isKids = isKids, pinHash = pinHash))
+            if (profile.isKids != isKids) {
+                launcherIntegrationRepository.refreshProfile(profile.id, allowBrowsableRequest = false)
+            }
         }
     }
 
@@ -114,6 +117,7 @@ class ProfilesViewModel(
             runCatching { launcherIntegrationRepository.clearProfile(profile.id) }
             // Deleting a profile permanently erases its stored OpenSubtitles login (subtitle plan §5.5).
             openSubtitlesAccounts.eraseFor(profile.id)
+            settings.setStartupChannel(profile.id, null)
             profileDao.delete(profile)
             if (activeProfileId == profile.id) {
                 settings.setActiveProfile(remainingProfileId ?: -1L)
@@ -146,6 +150,10 @@ internal fun shellMayCompose(
     if (active < 0L || loaded.profiles.none { it.id == active }) return false
     return !gateRequired || authenticatedProfileId == active
 }
+
+/** One unlocked profile enters the shell immediately; all chooser/PIN cases stay gated. */
+internal fun profileGateRequired(profiles: List<ProfileEntity>): Boolean =
+    profiles.size > 1 || profiles.singleOrNull()?.pinHash != null
 
 /** Links all currently-known sources to a freshly created profile (helper kept off the entity API). */
 private suspend fun SourceDao.observeForProfileOnceLinked(profileId: Long) {

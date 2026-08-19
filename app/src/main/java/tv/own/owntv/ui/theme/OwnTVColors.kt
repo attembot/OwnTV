@@ -113,8 +113,16 @@ private fun rolesFrom(seed: Color, isDark: Boolean): AccentRoles {
 /**
  * Build the resolved M3 tokens for a theme (dark/light) and accent. A valid [customAccent] hex
  * overrides the preset (its tonal roles are generated from the seed color).
+ *
+ * [focusHighlight] recolors the focus ring and its glow only (#121): the accent still owns buttons,
+ * chips and containers, so a loud focus color does not repaint the whole app. Blank = the accent.
  */
-fun ownTvColors(isDark: Boolean, accent: AccentColor, customAccent: String = ""): OwnTVColors {
+fun ownTvColors(
+    isDark: Boolean,
+    accent: AccentColor,
+    customAccent: String = "",
+    focusHighlight: String = "",
+): OwnTVColors {
     val roles = parseAccentHex(customAccent)?.let { rolesFrom(it, isDark) } ?: AccentRoles(
         primary = accent.primary(isDark),
         onPrimary = accent.onPrimary(isDark),
@@ -122,6 +130,7 @@ fun ownTvColors(isDark: Boolean, accent: AccentColor, customAccent: String = "")
         onPrimaryContainer = accent.onPrimaryContainer(isDark),
     )
     val primary = roles.primary
+    val focus = parseAccentHex(focusHighlight) ?: primary
     return if (isDark) {
         OwnTVColors(
             isDark = true,
@@ -148,8 +157,8 @@ fun ownTvColors(isDark: Boolean, accent: AccentColor, customAccent: String = "")
             onTertiary = DarkOnTertiary,
             tertiaryContainer = DarkTertiaryContainer,
             onTertiaryContainer = DarkOnTertiaryContainer,
-            focusBorder = primary,
-            focusGlow = primary.copy(alpha = 0.40f),
+            focusBorder = focus,
+            focusGlow = focus.copy(alpha = 0.40f),
             favorite = DarkError,
         )
     } else {
@@ -178,8 +187,8 @@ fun ownTvColors(isDark: Boolean, accent: AccentColor, customAccent: String = "")
             onTertiary = LightOnTertiary,
             tertiaryContainer = LightTertiaryContainer,
             onTertiaryContainer = LightOnTertiaryContainer,
-            focusBorder = primary,
-            focusGlow = primary.copy(alpha = 0.28f),
+            focusBorder = focus,
+            focusGlow = focus.copy(alpha = 0.28f),
             favorite = LightError,
         )
     }

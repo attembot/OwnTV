@@ -12,6 +12,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filter
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -65,6 +67,8 @@ class SettingsViewModel(
     private val epgDao: tv.own.owntv.core.database.dao.EpgDao,
     private val importFinalizer: tv.own.owntv.core.sync.ImportFinalizer,
     private val channelDao: tv.own.owntv.core.database.dao.ChannelDao,
+    private val categoryDao: tv.own.owntv.core.database.dao.CategoryDao,
+    private val customizationStore: tv.own.owntv.core.customize.CustomizationStore,
     private val movieDao: tv.own.owntv.core.database.dao.MovieDao,
     private val seriesDao: tv.own.owntv.core.database.dao.SeriesDao,
     private val historyDao: tv.own.owntv.core.database.dao.HistoryDao,
@@ -91,7 +95,7 @@ class SettingsViewModel(
         private const val STALKER_TEST_SOURCE_ID = -1L
     }
 
-    // ---- Remote (companion) add-source: a LAN web form fills the Add Source screen from a phone. ----
+    // ---- Remote (companion) add-source: a LAN web form fills the Add Source screen from another device. ----
     /** Server lifecycle (Idle / Starting / Listening with PIN+QR / Failed) for the Remote screen. */
     val remoteState get() = companion.state
 
@@ -105,12 +109,21 @@ class SettingsViewModel(
     fun stopRemoteListener() = companion.stop()
     fun consumeRemotePayload() = companion.consumePayload()
 
-    // ---- Remote background image: the phone uploads a photo over LAN (same PIN/QR companion flow). ----
+    // ---- Remote background image: another device uploads a photo over LAN (same PIN/QR companion flow). ----
 
-    /** Background images received from the phone in image-upload mode. */
+    /** Background images received from the remote device in image-upload mode. */
     val remoteImages get() = companion.images
 
     fun startRemoteImageListener(port: Int) = companion.startForImageUpload(port)
+
+    /** TMDB API keys handed over from another device, so a 32-character key never has to be typed with the remote. */
+    val remoteTmdbKeys get() = companion.tmdbKeys
+    val remoteTmdbConfigs get() = companion.tmdbConfigs
+    val remoteOpenSubtitlesConfigs get() = companion.openSubtitlesConfigs
+
+    fun startRemoteTmdbKeyListener(port: Int) = companion.startForTmdbKey(port)
+    fun startRemoteTmdbConfigListener(port: Int) = companion.startForTmdbConfig(port)
+    fun startRemoteOpenSubtitlesConfigListener(port: Int) = companion.startForOpenSubtitlesConfig(port)
 
     // Semi-auto EPG: after a playlist import, if the playlist has a guide URL we offer to sync the EPG now
     // (instead of the old slow auto-sync). "Sync now" shows a live programme count, just like the import.
@@ -381,8 +394,17 @@ class SettingsViewModel(
     val hwDecoding: StateFlow<Boolean> = settings.hwDecoding.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
     fun setHwDecoding(enabled: Boolean) { viewModelScope.launch { settings.setHwDecoding(enabled) } }
 
-    val vodPreferExo: StateFlow<Boolean> = settings.vodPreferExo.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
-    fun setVodPreferExo(enabled: Boolean) { viewModelScope.launch { settings.setVodPreferExo(enabled) } }
+    val vodEnginePreference: StateFlow<tv.own.owntv.player.EnginePreference> = settings.vodEnginePreference
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.player.EnginePreference.MPV_FIRST)
+    fun setVodEnginePreference(preference: tv.own.owntv.player.EnginePreference) {
+        viewModelScope.launch { settings.setVodEnginePreference(preference) }
+    }
+
+    val liveEnginePreference: StateFlow<tv.own.owntv.player.EnginePreference> = settings.liveEnginePreference
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.player.EnginePreference.EXO_FIRST)
+    fun setLiveEnginePreference(preference: tv.own.owntv.player.EnginePreference) {
+        viewModelScope.launch { settings.setLiveEnginePreference(preference) }
+    }
 
     /** How many movies/episodes are pinned to a specific engine — the row is only worth showing when
      *  there is something to forget. Counts both directions: a pin to mpv and a pin to ExoPlayer both
@@ -462,6 +484,75 @@ class SettingsViewModel(
         viewModelScope.launch { settings.setStartupMode(settings.activeProfileId.first(), mode) }
     }
 
+    val startupChannel: StateFlow<tv.own.owntv.features.settings.data.StartupChannelRef?> =
+        settings.activeProfileId
+            .flatMapLatest { profileId ->
+                if (profileId < 0L) flowOf(null) else settings.startupChannel(profileId)
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    private val _startupChannelQuery = MutableStateFlow("")
+    val startupChannelQuery: StateFlow<String> = _startupChannelQuery.asStateFlow()
+    private val startupChannelRefresh = MutableStateFlow(0)
+
+    @OptIn(kotlinx.coroutines.FlowPreview::class)
+    val startupChannelResults: StateFlow<List<tv.own.owntv.core.database.entity.ChannelEntity>> =
+        combine(
+            settings.activeProfileId,
+            _startupChannelQuery.debounce(180),
+            startupChannelRefresh,
+        ) { profileId, query, _ -> profileId to query }
+            .mapLatest { (profileId, query) -> loadStartupChannelResults(profileId, query) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun setStartupChannelQuery(query: String) { _startupChannelQuery.value = query }
+
+    fun refreshStartupChannelPicker() { startupChannelRefresh.value++ }
+
+    fun setStartupChannel(channel: tv.own.owntv.core.database.entity.ChannelEntity) {
+        viewModelScope.launch {
+            val profileId = settings.activeProfileId.first()
+            if (profileId < 0L) return@launch
+            settings.setSpecificStartupChannel(
+                profileId,
+                tv.own.owntv.features.settings.data.StartupChannelRef(
+                    sourceId = channel.sourceId,
+                    remoteId = channel.remoteId,
+                    name = channel.name,
+                    itemId = channel.id,
+                ),
+            )
+        }
+    }
+
+    private suspend fun loadStartupChannelResults(
+        profileId: Long,
+        query: String,
+    ): List<tv.own.owntv.core.database.entity.ChannelEntity> {
+        if (profileId < 0L) return emptyList()
+        val sources = sourceDao.observeForProfile(profileId).first().filter { it.syncLive }
+        val defaultSourceId = settings.defaultSourceId.first()
+        val sourceIds = if (defaultSourceId > 0L && sources.any { it.id == defaultSourceId }) {
+            listOf(defaultSourceId)
+        } else {
+            sources.map { it.id }
+        }
+        if (sourceIds.isEmpty()) return emptyList()
+        val customizations = customizationStore.observe(profileId, tv.own.owntv.core.model.MediaType.LIVE).first()
+        val isKids = profileDao.getById(profileId)?.isKids == true
+        val hiddenCategoryIds = tv.own.owntv.core.content.AdultCategoryClassifier.hiddenCategoryIds(
+            categoryDao.observe(sourceIds, tv.own.owntv.core.model.MediaType.LIVE).first(),
+            customizations.hiddenCategories,
+            isKids,
+        )
+        return channelDao.searchList(query.trim(), sourceIds, 500)
+            .asSequence()
+            .filter { tv.own.owntv.core.customize.CustomizeKeys.channel(it) !in customizations.hiddenItems }
+            .filter { it.categoryId == null || it.categoryId !in hiddenCategoryIds }
+            .take(300)
+            .toList()
+    }
+
     val resumeMode: StateFlow<SettingsRepository.ResumeMode> =
         settings.resumeMode.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsRepository.ResumeMode.ASK)
     fun setResumeMode(name: String) {
@@ -480,6 +571,10 @@ class SettingsViewModel(
 
     val subtitleScale: StateFlow<Float> = settings.subtitleScale.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SubtitleStyle.SCALE_DEFAULT)
     fun setSubtitleScale(scale: Float) { viewModelScope.launch { settings.setSubtitleScale(scale) } }
+
+    val subtitleFont: StateFlow<tv.own.owntv.ui.theme.AppFontFamily?> = settings.subtitleFont
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    fun setSubtitleFont(font: tv.own.owntv.ui.theme.AppFontFamily?) { viewModelScope.launch { settings.setSubtitleFont(font) } }
 
     val subtitleColor: StateFlow<String> = settings.subtitleColor.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SubtitleStyle.COLOR_DEFAULT)
     fun setSubtitleColor(hex: String) { viewModelScope.launch { settings.setSubtitleColor(hex) } }
@@ -539,6 +634,12 @@ class SettingsViewModel(
     /** Custom accent hex ("#52DBC8"); blank = the preset is in effect. */
     val customAccent: StateFlow<String> = settings.customAccent.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
     fun setCustomAccent(hex: String) { viewModelScope.launch { settings.setCustomAccent(hex) } }
+
+    /** Focus highlight (#121): ring color hex (blank = accent) and ring width in dp. */
+    val focusHighlight: StateFlow<String> = settings.focusHighlight.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+    val focusHighlightWidth: StateFlow<Int> = settings.focusHighlightWidth.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 2)
+    fun setFocusHighlight(hex: String) { viewModelScope.launch { settings.setFocusHighlight(hex) } }
+    fun setFocusHighlightWidth(dp: Int) { viewModelScope.launch { settings.setFocusHighlightWidth(dp) } }
 
     // --- Glass effect: background image + per-surface translucency ---
     val bgImagePath: StateFlow<String> = settings.bgImagePath.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
@@ -1376,6 +1477,14 @@ class SettingsViewModel(
         settings.metadataServerUrl.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
     fun setMetadataServerUrl(url: String) { viewModelScope.launch { settings.setMetadataServerUrl(url) } }
 
+    val openSubtitlesApiKey: StateFlow<String> = settings.openSubtitlesApiKey
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+    fun setOpenSubtitlesApiKey(key: String) { viewModelScope.launch { settings.setOpenSubtitlesApiKey(key) } }
+
+    val openSubtitlesServerUrl: StateFlow<String> = settings.openSubtitlesServerUrl
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+    fun setOpenSubtitlesServerUrl(url: String) { viewModelScope.launch { settings.setOpenSubtitlesServerUrl(url) } }
+
     /** TMDB content language ("" = TMDB default en-US, "auto" = device locale, else an ISO 639-1 code). */
     val metadataLanguage: StateFlow<String> =
         settings.metadataLanguage.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
@@ -1451,7 +1560,9 @@ class SettingsViewModel(
         }
         _metadataTest.value = MetadataTestState.Testing
         viewModelScope.launch {
-            val result = runCatching { metadataProvider.searchMovie(q) }
+            val profileId = settings.activeProfileId.first()
+            val includeAdult = tv.own.owntv.core.metadata.profileAllowsAdultMetadata(profileDao.getById(profileId)?.isKids)
+            val result = runCatching { metadataProvider.searchMovie(q, includeAdult = includeAdult) }
             _metadataTest.value = result.fold(
                 onSuccess = { hits ->
                     val top = hits?.firstOrNull()

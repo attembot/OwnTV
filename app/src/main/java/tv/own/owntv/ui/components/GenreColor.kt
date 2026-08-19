@@ -3,6 +3,7 @@ package tv.own.owntv.ui.components
 import androidx.annotation.StringRes
 import androidx.compose.ui.graphics.Color
 import tv.own.owntv.R
+import tv.own.owntv.core.content.AdultCategoryClassifier
 
 /**
  * Maps a channel / VOD category name to a coarse "genre" with a colour, used as a small dot/badge
@@ -48,10 +49,11 @@ enum class ChannelGenre(@param:StringRes val displayLabelRes: Int, val canonical
          * Action, "Anime Series" → Anime, "Kids Movies" → Kids). Returns [OTHER] when the name is
          * blank or nothing matches.
          */
-        fun fromCategory(categoryName: String?): ChannelGenre {
-            val n = categoryName?.lowercase()?.trim().orEmpty()
-            if (n.isEmpty()) return OTHER
-            for (g in ORDER) {
+    fun fromCategory(categoryName: String?): ChannelGenre {
+        val n = categoryName?.lowercase()?.trim().orEmpty()
+        if (n.isEmpty()) return OTHER
+        if (AdultCategoryClassifier.isAdult(categoryName)) return ADULT
+        for (g in ORDER) {
                 if (keywords(g).any { n.contains(it) }) return g
             }
             return OTHER
@@ -67,8 +69,8 @@ enum class ChannelGenre(@param:StringRes val displayLabelRes: Int, val canonical
 
         // Precedence: specific/high-signal first, generic scripted-content buckets (MOVIES/SERIES)
         // last so a "NETFLIX ACTION" reads as Action and only a bare "NETFLIX MOVIES" reads as Movies.
-        private val ORDER = listOf(
-            ADULT, SPORT, NEWS, RELIGIOUS, ANIME, KIDS, MUSIC, DOCUMENTARY,
+    private val ORDER = listOf(
+        SPORT, NEWS, RELIGIOUS, ANIME, KIDS, MUSIC, DOCUMENTARY,
             SCIFI, HORROR, ROMANCE, COMEDY, ACTION, DRAMA,
             ENTERTAINMENT, MOVIES, SERIES,
         )

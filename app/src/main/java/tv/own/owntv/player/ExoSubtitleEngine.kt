@@ -21,6 +21,7 @@ import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import tv.own.owntv.core.network.HttpClient
+import tv.own.owntv.core.drm.toMediaDrmConfiguration
 import tv.own.owntv.core.network.StreamHeaders
 import java.util.Locale
 
@@ -102,7 +103,8 @@ class ExoSubtitleEngine(
     private var shiftJob: kotlinx.coroutines.Job? = null
 
     private fun shiftKey(path: String, offsetMs: Int) = "$path|$offsetMs"
-    // Engine-fallback playback (mpv terminally failed this VOD): no auto subtitle, engine-worded errors.
+    // Engine-fallback playback (mpv terminally failed this VOD): no arbitrary subtitle; a configured
+    // preferred language is still honoured. Errors remain engine-worded.
     private var fallbackMode = false
     // First-frame watchdog: this handoff only exists to show an image subtitle over otherwise-healthy
     // video, so if ExoPlayer never renders a frame (a format/decoder combo mpv handled fine but this
@@ -342,6 +344,9 @@ class ExoSubtitleEngine(
 
     private fun buildMediaItem(url: String): MediaItem {
         val builder = MediaItem.Builder().setUri(url)
+        // #115 — a protected item. Single-session: a film's content key does not rotate, unlike a live
+        // channel's, so there is nothing to renew mid-playback.
+        drmConfig?.let { builder.setDrmConfiguration(it.toMediaDrmConfiguration(multiSession = false)) }
         if (externalSubs.isNotEmpty()) {
             builder.setSubtitleConfigurations(externalSubs.map { s ->
                 // Timing offset for the active external sub: side-load a timestamp-shifted copy (§8).
@@ -464,6 +469,9 @@ class ExoSubtitleEngine(
      *  fail the moment the engine fallback took over. */
     @Volatile var userAgent: String? = null
     @Volatile var httpHeaders: Map<String, String> = emptyMap()
+    /** This item's Widevine/ClearKey licence details (#115), pushed in by [OwnTVPlayer]; null for the
+     *  unprotected majority. Only this engine can honour it — mpv has no CDM to license the stream. */
+    @Volatile var drmConfig: tv.own.owntv.core.drm.DrmConfig? = null
     private var httpFactory: OkHttpDataSource.Factory? = null
 
     private fun applyRequestHeaders() {
@@ -759,10 +767,9 @@ class ExoSubtitleEngine(
                 val image = mime == androidx.media3.common.MimeTypes.APPLICATION_PGS ||
                     mime == androidx.media3.common.MimeTypes.APPLICATION_VOBSUB ||
                     mime == androidx.media3.common.MimeTypes.APPLICATION_DVBSUBS
-                // Side-loaded external subs keep their raw configured label; the Compose renderer adds
-                // the localized source label. The raw value remains an engine identity for selection and
-                // engine-toggle carry-over, never a translated sentence.
-                val external = format.label?.let { label -> externalSubs.firstOrNull { it.title == label } }
+                // Side-loaded external subs keep their raw configured label, which already carries their
+                // source in its prefix (see SubtitleTrackLabel). The raw value remains an engine identity
+                // for selection and engine-toggle carry-over, never a translated sentence.
                 out.add(
                     TrackOption(
                         label = format.label.orEmpty(),
@@ -772,7 +779,6 @@ class ExoSubtitleEngine(
                         lang = format.language,
                         typeIndex = id,
                         labelKind = TrackLabelKind.SUBTITLE,
-                        externalSource = external?.source,
                     ),
                 )
                 id++
@@ -804,15 +810,6 @@ class ExoSubtitleEngine(
             }
             return // its track hasn't appeared in this update yet — wait for the next onTracksChanged
         }
-        // Engine-fallback playback with no subtitle picked: keep text tracks OFF rather than letting the
-        // "?: textTracks.first()" recovery below auto-select one the user never asked for.
-        if (pendingSubTypeIndex < 0 && pendingSubLang == null) {
-            p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
-                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
-                .build()
-            subtitleApplied = true
-            return
-        }
         // Flatten text tracks in declaration order so the mpv sub ordinal lines up with ExoPlayer's.
         data class TextTrack(val group: TrackGroup, val index: Int, val lang: String?)
         val textTracks = ArrayList<TextTrack>()
@@ -823,6 +820,25 @@ class ExoSubtitleEngine(
             }
         }
         if (textTracks.isEmpty()) return
+        // A fresh item has no manual carry-over. Honour the configured language explicitly:
+        // this handoff path used to disable the text renderer after Media3 selected it.
+        // Blank preference or no matching track leaves subtitles off rather than choosing randomly.
+        if (pendingSubTypeIndex < 0 && pendingSubLang == null) {
+            val preferred = prefSubLang.takeIf { it.isNotBlank() }?.let { wanted ->
+                textTracks.firstOrNull { subtitleLanguageMatches(wanted, it.lang) }
+            }
+            val builder = p.trackSelectionParameters.buildUpon()
+            if (preferred == null) {
+                builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+            } else {
+                builder
+                    .setOverrideForType(TrackSelectionOverride(preferred.group, listOf(preferred.index)))
+                    .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+            }
+            p.trackSelectionParameters = builder.build()
+            subtitleApplied = true
+            return
+        }
         // The ordinal is a cross-engine guess — mpv's track order need not survive into ExoPlayer's — so
         // it only stands when the track it lands on also carries the language the user picked. Failing
         // that, match by language; and force a track only when there is exactly one it could be. The old

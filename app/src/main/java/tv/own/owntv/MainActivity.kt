@@ -217,6 +217,8 @@ class MainActivity : ComponentActivity() {
             val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
             val accent by viewModel.accent.collectAsStateWithLifecycle()
             val customAccent by viewModel.customAccent.collectAsStateWithLifecycle()
+            val focusHighlight by viewModel.focusHighlight.collectAsStateWithLifecycle()
+            val focusHighlightWidth by viewModel.focusHighlightWidth.collectAsStateWithLifecycle()
             val uiZoomPercent by viewModel.uiZoomPercent.collectAsStateWithLifecycle()
             val fontCustomization by viewModel.fontCustomization.collectAsStateWithLifecycle()
             val animationLevel by viewModel.animationLevel.collectAsStateWithLifecycle()
@@ -262,7 +264,7 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(loadedProfileId != null) {
                 if (loadedProfileId != null) Perf.stamp("profile-id-loaded")
             }
-            val shouldShowProfileGate = profilesLoaded && (profiles.size > 1 || profiles.singleOrNull()?.pinHash != null)
+            val shouldShowProfileGate = profilesLoaded && tv.own.owntv.features.profiles.profileGateRequired(profiles)
             // Keep the pure launch policy in the actual composition path as well as in its unit
             // tests. The policy checks the Room list, active-id membership, and authentication as
             // one decision; a future branch must not accidentally make the shell depend on only
@@ -301,6 +303,8 @@ class MainActivity : ComponentActivity() {
                 accent = accent,
                 systemInDarkTheme = isSystemInDarkTheme(),
                 customAccent = customAccent,
+                focusHighlight = focusHighlight,
+                focusBorderWidthDp = focusHighlightWidth,
                 animationLevel = animationLevel,
                 mainFontFamily = fontCustomization.mainFamily,
                 popupFontFamily = fontCustomization.popupFamily,

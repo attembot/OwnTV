@@ -126,7 +126,7 @@ fun AddSourceScreen(
     ) -> Unit,
     onStartM3u: (name: String, url: String, userAgent: String, epgUrl: String, autoRefresh: PlaylistAutoRefresh, isDefault: Boolean) -> Unit,
     // The last submission from the Remote companion screen, retained as a StateFlow so it survives the
-    // Remote → Manual hand-off (this screen mounts after the phone posted). When present, the matching
+    // Remote → Manual hand-off (this screen mounts after the remote browser posted). When present, the matching
     // type is selected and the fields pre-filled; the user then presses Start Import. Consumed once via
     // [onRemotePayloadConsumed] so it can't re-fill a later, unrelated Manual add.
     remotePayload: kotlinx.coroutines.flow.StateFlow<CompanionPayload?>? = null,

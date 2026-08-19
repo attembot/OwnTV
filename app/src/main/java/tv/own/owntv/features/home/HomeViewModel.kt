@@ -250,16 +250,19 @@ class HomeViewModel(
         h: tv.own.owntv.core.database.entity.WatchHistoryEntity,
     ): ContinueTarget? = when (h.mediaType) {
         MediaType.MOVIE -> movieDao.getById(h.itemId)?.let { m ->
+            if (!tv.own.owntv.core.content.AdultCategoryClassifier.allows(pid, m.categoryId, profileDao, categoryDao)) return@let null
             val pos = progressDao.get(pid, MediaType.MOVIE, m.id)?.positionMs ?: 0L
             ContinueTarget(ContinueKind.MOVIE, m.name, if (pos > 0) ContinueAction.RESUME else ContinueAction.PLAY, movieId = m.id, positionMs = pos)
         }
         MediaType.EPISODE -> seriesDao.getEpisodeById(h.itemId)?.let { ep ->
             seriesDao.getSeriesById(ep.seriesId)?.let { s ->
+                if (!tv.own.owntv.core.content.AdultCategoryClassifier.allows(pid, s.categoryId, profileDao, categoryDao)) return@let null
                 val pos = progressDao.get(pid, MediaType.EPISODE, ep.id)?.positionMs ?: 0L
                 ContinueTarget(ContinueKind.EPISODE, s.name, if (pos > 0) ContinueAction.RESUME else ContinueAction.NEXT_UP, seriesId = ep.seriesId, episodeId = ep.id, positionMs = pos)
             }
         }
         MediaType.LIVE -> channelDao.getById(h.itemId)?.let { c ->
+            if (!tv.own.owntv.core.content.AdultCategoryClassifier.allows(pid, c.categoryId, profileDao, categoryDao)) return@let null
             ContinueTarget(ContinueKind.LIVE, c.name, ContinueAction.LAST_CHANNEL, channelId = c.id)
         }
         else -> null
@@ -524,12 +527,14 @@ class HomeViewModel(
         val live = customize.observe(profileId, MediaType.LIVE).first()
         val movie = customize.observe(profileId, MediaType.MOVIE).first()
         val series = customize.observe(profileId, MediaType.SERIES).first()
+        val isKidsProfile = profileDao.getById(profileId)?.isKids == true
         suspend fun catIds(type: MediaType, hiddenKeys: Set<String>): Set<Long> {
-            if (hiddenKeys.isEmpty() || sourceIds.isEmpty()) return emptySet()
-            return categoryDao.observe(sourceIds, type).first()
-                .filter { CustomizeKeys.category(it) in hiddenKeys }
-                .map { it.id }
-                .toSet()
+            if ((hiddenKeys.isEmpty() && !isKidsProfile) || sourceIds.isEmpty()) return emptySet()
+            return tv.own.owntv.core.content.AdultCategoryClassifier.hiddenCategoryIds(
+                categoryDao.observe(sourceIds, type).first(),
+                hiddenKeys,
+                isKidsProfile,
+            )
         }
         return HiddenState(
             live = live, movie = movie, series = series,

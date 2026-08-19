@@ -142,12 +142,18 @@ class EpgViewModel(
         activeProfileSources(settings, sourceDao)
             .flatMapLatest { aps ->
                 if (aps.sources.isEmpty()) flowOf(emptyList())
-                else combine(categoryDao.observe(aps.liveSourceIds, MediaType.LIVE), settings.sortLive, custom) { cats, sort, cust ->
-                    // Mirror Live TV: hidden filtered + renames + pinned order; A–Z sorts the rest.
-                    cats.applyCustomizationsWithCustoms(
-                        cust,
-                        cust.customCategories,
-                        alphaRest = sort == SettingsRepository.SortMode.ALPHA,
+            else combine(categoryDao.observe(aps.liveSourceIds, MediaType.LIVE), settings.sortLive, custom, profileDao.observeById(aps.profileId)) { cats, sort, cust, profile ->
+                // Mirror Live TV: hidden filtered + renames + pinned order; A–Z sorts the rest.
+                val visibleCats = if (profile?.isKids == true) {
+                    cats.filterNot { tv.own.owntv.core.content.AdultCategoryClassifier.isAdult(it.name) }
+                } else cats
+                val visibleCustoms = if (profile?.isKids == true) {
+                    cust.customCategories.filterNot { tv.own.owntv.core.content.AdultCategoryClassifier.isAdult(it.name) }
+                } else cust.customCategories
+                visibleCats.applyCustomizationsWithCustoms(
+                    cust,
+                    visibleCustoms,
+                    alphaRest = sort == SettingsRepository.SortMode.ALPHA,
                     ).map { entry ->
                         GuideCategory(
                             key = entry.key,
@@ -321,6 +327,8 @@ class EpgViewModel(
     /** Hand an archive programme to an external app (VLC, MX Player) instead of the in-app player. */
     fun playCatchupExternal(channel: ChannelEntity, programme: EpgProgrammeEntity) {
         viewModelScope.launch {
+            val profileId = settings.activeProfileId.first()
+            if (!tv.own.owntv.core.content.AdultCategoryClassifier.allows(profileId, channel.categoryId, profileDao, categoryDao)) return@launch
             val url = withContext(kotlinx.coroutines.Dispatchers.IO) { catchupUrlFor(channel, programme) }
             if (url == null) {
                 _matchSummary.value = EpgMatchSummary.CatchupUnavailable
@@ -643,10 +651,16 @@ class EpgViewModel(
             val sortGuideMode = settings.sortGuide.first()
             // Hidden categories keep their channels out of the guide too (parity with Live TV), and a
             // filter pointing at a now-hidden category falls back to "All" instead of an empty grid.
-            val hiddenCatIds =
-                if (cust.hiddenCategories.isEmpty()) emptySet()
-                else categoryDao.observe(ids, MediaType.LIVE).first()
-                    .filter { CustomizeKeys.category(it) in cust.hiddenCategories }.map { it.id }.toSet()
+        val isKidsProfile = profileDao.getById(pid)?.isKids == true
+        val hiddenCatIds = if (cust.hiddenCategories.isEmpty() && !isKidsProfile) {
+            emptySet()
+        } else {
+            tv.own.owntv.core.content.AdultCategoryClassifier.hiddenCategoryIds(
+                categoryDao.observe(ids, MediaType.LIVE).first(),
+                cust.hiddenCategories,
+                isKidsProfile,
+            )
+        }
             val categoryFilter = _categoryFilter.value
                 ?.let { key -> guideCategories.value.firstOrNull { it.key == key } }
             val customMemberIds = categoryFilter?.customId

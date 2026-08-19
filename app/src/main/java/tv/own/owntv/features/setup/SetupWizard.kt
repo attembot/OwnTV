@@ -138,7 +138,7 @@ fun Onboarding(firstRun: Boolean, onDone: (Long?) -> Unit, onCancel: () -> Unit,
                 payloads = vm.remotePayloads,
                 onStartListener = { port -> vm.startRemoteListener(port) },
                 onStopListener = { vm.stopRemoteListener() },
-                // A phone submission hands off to the pre-filled Manual form (the user presses Start Import).
+                // A remote submission hands off to the pre-filled Manual form (the user presses Start Import).
                 onPayloadReceived = { step = Step.ADD_SOURCE },
                 onBack = { vm.stopRemoteListener(); step = Step.ADD_SOURCE_CHOOSER },
             )
@@ -524,7 +524,7 @@ private fun ImportBackupScreen(
     }
 }
 
-/** Restore chooser: send the backup from a phone (LAN companion server) or pick a local file. */
+/** Restore chooser: send the backup from another device (LAN companion server) or pick a local file. */
 @Composable
 private fun ImportBackupChooserScreen(onRemote: () -> Unit, onLocal: () -> Unit, onBack: () -> Unit) {
     val colors = OwnTVTheme.colors

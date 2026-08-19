@@ -91,7 +91,7 @@ internal fun ProgrammeStripCanvas(
     val pxPerMin = with(density) { GuideGridDefaults.PxPerMin.toPx() }
     val gapPx = with(density) { 4.dp.toPx() }
     val padPx = with(density) { 10.dp.toPx() }
-    val borderPx = with(density) { Dimens.FocusBorderWidth.toPx() }
+    val borderPx = with(density) { tv.own.owntv.ui.theme.LocalFocusBorderWidth.current.toPx() }
     val airingBarPx = with(density) { 3.dp.toPx() }
     val airingBarInsetPx = with(density) { 4.dp.toPx() }
     val corner = with(density) { CornerRadius(10.dp.toPx(), 10.dp.toPx()) }

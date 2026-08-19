@@ -92,13 +92,13 @@ fun BackupScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val restoreBtnFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { kotlinx.coroutines.delay(50); runCatching { firstFocus.requestFocus() } }
 
-    // Restore: first pick Remote (phone upload) or Local (file picker). Remote opens a full-screen
+    // Restore: first pick Remote (upload from another device) or Local (file picker). Remote opens a full-screen
     // companion panel; an uploaded file drops back into the same inspect → section-picker flow.
     var showRestoreChooser by remember { mutableStateOf(false) }
     var showRemoteRestore by remember { mutableStateOf(false) }
     val remoteState by vm.remoteState.collectAsStateWithLifecycle()
 
-    // Export: Remote (serve the file for a phone/laptop to download) or Local (save to a folder).
+    // Export: Remote (serve the file for another device to download) or Local (save to a folder).
     var showExportChooser by remember { mutableStateOf(false) }
     var exportToRemote by remember { mutableStateOf(false) }
     var showRemoteExportPassword by remember { mutableStateOf(false) }
@@ -298,7 +298,7 @@ fun BackupScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         )
     }
 
-    // Export step 0: Remote (serve for a phone/laptop to download) or Local (save to a folder).
+    // Export step 0: Remote (serve for another device to download) or Local (save to a folder).
     if (showExportChooser) {
         RemoteLocalChooserDialog(
             title = stringResource(R.string.settings_backup_export_title),
@@ -334,7 +334,7 @@ fun BackupScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         }
     }
 
-    // Restore step 0: Remote (send the backup from a phone) or Local (pick a file on this device).
+    // Restore step 0: Remote (send the backup from another device) or Local (pick a file on this device).
     if (showRestoreChooser) {
         RemoteLocalChooserDialog(
             title = stringResource(R.string.settings_backup_restore_title),
@@ -434,9 +434,16 @@ private fun BackupPasswordDialog(
 }
 
 /**
- * Export step 0: choose which profiles the backup contains. All start UNTICKED (the user chooses
- * explicitly). Ticking the active profile or an unlocked one is immediate; ticking another
- * profile with a PIN prompts for it — wrong PIN shows "PIN incorrect" and leaves it unticked.
+ * Export step 0: choose which profiles the backup contains. Ticking the active profile or an
+ * unlocked one is immediate; ticking another profile with a PIN prompts for it — wrong PIN shows
+ * "PIN incorrect" and leaves it unticked.
+ *
+ * The ACTIVE profile starts ticked; every other profile still starts unticked and is the user's
+ * explicit choice. Starting with nothing ticked meant a user who ticked every *section* — the
+ * screen before this one, where everything is selected by default — could still walk away with a
+ * backup containing no profile data at all, which is not what "back up everything" looked like.
+ * The active profile needs no PIN to include, so pre-ticking it reveals nothing a locked profile
+ * was protecting.
  */
 @Composable
 private fun ProfilePickerDialog(
@@ -447,7 +454,9 @@ private fun ProfilePickerDialog(
     onDismiss: () -> Unit,
 ) {
     val colors = OwnTVTheme.colors
-    var ticked by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var ticked by remember(activeId) {
+        mutableStateOf(if (profiles.any { it.id == activeId }) setOf(activeId) else emptySet())
+    }
     var pinFor by remember { mutableStateOf<tv.own.owntv.core.database.entity.ProfileEntity?>(null) }
     val firstFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }

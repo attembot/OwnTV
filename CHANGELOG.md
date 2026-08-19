@@ -1,5 +1,351 @@
 # Changelog
 
+## v4.2.2 — 2026-08-19
+
+### 🖼️ Episode grid — see a picture for every episode
+
+- **A new Grid / List button in a show's episode view.** Grid replaces the text rows with a wall of
+  16:9 episode stills, so you pick an episode by what it looks like rather than by its number. The
+  choice is remembered globally and applies to every show, and List stays the default so nothing
+  changes until you switch.
+- **Episodes TMDB doesn't have still get a usable tile.** IPTV catalogues name episodes in ways TMDB
+  often can't match, and providers supply no episode artwork at all. Those tiles fall back to the
+  show's own wide banner (or its poster), with the episode number drawn large across the middle so
+  the grid stays navigable when every tile looks alike. In **Provider only** metadata mode every tile
+  uses the show's artwork this way, and no lookups are made.
+- **Watched ticks, the "last watched" badge and the part-watched progress bar all carry over** from
+  the list, so nothing is lost by switching layout.
+
+### ⚡ A whole show's episode details now arrive in one request
+
+- **Opening a series used to cost one metadata lookup per episode you scrolled past** — roughly 120
+  for a five-season show, and a third of the daily allowance for a single title. Details for every
+  season now arrive in **one** request, folded into the show lookup that already happens. A grid of
+  episode pictures is only affordable at all because of this.
+- **Switching between seasons is instant and free** once a show has been opened; only shows longer
+  than ten seasons fetch again, and only if you actually browse that far.
+- **The shared metadata service now remembers a title for six months instead of one**, matching how
+  long the app keeps it, and requests are grouped so one viewer's lookup serves everyone else's.
+- **Duplicate entries no longer pay twice.** IPTV catalogues routinely list the same show or film in
+  several categories; the second copy now reuses the details the first one downloaded.
+
+### 🎯 Choose the colour and thickness of the focus highlight (#121)
+
+- **Settings → Appearance → Focus highlight sets the ring drawn around whatever the remote is
+  pointing at.** The old ring was a thin 2 dp accent line, which is easy to lose from sofa distance
+  on a wall of bright posters. Pick a colour from eight presets, from the full palette, or by typing
+  an exact hex code, and pick a thickness — Thin, Normal, Thick or Extra thick. A live sample inside
+  the dialog shows the result before you commit.
+- **One setting covers the whole app.** Live TV, Movies, Series, Home, the TV Guide, Downloads,
+  Search, Settings rows, the category column, the navigation rail, buttons, text fields and every
+  popup all follow it. Thicker rings also open up the surrounding glow, so *Extra thick* reads as a
+  halo rather than just a fatter line.
+- **It works with the Glass Effect on.** In glass mode the frosted rim is the focus ring, so the rim
+  now takes your colour and thickness instead of always being white.
+- **Only the highlight changes.** The accent colour still owns buttons, chips and panels, so a loud
+  focus colour does not repaint the rest of the interface. The default is unchanged, and the choice
+  is included in Backup & Restore.
+
+### 🐛 Fixes
+
+- **The advanced TMDB setting is no longer labelled "via remote".** It was called *Get advanced TMDB
+  info via remote*, but you can equally type the key in on the TV, so the label described only half
+  of what it does. Inside it, the option that hands the details over from a phone or computer had the
+  same name as the panel it sat on; it is now *Get key from another device*.
+- **Episode pictures no longer reload when you return to a season you have already opened.** The
+  cached information was being read one episode at a time, on the same thread that draws the screen —
+  so it queued behind the very grid it was filling. Seasons now appear immediately.
+- **Back from a show now returns focus to that show, instead of jumping to the category sidebar.**
+  Only the poster-grid layout was being scrolled back into view, so in the list layout the show was
+  never on screen to receive focus. The identical fault in Movies — returning from a film in list
+  view — is fixed too.
+
+### 👶 Kids profiles hide adult content
+
+- **Kids mode now hides adult provider categories and their items throughout OwnTV.** The same
+  profile rule covers Live TV, Movies, Series, Home, Search, the TV Guide, Catch-up, Downloads,
+  custom categories, Android TV recommendations and direct/deep-link playback. The Guide is hidden
+  completely for a kids profile. Normal profiles keep the provider's full catalogue.
+- **TMDB search now follows the active profile.** Adult TMDB results are excluded only while Kids
+  mode is on; a normal profile never has them silently removed.
+- **Adult folders are recognized from the names supplied by the IPTV provider**, using common
+  multilingual adult markers plus labels such as `18+` and `XXX`. `Adult Swim` is explicitly not
+  treated as adult content. IPTV formats do not provide a trustworthy universal adult flag, so
+  misleading or uncategorized provider content cannot be identified perfectly.
+
+### 🚀 Start OwnTV on a specific Live TV channel
+
+- **App startup has a new Specific channel choice for each profile.** Its D-pad-friendly picker has
+  a search bar, and the saved channel is resolved by the provider's stable ID, then its name, with
+  the local row ID as a final fallback. The choice is included in Backup & Restore.
+- **A single unlocked profile can start playing its chosen channel immediately.** Multiple profiles
+  still show “Who's watching?”, and a PIN-locked profile still waits for authentication before any
+  channel starts.
+- **Unavailable or restricted startup channels fail safely.** Hidden channels, channels blocked by
+  Kids mode and channels from a disconnected source are never auto-played. If the saved channel no
+  longer exists, OwnTV opens Home and explains what happened.
+
+### ⏪ Catch-up without a TV guide — a Catch-up category and "Go back to…"
+
+- **Live TV has a new Catch-up category**, between History and All, listing every channel your
+  provider keeps a recording for. It appears only if you actually have such channels, and it is a
+  filter over the channels you already have — nothing extra is downloaded, and it stays correct after
+  every playlist refresh. Sorting, the inline search and the in-player channel list all work in it.
+- **You can now jump straight to a time instead of holding rewind.** Catch-up channels get a
+  **Go back to…** button in the player, and the same list appears when you open Catch-up on a channel
+  with no guide data. It offers times counted back from now — 21:30, 19:00, `Sun 20:00` — so reaching
+  three hours back is one press instead of holding a key while a counter crawls. Times, not "3 hours
+  ago", because you are usually looking for the programme that started at a particular clock time.
+- **"Choose exact time…" reaches any moment your provider still holds.** The last row of that list
+  opens a day, hour and minute picker, so "yesterday at 10:31" is reachable and not just the round
+  offsets. Press **OK** on the day, hour or minute to step into it, change it with up and down, then
+  **OK** or **Back** to step out; left and right move between the three. The wheels stop at both ends
+  of your archive — you cannot scroll past the live edge into the future, and you cannot scroll off
+  the far end into a request that could only fail.
+- **None of this needs a TV guide.** Rewinding a channel never did, but the only thing named
+  "Catch-up" was the programme list, which does — so opening it without a guide produced a dead end
+  advising you to go and fix your EPG, and the feature looked missing. That screen now offers times.
+  With a guide, the programme list is still shown: it has titles, which is better.
+
+### 🕐 A clock in the player — and, on catch-up, the time the programme actually aired
+
+- **Every player now shows the time and date**, centred at the top: Live TV, Movies, Series and
+  catch-up alike. It sits in a band that was empty in every mode, so nothing else on screen moved to
+  make room for it.
+- **While you replay a recording, a second clock appears beside it.** The panel then reads
+  **Programme time** on the left — when what you are watching originally aired, counting forward as it
+  plays — and **Current time** on the right. Without the pair, a clock reading 10:00 over a picture
+  from yesterday afternoon would be worse than no clock at all. Both columns are labelled, so a lone
+  time is never mistaken for a wrong device clock.
+- **The guide card gains a matching row during catch-up.** Above the live programme it now shows
+  **Playing** and **Then** — what was on air at the moment being replayed, and what followed it — so
+  you can see what you are watching even when you jumped to a bare time. The live row stays where it
+  is, dimmed, and returns to full strength the moment you go back to live. Channels whose guide comes
+  only from the provider's now/next API get no archive row: that API cannot describe the past.
+- **The live guide labels now read "Live now" and "Live next"** rather than "Now" and "Next", so they
+  cannot be confused with the archive row sitting directly above them.
+
+### 🧾 Dedicated Metadata and OpenSubtitles settings
+
+- **Metadata and OpenSubtitles now have separate, purpose-built settings pages.** OpenSubtitles sits directly below Metadata in the main Settings list instead of being buried under Video Player. Both pages use compact status cards and keep secondary setup inside shared, D-pad-safe popups.
+- **The shared metadata allowance is easier to read.** Built-in service users see separate minute, hourly and daily remaining cards plus the refill time. Personal keys and custom servers are identified as the active source without exposing a full key.
+- **Both services now support advanced custom access.** TMDB and OpenSubtitles each accept a personal API key or Worker/server URL in a compact popup; a URL takes priority over a key, while leaving both blank uses OwnTV's built-in service. OpenSubtitles custom access is included in Backup & Restore.
+
+- **Your daily share is laid out as a proper status panel.** Source, then the remaining lookups for
+  each window and the refill time, each as a label on the left and a value on the right — the same
+  shape as the OpenSubtitles account panel, instead of a loose block of text wedged between two
+  settings.
+- **The active source is always shown, whichever one you use.** With your own TMDB key it shows the
+  key masked to its last four characters, so you can tell two keys apart without exposing one on
+  screen; with a self-hosted server it shows the address. The daily-share rows appear only on the
+  shared service, which is the only one that is metered.
+
+### 📱 Send TMDB or OpenSubtitles access from another device
+
+- **OpenSubtitles sign-in can be filled in from another device, password included.** Choose **Remote**
+  and the browser page now asks for your OpenSubtitles username and password as well as the optional
+  API key and Worker/server URL — so none of it has to be typed with the remote. The details land in
+  the sign-in panel on the TV and wait there; you still press **Sign in** yourself.
+- **Setting up OpenSubtitles is one screen instead of several.** **Sign in** first asks how you want to
+  enter your details — **Remote** or **Enter here** — and then shows a single compact panel holding your
+  username, password, "Stay signed in", and the optional API key and server URL underneath, marked
+  optional. The advanced fields are no longer a separate popup, and the duplicate "Advanced options"
+  row that appeared both on the screen and inside the form is gone.
+- **The Remote companion now accepts complete service access.** For TMDB, open Advanced options, scan
+  the QR code, enter the PIN, and send an API key plus an optional Worker/server URL from any browser
+  on the same Wi-Fi — phone, tablet or PC. The TV fills the fields but waits for **Save**, so
+  configuration never changes behind your back.
+
+- **A personal TMDB key no longer means typing 32 characters with a remote.** Under
+  **Settings → Metadata → Advanced options** there is now **Get key from another device**: the TV shows a
+  QR code and a PIN, you open it on a phone, tablet or computer where typing is easy, sign in to TMDB, paste the key
+  and send it across. It lands in the key field on the TV; you still press Save, so nothing is
+  changed behind your back. This matters because a personal key is free and has practically no daily
+  limit, while the built-in shared service has to be rationed between everyone.
+- Uses the same Remote link as the other remote-companion features, with the same protection: the QR carries
+  only the address, never the PIN, and the listener closes as soon as the panel does.
+
+### 🔐 Your data no longer leaves the TV without a backup password
+
+- **Android's automatic backup is switched off.** The app was letting Android copy its own database
+  and settings to Google Drive, and to a new device during setup transfer — including playlist
+  passwords, the proxy password and API keys, all in plain form, with no backup password anywhere in
+  the process. That directly contradicted the promise the app already made: without a backup password,
+  secrets are left out. **Settings → Backup & Restore is now the only way OwnTV data moves between
+  devices**, and it is explicit and encryptable. Device-to-device transfer is closed too — it keeps
+  running on Android 12 and newer even when Drive backup is off, so switching one off was not enough.
+- **Profile and Customize PINs are treated as secrets.** A PIN is stored as a scrambled value, but a
+  four-digit PIN has only ten thousand possibilities, so that value is trivially unscrambled by anyone
+  holding an unencrypted backup file. PINs now follow the same rule as every other secret: included
+  when you set a backup password, left out entirely when you don't. Restoring a passwordless backup
+  never *removes* a PIN you already have on the device — it simply doesn't carry one in.
+- **Per-channel "compatibility mode" settings stay out of an unencrypted backup when they identify a
+  stream by its address**, because provider addresses routinely contain the account's username and
+  password.
+
+### 🗃️ Backup & Restore now really does back up everything
+
+- **Two per-playlist settings were being lost.** **Prefer HLS** and the per-playlist **Pre-buffer**
+  override were never written into the backup, so a restore silently returned them to their defaults —
+  quietly reintroducing whatever streaming problem you had already fixed on that playlist.
+- **Downloaded subtitles are included, files and all.** Your saved subtitle choice per film or episode,
+  the timing offsets you nudged by hand, and the subtitle files themselves now travel in the backup, so
+  a restored film plays with the same subtitle, already in sync. Previously none of it was backed up:
+  the app remembered a subtitle whose file did not exist on the new device.
+- **The profile you were using is remembered.** A restore onto a fresh device used to land on whichever
+  profile happened to come first, which in a household with a kids profile could be the wrong one.
+- **Where you left off in each section is remembered**, for the sections whose position can be
+  meaningfully restored.
+- **The active profile now starts ticked when choosing what to back up.** Every section was selected by
+  default but every profile was not, so it was possible to tick "everything" and still produce a backup
+  containing no profile data at all.
+
+### 🔤 Subtitle font selection — plus Monospace throughout the app
+
+- **Subtitle typography can now be chosen independently in Settings → Video Player → Subtitle
+  appearance.** Choose Default, System Sans, Monospace, Lora, Playfair Display, Dancing Script or
+  Poppins. Default preserves the stream's authored or broadcaster styling.
+- **The selected font is applied consistently across both playback engines and app-drawn subtitle
+  overlays:** mpv, ExoPlayer/Media3 and the docked-player overlay all use the same preference.
+- **Monospace is also available for the main interface and popup menus.** The subtitle-font choice
+  survives restarts and is included in Backup & Restore with the other appearance settings.
+
+### 🎛️ Choose the playback engine — four options, for Live TV and for Movies & Series
+
+- **Settings → Video Player now has a Live TV player setting, and the Movies & Series player setting
+  has grown from a switch into the same four choices:** *ExoPlayer, then mpv* · *mpv, then ExoPlayer* ·
+  *ExoPlayer only* · *mpv only*. Each list marks its own default, because the two sections differ on
+  purpose: Live TV starts on ExoPlayer, which opens channels far faster and is the only engine with
+  live subtitles, while Movies & Series starts on mpv, which supports more formats. Nothing changes
+  for anyone who leaves them alone — the old Movies & Series switch carries its setting over.
+- **The two "only" choices stop the automatic switch between players.** Handing a channel from one
+  engine to the other costs a stop, a release and a re-open — several seconds of black screen — which
+  is wasted on a TV or a provider where the second engine was never going to work anyway. "Only" means
+  only: no switch after a decode failure, an account-busy refusal or anything OwnTV worked out for
+  itself. It still tries that engine's own `.m3u8` and `.ts` variants, which is what rescues most
+  channels; what it drops is the other engine.
+- **The compatibility-mode button in the player now stays where you put it.** Switching a live channel
+  back to ExoPlayer by hand could be undone by OwnTV about two seconds later, over and over, on TVs
+  where neither engine can decode a channel's audio — the button looked broken and there was no way to
+  remain on the chosen engine. Your choice now holds for that channel, and is remembered for next time
+  in both directions (previously only a choice of mpv was remembered).
+- **A channel or item you switch by hand always outranks the setting**, including the "only" choices,
+  so a single awkward channel never leaves you stuck: pick the other engine for that one and the rest
+  keep following your setting. Live TV's per-channel choices travel in Backup & Restore alongside the
+  Movies & Series ones.
+
+### 🔒 Protected (DRM) channels now play — Widevine and ClearKey (#115)
+
+- **OwnTV can now play channels and films protected with Widevine or ClearKey.** Some providers —
+  including self-hosted setups such as JioTV-Go — publish MPEG-DASH channels that are locked, with the
+  unlock address written into the playlist. Until now OwnTV threw that address away while reading the
+  playlist, so those channels simply failed with a general playback error and looked broken.
+- **Nothing to set up, and nothing to buy.** The unlocking is done by the component already built into
+  every Android TV and Fire TV device; OwnTV just has to ask it. There is no key to enter, no account,
+  and no licence for you to purchase — if your playlist carries the details, the channel plays.
+- **Protected channels always use ExoPlayer.** mpv has no way to request an unlock key, so a protected
+  channel goes straight to the player that can, without the usual switch between players first. The
+  compatibility-mode button is hidden for those channels, because its other position could only fail.
+  Everything else keeps following your engine settings exactly as before.
+- **Works for Live TV, Movies and Series**, and for both `.mpd` (DASH) and protected HLS streams.
+- **Two things are worth knowing.** Older or cheaper TV boxes may only be allowed to play protected
+  channels in standard definition — that is decided by the device, not by OwnTV. And a protected item
+  always plays inside OwnTV even if you have chosen an external player, because no external player can
+  be given the unlock address.
+
+### 📁 Send a playlist file from your computer with Remote
+
+- **The Remote page can now upload a playlist file.** Its M3U tab said “Playlist URL or local file” but
+  offered no way to choose a file — the wording came from the TV's own screen, where a file picker does
+  exist. There is now a real **Or upload a playlist file** button next to the address box.
+- **Useful when the playlist only exists on your computer**, with no web address to point at and no
+  wish to copy it onto a USB stick. Choose the file, press Send, then press Start Import on the TV as
+  usual. Typing an address still works exactly as before.
+- The uploaded playlist is kept on the TV until you import it, so there is no rush between sending it
+  and picking up the remote. Only the few most recent uploads are kept.
+
+### 🐛 Fixes
+
+- **"Couldn't reach OpenSubtitles" no longer blames your internet when the connection is fine.** Every
+  possible failure showed that one message — a refused request, a rate limit, a server error, and a
+  genuinely dead connection alike — which sent people looking in the wrong place. A server that answers
+  and declines now says so and shows its error number, and the cause of a real connection failure is
+  written to the log, so a report can actually be diagnosed instead of guessed at.
+- **OpenSubtitles sign-in now tries the server's other address.** OpenSubtitles is reached through an
+  address that resolves to both IPv4 and IPv6. On a network that advertises IPv6 but cannot route it,
+  the first attempt failed and OwnTV gave up instantly — so signing in was impossible while everything
+  else on the TV worked normally. Subtitle requests now fall back to the next address.
+- **The Remote companion is no longer described as a "phone" feature.** It works from any browser on the
+  same Wi-Fi, so the app, the guide and the setup pages now say phone, tablet or computer throughout.
+
+- **Restoring a backup no longer gives every Stalker playlist the same MAC address (#114).** Several
+  Stalker playlists usually share one portal address and have no username, so a restore treated them
+  all as the same playlist: they were merged onto one, each overwriting the previous one's MAC, and
+  their favourites, history and folder customizations were merged onto it too. Restore now also looks
+  at the MAC, and each saved playlist can only match one playlist on the device. A backup saved
+  *without* a password still carries no MAC at all — MACs are treated as secrets — so those restores
+  keep the MACs already on the device instead of duplicating the playlist.
+
+- **Your DNS choice now survives an app restart.** Selecting Google, Cloudflare, Quad9 or entering a
+  custom DNS server was saved correctly, but the settings screen opened from an empty startup value
+  and never refreshed when that saved choice arrived. The screen now restores the saved server and
+  enabled state as soon as settings load, without overwriting normal editing.
+- **“Audio only” no longer flashes while an ordinary TV channel is starting.** Some providers announce
+  the audio track before the video track, so v4.2.1 briefly treated every channel as a radio station
+  and removed the message only when the picture arrived. OwnTV now waits for a ready stream to remain
+  audio-without-video for five seconds; any video announcement cancels the message immediately, while
+  genuine radio channels still receive the persistent explanation.
+- **Ambient Glow now appears only with the explicit Dark theme while Glass Effect is off.** Turning
+  Slow pulse off leaves the soft glow in place without the distracting outline circle; turning it on
+  adds the moving pulse ring.
+- **A preferred subtitle language now turns a matching subtitle track on automatically on both
+  players.** Language variants such as `eng`, `en` and `en-US` match correctly, including when the
+  audio uses the same language, while streams without a match do not enable an unrelated subtitle.
+
+- **"Watch from start" needed two presses.** Opening a programme from the Guide or from the Live TV
+  catch-up list, the first press of **Watch from start** did nothing and only the second one played.
+  The dialog swallows OK until it knows the button that opened it has been released, so that a held
+  press cannot instantly trigger whatever is focused — but the press that opens the dialog is acted on
+  as the button goes *down*, so the release happened while the dialog was still appearing and was
+  never seen. It waited forever, and ate the next real press. It now also treats a moment's silence as
+  proof the button is up, which a held button cannot produce. Affects every dialog with that guard.
+
+- **Per-channel and per-item playback settings attached to the wrong playlist after a restore.**
+  "Compatibility mode" for a channel, and the zoom or volume boost you saved for a particular film,
+  are stored against the playlist the item came from. A restore was not translating that playlist's
+  internal number to its number on the restored device, so those settings either did nothing or —
+  when the number happened to belong to a different playlist — were applied to somebody else's
+  channels entirely.
+- **Restoring onto a device that already had the playlist discarded the backup's settings for it.**
+  Only credentials were applied; the playlist's name, its Live/Movies/Series scope, Prefer HLS and
+  Pre-buffer were left at whatever the device already had. The same applied to a guide feed already
+  present under the same address, which kept its local name and user agent.
+- **The default playlist could be repointed at an unrelated playlist.** When the backup's default
+  playlist was not part of the restore, its stored number was used as-is, and it matched whichever
+  unrelated playlist happened to hold that number on the device.
+- **Backup data belonging to playlists that were not part of the backup is no longer written into the
+  file**, where it could not be translated on restore and could collide with unrelated playlists.
+- **Startup screen and the Customize PIN lock were filed under "Sources".** Deselecting Sources —
+  described as playlists, guide feeds and credentials — silently dropped both. They now travel with
+  Settings, where they belong. Backups made by older versions still restore from either place.
+- **Turning "Advanced options" off now actually stops using your own key.** It previously just hid
+  the fields while quietly leaving the saved key in force, so the screen still reported "Your TMDB
+  key" with nothing on screen to explain why. It now asks for confirmation, then deletes the saved
+  key and server address and returns to the built-in shared service.
+
+- **Downloaded subtitles are now told apart, and subtitle timing changes the one you selected.**
+  Every downloaded subtitle was named only by its language, so three Korean downloads appeared as
+  three identical rows — and because that name was also how OwnTV identified them internally, it
+  could only ever find the first. Selecting the second and adjusting its timing shifted the first
+  one's file and switched you to it, which made subtitle timing unusable whenever you had more than
+  one subtitle in a language. Downloads now read `OS_Korean · WEB-DL.NF`, showing the release they
+  came from, with locally imported files marked `LOCAL_` instead. Because the name is checked against
+  every subtitle already in the video, a track inside the file can no longer be mistaken for a
+  download either — previously it could be selected in place of the subtitle you just downloaded, be
+  labelled as coming from OpenSubtitles, or, on the mpv engine, stop your download from reappearing
+  at all when the film reloaded. Timing offsets you saved before this fix were stored against the
+  wrong subtitle; reset the timing once on those and it will stay correct.
+
 ## v4.2.1 — 2026-08-15
 
 ### 🎧 "Audio only" — sound with no picture is now labelled, not mistaken for a fault

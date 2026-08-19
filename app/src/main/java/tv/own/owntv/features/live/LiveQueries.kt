@@ -39,6 +39,7 @@ internal fun livePagingSource(
             LiveKey.All -> if (playlist) channelDao.pagingAllOriginal(ids) else channelDao.pagingAll(ids)
             LiveKey.Favorites -> channelDao.pagingFavoritesManual(profileId, ContentOrderEntity.FAV_CONTEXT, ids)
             LiveKey.History -> channelDao.pagingHistory(profileId, ids)
+            LiveKey.Catchup -> if (playlist) channelDao.pagingCatchupOriginal(ids) else channelDao.pagingCatchup(ids)
             is LiveKey.Custom -> customCategoryDao.pagingChannels(profileId, key.id, ids)
             is LiveKey.Folder -> {
                 val ctxKey = contextKey(key.id) ?: ""
@@ -53,6 +54,7 @@ internal fun livePagingSource(
             LiveKey.All -> channelDao.searchAll(query, ids)
             LiveKey.Favorites -> channelDao.searchFavorites(query, profileId, ids)
             LiveKey.History -> channelDao.searchHistory(query, profileId, ids)
+            LiveKey.Catchup -> channelDao.searchCatchup(query, ids)
             is LiveKey.Custom -> customCategoryDao.searchChannels(query, profileId, key.id, ids)
             is LiveKey.Folder -> channelDao.searchInCategory(query, key.id)
         }
@@ -73,6 +75,7 @@ internal fun liveCountFlow(
         LiveKey.All -> if (hiddenCats.isEmpty()) channelDao.countAll(ids) else channelDao.countAllExcluding(ids, hiddenCats.toList())
         LiveKey.Favorites -> channelDao.countFavorites(profileId, ids)
         LiveKey.History -> channelDao.countHistory(profileId, ids)
+        LiveKey.Catchup -> channelDao.observeCatchupCount(ids)
         is LiveKey.Custom -> customCategoryDao.countMembers(profileId, MediaType.LIVE, key.id, ids)
         is LiveKey.Folder -> channelDao.countByCategory(key.id)
     }

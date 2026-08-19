@@ -60,12 +60,15 @@ import tv.own.owntv.ui.components.OwnTVButton
 import tv.own.owntv.ui.components.dialogPanel
 import tv.own.owntv.ui.components.modalScrim
 import tv.own.owntv.ui.components.OwnTVButtonStyle
+import tv.own.owntv.player.EnginePreference
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.theme.Dimens
 import tv.own.owntv.ui.theme.GlassSurface
 import tv.own.owntv.ui.components.roundedPanel
 import tv.own.owntv.ui.components.trapAllFocusExit
 import tv.own.owntv.ui.theme.OwnTVTheme
+import tv.own.owntv.ui.theme.AppFontFamily
+import tv.own.owntv.ui.theme.asComposeFamily
 
 /** Common language codes offered for the audio/subtitle preference. Display names resolve in Compose. */
 private val LANGUAGE_CODES = listOf("", "eng", "spa", "fra", "deu", "ita", "por", "nld", "rus", "ara", "hin", "zho", "jpn", "kor", "tur")
@@ -122,7 +125,8 @@ fun VideoPlayerSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier)
     val colors = OwnTVTheme.colors
     val vm: SettingsViewModel = koinViewModel()
     val hw by vm.hwDecoding.collectAsStateWithLifecycle()
-    val vodExo by vm.vodPreferExo.collectAsStateWithLifecycle()
+    val vodEngine by vm.vodEnginePreference.collectAsStateWithLifecycle()
+    val liveEngine by vm.liveEnginePreference.collectAsStateWithLifecycle()
     val enginePins by vm.vodEnginePinCount.collectAsStateWithLifecycle()
     val defaultVolume by vm.defaultVolume.collectAsStateWithLifecycle()
     val savedZoom by vm.savedZoomCount.collectAsStateWithLifecycle()
@@ -139,6 +143,7 @@ fun VideoPlayerSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier)
     val zoom by vm.defaultZoom.collectAsStateWithLifecycle()
     val subStyleOn by vm.subtitleStyleEnabled.collectAsStateWithLifecycle()
     val subScale by vm.subtitleScale.collectAsStateWithLifecycle()
+    val subFont by vm.subtitleFont.collectAsStateWithLifecycle()
     val subColor by vm.subtitleColor.collectAsStateWithLifecycle()
     val subPosition by vm.subtitlePosition.collectAsStateWithLifecycle()
     val subBgOpacity by vm.subtitleBgOpacity.collectAsStateWithLifecycle()
@@ -159,17 +164,6 @@ fun VideoPlayerSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier)
     // OpenSubtitles account lives as an in-place sub-screen of this tab (plan §15). These three
     // are declared before the early return so they survive while the sub-screen is shown — that's
     // what lets Back land focus on the row that opened it instead of the top of the list.
-    var showOpenSubAccount by remember { mutableStateOf(false) }
-    var returnedFromOpenSub by remember { mutableStateOf(false) }
-    val openSubRowFocus = remember { FocusRequester() }
-    if (showOpenSubAccount) {
-        OpenSubtitlesAccountScreen(
-            onBack = { showOpenSubAccount = false; returnedFromOpenSub = true },
-            modifier = modifier,
-        )
-        return
-    }
-
     var dialog by remember { mutableStateOf(Dialog.NONE) }
     /** Whether the Custom-latency stepper actually set a value this time round — the mode switch to
      *  Custom, and the low-latency acknowledgement, both hang off that rather than off merely opening it. */
@@ -237,10 +231,9 @@ fun VideoPlayerSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier)
                         // so the popup-close restore still has a target to return to.
                         runCatching { dialogRowFocus.getValue(Dialog.LIVE_LATENCY).requestFocus() }
                     } else {
-                        val target = dialogReturn ?: if (returnedFromOpenSub) openSubRowFocus else firstFocus
-                        dialogReturn = null
-                        returnedFromOpenSub = false
-                        runCatching { target.requestFocus() }
+                    val target = dialogReturn ?: firstFocus
+                    dialogReturn = null
+                    runCatching { target.requestFocus() }
                     }
                 }
             }
@@ -268,10 +261,20 @@ fun VideoPlayerSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier)
             onClick = { vm.setDeinterlace(!deinterlace) },
         )
         Row2(
+            icon = OwnTVIcon.PLAY, title = stringResource(R.string.settings_live_tv_player),
+            desc = stringResource(R.string.settings_live_player_description),
+            chip = engineLabel(liveEngine), chevron = true,
+            primaryChip = liveEngine != EnginePreference.EXO_FIRST,
+            modifier = Modifier.focusRequester(dialogRowFocus.getValue(Dialog.LIVE_ENGINE)),
+            onClick = { savedScroll = scrollState.value; dialog = Dialog.LIVE_ENGINE },
+        )
+        Row2(
             icon = OwnTVIcon.PLAY, title = stringResource(R.string.settings_movies_series_player),
             desc = stringResource(R.string.settings_movies_player_description),
-            chip = stringResource(if (vodExo) R.string.settings_player_exoplayer else R.string.settings_player_mpv), primaryChip = !vodExo,
-            onClick = { vm.setVodPreferExo(!vodExo) },
+            chip = engineLabel(vodEngine), chevron = true,
+            primaryChip = vodEngine != EnginePreference.MPV_FIRST,
+            modifier = Modifier.focusRequester(dialogRowFocus.getValue(Dialog.VOD_ENGINE)),
+            onClick = { savedScroll = scrollState.value; dialog = Dialog.VOD_ENGINE },
         )
         Row2(
             icon = OwnTVIcon.PLAY, title = stringResource(R.string.settings_reset_player_choices),
@@ -363,13 +366,6 @@ fun VideoPlayerSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier)
             modifier = Modifier.focusRequester(dialogRowFocus.getValue(Dialog.SUB_LANG)),
             onClick = { savedScroll = scrollState.value; dialog = Dialog.SUB_LANG },
         )
-        Row2(
-            icon = OwnTVIcon.SUBTITLE, title = stringResource(R.string.settings_open_subtitles),
-            desc = stringResource(R.string.settings_open_subtitles_description),
-            chevron = true,
-            modifier = Modifier.focusRequester(openSubRowFocus),
-            onClick = { showOpenSubAccount = true },
-        )
 
         Divider()
         GroupLabel(stringResource(R.string.settings_audio))
@@ -451,6 +447,20 @@ fun VideoPlayerSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier)
     }
 
     when (dialog) {
+        Dialog.LIVE_ENGINE -> PickerDialog(
+            title = stringResource(R.string.settings_live_tv_player),
+            options = engineOptions(default = EnginePreference.EXO_FIRST),
+            selected = liveEngine.name,
+            onSelect = { vm.setLiveEnginePreference(EnginePreference.valueOf(it)); dialog = Dialog.NONE },
+            onDismiss = { dialog = Dialog.NONE },
+        )
+        Dialog.VOD_ENGINE -> PickerDialog(
+            title = stringResource(R.string.settings_movies_series_player),
+            options = engineOptions(default = EnginePreference.MPV_FIRST),
+            selected = vodEngine.name,
+            onSelect = { vm.setVodEnginePreference(EnginePreference.valueOf(it)); dialog = Dialog.NONE },
+            onDismiss = { dialog = Dialog.NONE },
+        )
         Dialog.ZOOM -> PickerDialog(
             title = stringResource(R.string.settings_default_zoom),
             options = ZoomMode.entries.map { it.name to stringResource(it.labelRes) },
@@ -466,14 +476,16 @@ fun VideoPlayerSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier)
             onDismiss = { dialog = Dialog.NONE },
         )
         Dialog.SUB_STYLE -> SubtitleAppearanceDialog(
-            enabled = subStyleOn,
-            scale = subScale,
-            color = subColor,
+                enabled = subStyleOn,
+                scale = subScale,
+                font = subFont,
+                color = subColor,
             position = subPosition,
             bgOpacity = subBgOpacity,
-            onToggle = { vm.setSubtitleStyleEnabled(it) },
-            onScale = { vm.setSubtitleScale(it) },
-            onColor = { vm.setSubtitleColor(it) },
+                onToggle = { vm.setSubtitleStyleEnabled(it) },
+                onScale = { vm.setSubtitleScale(it) },
+                onFont = { vm.setSubtitleFont(it) },
+                onColor = { vm.setSubtitleColor(it) },
             onPosition = { vm.setSubtitlePosition(it) },
             onBgOpacity = { vm.setSubtitleBgOpacity(it) },
             onDismiss = { dialog = Dialog.NONE },
@@ -712,7 +724,39 @@ private fun ConfirmResetDialog(title: String, description: String, onConfirm: ()
     }
 }
 
-private enum class Dialog { NONE, ZOOM, VOLUME, RESET_SAVED_ZOOM, RESET_SAVED_VOLUME, SEEK_STEP, LIVE_REWIND_STEP, SUB_STYLE, SUB_LANG, AUDIO_LANG, AUDIO_SYNC, RESUME, LIVE_LATENCY, LIVE_CUSTOM, LIVE_PREROLL, LIVE_PREROLL_SOURCES, LIVE_PREROLL_SOURCE, EXTERNAL_PLAYER, RESET_PINS }
+private enum class Dialog { NONE, LIVE_ENGINE, VOD_ENGINE, ZOOM, VOLUME, RESET_SAVED_ZOOM, RESET_SAVED_VOLUME, SEEK_STEP, LIVE_REWIND_STEP, SUB_STYLE, SUB_LANG, AUDIO_LANG, AUDIO_SYNC, RESUME, LIVE_LATENCY, LIVE_CUSTOM, LIVE_PREROLL, LIVE_PREROLL_SOURCES, LIVE_PREROLL_SOURCE, EXTERNAL_PLAYER, RESET_PINS }
+
+/**
+ * Label for one engine preference — "ExoPlayer, then mpv", "mpv only", and so on.
+ *
+ * The engine names themselves are brands and never translated (`settings_player_*` are
+ * `translatable="false"`), so only the two sentence frames around them are, which is also why the same
+ * four labels serve both sections.
+ */
+@Composable
+internal fun engineLabel(preference: EnginePreference): String {
+    val exo = stringResource(R.string.settings_player_exoplayer)
+    val mpv = stringResource(R.string.settings_player_mpv)
+    return when (preference) {
+        EnginePreference.EXO_FIRST -> stringResource(R.string.settings_engine_order, exo, mpv)
+        EnginePreference.MPV_FIRST -> stringResource(R.string.settings_engine_order, mpv, exo)
+        EnginePreference.EXO_ONLY -> stringResource(R.string.settings_engine_only, exo)
+        EnginePreference.MPV_ONLY -> stringResource(R.string.settings_engine_only, mpv)
+    }
+}
+
+/** The four options for an engine picker, with [default] marked — Live TV and Movies & Series have
+ *  different defaults, so which line carries the mark depends on the section, not on the option. */
+@Composable
+private fun engineOptions(default: EnginePreference): List<Pair<String, String>> =
+    EnginePreference.entries.map { preference ->
+        val label = engineLabel(preference)
+        preference.name to if (preference == default) {
+            stringResource(R.string.settings_engine_default, label)
+        } else {
+            label
+        }
+    }
 
 /** Row chip for the External player row: "Off", "On" (all three), or the sections that are on. */
 @Composable
@@ -1060,11 +1104,13 @@ private fun subtitlePositionName(position: SubtitleStyle.Position): String = str
 private fun SubtitleAppearanceDialog(
     enabled: Boolean,
     scale: Float,
+    font: AppFontFamily?,
     color: String,
     position: SubtitleStyle.Position,
     bgOpacity: Int,
     onToggle: (Boolean) -> Unit,
     onScale: (Float) -> Unit,
+    onFont: (AppFontFamily?) -> Unit,
     onColor: (String) -> Unit,
     onPosition: (SubtitleStyle.Position) -> Unit,
     onBgOpacity: (Int) -> Unit,
@@ -1091,18 +1137,29 @@ private fun SubtitleAppearanceDialog(
     // D-pad, and the popups that need one carry their own preview, so nothing is lost by hiding this.
     if (child != SubDialog.NONE) {
         val close = { child = SubDialog.NONE }
-        when (child) {
-            SubDialog.SIZE -> PickerDialog(
+            when (child) {
+                SubDialog.SIZE -> PickerDialog(
                 title = stringResource(R.string.settings_subtitle_size),
                 options = SUB_SIZES.map { it.first.toString() to stringResource(it.second) },
                 selected = nearestSubSize(scale).first.toString(),
                 onSelect = { onScale(it.toFloat()); close() },
-                onDismiss = close,
-            )
-            SubDialog.COLOR -> SubtitleColorDialog(color = color, onColor = onColor, onDismiss = close)
+                    onDismiss = close,
+                )
+                SubDialog.FONT -> PickerDialog(
+                    title = stringResource(R.string.settings_subtitle_font),
+                    options = listOf("" to stringResource(R.string.settings_subtitle_default)) +
+                        AppFontFamily.entries.map { it.name to subtitleFontFamilyLabel(it) },
+                    selected = font?.name.orEmpty(),
+                    onSelect = { selected ->
+                        onFont(AppFontFamily.entries.firstOrNull { it.name == selected })
+                        close()
+                    },
+                    onDismiss = close,
+                )
+                SubDialog.COLOR -> SubtitleColorDialog(color = color, onColor = onColor, onDismiss = close)
             SubDialog.POSITION -> SubtitlePositionDialog(position = position, onSelect = onPosition, onDismiss = close)
-            SubDialog.TRANSPARENCY -> SubtitleTransparencyDialog(
-                scale = scale, color = color, position = position,
+                SubDialog.TRANSPARENCY -> SubtitleTransparencyDialog(
+                    scale = scale, font = font, color = color, position = position,
                 bgOpacity = bgOpacity, onSet = onBgOpacity, onDismiss = close,
             )
             SubDialog.NONE -> Unit
@@ -1128,7 +1185,7 @@ private fun SubtitleAppearanceDialog(
 
                 // The overview sits above every row, including the master toggle, so the effect of a
                 // change is judged against a picture instead of guessed from a chip.
-                SubtitlePreview(enabled = enabled, scale = scale, color = color, position = position, bgOpacity = bgOpacity)
+        SubtitlePreview(enabled = enabled, scale = scale, font = font, color = color, position = position, bgOpacity = bgOpacity)
                 Spacer(Modifier.height(16.dp))
 
                 Row2(
@@ -1144,15 +1201,25 @@ private fun SubtitleAppearanceDialog(
                 if (enabled) {
                     val open = { target: SubDialog -> lastChild = target; child = target }
                     Spacer(Modifier.height(2.dp))
-                    Row2(
-                        icon = OwnTVIcon.SUBTITLE,
-                        title = stringResource(R.string.settings_subtitle_size),
+            Row2(
+                icon = OwnTVIcon.SUBTITLE,
+                title = stringResource(R.string.settings_subtitle_size),
                         desc = stringResource(R.string.settings_subtitle_size_description),
                         chip = subSizeName(scale), primaryChip = SubtitleStyle.hasScale(scale), chevron = true,
                         modifier = Modifier.focusRequester(rowFocus.getValue(SubDialog.SIZE)),
-                        onClick = { open(SubDialog.SIZE) },
-                    )
-                    Row2(
+                onClick = { open(SubDialog.SIZE) },
+            )
+            Row2(
+                icon = OwnTVIcon.SUBTITLE,
+                title = stringResource(R.string.settings_subtitle_font),
+                desc = stringResource(R.string.settings_choose_font),
+                chip = font?.let { subtitleFontFamilyLabel(it) } ?: stringResource(R.string.settings_subtitle_default),
+                primaryChip = font != null,
+                chevron = true,
+                modifier = Modifier.focusRequester(rowFocus.getValue(SubDialog.FONT)),
+                onClick = { open(SubDialog.FONT) },
+            )
+            Row2(
                         icon = OwnTVIcon.SUBTITLE,
                         title = stringResource(R.string.settings_subtitle_color_short),
                         desc = stringResource(R.string.settings_subtitle_color_description),
@@ -1184,8 +1251,9 @@ private fun SubtitleAppearanceDialog(
                     Spacer(Modifier.weight(1f))
                     if (enabled) {
                         OwnTVButton(stringResource(R.string.settings_subtitle_reset_all), style = OwnTVButtonStyle.SECONDARY, onClick = {
-                            onScale(SubtitleStyle.SCALE_DEFAULT)
-                            onColor(SubtitleStyle.COLOR_DEFAULT)
+                        onScale(SubtitleStyle.SCALE_DEFAULT)
+                        onFont(null)
+                        onColor(SubtitleStyle.COLOR_DEFAULT)
                             onPosition(SubtitleStyle.Position.DEFAULT)
                             onBgOpacity(SubtitleStyle.OPACITY_DEFAULT)
                         })
@@ -1197,7 +1265,19 @@ private fun SubtitleAppearanceDialog(
 }
 
 /** The four options of [SubtitleAppearanceDialog], each opening its own popup. */
-private enum class SubDialog { NONE, SIZE, COLOR, POSITION, TRANSPARENCY }
+private enum class SubDialog { NONE, SIZE, FONT, COLOR, POSITION, TRANSPARENCY }
+
+@Composable
+private fun subtitleFontFamilyLabel(family: AppFontFamily): String = stringResource(
+    when (family) {
+        AppFontFamily.LORA -> R.string.settings_font_lora
+        AppFontFamily.SYSTEM_SANS -> R.string.settings_font_system_sans
+        AppFontFamily.MONOSPACE -> R.string.settings_font_monospace
+        AppFontFamily.PLAYFAIR_DISPLAY -> R.string.settings_font_playfair_display
+        AppFontFamily.DANCING_SCRIPT -> R.string.settings_font_dancing_script
+        AppFontFamily.POPPINS -> R.string.settings_font_poppins
+    },
+)
 
 /**
  * Subtitle text color — the same D-pad-tuned picker the accent color uses (shared controls live in
@@ -1424,6 +1504,7 @@ private fun PositionCell(
 @Composable
 private fun SubtitleTransparencyDialog(
     scale: Float,
+    font: AppFontFamily?,
     color: String,
     position: SubtitleStyle.Position,
     bgOpacity: Int,
@@ -1455,8 +1536,8 @@ private fun SubtitleTransparencyDialog(
                     style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(12.dp))
-                SubtitlePreview(
-                    enabled = true, scale = scale, color = color, position = position,
+        SubtitlePreview(
+            enabled = true, scale = scale, font = font, color = color, position = position,
                     bgOpacity = bgOpacity, height = 92.dp,
                 )
                 Spacer(Modifier.height(14.dp))
@@ -1498,6 +1579,7 @@ private fun SubtitleTransparencyDialog(
 private fun SubtitlePreview(
     enabled: Boolean,
     scale: Float,
+    font: AppFontFamily? = null,
     color: String,
     position: SubtitleStyle.Position,
     bgOpacity: Int,
@@ -1529,6 +1611,8 @@ private fun SubtitlePreview(
             stringResource(R.string.settings_subtitle_preview_sample),
             style = MaterialTheme.typography.bodyLarge.copy(
                 fontSize = MaterialTheme.typography.bodyLarge.fontSize * textScale,
+                fontFamily = if (enabled && font != null) font.asComposeFamily()
+                    else MaterialTheme.typography.bodyLarge.fontFamily,
             ),
             color = textColor,
             modifier = Modifier

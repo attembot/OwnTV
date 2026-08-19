@@ -45,7 +45,7 @@ import java.io.File
 
 /**
  * Remote restore: opens the LAN companion server in backup-upload mode and shows the PIN, a QR of the
- * URL, and the URL text so a phone on the same Wi-Fi can send an OwnTV backup file to the TV. When an
+ * URL, and the URL text so another device on the same Wi-Fi can send an OwnTV backup file to the TV. When an
  * upload arrives, [onBackupReceived] hands the saved file off to the normal restore flow (section
  * picker, password prompt). The listener stops automatically when this screen leaves composition.
  *
@@ -139,7 +139,7 @@ fun RemoteBackupRestoreScreen(
 
 /**
  * Remote export: the TV has written the backup to a cache file and is serving it over the companion
- * server. Shows the PIN, a QR of the URL, and the URL text so a phone/laptop on the same Wi-Fi can
+ * server. Shows the PIN, a QR of the URL, and the URL text so another device on the same Wi-Fi can
  * open it, enter the PIN and download the file. The server is started by the ViewModel (after the
  * export finishes) and stopped when this screen leaves composition.
  */

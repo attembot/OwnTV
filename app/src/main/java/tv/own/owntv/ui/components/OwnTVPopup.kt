@@ -40,6 +40,7 @@ fun OwnTVPopup(
     onDismissRequest: () -> Unit,
     dismissOnBackPress: Boolean = true,
     dismissOnClickOutside: Boolean = true,
+    fontScale: Float = 0.70f,
     content: @Composable () -> Unit,
 ) {
     Dialog(
@@ -127,7 +128,7 @@ fun OwnTVPopup(
                     LocalTvImeWatcher provides watcher,
                     LocalTvImeMetrics provides metrics,
                 ) {
-                    PopupFontTheme(fontScale = popupScale) {
+                PopupFontTheme(fontScale = fontScale) {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             content()
                         }

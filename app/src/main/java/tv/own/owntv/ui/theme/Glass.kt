@@ -464,7 +464,15 @@ fun Modifier.glass(
     if (!config.isGlassy(surface)) return this.background(baseFill, shape)
 
     val colors = OwnTVTheme.colors
-    val accent = colors.primary
+    // The luminous rim IS the focus ring in glass mode — the solid-mode border is skipped entirely
+    // (see FocusableSurface). So it has to follow the user's focus highlight (#121), not the accent.
+    // With no highlight chosen, focusBorder == primary and the rim renders exactly as before.
+    val accent = colors.focusBorder
+    val customFocusRing = colors.focusBorder != colors.primary
+    // A rim that is 62% white cannot show a chosen color, and a fixed 1.5 dp cannot show a chosen
+    // thickness. Both only diverge from the shipped values once the user has actually picked one.
+    val focusRingMix = if (customFocusRing) 0.85f else 0.38f
+    val focusRingWidth = LocalFocusBorderWidth.current.let { if (it == Dimens.FocusBorderWidth) 1.5.dp else it }
     val motion = LocalGlassMotion.current
     val motionFocused = interaction == GlassInteraction.FOCUSED || interaction == GlassInteraction.PRESSED
     fun glintMotionOffset(): Offset = if (motionFocused) motion?.glintOffset() ?: Offset.Zero else Offset.Zero
@@ -556,6 +564,8 @@ fun Modifier.glass(
                 material = material,
                 treatment = treatment,
                 accent = accent,
+                focusRingMix = focusRingMix,
+                focusRingWidth = focusRingWidth,
                 shape = shape,
                 interaction = interaction,
                 idleAlpha = resolvedIdleRim,
@@ -578,7 +588,7 @@ fun Modifier.glass(
                 interaction == GlassInteraction.FOCUSED || interaction == GlassInteraction.PRESSED
             ) motion?.focusedRimScale() ?: 1f else 1f
             val body = if (lightweightIdle || !treatment.glint) null else createLuminousBody(material = material, interaction = interaction, tonal = true, highlightScale = highlightScale)
-            val rim = if (lightweightIdle) null else createLuminousRim(material = material, treatment = treatment, accent = accent, shape = shape, interaction = interaction, idleAlpha = resolvedIdleRim, highlightScale = highlightScale, focusedMotionScale = rimMotionScale)
+            val rim = if (lightweightIdle) null else createLuminousRim(material = material, treatment = treatment, accent = accent, shape = shape, interaction = interaction, idleAlpha = resolvedIdleRim, highlightScale = highlightScale, focusedMotionScale = rimMotionScale, focusRingMix = focusRingMix, focusRingWidth = focusRingWidth)
             onDrawWithContent {
                 drawRect(baseFill.copy(alpha = 0.94f))
                 body?.let { drawLuminousBody(it, darkLensMix(null), glintMotionOffset()) }
@@ -614,7 +624,7 @@ fun Modifier.glass(
                     interaction == GlassInteraction.FOCUSED || interaction == GlassInteraction.PRESSED
                 ) motion?.focusedRimScale() ?: 1f else 1f
                 val body = if (!treatment.glint) null else createLuminousBody(material = material, interaction = interaction, tonal = false, highlightScale = highlightScale)
-                val rim = createLuminousRim(material = material, treatment = treatment, accent = accent, shape = shape, interaction = interaction, idleAlpha = resolvedIdleRim, highlightScale = highlightScale, focusedMotionScale = rimMotionScale)
+                val rim = createLuminousRim(material = material, treatment = treatment, accent = accent, shape = shape, interaction = interaction, idleAlpha = resolvedIdleRim, highlightScale = highlightScale, focusedMotionScale = rimMotionScale, focusRingMix = focusRingMix, focusRingWidth = focusRingWidth)
                 onDrawWithContent {
                     val sampled = blurred?.sampledLuminance(position.bounds)
                     drawRect(baseFill.copy(alpha = tintAlpha(sampled)))
@@ -640,7 +650,7 @@ fun Modifier.glass(
             val rimMotionScale = if (
                 interaction == GlassInteraction.FOCUSED || interaction == GlassInteraction.PRESSED
             ) motion?.focusedRimScale() ?: 1f else 1f
-            val rim = createLuminousRim(material = material, treatment = treatment, accent = accent, shape = shape, interaction = interaction, idleAlpha = resolvedIdleRim, highlightScale = highlightScale, focusedMotionScale = rimMotionScale)
+            val rim = createLuminousRim(material = material, treatment = treatment, accent = accent, shape = shape, interaction = interaction, idleAlpha = resolvedIdleRim, highlightScale = highlightScale, focusedMotionScale = rimMotionScale, focusRingMix = focusRingMix, focusRingWidth = focusRingWidth)
             onDrawWithContent {
                 val bounds = position.bounds
                 val sampled = blurred.sampledLuminance(bounds)
@@ -858,6 +868,8 @@ private fun CacheDrawScope.createLuminousRim(
     idleAlpha: Float,
     highlightScale: Float,
     focusedMotionScale: Float = 1f,
+    focusRingMix: Float = 0.38f,
+    focusRingWidth: Dp = 1.5.dp,
 ): LuminousRim {
     val focused = interaction == GlassInteraction.FOCUSED || interaction == GlassInteraction.PRESSED
     val selected = interaction == GlassInteraction.SELECTED
@@ -874,11 +886,11 @@ private fun CacheDrawScope.createLuminousRim(
     }
     val edgeDark = if (treatment.darkEdge) material.edgeDark else 0f
     val brightColor = when {
-        focused -> androidx.compose.ui.graphics.lerp(Color.White, accent, 0.38f)
+        focused -> androidx.compose.ui.graphics.lerp(Color.White, accent, focusRingMix)
         selected -> androidx.compose.ui.graphics.lerp(Color.White, accent, 0.55f)
         else -> Color.White
     }
-    val stroke = if (focused) 1.5.dp.toPx() else 1.dp.toPx()
+    val stroke = if (focused) focusRingWidth.toPx() else 1.dp.toPx()
     val inset = stroke / 2f
     val outlineSize = Size(
         width = (size.width - stroke).coerceAtLeast(0f),

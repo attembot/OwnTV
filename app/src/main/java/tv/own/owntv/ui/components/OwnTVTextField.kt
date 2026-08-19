@@ -100,10 +100,11 @@ fun OwnTVTextField(
     // Glassy only when a surface is given and it's in the active glass scope (matches FocusableSurface).
     val glassy = surface != null && LocalGlass.current.isGlassy(surface)
     // Glass edge: a faint white rim lenses the whole edge at all times, brightening on focus.
+    // Focused = where the remote is, so it follows the user's focus highlight (#121) in both
+    // materials; glass keeps its faint white hairline for the idle edge.
     val borderColor = when {
-        glassy && (focused || eyeFocused) -> Color.White.copy(alpha = 0.5f)
+        focused || eyeFocused -> colors.focusBorder
         glassy -> Color.White.copy(alpha = 0.22f)
-        focused || eyeFocused -> colors.primary
         else -> colors.outlineVariant
     }
 
@@ -142,7 +143,7 @@ fun OwnTVTextField(
                     else Modifier.background(colors.surfaceContainerHigh)
                 )
                 .border(
-                    width = if (focused || eyeFocused) 2.5.dp else 1.dp,
+                    width = if (focused || eyeFocused) tv.own.owntv.ui.theme.LocalFocusBorderWidth.current else 1.dp,
                     color = borderColor,
                     shape = shape,
                 ),

@@ -55,7 +55,7 @@ class SetupViewModel(
     private val companion: tv.own.owntv.core.companion.CompanionController,
 ) : ViewModel() {
 
-    // ---- Remote (companion) add-source: a LAN web form fills the Add Source screen from a phone. ----
+    // ---- Remote (companion) add-source: a LAN web form fills the Add Source screen from another device. ----
     /** Server lifecycle (Idle / Starting / Listening with PIN+QR / Failed) for the Remote screen. */
     val remoteState get() = companion.state
 
@@ -69,7 +69,7 @@ class SetupViewModel(
     fun stopRemoteListener() = companion.stop()
     fun consumeRemotePayload() = companion.consumePayload()
 
-    // ---- Remote restore: a phone uploads a backup JSON to the TV over the LAN companion server. ----
+    // ---- Remote restore: another device uploads a backup JSON to the TV over the LAN companion server. ----
     /** Uploaded backup files — the remote-restore screen collects this and hands each to [importBackup]. */
     val remoteBackups get() = companion.backups
 

@@ -25,6 +25,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+// Aliased: the grid and list versions share a name, and both are used in this file.
+import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -307,9 +309,23 @@ private fun SeriesGrid(
             val sel = selectedSeries
             val idx = if (sel != null) series.itemSnapshotList.items.indexOfFirst { it.id == sel.id } else -1
             if (idx >= 0) {
-                runCatching { effectiveGridState.scrollToItem(idx) }
+                // Scroll the layout that is actually on screen. Scrolling only the grid state left the
+                // LIST view unscrolled, so a show further down was never composed, the focus request
+                // failed, and focus fell out to the CategoryRail instead of the show you came back from.
+                if (viewMode == SettingsRepository.VodViewMode.GRID) {
+                    runCatching { effectiveGridState.scrollToItem(idx) }
+                } else {
+                    runCatching { effectiveListState.scrollToItem(idx) }
+                }
                 kotlinx.coroutines.delay(60)
-                runCatching { gridSelFocus.requestFocus() }
+                // One retry: on a cold paged list 60 ms is occasionally short of composition, and a
+                // silent miss is exactly the failure being fixed here.
+                if (runCatching { gridSelFocus.requestFocus() }.isFailure) {
+                    withFrameNanos { }
+                    if (runCatching { gridSelFocus.requestFocus() }.isFailure) {
+                        runCatching { firstItemFocus.requestFocus() }
+                    }
+                }
             } else {
                 runCatching { firstItemFocus.requestFocus() }
             }
@@ -1008,6 +1024,12 @@ private fun EpisodeView(
     val seriesOrder by vm.seriesOrder.collectAsStateWithLifecycle()
     val nextUpId by vm.nextUpEpisodeId.collectAsStateWithLifecycle()
     val epListState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val episodeViewMode by vm.episodeViewMode.collectAsStateWithLifecycle()
+    val isEpisodeGrid = episodeViewMode == SettingsRepository.VodViewMode.GRID
+    // Grid mode has its own scroll state; every scroll/focus path below goes through `scrollEpisodes`
+    // so the two layouts share one set of focus rules instead of duplicating them.
+    val epGridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+    val seasonMeta by vm.seasonEpisodeMeta.collectAsStateWithLifecycle()
     // Season selector rail state — long-running shows can have more seasons than fit on one line
     // (12+); the selector scrolls chip-by-chip with D-pad focus and keeps the active season in view.
     val seasonRowState = androidx.compose.foundation.lazy.rememberLazyListState()
@@ -1028,6 +1050,11 @@ private fun EpisodeView(
     val toast = rememberInAppToast()
 
     BackHandler { vm.closeSeries() }
+
+    /** Scrolls whichever episode layout is live, so focus handling stays layout-agnostic. */
+    suspend fun scrollEpisodes(index: Int) {
+        if (isEpisodeGrid) epGridState.scrollToItem(index) else epListState.scrollToItem(index)
+    }
 
     // Season rail and episode list are ordered independently (the "Sorting" popup). Both branches
     // sort explicitly rather than leaning on upstream order, so the two orders are symmetrical.
@@ -1057,7 +1084,7 @@ private fun EpisodeView(
             val idx = lastPlayedId?.let { id -> visibleEpisodes.indexOfFirst { it.id == id } } ?: -1
             kotlinx.coroutines.delay(80)
             if (idx >= 0) {
-                runCatching { epListState.scrollToItem(idx) }
+                runCatching { scrollEpisodes(idx) }
                 kotlinx.coroutines.delay(40)
                 runCatching { selFocus.requestFocus() }
             } else {
@@ -1096,7 +1123,7 @@ private fun EpisodeView(
         if (!restoreFocus) return@LaunchedEffect
         val idx = lastPlayedId?.let { id -> visibleEpisodes.indexOfFirst { it.id == id } } ?: -1
         if (idx >= 0) {
-            runCatching { epListState.scrollToItem(idx) }
+            runCatching { scrollEpisodes(idx) }
             kotlinx.coroutines.delay(60)
             runCatching { selFocus.requestFocus() }
         }
@@ -1138,6 +1165,22 @@ private fun EpisodeView(
                     style = OwnTVButtonStyle.SECONDARY,
                 )
             }
+            // List of titles, or a wall of episode stills. Same control and the same two labels as the
+            // catalog's own view toggle, so it reads as the same idea in a different place.
+            OwnTVButton(
+                label = stringResource(
+                    if (episodeViewMode == SettingsRepository.VodViewMode.GRID) R.string.settings_view_grid
+                    else R.string.settings_view_list,
+                ),
+                onClick = {
+                    vm.setEpisodeViewMode(
+                        if (episodeViewMode == SettingsRepository.VodViewMode.GRID) SettingsRepository.VodViewMode.LIST
+                        else SettingsRepository.VodViewMode.GRID,
+                    )
+                },
+                style = OwnTVButtonStyle.SECONDARY,
+                icon = if (episodeViewMode == SettingsRepository.VodViewMode.GRID) OwnTVIcon.MENU else OwnTVIcon.SERIES,
+            )
             // Season/episode order for THIS series (visual only — playback always runs 1,2,3…).
             // Opens the popup; the two orders are set independently and saved per series.
             OwnTVButton(
@@ -1158,9 +1201,10 @@ private fun EpisodeView(
             }
             else -> {
                 // Option B (§11.1): episode list on the left, focused-episode detail pane on the right.
+                // In grid mode the pane is gone and the episodes take the full width.
                 Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     Column(modifier = Modifier
-                        .weight(1.4f)
+                        .weight(if (isEpisodeGrid) 1f else 1.4f)
                         .fillMaxHeight()
                         .onFocusChanged { epPaneFocused = it.hasFocus }
                         .chNavPaging(
@@ -1172,7 +1216,7 @@ private fun EpisodeView(
                             currentTargetIndex = {
                                 val sel = selectedEpisode
                                 if (sel != null) visibleEpisodes.indexOfFirst { it.id == sel.id }
-                                else epListState.firstVisibleItemIndex
+                                else if (isEpisodeGrid) epGridState.firstVisibleItemIndex else epListState.firstVisibleItemIndex
                             },
                             onJumpToIndex = { idx ->
                                 // Set the target as the context anchor so epContextFocus binds to its
@@ -1181,7 +1225,7 @@ private fun EpisodeView(
                                 contextEpisodeId = target.id
                                 vm.onEpisodeFocused(target)
                                 scope.launch {
-                                    runCatching { epListState.scrollToItem(idx) }
+                                    runCatching { scrollEpisodes(idx) }
                                     withFrameNanos { }
                                     runCatching { epContextFocus.requestFocus() }
                                 }
@@ -1205,33 +1249,65 @@ private fun EpisodeView(
                             }
                             Spacer(Modifier.height(14.dp))
                         }
-                        LazyColumn(state = epListState, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            // Keyed by episode id, not index: on a season switch the item at a
-                            // given position is a different episode, and index keys would carry
-                            // focus/row state across to it.
-                            itemsIndexed(visibleEpisodes, key = { _, ep -> ep.id }) { index, ep ->
-                                val prog = episodeProgress[ep.id]
-                                val completed = ep.id in completedIds
-                                val progressFraction = prog?.takeIf { !completed && it.durationMs > 0 }
-                                    ?.let { (it.positionMs.toFloat() / it.durationMs).coerceIn(0f, 1f) }
-                                val epModifier = Modifier
-                                    .then(if (ep.id == lastPlayedId) Modifier.focusRequester(selFocus) else Modifier)
-                                    .then(if (index == 0) Modifier.focusRequester(firstEpFocus) else Modifier)
-                                    .then(if (ep.id == contextEpisodeId) Modifier.focusRequester(epContextFocus) else Modifier)
-                                EpisodeRow(
-                                    episode = ep,
-                                    lastWatched = ep.id == lastPlayedId,
-                                    completed = completed,
-                                    progressFraction = progressFraction,
-                                    onClick = { startEpisode(ep) },
-                                    onFocus = { vm.onEpisodeFocused(ep) },
-                                    onLongClick = { contextEpisode = ep; contextEpisodeId = ep.id },
-                                    modifier = epModifier,
-                                )
+                        // Shared by both layouts: the focus anchors are identical, only the item differs.
+                        val epModifierFor: (Int, EpisodeEntity) -> Modifier = { index, ep ->
+                            Modifier
+                                .then(if (ep.id == lastPlayedId) Modifier.focusRequester(selFocus) else Modifier)
+                                .then(if (index == 0) Modifier.focusRequester(firstEpFocus) else Modifier)
+                                .then(if (ep.id == contextEpisodeId) Modifier.focusRequester(epContextFocus) else Modifier)
+                        }
+                        if (isEpisodeGrid) {
+                            LazyVerticalGrid(
+                                state = epGridState,
+                                columns = GridCells.Adaptive(minSize = 210.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                gridItemsIndexed(visibleEpisodes, key = { _, ep -> ep.id }) { index, ep ->
+                                    val prog = episodeProgress[ep.id]
+                                    val completed = ep.id in completedIds
+                                    EpisodeTile(
+                                        episode = ep,
+                                        meta = seasonMeta[ep.id],
+                                        series = series,
+                                        tmdbWins = metadataMode.tmdbWins,
+                                        lastWatched = ep.id == lastPlayedId,
+                                        completed = completed,
+                                        progressFraction = prog?.takeIf { !completed && it.durationMs > 0 }
+                                            ?.let { (it.positionMs.toFloat() / it.durationMs).coerceIn(0f, 1f) },
+                                        onClick = { startEpisode(ep) },
+                                        onFocus = { vm.onEpisodeFocused(ep) },
+                                        onLongClick = { contextEpisode = ep; contextEpisodeId = ep.id },
+                                        modifier = epModifierFor(index, ep),
+                                    )
+                                }
+                            }
+                        } else {
+                            LazyColumn(state = epListState, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                // Keyed by episode id, not index: on a season switch the item at a
+                                // given position is a different episode, and index keys would carry
+                                // focus/row state across to it.
+                                itemsIndexed(visibleEpisodes, key = { _, ep -> ep.id }) { index, ep ->
+                                    val prog = episodeProgress[ep.id]
+                                    val completed = ep.id in completedIds
+                                    EpisodeRow(
+                                        episode = ep,
+                                        lastWatched = ep.id == lastPlayedId,
+                                        completed = completed,
+                                        progressFraction = prog?.takeIf { !completed && it.durationMs > 0 }
+                                            ?.let { (it.positionMs.toFloat() / it.durationMs).coerceIn(0f, 1f) },
+                                        onClick = { startEpisode(ep) },
+                                        onFocus = { vm.onEpisodeFocused(ep) },
+                                        onLongClick = { contextEpisode = ep; contextEpisodeId = ep.id },
+                                        modifier = epModifierFor(index, ep),
+                                    )
+                                }
                             }
                         }
                     }
-                    Box(modifier = Modifier.weight(1f).fillMaxHeight().roundedPanel(fillColor = PreviewPanelFill)) {
+                    // Grid mode drops the preview pane on purpose: the tiles already show the still,
+                    // which is the whole point of the layout, and a full-width grid fits far more.
+                    if (!isEpisodeGrid) Box(modifier = Modifier.weight(1f).fillMaxHeight().roundedPanel(fillColor = PreviewPanelFill)) {
                         val ep = selectedEpisode
                         val meta = selectedEpisodeMeta?.takeIf { it.episodeId == ep?.id }?.cache
                         val nextUpEp = nextUpId?.let { id -> episodes.firstOrNull { it.id == id } }
@@ -1382,6 +1458,133 @@ private fun SeasonChip(season: Int, selected: Boolean, completedCount: Int, tota
             color = if (selected) colors.onPrimaryContainer else colors.onSurface,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
         )
+    }
+}
+
+/**
+ * One episode tile in grid mode: a 16:9 still with the episode number, title and watched state.
+ *
+ * The image ladder matters more here than in the list. TMDB's still is the point of the grid, but an
+ * episode it has never heard of has NO picture of its own — the provider stores none — so it falls back
+ * to the show's own art. The show's *backdrop* comes first because it is 16:9 like the still; the
+ * portrait poster only after that, since it has to be cropped to fit.
+ *
+ * When the tile is showing fallback art every tile in the season looks identical, so the episode number
+ * becomes the only thing distinguishing them and is drawn large. With a real still it stays a small
+ * corner badge and lets the picture do the work.
+ */
+@Composable
+private fun EpisodeTile(
+    episode: EpisodeEntity,
+    meta: tv.own.owntv.core.database.entity.MetadataCacheEntity?,
+    series: SeriesEntity,
+    tmdbWins: Boolean,
+    lastWatched: Boolean,
+    completed: Boolean,
+    progressFraction: Float?,
+    onClick: () -> Unit,
+    onFocus: () -> Unit = {},
+    onLongClick: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
+    val colors = OwnTVTheme.colors
+    // w300, not the w780 the detail pane uses: a tile is a fraction of the screen, and a season of
+    // w780 stills is several times the pixels for no visible gain on a TV.
+    val still = tv.own.owntv.core.metadata.MetadataImages.backdrop(meta?.backdropPath, size = "w300")
+    val fallback = series.backdropUrl?.takeIf { it.isNotBlank() } ?: series.posterUrl?.takeIf { it.isNotBlank() }
+    // The still ALWAYS wins when there is one — unlike titles or plots, this is not a provider-vs-TMDB
+    // merge (§7.1). The provider has no episode image at all, so the show's own art is a stand-in for a
+    // missing picture, never a competing one. Letting it win would put the same image on every tile and
+    // defeat the whole layout. Provider-only mode never resolves metadata, so `still` is null there and
+    // the show art is used for all episodes, which is what that mode should look like.
+    val art = still ?: fallback
+    val isFallback = still == null
+    val title = if (tmdbWins) meta?.title?.takeIf { it.isNotBlank() } ?: episodeDisplayTitle(episode)
+    else episodeDisplayTitle(episode)
+
+    FocusableSurface(
+        onClick = onClick,
+        onLongClick = onLongClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        contentAlignment = Alignment.TopStart,
+        surface = GlassSurface.CARDS,
+    ) { focused ->
+        LaunchedEffect(focused) { if (focused) onFocus() }
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)
+                    .clip(RoundedCornerShape(10.dp)).background(colors.surfaceContainerLowest),
+            ) {
+                if (!art.isNullOrBlank()) {
+                    AsyncImage(
+                        model = art,
+                        contentDescription = null,
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                // Big centred number whenever the picture cannot identify the episode by itself.
+                if (isFallback) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            localizedInteger(episode.episodeNumber, grouping = false),
+                            style = MaterialTheme.typography.headlineLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.onSurface,
+                        )
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier.padding(6.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(colors.primaryContainer)
+                            .padding(horizontal = 7.dp, vertical = 2.dp),
+                    ) {
+                        Text(
+                            localizedInteger(episode.episodeNumber, grouping = false),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = colors.onPrimaryContainer,
+                        )
+                    }
+                }
+                if (completed) {
+                    Box(
+                        modifier = Modifier.align(Alignment.TopEnd).padding(6.dp)
+                            .clip(RoundedCornerShape(6.dp)).background(colors.primaryContainer)
+                            .padding(horizontal = 7.dp, vertical = 2.dp),
+                    ) {
+                        Text("✓", style = MaterialTheme.typography.labelMedium, color = colors.onPrimaryContainer)
+                    }
+                }
+                if (lastWatched) {
+                    Text(
+                        stringResource(R.string.content_last_watched),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = colors.onPrimaryContainer,
+                        modifier = Modifier.align(Alignment.BottomStart).padding(6.dp)
+                            .clip(RoundedCornerShape(6.dp)).background(colors.primaryContainer)
+                            .padding(horizontal = 7.dp, vertical = 2.dp),
+                    )
+                }
+                // Part-watched bar hugging the bottom edge, same language as the list row.
+                if (progressFraction != null) {
+                    Box(
+                        Modifier.align(Alignment.BottomStart).fillMaxWidth(progressFraction)
+                            .height(3.dp).background(colors.primary),
+                    )
+                }
+            }
+            Text(
+                title,
+                style = MaterialTheme.typography.labelLarge,
+                color = if (completed && !focused) colors.onSurfaceVariant else colors.onSurface,
+                fontWeight = if (focused) FontWeight.Medium else FontWeight.Normal,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+            )
+        }
     }
 }
 

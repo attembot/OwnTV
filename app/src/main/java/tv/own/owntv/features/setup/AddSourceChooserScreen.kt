@@ -36,7 +36,7 @@ import tv.own.owntv.ui.theme.GlassSurface
 import tv.own.owntv.ui.theme.OwnTVTheme
 
 /**
- * First step of "Add source": pick **Remote** (fill the form on a phone over the LAN) or **Manual**
+ * First step of "Add source": pick **Remote** (fill the form on another device over the LAN) or **Manual**
  * (type Xtream / M3U / Stalker here with the remote). Shared by the setup wizard and Settings → Manage
  * sources so both entry points offer the same choice.
  */

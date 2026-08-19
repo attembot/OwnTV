@@ -94,21 +94,36 @@
     <string name="settings_metadata_provider_tmdb_description">تكون الأولوية لمعلومات قائمة التشغيل؛ ويملأ TMDB الفجوات ويضيف طاقم التمثيل والأنواع والصور الخلفية.</string>
     <string name="settings_metadata_tmdb_only_description">فضّل TMDB لكل حقل؛ ولا تستخدم قائمة التشغيل إلا عندما لا يحتوي TMDB على أي معلومات.</string>
     <string name="settings_selected">محدد</string>
-    <string name="settings_active_tmdb_source">مصدر TMDB النشط: <xliff:g id="tier">%1$s</xliff:g></string>
     <string name="settings_metadata_allowance">حصتك اليومية</string>
-    <string name="settings_metadata_allowance_row"><xliff:g id="window">%1$s</xliff:g>: بقي <xliff:g id="remaining">%2$d</xliff:g> من <xliff:g id="total">%3$d</xliff:g></string>
-    <string name="settings_metadata_window_minute">في الدقيقة</string>
-    <string name="settings_metadata_window_hour">في الساعة</string>
-    <string name="settings_metadata_window_day">اليوم</string>
-    <plurals name="settings_metadata_allowance_left">
-        <item quantity="zero">بقي <xliff:g id="remaining">%1$d</xliff:g> من <xliff:g id="total">%2$d</xliff:g> عملية بحث اليوم</item>
-        <item quantity="one">بقي <xliff:g id="remaining">%1$d</xliff:g> من <xliff:g id="total">%2$d</xliff:g> عملية بحث اليوم</item>
-        <item quantity="two">بقيت <xliff:g id="remaining">%1$d</xliff:g> من <xliff:g id="total">%2$d</xliff:g> عمليتا بحث اليوم</item>
-        <item quantity="few">بقيت <xliff:g id="remaining">%1$d</xliff:g> من <xliff:g id="total">%2$d</xliff:g> عمليات بحث اليوم</item>
-        <item quantity="many">بقيت <xliff:g id="remaining">%1$d</xliff:g> من <xliff:g id="total">%2$d</xliff:g> عملية بحث اليوم</item>
-        <item quantity="other">بقي <xliff:g id="remaining">%1$d</xliff:g> من <xliff:g id="total">%2$d</xliff:g> عملية بحث اليوم</item>
+    <string name="settings_metadata_reset_automatic">يُعاد التعيين تلقائيًا</string>
+    <string name="settings_metadata_library_details">تفاصيل المكتبة</string>
+    <string name="settings_metadata_test_connection">اختبار الاتصال الحالي</string>
+    <string name="settings_allowance_available">المتاح</string>
+    <string name="settings_allowance_refills">يُجدَّد <xliff:g id="time">%1$s</xliff:g></string>
+    <string name="settings_allowance_minute">الدقيقة</string>
+    <string name="settings_allowance_hour">الساعة</string>
+    <string name="settings_allowance_day">اليوم</string>
+    <plurals name="settings_allowance_value">
+        <item quantity="zero"><xliff:g id="remaining">%1$d</xliff:g> / <xliff:g id="limit">%2$d</xliff:g> متبقٍ</item>
+        <item quantity="one"><xliff:g id="remaining">%1$d</xliff:g> / <xliff:g id="limit">%2$d</xliff:g> متبقٍ</item>
+        <item quantity="two"><xliff:g id="remaining">%1$d</xliff:g> / <xliff:g id="limit">%2$d</xliff:g> متبقٍ</item>
+        <item quantity="few"><xliff:g id="remaining">%1$d</xliff:g> / <xliff:g id="limit">%2$d</xliff:g> متبقٍ</item>
+        <item quantity="many"><xliff:g id="remaining">%1$d</xliff:g> / <xliff:g id="limit">%2$d</xliff:g> متبقٍ</item>
+        <item quantity="other"><xliff:g id="remaining">%1$d</xliff:g> / <xliff:g id="limit">%2$d</xliff:g> متبقٍ</item>
     </plurals>
-    <string name="settings_metadata_allowance_resets">تتجدد في <xliff:g id="time">%1$s</xliff:g></string>
+    <string name="settings_metadata_active_source">المصدر النشط</string>
+    <string name="settings_metadata_shared_worker_description">OwnTV Worker · بدون إعداد</string>
+    <string name="settings_metadata_connection">الاتصال</string>
+    <string name="settings_metadata_remote_advanced">الحصول على بيانات TMDB المتقدمة</string>
+    <string name="settings_metadata_remote_advanced_description">استخدم مفتاح TMDB API الخاص بك أو Worker مستضافًا بنفسك بدلًا من الافتراضي المشترك.</string>
+    <string name="settings_metadata_usage_label">الاستخدام</string>
+    <string name="settings_metadata_usage_value"><xliff:g id="min_used">%1$d</xliff:g>/<xliff:g id="min_total">%2$d</xliff:g> دقيقة · <xliff:g id="hr_used">%3$d</xliff:g>/<xliff:g id="hr_total">%4$d</xliff:g> ساعة · <xliff:g id="day_used">%5$d</xliff:g>/<xliff:g id="day_total">%6$d</xliff:g> يوم</string>
+    <string name="settings_metadata_source_label">المصدر</string>
+    <string name="settings_metadata_key_label">المفتاح</string>
+    <string name="settings_metadata_server_label">الخادم</string>
+    <string name="settings_metadata_refills_label">يتجدد في</string>
+    <string name="settings_metadata_clear_advanced_title">هل تريد التوقف عن استخدام مفتاحك؟</string>
+    <string name="settings_metadata_clear_advanced_message">سيتم حذف مفتاح TMDB API وعنوان خادمك من هذا الجهاز، وسيعود OwnTV إلى الخدمة المشتركة المدمجة بحصتها اليومية.</string>
     <string name="settings_metadata_fair_share">خدمة البيانات الوصفية المدمجة يشترك فيها جميع مستخدمي OwnTV، لذا يحصل كل جهاز على حصته الخاصة كل يوم. إذا استنفدت حصتك، تتوقف الملصقات والأوصاف مؤقتًا حتى تتجدد — وتظل معلومات قائمة التشغيل الخاصة بك تعمل كالمعتاد. إضافة مفتاح TMDB API الخاص بك أو خادمك تلغي هذا الحد: فهو مجاني، والمفتاح الشخصي لا حد له عمليًا.</string>
     <string name="settings_metadata_limit_reached">نفدت حصتك اليومية من البيانات الوصفية — أضف مفتاح TMDB الخاص بك من الإعدادات → البيانات الوصفية لإلغاء هذا الحد.</string>
     <string name="settings_metadata_language">لغة البيانات الوصفية</string>
@@ -116,6 +131,9 @@
     <string name="settings_advanced_options">خيارات متقدمة</string>
     <string name="settings_advanced_metadata_description">استخدم مفتاح TMDB API الخاص بك أو خادمًا مستضافًا ذاتيًا بدلًا من الإعداد الافتراضي المشترك.</string>
     <string name="settings_metadata_server_description">اترك الحقلين فارغين لاستخدام الخادم المشترك المضمّن (بلا إعداد). أدخل مفتاح TMDB API الخاص بك للاتصال بـ TMDB مباشرةً، أو عنوان URL لخادم مستضاف ذاتيًا لاستخدام الوكيل/النسخة المتطابقة الخاصة بك. تكون الأولوية لعنوان URL على المفتاح.</string>
+    <string name="settings_metadata_key_from_phone">احصل على المفتاح من جهاز آخر</string>
+    <string name="settings_metadata_key_from_phone_desc">امسح الرمز بهاتف أو جهاز لوحي أو حاسوب، وسجّل الدخول إلى TMDB هناك، ثم أرسل المفتاح. لا شيء تكتبه بجهاز التحكم.</string>
+    <string name="settings_metadata_key_received">تم استلام مفتاح TMDB</string>
     <string name="settings_tmdb_api_key">مفتاح TMDB API ‏(v3)</string>
     <string name="settings_self_host_url">عنوان URL للخادم المستضاف ذاتيًا</string>
     <string name="settings_test">اختبار</string>
@@ -180,6 +198,15 @@
     <string name="settings_theme_description">فاتحة أو داكنة أو تتبع النظام</string>
     <string name="settings_accent">اللون المميّز</string>
     <string name="settings_accent_description">تلوين الواجهة — إعدادات مسبقة أو لوحة ألوان أو رمز سداسي عشري</string>
+    <string name="settings_focus_highlight">إبراز التحديد</string>
+    <string name="settings_focus_highlight_description">لون وسُمك الإطار حول العنصر المحدد</string>
+    <string name="settings_focus_highlight_chip"><xliff:g id="color">%1$s</xliff:g> · <xliff:g id="thickness">%2$s</xliff:g></string>
+    <string name="settings_focus_thickness">السُمك</string>
+    <string name="settings_focus_width_thin">رفيع</string>
+    <string name="settings_focus_width_normal">عادي</string>
+    <string name="settings_focus_width_thick">سميك</string>
+    <string name="settings_focus_width_extra">سميك جدًا</string>
+    <string name="settings_focus_highlight_sample">محدَّد</string>
     <string name="settings_glass_effect">التأثير الزجاجي</string>
     <string name="settings_glass_description">لوحات شفافة ضبابية وصورة خلفية ومستوى الشفافية</string>
     <string name="settings_ui_zoom">تكبير الواجهة</string>
@@ -233,6 +260,8 @@
     <string name="settings_startup_home">الشاشة الرئيسية</string>
     <string name="settings_startup_last_channel">آخر قناة</string>
     <string name="settings_startup_favorites">البث المباشر · المفضّلة</string>
+    <string name="settings_startup_specific_channel">قناة محددة</string>
+    <string name="settings_startup_channel_unavailable">قناة بدء التشغيل غير متاحة. تم فتح الصفحة الرئيسية.</string>
     <string name="settings_all_history">السجل بالكامل</string>
     <string name="settings_choose_history">اختر ما تريد إزالته لهذا الملف الشخصي. لن تتأثر قوائم التشغيل والمفضّلة والتنزيلات.</string>
     <string name="settings_clear_history_confirm">هل تريد مسح سجل <xliff:g id="scope">%1$s</xliff:g>؟</string>
@@ -303,6 +332,7 @@
     <string name="settings_search_keywords_history">شوهد مؤخرًا متابعة إزالة</string>
     <string name="settings_search_keywords_theme">فاتح داكن نظام</string>
     <string name="settings_search_keywords_accent">تلوين لوحة ألوان سداسي عشري إعداد مسبق</string>
+    <string name="settings_search_keywords_focus">تركيز إطار حدود تحديد مؤشر مخطط</string>
     <string name="settings_search_keywords_zoom">مقياس واجهة حجم</string>
     <string name="settings_search_keywords_animation">حركة سرعة أداء</string>
     <string name="settings_search_keywords_weather">شريط علوي شريحة موقع مئوية فهرنهايت</string>
@@ -376,6 +406,10 @@
     <!-- Translators: Description of the deinterlacing setting. -->
     <string name="settings_deinterlace_description">تنعيم الخطوط المتداخلة التي تظهرها بعض قنوات SD القديمة عند الحركة. يسري على محرّك mpv أثناء رسمه للصورة بنفسه، لذا أوقف فك التشفير العتادي إذا لم يُحدث فرقًا.</string>
     <string name="settings_movies_series_player">مشغّل الأفلام والمسلسلات</string>
+    <string name="settings_live_tv_player">مشغّل البث المباشر</string>
+    <string name="settings_engine_order"><xliff:g id="first">%1$s</xliff:g>، ثم <xliff:g id="second">%2$s</xliff:g></string>
+    <string name="settings_engine_only"><xliff:g id="engine">%1$s</xliff:g> فقط</string>
+    <string name="settings_engine_default"><xliff:g id="option">%1$s</xliff:g> (افتراضي)</string>
     <string name="settings_reset_player_choices">إعادة ضبط خيارات المشغّل المحفوظة</string>
     <string name="settings_external_player">مشغّل خارجي</string>
     <string name="settings_default_zoom">التكبير الافتراضي</string>
@@ -418,7 +452,22 @@
     <string name="settings_preferred_subtitle_language">لغة الترجمة المفضّلة</string>
     <string name="settings_preferred_language_description">تحديد مسار الترجمة هذا تلقائيًا عند توفره.</string>
     <string name="settings_open_subtitles">OpenSubtitles</string>
+    <string name="settings_open_subtitles_connected">متصل</string>
+    <string name="settings_open_subtitles_reset_in">بعد <xliff:g id="hours">%1$d</xliff:g> س <xliff:g id="minutes">%2$d</xliff:g> د</string>
     <string name="settings_open_subtitles_description">سجّل الدخول للبحث عن الترجمات وتنزيلها وإدارة الترجمات المنزّلة. الإعداد خاص بكل ملف شخصي؛ ويلزم حساب مجاني على opensubtitles.com.</string>
+    <string name="settings_open_subtitles_advanced">خيارات متقدمة</string>
+    <string name="settings_open_subtitles_advanced_description">استخدم مفتاح API الخاص بتطبيقك أو خادم OpenSubtitles Worker المستضاف بنفسك.</string>
+    <string name="settings_open_subtitles_setup_title">إعداد OpenSubtitles</string>
+    <string name="settings_open_subtitles_setup_description">سجّل الدخول بحساب OpenSubtitles الخاص بك.</string>
+    <string name="settings_open_subtitles_setup_remote">عن بُعد</string>
+    <string name="settings_open_subtitles_setup_remote_description">املأ بياناتك في متصفح على جهاز آخر على نفس شبكة Wi-Fi — هاتف أو جهاز لوحي أو حاسوب.</string>
+    <string name="settings_open_subtitles_setup_local">الإدخال هنا</string>
+    <string name="settings_open_subtitles_setup_local_description">أدخل بياناتك على هذا التلفزيون باستخدام جهاز التحكم.</string>
+    <string name="settings_open_subtitles_api_key">مفتاح API لتطبيق OpenSubtitles</string>
+    <string name="settings_worker_server_url">عنوان Worker / الخادم</string>
+    <string name="settings_shared">مشترك</string>
+    <string name="settings_open_subtitles_access_priority">اترك الحقلين فارغين لاستخدام Worker المشترك من OwnTV. عنوان Worker المخصص له أولوية على مفتاح API المباشر. جلسات الحساب تبقى خاصة بكل ملف شخصي.</string>
+    <string name="settings_remove_custom_access">إزالة الوصول المخصص</string>
     <string name="settings_audio">الصوت</string>
     <string name="settings_preferred_audio_language">لغة الصوت المفضّلة</string>
     <string name="settings_audio_sync">مزامنة الصوت</string>
@@ -450,7 +499,8 @@
     <string name="settings_audio_delay"><xliff:g id="delay">%1$d</xliff:g> مللي ثانية</string>
     <string name="settings_external_player_description">اختر الأقسام التي تُفتح في تطبيق خارجي.</string>
     <string name="settings_audio_delay_value"><xliff:g id="delay">%1$d</xliff:g> مللي ثانية</string>
-    <string name="settings_movies_player_description">يتمتع mpv (موصى به) بأوسع دعم للتنسيقات — بما في ذلك صوت DTS/TrueHD والملفات غير المعتادة — بالإضافة إلى إصلاح مزامنة الصوت/الفيديو. انتقل إلى ExoPlayer فقط إذا تعذر بدء الأفلام أو الحلقات: فهو يشغّل بعض عمليات البث التي لا يستطيع mpv تشغيلها على بعض أجهزة التلفزيون، لكنه لا يستطيع فك ترميز صوت DTS/TrueHD ولا يتضمن إصلاحًا لمزامنة الصوت/الفيديو. أيًا كان اختيارك، ستتم تجربة الآخر تلقائيًا إذا فشل.</string>
+    <string name="settings_movies_player_description">يوفّر mpv (موصى به) أوسع دعم للصيغ — صوت DTS/TrueHD والملفات غير المألوفة — إضافة إلى إصلاح مزامنة الصوت والصورة. ويشغّل ExoPlayer بعض المقاطع التي لا يستطيع mpv تشغيلها على تلفازات معيّنة، لكنه لا يفك ترميز صوت DTS/TrueHD ولا يوفّر إصلاح المزامنة. تجرّب الخيارات المزدوجة المشغّل الآخر تلقائيًا عند فشل الأول، أما خيارات المشغّل الواحد فلا تفعل ذلك أبدًا، ما يوفّر بضع ثوانٍ من الشاشة السوداء إذا كان المشغّل الثاني لا يعمل أبدًا على تلفازك.</string>
+    <string name="settings_live_player_description">يفتح ExoPlayer (موصى به) القنوات أسرع بكثير وهو الوحيد الذي يدعم الترجمة أثناء البث المباشر. ويشغّل mpv قنوات لا يستطيع ExoPlayer تشغيلها، بما فيها بعض القنوات ذات الصوت غير المألوف. تجرّب الخيارات المزدوجة المشغّل الآخر تلقائيًا عند فشل الأول، أما خيارات المشغّل الواحد فلا تفعل ذلك أبدًا، ما يوفّر بضع ثوانٍ من الشاشة السوداء إذا كان المشغّل الثاني لا يعمل أبدًا على تلفازك. وتحتفظ أي قناة تبدّلها يدويًا في المشغّل باختيارك في الحالتين.</string>
     <string name="settings_reset_player_choices_description">عند تبديل فيلم أو حلقة واحدة بين mpv وExoPlayer داخل المشغّل، يُحفظ هذا الخيار للمرة التالية. تعيد إعادة الضبط كل شيء إلى الإعداد أعلاه. أما الخيارات المحفوظة لقنوات البث المباشر فتبقى كما هي.</string>
     <string name="settings_reset_player_choices_none">لا شيء محفوظ</string>
     <plurals name="settings_reset_player_choices_count">
@@ -488,7 +538,7 @@
     <string name="settings_guide_synced">تمت مزامنة دليل البرامج التلفزيونية</string>
     <string name="settings_guide_sync_failed">فشلت مزامنة دليل البرامج التلفزيونية</string>
     <string name="settings_restore_remote_title">الاستعادة من جهاز آخر</string>
-    <string name="settings_restore_remote_description">على هاتف أو حاسوب محمول متصل بشبكة Wi-Fi نفسها، امسح رمز QR ضوئيًا (أو افتح عنوان URL)، وأدخل رمز PIN هذا، واختر ملف النسخة الاحتياطية لـ OwnTV، ثم اضغط على «إرسال إلى التلفزيون». بعد ذلك تختار هنا ما تريد استعادته.</string>
+    <string name="settings_restore_remote_description">على هاتف أو جهاز لوحي أو حاسوب متصل بشبكة Wi-Fi نفسها، امسح رمز QR ضوئيًا (أو افتح عنوان URL)، وأدخل رمز PIN هذا، واختر ملف النسخة الاحتياطية لـ OwnTV، ثم اضغط على «إرسال إلى التلفزيون». بعد ذلك تختار هنا ما تريد استعادته.</string>
     <string name="settings_opening_server">جارٍ فتح الخادم…</string>
     <string name="settings_enter_pin_browser">أدخل رمز PIN هذا في المتصفح</string>
     <string name="settings_companion_qr">رمز QR لعنوان URL الخاص بالصفحة المرافقة</string>
@@ -496,7 +546,7 @@
     <string name="settings_try_again">إعادة المحاولة</string>
     <string name="settings_new_pin">البدء من جديد باستخدام PIN جديد</string>
     <string name="settings_download_remote_title">التنزيل على جهاز آخر</string>
-    <string name="settings_download_remote_description">على هاتف أو حاسوب محمول متصل بشبكة Wi-Fi نفسها، امسح رمز QR ضوئيًا (أو افتح عنوان URL)، وأدخل رمز PIN هذا، ثم نزّل ملف النسخة الاحتياطية واحتفظ به في مكان آمن.</string>
+    <string name="settings_download_remote_description">على هاتف أو جهاز لوحي أو حاسوب متصل بشبكة Wi-Fi نفسها، امسح رمز QR ضوئيًا (أو افتح عنوان URL)، وأدخل رمز PIN هذا، ثم نزّل ملف النسخة الاحتياطية واحتفظ به في مكان آمن.</string>
     <string name="settings_preparing_backup">جارٍ إعداد النسخة الاحتياطية…</string>
     <string name="settings_glass_effect_on">التأثير الزجاجي: مفعّل</string>
     <string name="settings_glass_effect_off">التأثير الزجاجي: متوقف</string>
@@ -717,7 +767,7 @@
     <string name="settings_backup_what_backup">ما تريد نسخه احتياطيًا</string>
     <string name="settings_backup_what_restore">ما تريد استعادته</string>
     <string name="settings_backup_encrypt_title">هل تريد تشفير هذه النسخة الاحتياطية؟</string>
-    <string name="settings_backup_encrypt_message">عند استخدام كلمة مرور للنسخة الاحتياطية، يُشفّر الملف بالكامل — بما في ذلك قوائم التشغيل والملفات الشخصية وكلمات المرور المحفوظة — ولا يمكن قراءة أي شيء فيه دون كلمة المرور تلك. احتفظ بها في مكان آمن: إذا فقدتها، فلن يمكن فتح النسخة الاحتياطية مطلقًا. ودون كلمة مرور، لا يكون الملف مشفّرًا وتُستبعد منه كلمات المرور المحفوظة.</string>
+    <string name="settings_backup_encrypt_message">عند استخدام كلمة مرور للنسخة الاحتياطية، يُشفّر الملف بالكامل — بما في ذلك قوائم التشغيل والملفات الشخصية وكلمات المرور المحفوظة — ولا يمكن قراءة أي شيء فيه دون كلمة المرور تلك. احتفظ بها في مكان آمن: إذا فقدتها، فلن يمكن فتح النسخة الاحتياطية مطلقًا. ودون كلمة مرور، لا يكون الملف مشفّرًا وتُستبعد منه كلمات المرور المحفوظة ورموز PIN.</string>
     <string name="settings_backup_export_title">تصدير نسخة احتياطية</string>
     <string name="settings_backup_export_message">أرسل النسخة الاحتياطية إلى جهاز آخر (هاتف أو حاسوب محمول) على شبكة Wi-Fi نفسها، أو احفظها في ملف على هذا الجهاز.</string>
     <string name="settings_backup_restore_title">استعادة نسخة احتياطية</string>
@@ -766,7 +816,7 @@
     <string name="settings_backup_section_settings">إعدادات التطبيق</string>
     <string name="settings_backup_section_settings_desc">تفضيلات السمة واللون المميّز والمشغّل والتخطيط</string>
     <string name="settings_backup_saved_to">تم الحفظ في <xliff:g id="path">%1$s</xliff:g>.</string>
-    <string name="settings_backup_saved_to_without_passwords">تم الحفظ في <xliff:g id="path">%1$s</xliff:g>. لم تُضمّن كلمات المرور.</string>
+    <string name="settings_backup_saved_to_without_passwords">تم الحفظ في <xliff:g id="path">%1$s</xliff:g>. لم تُضمّن كلمات المرور ورموز PIN.</string>
     <plurals name="settings_backup_restored">
         <item quantity="zero">تمت استعادة <xliff:g id="items">%1$d</xliff:g> عنصر.</item>
         <item quantity="one">تمت استعادة <xliff:g id="items">%1$d</xliff:g> عنصر.</item>
@@ -776,7 +826,7 @@
         <item quantity="other">تمت استعادة <xliff:g id="items">%1$d</xliff:g> عنصر.</item>
     </plurals>
     <string name="settings_backup_restore_resync">أعد مزامنة مصادرك لتحميل المحتوى.</string>
-    <string name="settings_backup_restore_password_note">أعد إدخال أي كلمات مرور محفوظة في المصادر/الوكيل.</string>
+    <string name="settings_backup_restore_password_note">أعد إدخال أي كلمات مرور محفوظة في المصادر/الوكيل، وأي رموز PIN للملفات الشخصية.</string>
     <plurals name="settings_backup_skipped_sources">
         <item quantity="zero">تم تخطي <xliff:g id="count">%1$d</xliff:g> مصدر لأن أنواع قوائم التشغيل الخاصة بها غير مدعومة.</item>
         <item quantity="one">تم تخطي <xliff:g id="count">%1$d</xliff:g> مصدر لأن نوع قائمة التشغيل الخاص به غير مدعوم.</item>
@@ -1025,6 +1075,8 @@
     <string name="settings_font_preview">ترفيه أبسط وأكثر متعة.</string>
     <string name="settings_search_keywords_fonts">خط نص حجم كتابة نوافذ قراءة وصول</string>
     <string name="settings_font_system_sans">خط النظام بلا زوائد</string>
+    <string name="settings_font_monospace">خط أحادي المسافة</string>
+    <string name="settings_subtitle_font">خط الترجمة</string>
     <string name="settings_glass_preset_title">إعداد مسبق للمظهر</string>
     <string name="settings_glass_preset_clear">شفاف</string>
     <string name="settings_glass_preset_balanced">متوازن</string>

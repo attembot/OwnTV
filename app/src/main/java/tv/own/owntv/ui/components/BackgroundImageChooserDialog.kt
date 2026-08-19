@@ -36,12 +36,12 @@ import java.io.File
  * Background image picker chooser — mirrors Backup's Local/Remote chooser UX:
  * - **From device**: opens the StorageBrowser to pick an image file, which is then copied into
  *   app-private storage (so a USB unplug / source-folder delete can't blank it).
- * - **From phone**: opens the LAN companion upload flow (PIN + QR, same as Remote backup restore)
- *   so a phone on the same Wi-Fi can send a photo to the TV.
+ * - **Remote**: opens the LAN companion upload flow (PIN + QR, same as Remote backup restore)
+ *   so another device on the same Wi-Fi — phone, tablet or PC — can send a photo to the TV.
  * - **Clear**: removes the current background (panels return to solid).
  *
  * @param onPickLocal invoked when the user taps "From device" (the host opens the StorageBrowser).
- * @param onPickRemote invoked when the user taps "From phone" (the host opens [RemoteBackgroundDialog]).
+ * @param onPickRemote invoked when the user taps "Remote" (the host opens [RemoteBackgroundDialog]).
  * @param onClear invoked when the user taps "Clear".
  * @param onDismiss invoked on Cancel / Back / outside.
  */

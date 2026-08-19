@@ -94,19 +94,34 @@
     <string name="settings_metadata_provider_tmdb_description">Pierwszeństwo mają informacje z listy odtwarzania; TMDB uzupełnia braki oraz dodaje obsadę, gatunki i tła.</string>
     <string name="settings_metadata_tmdb_only_description">Preferuj TMDB dla każdego pola; używaj listy odtwarzania tylko wtedy, gdy TMDB nie zawiera żadnych danych.</string>
     <string name="settings_selected">Wybrano</string>
-    <string name="settings_active_tmdb_source">Aktywne źródło TMDB: <xliff:g id="tier">%1$s</xliff:g></string>
     <string name="settings_metadata_allowance">Twój dzienny przydział</string>
-    <string name="settings_metadata_allowance_row"><xliff:g id="window">%1$s</xliff:g>: pozostało <xliff:g id="remaining">%2$d</xliff:g> z <xliff:g id="total">%3$d</xliff:g></string>
-    <string name="settings_metadata_window_minute">Na minutę</string>
-    <string name="settings_metadata_window_hour">Na godzinę</string>
-    <string name="settings_metadata_window_day">Dzisiaj</string>
-    <plurals name="settings_metadata_allowance_left">
-        <item quantity="one">Dziś pozostało <xliff:g id="remaining">%1$d</xliff:g> z <xliff:g id="total">%2$d</xliff:g> zapytania</item>
-        <item quantity="few">Dziś pozostały <xliff:g id="remaining">%1$d</xliff:g> z <xliff:g id="total">%2$d</xliff:g> zapytania</item>
-        <item quantity="many">Dziś pozostało <xliff:g id="remaining">%1$d</xliff:g> z <xliff:g id="total">%2$d</xliff:g> zapytań</item>
-        <item quantity="other">Dziś pozostało <xliff:g id="remaining">%1$d</xliff:g> z <xliff:g id="total">%2$d</xliff:g> zapytania</item>
+    <string name="settings_metadata_reset_automatic">Resetuje się automatycznie</string>
+    <string name="settings_metadata_library_details">Szczegóły biblioteki</string>
+    <string name="settings_metadata_test_connection">Przetestuj bieżące połączenie</string>
+    <string name="settings_allowance_available">Dostępne</string>
+    <string name="settings_allowance_refills">Odnowi się <xliff:g id="time">%1$s</xliff:g></string>
+    <string name="settings_allowance_minute">Minuta</string>
+    <string name="settings_allowance_hour">Godzina</string>
+    <string name="settings_allowance_day">Dzień</string>
+    <plurals name="settings_allowance_value">
+        <item quantity="one">pozostało <xliff:g id="remaining">%1$d</xliff:g> / <xliff:g id="limit">%2$d</xliff:g></item>
+        <item quantity="few">pozostało <xliff:g id="remaining">%1$d</xliff:g> / <xliff:g id="limit">%2$d</xliff:g></item>
+        <item quantity="many">pozostało <xliff:g id="remaining">%1$d</xliff:g> / <xliff:g id="limit">%2$d</xliff:g></item>
+        <item quantity="other">pozostało <xliff:g id="remaining">%1$d</xliff:g> / <xliff:g id="limit">%2$d</xliff:g></item>
     </plurals>
-    <string name="settings_metadata_allowance_resets">Odnowi się o <xliff:g id="time">%1$s</xliff:g></string>
+    <string name="settings_metadata_active_source">Aktywne źródło</string>
+    <string name="settings_metadata_shared_worker_description">OwnTV Worker · bez konfiguracji</string>
+    <string name="settings_metadata_connection">Połączenie</string>
+    <string name="settings_metadata_remote_advanced">Pobierz zaawansowane dane TMDB</string>
+    <string name="settings_metadata_remote_advanced_description">Użyj własnego klucza API TMDB lub samodzielnie hostowanego Workera zamiast wspólnej opcji domyślnej.</string>
+    <string name="settings_metadata_usage_label">Zużycie</string>
+    <string name="settings_metadata_usage_value"><xliff:g id="min_used">%1$d</xliff:g>/<xliff:g id="min_total">%2$d</xliff:g> min · <xliff:g id="hr_used">%3$d</xliff:g>/<xliff:g id="hr_total">%4$d</xliff:g> godz. · <xliff:g id="day_used">%5$d</xliff:g>/<xliff:g id="day_total">%6$d</xliff:g> dzień</string>
+    <string name="settings_metadata_source_label">Źródło</string>
+    <string name="settings_metadata_key_label">Klucz</string>
+    <string name="settings_metadata_server_label">Serwer</string>
+    <string name="settings_metadata_refills_label">Odnowi się o</string>
+    <string name="settings_metadata_clear_advanced_title">Przestać używać własnego klucza?</string>
+    <string name="settings_metadata_clear_advanced_message">Twój klucz API TMDB i adres własnego serwera zostaną usunięte z tego urządzenia, a OwnTV wróci do wbudowanej usługi współdzielonej z jej dziennym przydziałem.</string>
     <string name="settings_metadata_fair_share">Wbudowana usługa metadanych jest współdzielona przez wszystkich użytkowników OwnTV, więc każde urządzenie otrzymuje każdego dnia własny przydział. Po jego wyczerpaniu plakaty i opisy zostają wstrzymane do czasu odnowienia — informacje z Twojej własnej playlisty działają normalnie. Dodanie własnego klucza API TMDB lub serwera usuwa ten limit: jest bezpłatny, a klucz osobisty praktycznie nie ma limitu.</string>
     <string name="settings_metadata_limit_reached">Dzienny przydział metadanych wyczerpany — dodaj własny klucz TMDB w Ustawieniach → Metadane, aby usunąć ten limit.</string>
     <string name="settings_metadata_language">Język metadanych</string>
@@ -114,6 +129,9 @@
     <string name="settings_advanced_options">Opcje zaawansowane</string>
     <string name="settings_advanced_metadata_description">Używaj własnego klucza API TMDB lub samodzielnie hostowanego serwera zamiast domyślnego serwera współdzielonego.</string>
     <string name="settings_metadata_server_description">Pozostaw oba pola puste, aby używać wbudowanego serwera współdzielonego (bez konfiguracji). Wprowadź własny klucz API TMDB, aby łączyć się bezpośrednio z TMDB, albo adres URL samodzielnie hostowanego serwera, aby używać własnego serwera proxy lub kopii lustrzanej. Adres URL ma pierwszeństwo przed kluczem.</string>
+    <string name="settings_metadata_key_from_phone">Pobierz klucz z innego urządzenia</string>
+    <string name="settings_metadata_key_from_phone_desc">Zeskanuj kod telefonem, tabletem lub komputerem, zaloguj się tam do TMDB i wyślij klucz. Nic nie trzeba wpisywać pilotem.</string>
+    <string name="settings_metadata_key_received">Odebrano klucz TMDB</string>
     <string name="settings_tmdb_api_key">Klucz API TMDB (v3)</string>
     <string name="settings_self_host_url">Adres URL własnego serwera</string>
     <string name="settings_test">Test</string>
@@ -178,6 +196,15 @@
     <string name="settings_theme_description">Jasny, ciemny lub zgodny z systemem</string>
     <string name="settings_accent">Kolor akcentu</string>
     <string name="settings_accent_description">Nadaj interfejsowi kolor — wybierz ustawienie wstępne, paletę lub kod szesnastkowy</string>
+    <string name="settings_focus_highlight">Podświetlenie fokusu</string>
+    <string name="settings_focus_highlight_description">Kolor i grubość ramki wokół zaznaczonego elementu</string>
+    <string name="settings_focus_highlight_chip"><xliff:g id="color">%1$s</xliff:g> · <xliff:g id="thickness">%2$s</xliff:g></string>
+    <string name="settings_focus_thickness">Grubość</string>
+    <string name="settings_focus_width_thin">Cienka</string>
+    <string name="settings_focus_width_normal">Normalna</string>
+    <string name="settings_focus_width_thick">Gruba</string>
+    <string name="settings_focus_width_extra">Bardzo gruba</string>
+    <string name="settings_focus_highlight_sample">Zaznaczone</string>
     <string name="settings_glass_effect">Efekt szkła</string>
     <string name="settings_glass_description">Półprzezroczyste, matowe panele, obraz tła i przezroczystość</string>
     <string name="settings_ui_zoom">Powiększenie interfejsu</string>
@@ -229,6 +256,8 @@
     <string name="settings_startup_home">Ekran główny</string>
     <string name="settings_startup_last_channel">Ostatni kanał</string>
     <string name="settings_startup_favorites">Na żywo · Ulubione</string>
+    <string name="settings_startup_specific_channel">Wybrany kanał</string>
+    <string name="settings_startup_channel_unavailable">Kanał startowy jest niedostępny. Otwarto ekran główny.</string>
     <string name="settings_all_history">Cała historia</string>
     <string name="settings_choose_history">Wybierz, co usunąć dla tego profilu. Nie wpłynie to na listy odtwarzania, ulubione ani pobrane.</string>
     <string name="settings_clear_history_confirm">Wyczyścić historię <xliff:g id="scope">%1$s</xliff:g>?</string>
@@ -299,6 +328,7 @@
     <string name="settings_search_keywords_history">ostatnio oglądane kontynuuj usuń</string>
     <string name="settings_search_keywords_theme">jasny ciemny systemowy</string>
     <string name="settings_search_keywords_accent">odcień paleta hex ustawienie wstępne</string>
+    <string name="settings_search_keywords_focus">fokus ramka obramowanie zaznaczenie kursor kontur</string>
     <string name="settings_search_keywords_zoom">skala interfejs rozmiar</string>
     <string name="settings_search_keywords_animation">ruch płynność wydajność</string>
     <string name="settings_search_keywords_weather">górny pasek znacznik lokalizacja Celsjusz Fahrenheit</string>
@@ -372,6 +402,10 @@
     <!-- Translators: Description of the deinterlacing setting. -->
     <string name="settings_deinterlace_description">Wygładza grzebieniowe linie, które niektóre stare kanały SD pokazują przy ruchu. Dotyczy silnika mpv, gdy sam rysuje obraz — jeśli nic się nie zmienia, wyłącz dekodowanie sprzętowe.</string>
     <string name="settings_movies_series_player">Odtwarzacz filmów i seriali</string>
+    <string name="settings_live_tv_player">Odtwarzacz telewizji na żywo</string>
+    <string name="settings_engine_order"><xliff:g id="first">%1$s</xliff:g>, potem <xliff:g id="second">%2$s</xliff:g></string>
+    <string name="settings_engine_only">Tylko <xliff:g id="engine">%1$s</xliff:g></string>
+    <string name="settings_engine_default"><xliff:g id="option">%1$s</xliff:g> (domyślnie)</string>
     <string name="settings_reset_player_choices">Resetuj zapisane wybory odtwarzacza</string>
     <string name="settings_external_player">Odtwarzacz zewnętrzny</string>
     <string name="settings_default_zoom">Domyślne powiększenie</string>
@@ -414,7 +448,22 @@
     <string name="settings_preferred_subtitle_language">Preferowany język napisów</string>
     <string name="settings_preferred_language_description">Automatycznie wybieraj tę ścieżkę napisów, gdy jest dostępna.</string>
     <string name="settings_open_subtitles">OpenSubtitles</string>
+    <string name="settings_open_subtitles_connected">Połączono</string>
+    <string name="settings_open_subtitles_reset_in">Za <xliff:g id="hours">%1$d</xliff:g> godz. <xliff:g id="minutes">%2$d</xliff:g> min</string>
     <string name="settings_open_subtitles_description">Zaloguj się, aby wyszukiwać i pobierać napisy oraz zarządzać pobranymi napisami. Ustawienie osobne dla każdego profilu; wymagane jest bezpłatne konto opensubtitles.com.</string>
+    <string name="settings_open_subtitles_advanced">Opcje zaawansowane</string>
+    <string name="settings_open_subtitles_advanced_description">Użyj własnego klucza API aplikacji lub samodzielnie hostowanego OpenSubtitles Workera.</string>
+    <string name="settings_open_subtitles_setup_title">Skonfiguruj OpenSubtitles</string>
+    <string name="settings_open_subtitles_setup_description">Zaloguj się na swoje konto OpenSubtitles.</string>
+    <string name="settings_open_subtitles_setup_remote">Zdalnie</string>
+    <string name="settings_open_subtitles_setup_remote_description">Wpisz dane w przeglądarce na innym urządzeniu w tej samej sieci Wi-Fi – w telefonie, tablecie lub komputerze.</string>
+    <string name="settings_open_subtitles_setup_local">Wpisz tutaj</string>
+    <string name="settings_open_subtitles_setup_local_description">Wpisz dane na tym telewizorze za pomocą pilota.</string>
+    <string name="settings_open_subtitles_api_key">Klucz API aplikacji OpenSubtitles</string>
+    <string name="settings_worker_server_url">Adres URL Workera / serwera</string>
+    <string name="settings_shared">Wspólne</string>
+    <string name="settings_open_subtitles_access_priority">Pozostaw oba pola puste, aby korzystać ze wspólnego Workera OwnTV. Własny adres URL Workera ma pierwszeństwo przed bezpośrednim kluczem API. Sesje konta pozostają przypisane do profilu.</string>
+    <string name="settings_remove_custom_access">Usuń własny dostęp</string>
     <string name="settings_audio">Dźwięk</string>
     <string name="settings_preferred_audio_language">Preferowany język dźwięku</string>
     <string name="settings_audio_sync">Synchronizacja dźwięku</string>
@@ -446,7 +495,8 @@
     <string name="settings_audio_delay"><xliff:g id="delay">%1$d</xliff:g> ms</string>
     <string name="settings_external_player_description">Wybierz sekcje, które mają być otwierane w aplikacji zewnętrznej.</string>
     <string name="settings_audio_delay_value"><xliff:g id="delay">%1$d</xliff:g> ms</string>
-    <string name="settings_movies_player_description">mpv (zalecany) obsługuje najwięcej formatów — dźwięk DTS/TrueHD, nietypowe pliki — oraz umożliwia korektę synchronizacji dźwięku i obrazu. Przełącz na ExoPlayer tylko wtedy, gdy nie można uruchomić filmu lub odcinka: na niektórych telewizorach odtwarza on strumienie, których mpv nie obsługuje, ale nie dekoduje dźwięku DTS/TrueHD i nie umożliwia korekty synchronizacji dźwięku i obrazu. Niezależnie od wyboru w razie błędu automatycznie zostanie wypróbowany drugi odtwarzacz.</string>
+    <string name="settings_movies_player_description">mpv (zalecany) obsługuje najwięcej formatów — dźwięk DTS/TrueHD, nietypowe pliki — a do tego poprawia synchronizację dźwięku i obrazu. Na niektórych telewizorach ExoPlayer odtwarza strumienie, z którymi mpv sobie nie radzi, ale nie dekoduje dźwięku DTS/TrueHD i nie poprawia synchronizacji. Opcje łączone automatycznie próbują drugiego odtwarzacza, gdy pierwszy zawiedzie; opcje z jednym odtwarzaczem nie robią tego nigdy, co oszczędza kilka sekund czarnego ekranu, jeśli drugi odtwarzacz i tak nie działa na Twoim telewizorze.</string>
+    <string name="settings_live_player_description">ExoPlayer (zalecany) otwiera kanały znacznie szybciej i jako jedyny obsługuje napisy na żywo. mpv odtwarza kanały, z którymi ExoPlayer sobie nie radzi, w tym niektóre z nietypowym dźwiękiem. Opcje łączone automatycznie próbują drugiego odtwarzacza, gdy pierwszy zawiedzie; opcje z jednym odtwarzaczem nie robią tego nigdy, co oszczędza kilka sekund czarnego ekranu, jeśli drugi odtwarzacz i tak nie działa na Twoim telewizorze. W kanale przełączonym ręcznie w odtwarzaczu Twój wybór zostaje zachowany w obu przypadkach.</string>
     <string name="settings_reset_player_choices_description">Przełączenie pojedynczego filmu lub odcinka między mpv a ExoPlayerem w odtwarzaczu zapisuje ten wybór na następny raz. Reset sprawia, że wszystko znów stosuje ustawienie powyżej. Zapisane wybory dla kanałów na żywo zostają zachowane.</string>
     <string name="settings_reset_player_choices_none">Nic nie zapisano</string>
     <plurals name="settings_reset_player_choices_count">
@@ -482,7 +532,7 @@
     <string name="settings_guide_synced">Zsynchronizowano przewodnik po programach</string>
     <string name="settings_guide_sync_failed">Synchronizacja przewodnika po programach nie powiodła się</string>
     <string name="settings_restore_remote_title">Przywracanie z innego urządzenia</string>
-    <string name="settings_restore_remote_description">Na telefonie lub laptopie połączonym z tą samą siecią Wi-Fi zeskanuj kod QR (lub otwórz adres URL), wprowadź ten PIN, wybierz plik kopii zapasowej OwnTV i naciśnij Wyślij do telewizora. Następnie wybierz tutaj dane do przywrócenia.</string>
+    <string name="settings_restore_remote_description">Na telefonie, tablecie lub komputerze połączonym z tą samą siecią Wi-Fi zeskanuj kod QR (lub otwórz adres URL), wprowadź ten PIN, wybierz plik kopii zapasowej OwnTV i naciśnij Wyślij do telewizora. Następnie wybierz tutaj dane do przywrócenia.</string>
     <string name="settings_opening_server">Uruchamianie serwera…</string>
     <string name="settings_enter_pin_browser">Wprowadź ten PIN w przeglądarce</string>
     <string name="settings_companion_qr">Kod QR adresu URL aplikacji towarzyszącej</string>
@@ -490,7 +540,7 @@
     <string name="settings_try_again">Spróbuj ponownie</string>
     <string name="settings_new_pin">Uruchom ponownie z nowym PIN-em</string>
     <string name="settings_download_remote_title">Pobieranie na innym urządzeniu</string>
-    <string name="settings_download_remote_description">Na telefonie lub laptopie połączonym z tą samą siecią Wi-Fi zeskanuj kod QR (lub otwórz adres URL), wprowadź ten PIN i pobierz plik kopii zapasowej, aby zachować go w bezpiecznym miejscu.</string>
+    <string name="settings_download_remote_description">Na telefonie, tablecie lub komputerze połączonym z tą samą siecią Wi-Fi zeskanuj kod QR (lub otwórz adres URL), wprowadź ten PIN i pobierz plik kopii zapasowej, aby zachować go w bezpiecznym miejscu.</string>
     <string name="settings_preparing_backup">Przygotowywanie kopii zapasowej…</string>
     <string name="settings_glass_effect_on">Efekt szkła: włączone</string>
     <string name="settings_glass_effect_off">Efekt szkła: wyłączone</string>
@@ -699,7 +749,7 @@
     <string name="settings_backup_what_backup">Dane do zapisania w kopii zapasowej</string>
     <string name="settings_backup_what_restore">Dane do przywrócenia</string>
     <string name="settings_backup_encrypt_title">Zaszyfrować tę kopię zapasową?</string>
-    <string name="settings_backup_encrypt_message">Jeśli ustawisz hasło kopii zapasowej, cały plik zostanie zaszyfrowany — łącznie z listami odtwarzania, profilami i zapisanymi hasłami — i bez tego hasła nie będzie można odczytać żadnych zawartych w nim danych. Przechowuj je bezpiecznie: jeśli je utracisz, kopii zapasowej nie będzie można w ogóle otworzyć. Bez hasła plik nie będzie szyfrowany, a zapisane hasła nie zostaną w nim uwzględnione.</string>
+    <string name="settings_backup_encrypt_message">Jeśli ustawisz hasło kopii zapasowej, cały plik zostanie zaszyfrowany — łącznie z listami odtwarzania, profilami i zapisanymi hasłami — i bez tego hasła nie będzie można odczytać żadnych zawartych w nim danych. Przechowuj je bezpiecznie: jeśli je utracisz, kopii zapasowej nie będzie można w ogóle otworzyć. Bez hasła plik nie będzie szyfrowany, a zapisane hasła i kody PIN nie zostaną w nim uwzględnione.</string>
     <string name="settings_backup_export_title">Eksport kopii zapasowej</string>
     <string name="settings_backup_export_message">Wyślij kopię zapasową na inne urządzenie (telefon lub laptop) połączone z tą samą siecią Wi-Fi albo zapisz ją w pliku na tym urządzeniu.</string>
     <string name="settings_backup_restore_title">Przywracanie kopii zapasowej</string>
@@ -748,7 +798,7 @@
     <string name="settings_backup_section_settings">Ustawienia aplikacji</string>
     <string name="settings_backup_section_settings_desc">Preferencje motywu, koloru akcentu, odtwarzacza i układu</string>
     <string name="settings_backup_saved_to">Zapisano w <xliff:g id="path">%1$s</xliff:g>.</string>
-    <string name="settings_backup_saved_to_without_passwords">Zapisano w <xliff:g id="path">%1$s</xliff:g>. Hasła nie zostały uwzględnione.</string>
+    <string name="settings_backup_saved_to_without_passwords">Zapisano w <xliff:g id="path">%1$s</xliff:g>. Hasła i kody PIN nie zostały uwzględnione.</string>
     <plurals name="settings_backup_restored">
         <item quantity="one">Przywrócono <xliff:g id="items">%1$d</xliff:g> element.</item>
         <item quantity="few">Przywrócono <xliff:g id="items">%1$d</xliff:g> elementy.</item>
@@ -756,7 +806,7 @@
         <item quantity="other">Przywrócono <xliff:g id="items">%1$d</xliff:g> elementu.</item>
     </plurals>
     <string name="settings_backup_restore_resync">Ponownie zsynchronizuj źródła, aby wczytać treści.</string>
-    <string name="settings_backup_restore_password_note">Ponownie wprowadź zapisane hasła w sekcji Źródła/Proxy.</string>
+    <string name="settings_backup_restore_password_note">Ponownie wprowadź zapisane hasła oraz kody PIN profili w sekcji Źródła/Proxy.</string>
     <plurals name="settings_backup_skipped_sources">
         <item quantity="one">Pominięto <xliff:g id="count">%1$d</xliff:g> źródło, ponieważ typ jego listy odtwarzania nie jest obsługiwany.</item>
         <item quantity="few">Pominięto <xliff:g id="count">%1$d</xliff:g> źródła, ponieważ typy ich list odtwarzania nie są obsługiwane.</item>
@@ -989,6 +1039,8 @@
     <string name="settings_font_preview">Rozrywka w prostym wydaniu.</string>
     <string name="settings_search_keywords_fonts">czcionka tekst rozmiar typografia okno czytanie dostępność</string>
     <string name="settings_font_system_sans">Systemowa bezszeryfowa</string>
+    <string name="settings_font_monospace">Stała szerokość</string>
+    <string name="settings_subtitle_font">Czcionka napisów</string>
     <string name="settings_glass_preset_title">Ustawienie wyglądu</string>
     <string name="settings_glass_preset_clear">Przejrzyste</string>
     <string name="settings_glass_preset_balanced">Zrównoważone</string>

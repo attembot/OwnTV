@@ -56,11 +56,16 @@ fun DnsSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         return ""
     }
 
-    // Seed local state from the stored config exactly once at composition time.
-    // After that, toggleOn and server are user-controlled and don't depend on async save responses.
+    // DataStore can emit after the screen's initial empty value. Synchronize only when persisted
+    // DNS fields change so restored values do not overwrite normal editing.
     val hasServer = dnsConfig.host.isNotBlank() || dnsConfig.dohUrl.isNotBlank()
     var toggleOn by remember { mutableStateOf(dnsConfig.enabled || hasServer) }
     var server by remember { mutableStateOf(dnsToServerText(dnsConfig)) }
+
+    LaunchedEffect(dnsConfig.enabled, dnsConfig.host, dnsConfig.port, dnsConfig.dohUrl) {
+        toggleOn = dnsConfig.enabled || dnsConfig.host.isNotBlank() || dnsConfig.dohUrl.isNotBlank()
+        server = dnsToServerText(dnsConfig)
+    }
 
     val serverConfigured = server.trim().isNotBlank()
     val effectiveEnabled = toggleOn && serverConfigured

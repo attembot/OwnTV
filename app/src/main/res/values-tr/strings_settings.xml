@@ -94,17 +94,32 @@
     <string name="settings_metadata_provider_tmdb_description">Oynatma listenizdeki bilgiler önceliklidir; TMDB eksikleri tamamlar ve oyuncu kadrosu, türler ile arka plan görsellerini ekler.</string>
     <string name="settings_metadata_tmdb_only_description">Her alanda TMDB bilgilerini tercih edin; yalnızca TMDB hiçbir bilgi sunmadığında oynatma listenize başvurun.</string>
     <string name="settings_selected">Seçili</string>
-    <string name="settings_active_tmdb_source">Etkin TMDB kaynağı: <xliff:g id="tier">%1$s</xliff:g></string>
     <string name="settings_metadata_allowance">Günlük payınız</string>
-    <string name="settings_metadata_allowance_row"><xliff:g id="window">%1$s</xliff:g>: <xliff:g id="total">%3$d</xliff:g> işlemden <xliff:g id="remaining">%2$d</xliff:g> tanesi kaldı</string>
-    <string name="settings_metadata_window_minute">Dakika başına</string>
-    <string name="settings_metadata_window_hour">Saat başına</string>
-    <string name="settings_metadata_window_day">Bugün</string>
-    <plurals name="settings_metadata_allowance_left">
-        <item quantity="one">Bugün <xliff:g id="total">%2$d</xliff:g> aramadan <xliff:g id="remaining">%1$d</xliff:g> tanesi kaldı</item>
-        <item quantity="other">Bugün <xliff:g id="total">%2$d</xliff:g> aramadan <xliff:g id="remaining">%1$d</xliff:g> tanesi kaldı</item>
+    <string name="settings_metadata_reset_automatic">Otomatik olarak sıfırlanır</string>
+    <string name="settings_metadata_library_details">Kitaplık ayrıntıları</string>
+    <string name="settings_metadata_test_connection">Geçerli bağlantıyı test et</string>
+    <string name="settings_allowance_available">Kullanılabilir</string>
+    <string name="settings_allowance_refills"><xliff:g id="time">%1$s</xliff:g> yenilenir</string>
+    <string name="settings_allowance_minute">Dakika</string>
+    <string name="settings_allowance_hour">Saat</string>
+    <string name="settings_allowance_day">Gün</string>
+    <plurals name="settings_allowance_value">
+        <item quantity="one"><xliff:g id="remaining">%1$d</xliff:g> / <xliff:g id="limit">%2$d</xliff:g> kaldı</item>
+        <item quantity="other"><xliff:g id="remaining">%1$d</xliff:g> / <xliff:g id="limit">%2$d</xliff:g> kaldı</item>
     </plurals>
-    <string name="settings_metadata_allowance_resets"><xliff:g id="time">%1$s</xliff:g> saatinde yenilenir</string>
+    <string name="settings_metadata_active_source">Etkin kaynak</string>
+    <string name="settings_metadata_shared_worker_description">OwnTV Worker · kurulum gerekmez</string>
+    <string name="settings_metadata_connection">Bağlantı</string>
+    <string name="settings_metadata_remote_advanced">Gelişmiş TMDB bilgilerini alın</string>
+    <string name="settings_metadata_remote_advanced_description">Paylaşılan varsayılan hizmet yerine kendi TMDB API anahtarınızı ya da kendi barındırdığınız Worker’ı kullanın.</string>
+    <string name="settings_metadata_usage_label">Kullanım</string>
+    <string name="settings_metadata_usage_value"><xliff:g id="min_used">%1$d</xliff:g>/<xliff:g id="min_total">%2$d</xliff:g> dk · <xliff:g id="hr_used">%3$d</xliff:g>/<xliff:g id="hr_total">%4$d</xliff:g> sa · <xliff:g id="day_used">%5$d</xliff:g>/<xliff:g id="day_total">%6$d</xliff:g> gün</string>
+    <string name="settings_metadata_source_label">Kaynak</string>
+    <string name="settings_metadata_key_label">Anahtar</string>
+    <string name="settings_metadata_server_label">Sunucu</string>
+    <string name="settings_metadata_refills_label">Yenilenme saati</string>
+    <string name="settings_metadata_clear_advanced_title">Kendi anahtarınızı kullanmayı bırakmak istiyor musunuz?</string>
+    <string name="settings_metadata_clear_advanced_message">TMDB API anahtarınız ve kendi sunucu adresiniz bu cihazdan silinecek ve OwnTV, günlük payı olan yerleşik paylaşılan hizmete geri dönecek.</string>
     <string name="settings_metadata_fair_share">Yerleşik meta veri hizmeti OwnTV kullanan herkes tarafından paylaşılır; bu nedenle her cihaz her gün kendi payını alır. Payınızı tüketirseniz posterler ve açıklamalar yenilenene kadar duraklar — kendi oynatma listenizdeki bilgiler normal şekilde çalışmaya devam eder. Kendi TMDB API anahtarınızı veya sunucunuzu eklemek bu sınırı kaldırır: ücretsizdir ve kişisel bir anahtarın neredeyse hiç sınırı yoktur.</string>
     <string name="settings_metadata_limit_reached">Günlük meta veri payınız tükendi — bu sınırı kaldırmak için Ayarlar → Meta Veri bölümünden kendi TMDB anahtarınızı ekleyin.</string>
     <string name="settings_metadata_language">Meta veri dili</string>
@@ -112,6 +127,9 @@
     <string name="settings_advanced_options">Gelişmiş seçenekler</string>
     <string name="settings_advanced_metadata_description">Paylaşılan varsayılan yerine kendi TMDB API anahtarınızı veya kendi barındırdığınız sunucuyu kullanın.</string>
     <string name="settings_metadata_server_description">Yerleşik paylaşımlı sunucuyu kullanmak için ikisini de boş bırakın (kurulum gerekmez). Doğrudan TMDB\'ye bağlanmak için kendi TMDB API anahtarınızı veya kendi proxy/yansınızı kullanmak için kendi barındırdığınız sunucunun URL\'sini girin. URL, anahtardan önceliklidir.</string>
+    <string name="settings_metadata_key_from_phone">Anahtarı başka bir cihazdan alın</string>
+    <string name="settings_metadata_key_from_phone_desc">Kodu bir telefon, tablet veya bilgisayarla tarayın, orada TMDB’ye giriş yapın ve anahtarı gönderin. Kumandayla yazacak bir şey yok.</string>
+    <string name="settings_metadata_key_received">TMDB anahtarı alındı</string>
     <string name="settings_tmdb_api_key">TMDB API anahtarı (v3)</string>
     <string name="settings_self_host_url">Kendi barındırdığınız sunucunun URL\'si</string>
     <string name="settings_test">Test</string>
@@ -176,6 +194,15 @@
     <string name="settings_theme_description">Açık, koyu veya sistemi izle</string>
     <string name="settings_accent">Vurgu rengi</string>
     <string name="settings_accent_description">Arayüzü renklendirin — hazır ayarlar, palet veya onaltılık kod</string>
+    <string name="settings_focus_highlight">Odak vurgusu</string>
+    <string name="settings_focus_highlight_description">Seçili öğenin etrafındaki çerçevenin rengi ve kalınlığı</string>
+    <string name="settings_focus_highlight_chip"><xliff:g id="color">%1$s</xliff:g> · <xliff:g id="thickness">%2$s</xliff:g></string>
+    <string name="settings_focus_thickness">Kalınlık</string>
+    <string name="settings_focus_width_thin">İnce</string>
+    <string name="settings_focus_width_normal">Normal</string>
+    <string name="settings_focus_width_thick">Kalın</string>
+    <string name="settings_focus_width_extra">Çok kalın</string>
+    <string name="settings_focus_highlight_sample">Odakta</string>
     <string name="settings_glass_effect">Cam Efekti</string>
     <string name="settings_glass_description">Yarı saydam buzlu paneller, arka plan görseli ve şeffaflık</string>
     <string name="settings_ui_zoom">Arayüz Yakınlaştırması</string>
@@ -225,6 +252,8 @@
     <string name="settings_startup_home">Ana ekran</string>
     <string name="settings_startup_last_channel">Son kanal</string>
     <string name="settings_startup_favorites">Canlı · Favoriler</string>
+    <string name="settings_startup_specific_channel">Belirli kanal</string>
+    <string name="settings_startup_channel_unavailable">Başlangıç kanalı kullanılamıyor. Ana sayfa açıldı.</string>
     <string name="settings_all_history">Tüm geçmiş</string>
     <string name="settings_choose_history">Bu profilden nelerin kaldırılacağını seçin. Oynatma listeleri, favoriler ve indirilenler etkilenmez.</string>
     <string name="settings_clear_history_confirm"><xliff:g id="scope">%1$s</xliff:g> geçmişi temizlensin mi?</string>
@@ -295,6 +324,7 @@
     <string name="settings_search_keywords_history">son izlenenler devam et kaldır</string>
     <string name="settings_search_keywords_theme">açık koyu sistem</string>
     <string name="settings_search_keywords_accent">renk tonu palet onaltılık hazır ayar</string>
+    <string name="settings_search_keywords_focus">odak çerçeve kenarlık seçim imleç dış hat</string>
     <string name="settings_search_keywords_zoom">ölçek arayüz boyut</string>
     <string name="settings_search_keywords_animation">hareket hız performans</string>
     <string name="settings_search_keywords_weather">üst çubuk çip konum Celsius Fahrenheit</string>
@@ -368,6 +398,10 @@
     <!-- Translators: Description of the deinterlacing setting. -->
     <string name="settings_deinterlace_description">Bazı eski SD kanalların harekette gösterdiği tarak benzeri çizgileri yumuşatır. mpv motoru görüntüyü kendisi çizerken geçerlidir; fark etmiyorsa donanım kod çözmeyi kapatın.</string>
     <string name="settings_movies_series_player">Film ve Dizi oynatıcısı</string>
+    <string name="settings_live_tv_player">Canlı TV oynatıcısı</string>
+    <string name="settings_engine_order"><xliff:g id="first">%1$s</xliff:g>, sonra <xliff:g id="second">%2$s</xliff:g></string>
+    <string name="settings_engine_only">Yalnızca <xliff:g id="engine">%1$s</xliff:g></string>
+    <string name="settings_engine_default"><xliff:g id="option">%1$s</xliff:g> (varsayılan)</string>
     <string name="settings_reset_player_choices">Kaydedilen oynatıcı seçimlerini sıfırla</string>
     <string name="settings_external_player">Harici oynatıcı</string>
     <string name="settings_default_zoom">Varsayılan yakınlaştırma</string>
@@ -410,7 +444,22 @@
     <string name="settings_preferred_subtitle_language">Tercih edilen altyazı dili</string>
     <string name="settings_preferred_language_description">Kullanılabilir olduğunda bu altyazı parçasını otomatik olarak seç.</string>
     <string name="settings_open_subtitles">OpenSubtitles</string>
+    <string name="settings_open_subtitles_connected">Bağlandı</string>
+    <string name="settings_open_subtitles_reset_in"><xliff:g id="hours">%1$d</xliff:g> sa <xliff:g id="minutes">%2$d</xliff:g> dk sonra</string>
     <string name="settings_open_subtitles_description">Altyazıları aramak ve indirmek, ayrıca indirilen altyazıları yönetmek için oturum açın. Her profil için ayrı ayrı geçerlidir; ücretsiz bir opensubtitles.com hesabı gerekir.</string>
+    <string name="settings_open_subtitles_advanced">Gelişmiş seçenekler</string>
+    <string name="settings_open_subtitles_advanced_description">Kendi uygulama API anahtarınızı ya da kendi barındırdığınız OpenSubtitles Worker’ını kullanın.</string>
+    <string name="settings_open_subtitles_setup_title">OpenSubtitles kurulumu</string>
+    <string name="settings_open_subtitles_setup_description">OpenSubtitles hesabınızla oturum açın.</string>
+    <string name="settings_open_subtitles_setup_remote">Uzaktan</string>
+    <string name="settings_open_subtitles_setup_remote_description">Aynı Wi-Fi ağındaki başka bir cihazın (telefon, tablet veya bilgisayar) tarayıcısında bilgilerinizi girin.</string>
+    <string name="settings_open_subtitles_setup_local">Buradan gir</string>
+    <string name="settings_open_subtitles_setup_local_description">Bilgilerinizi kumandayla bu TV’de yazın.</string>
+    <string name="settings_open_subtitles_api_key">OpenSubtitles uygulama API anahtarı</string>
+    <string name="settings_worker_server_url">Worker / sunucu URL’si</string>
+    <string name="settings_shared">Paylaşılan</string>
+    <string name="settings_open_subtitles_access_priority">OwnTV’nin paylaşılan Worker’ını kullanmak için ikisini de boş bırakın. Özel bir Worker URL’si, doğrudan API anahtarına göre önceliklidir. Hesap oturumları profile özel kalır.</string>
+    <string name="settings_remove_custom_access">Özel erişimi kaldır</string>
     <string name="settings_audio">Ses</string>
     <string name="settings_preferred_audio_language">Tercih edilen ses dili</string>
     <string name="settings_audio_sync">Ses eşitleme</string>
@@ -442,7 +491,8 @@
     <string name="settings_audio_delay"><xliff:g id="delay">%1$d</xliff:g> ms</string>
     <string name="settings_external_player_description">Hangi bölümlerin harici bir uygulamada açılacağını seçin.</string>
     <string name="settings_audio_delay_value"><xliff:g id="delay">%1$d</xliff:g> ms</string>
-    <string name="settings_movies_player_description">mpv (önerilen) en geniş biçim desteğine sahiptir — DTS/TrueHD ses, sıra dışı dosyalar — ayrıca ses/görüntü eşitleme düzeltmesi sunar. Yalnızca filmler veya bölümler başlamazsa ExoPlayer\'a geçin: Belirli TV\'lerde mpv\'nin oynatamadığı bazı akışları oynatabilir ancak DTS/TrueHD sesin kodunu çözemez ve ses/görüntü eşitleme düzeltmesi yoktur. Hangisini seçerseniz seçin, başarısız olursa diğeri otomatik olarak denenir.</string>
+    <string name="settings_movies_player_description">mpv (önerilir) en geniş biçim desteğine sahiptir — DTS/TrueHD ses, alışılmadık dosyalar — ayrıca A/V eşitleme düzeltmesi de vardır. Bazı televizyonlarda ExoPlayer, mpv’nin açamadığı yayınları oynatır; ancak DTS/TrueHD sesi çözemez ve A/V eşitleme düzeltmesi yoktur. Birleşik seçenekler ilki başarısız olduğunda diğer oynatıcıyı otomatik dener; tek oynatıcılı seçenekler bunu hiç yapmaz; ikinci oynatıcı televizyonunuzda zaten çalışmıyorsa bu, birkaç saniyelik siyah ekrandan kurtarır.</string>
+    <string name="settings_live_player_description">ExoPlayer (önerilir) kanalları çok daha hızlı açar ve canlı altyazıyı destekleyen tek oynatıcıdır. mpv, ExoPlayer’ın açamadığı kanalları, alışılmadık sese sahip bazıları dahil, oynatır. Birleşik seçenekler ilki başarısız olduğunda diğer oynatıcıyı otomatik dener; tek oynatıcılı seçenekler bunu hiç yapmaz; ikinci oynatıcı televizyonunuzda zaten çalışmıyorsa bu, birkaç saniyelik siyah ekrandan kurtarır. Oynatıcıda elle değiştirdiğiniz bir kanalda seçiminiz her iki durumda da korunur.</string>
     <string name="settings_reset_player_choices_description">Oynatıcıda tek bir filmi veya bölümü mpv ile ExoPlayer arasında değiştirmek, bu seçimi bir sonraki sefer için kaydeder. Sıfırlama her şeyin yeniden yukarıdaki ayarı izlemesini sağlar. Canlı kanallar için kaydedilen seçimler korunur.</string>
     <string name="settings_reset_player_choices_none">Kayıtlı seçim yok</string>
     <plurals name="settings_reset_player_choices_count">
@@ -476,7 +526,7 @@
     <string name="settings_guide_synced">Program rehberi eşitlendi</string>
     <string name="settings_guide_sync_failed">Program rehberi eşitlenemedi</string>
     <string name="settings_restore_remote_title">Başka bir cihazdan geri yükle</string>
-    <string name="settings_restore_remote_description">Aynı Wi-Fi ağına bağlı bir telefon veya dizüstü bilgisayarda QR kodunu tarayın (ya da URL\'yi açın), bu PIN\'i girin, OwnTV yedekleme dosyanızı seçin ve TV\'ye Gönder\'e dokunun. Ardından burada nelerin geri yükleneceğini seçin.</string>
+    <string name="settings_restore_remote_description">Aynı Wi-Fi ağına bağlı bir telefon, tablet veya bilgisayarda QR kodunu tarayın (ya da URL\'yi açın), bu PIN\'i girin, OwnTV yedekleme dosyanızı seçin ve TV\'ye Gönder\'e dokunun. Ardından burada nelerin geri yükleneceğini seçin.</string>
     <string name="settings_opening_server">Sunucu açılıyor…</string>
     <string name="settings_enter_pin_browser">Bu PIN\'i tarayıcıya girin</string>
     <string name="settings_companion_qr">Yardımcı URL\'nin QR kodu</string>
@@ -484,7 +534,7 @@
     <string name="settings_try_again">Tekrar dene</string>
     <string name="settings_new_pin">Yeni bir PIN ile yeniden başlat</string>
     <string name="settings_download_remote_title">Başka bir cihaza indir</string>
-    <string name="settings_download_remote_description">Aynı Wi-Fi ağına bağlı bir telefon veya dizüstü bilgisayarda QR kodunu tarayın (ya da URL\'yi açın), bu PIN\'i girin ve güvenli bir yerde saklamak için yedekleme dosyanızı indirin.</string>
+    <string name="settings_download_remote_description">Aynı Wi-Fi ağına bağlı bir telefon, tablet veya bilgisayarda QR kodunu tarayın (ya da URL\'yi açın), bu PIN\'i girin ve güvenli bir yerde saklamak için yedekleme dosyanızı indirin.</string>
     <string name="settings_preparing_backup">Yedekleme hazırlanıyor…</string>
     <string name="settings_glass_effect_on">Cam Efekti: Açık</string>
     <string name="settings_glass_effect_off">Cam Efekti: Kapalı</string>
@@ -681,7 +731,7 @@
     <string name="settings_backup_what_backup">Yedeklenecekler</string>
     <string name="settings_backup_what_restore">Geri yüklenecekler</string>
     <string name="settings_backup_encrypt_title">Bu yedekleme şifrelensin mi?</string>
-    <string name="settings_backup_encrypt_message">Bir yedekleme parolası kullanıldığında oynatma listeleri, profiller ve kayıtlı parolalar dâhil tüm dosya şifrelenir ve parola olmadan içindeki hiçbir veri okunamaz. Parolayı güvenli bir yerde saklayın: Kaybederseniz yedekleme hiçbir şekilde açılamaz. Parola kullanılmadığında dosya şifrelenmez ve kayıtlı parolalar dosyaya eklenmez.</string>
+    <string name="settings_backup_encrypt_message">Bir yedekleme parolası kullanıldığında oynatma listeleri, profiller ve kayıtlı parolalar dâhil tüm dosya şifrelenir ve parola olmadan içindeki hiçbir veri okunamaz. Parolayı güvenli bir yerde saklayın: Kaybederseniz yedekleme hiçbir şekilde açılamaz. Parola kullanılmadığında dosya şifrelenmez ve kayıtlı parolalar ile PIN kodları dosyaya eklenmez.</string>
     <string name="settings_backup_export_title">Yedeklemeyi dışa aktar</string>
     <string name="settings_backup_export_message">Yedeklemeyi aynı Wi-Fi ağındaki başka bir cihaza (telefon veya dizüstü bilgisayar) gönderin ya da bu cihazda bir dosyaya kaydedin.</string>
     <string name="settings_backup_restore_title">Yedeklemeyi geri yükle</string>
@@ -730,13 +780,13 @@
     <string name="settings_backup_section_settings">Uygulama ayarları</string>
     <string name="settings_backup_section_settings_desc">Tema, vurgu rengi, oynatıcı ve düzen tercihleri</string>
     <string name="settings_backup_saved_to"><xliff:g id="path">%1$s</xliff:g> konumuna kaydedildi.</string>
-    <string name="settings_backup_saved_to_without_passwords"><xliff:g id="path">%1$s</xliff:g> konumuna kaydedildi. Parolalar dâhil edilmedi.</string>
+    <string name="settings_backup_saved_to_without_passwords"><xliff:g id="path">%1$s</xliff:g> konumuna kaydedildi. Parolalar ve PIN kodları dâhil edilmedi.</string>
     <plurals name="settings_backup_restored">
         <item quantity="one"><xliff:g id="items">%1$d</xliff:g> öğe geri yüklendi.</item>
         <item quantity="other"><xliff:g id="items">%1$d</xliff:g> öğe geri yüklendi.</item>
     </plurals>
     <string name="settings_backup_restore_resync">İçeriği yüklemek için kaynaklarınızı yeniden eşitleyin.</string>
-    <string name="settings_backup_restore_password_note">Kayıtlı parolaları Kaynaklar/Proxy bölümünde yeniden girin.</string>
+    <string name="settings_backup_restore_password_note">Kayıtlı parolaları ve profil PIN kodlarını Kaynaklar/Proxy bölümünde yeniden girin.</string>
     <plurals name="settings_backup_skipped_sources">
         <item quantity="one">Oynatma listesi türü desteklenmediği için <xliff:g id="count">%1$d</xliff:g> kaynak atlandı.</item>
         <item quantity="other">Oynatma listesi türleri desteklenmediği için <xliff:g id="count">%1$d</xliff:g> kaynak atlandı.</item>
@@ -953,6 +1003,8 @@
     <string name="settings_font_preview">Eğlence artık daha basit.</string>
     <string name="settings_search_keywords_fonts">yazı tipi metin boyut tipografi pencere okuma erişilebilirlik</string>
     <string name="settings_font_system_sans">Sistem Sans</string>
+    <string name="settings_font_monospace">Eş aralıklı</string>
+    <string name="settings_subtitle_font">Altyazı yazı tipi</string>
     <string name="settings_glass_preset_title">Görünüm ön ayarı</string>
     <string name="settings_glass_preset_clear">Şeffaf</string>
     <string name="settings_glass_preset_balanced">Dengeli</string>

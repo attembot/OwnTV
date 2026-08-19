@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ColorScheme
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.darkColorScheme
@@ -16,6 +17,16 @@ import androidx.tv.material3.lightColorScheme
 enum class ThemeMode { SYSTEM, DARK, LIGHT }
 
 val LocalThemeMode = staticCompositionLocalOf { ThemeMode.DARK }
+
+/**
+ * Width of the focus ring drawn by FocusableSurface (#121 — "make the selection prominent").
+ * A CompositionLocal rather than a [Dimens] constant because the user picks it in Settings, and
+ * every focusable surface in the app has to follow the same choice.
+ */
+val LocalFocusBorderWidth = staticCompositionLocalOf { Dimens.FocusBorderWidth }
+
+/** The offered ring widths in dp — thin, normal, thick, extra thick. 2 dp is the shipped default. */
+val FocusBorderWidthChoices = listOf(1, 2, 4, 6)
 
 /** Map the resolved OwnTV tokens onto a tv-material3 M3 [ColorScheme]. */
 private fun schemeFrom(c: OwnTVColors): ColorScheme =
@@ -73,6 +84,8 @@ fun OwnTVTheme(
     accent: AccentColor,
     systemInDarkTheme: Boolean,
     customAccent: String = "",
+    focusHighlight: String = "",
+    focusBorderWidthDp: Int = 2,
     animationLevel: AnimationLevel = AnimationLevel.FULL,
     mainFontFamily: AppFontFamily = AppFontFamily.SYSTEM_SANS,
     popupFontFamily: AppFontFamily = AppFontFamily.LORA,
@@ -84,11 +97,17 @@ fun OwnTVTheme(
         ThemeMode.SYSTEM -> systemInDarkTheme
     }
 
-    val colors = ownTvColors(isDark = useDark, accent = accent, customAccent = customAccent)
+    val colors = ownTvColors(
+        isDark = useDark,
+        accent = accent,
+        customAccent = customAccent,
+        focusHighlight = focusHighlight,
+    )
 
     CompositionLocalProvider(
         LocalOwnTVColors provides colors,
         LocalThemeMode provides themeMode,
+        LocalFocusBorderWidth provides focusBorderWidthDp.dp,
         LocalAnimationLevel provides animationLevel,
         LocalMainFontFamily provides mainFontFamily.asComposeFamily(),
         LocalPopupFontFamily provides popupFontFamily.asComposeFamily(),

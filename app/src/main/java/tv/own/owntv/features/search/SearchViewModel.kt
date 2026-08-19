@@ -198,9 +198,10 @@ class SearchViewModel(
         val custLive = customize.observe(pid, MediaType.LIVE).first()
         val custMovie = customize.observe(pid, MediaType.MOVIE).first()
         val custSeries = customize.observe(pid, MediaType.SERIES).first()
-        val hiddenLiveCats = hiddenCategoryIds(c.liveSourceIds, MediaType.LIVE, custLive)
-        val hiddenMovieCats = hiddenCategoryIds(c.movieSourceIds, MediaType.MOVIE, custMovie)
-        val hiddenSeriesCats = hiddenCategoryIds(c.seriesSourceIds, MediaType.SERIES, custSeries)
+        val isKidsProfile = profileDao.getById(pid)?.isKids == true
+        val hiddenLiveCats = hiddenCategoryIds(c.liveSourceIds, MediaType.LIVE, custLive, isKidsProfile)
+        val hiddenMovieCats = hiddenCategoryIds(c.movieSourceIds, MediaType.MOVIE, custMovie, isKidsProfile)
+        val hiddenSeriesCats = hiddenCategoryIds(c.seriesSourceIds, MediaType.SERIES, custSeries, isKidsProfile)
         return SearchResults(
             channels = if (c.liveSourceIds.isEmpty()) emptyList()
             else (if (fts != null) channelDao.searchListDetailedFts(fts, c.liveSourceIds, LIMIT) else channelDao.searchListDetailed(q, c.liveSourceIds, LIMIT))
@@ -231,12 +232,14 @@ class SearchViewModel(
         sourceIds: List<Long>,
         type: MediaType,
         cust: tv.own.owntv.core.customize.SectionCustomizations,
+        isKidsProfile: Boolean,
     ): Set<Long> {
-        if (cust.hiddenCategories.isEmpty()) return emptySet()
-        return categoryDao.observe(sourceIds, type).first()
-            .filter { CustomizeKeys.category(it) in cust.hiddenCategories }
-            .map { it.id }
-            .toSet()
+        if (cust.hiddenCategories.isEmpty() && !isKidsProfile) return emptySet()
+        return tv.own.owntv.core.content.AdultCategoryClassifier.hiddenCategoryIds(
+            categoryDao.observe(sourceIds, type).first(),
+            cust.hiddenCategories,
+            isKidsProfile,
+        )
     }
 
     /** Live channels this profile has favourited — so a search result can show a star and toggle it. */
@@ -273,6 +276,8 @@ class SearchViewModel(
 
     fun playMovie(movie: MovieEntity) {
         viewModelScope.launch {
+            val pid = currentProfileId() ?: return@launch
+            if (!tv.own.owntv.core.content.AdultCategoryClassifier.allows(pid, movie.categoryId, profileDao, categoryDao)) return@launch
             val source = sourceDao.getById(movie.sourceId)
             // Stalker: resolve the stored cmd before EITHER branch — the external player must never
             // receive a raw portal cmd (plan §7), and neither should the in-app engines.
@@ -284,7 +289,10 @@ class SearchViewModel(
                 movie.streamUrl
             }
             // Global external-player toggle: same chokepoint behavior as MovieViewModel.play().
-            if (settings.externalPlayerMovies.first()) {
+            // #115 — a protected item cannot go to an external player: no standard intent extra
+            // carries a licence URL, so the other app would open it and fail on the first segment.
+            // Play it here instead, where the licence request can actually be made.
+            if (settings.externalPlayerMovies.first() && movie.drmConfig == null) {
                 externalPlayerLauncher.launch(
                     url = url,
                     title = movie.name,
@@ -297,6 +305,7 @@ class SearchViewModel(
                 url, title = movie.name, year = movie.year?.toString(), isLive = false,
                 userAgent = source?.userAgent,
                 httpHeaders = movie.httpHeaders,
+                drmConfig = movie.drmConfig,
                 // P6 — same stable engine-pin identity MovieViewModel uses, so a pin made in one
                 // screen applies in the other.
                 contentKey = tv.own.owntv.core.player.enginePinKey(movie.sourceId, "MOVIE", movie.remoteId),

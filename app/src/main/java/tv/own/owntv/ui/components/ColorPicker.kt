@@ -64,7 +64,7 @@ fun HueBar(hue: Float, modifier: Modifier = Modifier, onHue: (Float) -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val ring = when {
         editing -> Color(0xFFFFC24A)
-        focused -> colors.primary
+        focused -> colors.focusBorder
         else -> colors.outline
     }
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
@@ -126,7 +126,7 @@ fun SatValSquare(
     var focused by remember { mutableStateOf(false) }
     val ring = when {
         editing -> Color(0xFFFFC24A)
-        focused -> colors.primary
+        focused -> colors.focusBorder
         else -> colors.outline
     }
     val hueColor = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, 1f, 1f)))

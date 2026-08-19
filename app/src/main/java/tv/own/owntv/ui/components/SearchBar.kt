@@ -89,10 +89,11 @@ fun SearchBar(
     val glassy = surface != null && LocalGlass.current.isGlassy(surface)
     // The material reads as glass because a bright hairline lenses the whole edge at all times, not
     // just on focus. So when glassy: a faint white rim always, brightening on focus.
+    // A focused pill is a cursor position, so it follows the user's focus highlight (#121) in both
+    // materials — glass keeps its white idle hairline, but the focused rim is the chosen color.
     val borderColor = when {
-        glassy && focused -> Color.White.copy(alpha = 0.5f)
+        focused -> colors.focusBorder
         glassy -> Color.White.copy(alpha = 0.22f)
-        focused -> colors.primary
         else -> colors.outlineVariant
     }
 
@@ -126,7 +127,7 @@ fun SearchBar(
                 else Modifier.background(colors.surfaceContainerHigh)
             )
             .border(
-                width = if (focused) 2.dp else 1.dp,
+                width = if (focused) tv.own.owntv.ui.theme.LocalFocusBorderWidth.current else 1.dp,
                 color = borderColor,
                 shape = shape,
             )

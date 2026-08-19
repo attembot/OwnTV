@@ -45,7 +45,7 @@ import tv.own.owntv.ui.theme.OwnTVTheme
 
 /**
  * The Remote add-source screen: opens a small LAN web server and shows the PIN, a QR of the URL, and
- * the URL text so a phone on the same Wi-Fi can fill the Add Source form. The phone only fills it —
+ * the URL text so another device on the same Wi-Fi can fill the Add Source form. It only fills it —
  * when a submission arrives, [onPayloadReceived] hands off to the Manual form (pre-filled) where the
  * user presses Start Import. The listener stops automatically when this screen leaves composition.
  */
@@ -63,7 +63,7 @@ fun RemoteSetupScreen(
     val actionFocus = remember { FocusRequester() }
     LaunchedEffect(state::class) { runCatching { actionFocus.requestFocus() } }
 
-    // A phone submission hands off to the Manual form; the host navigates away (which stops the server).
+    // A remote submission hands off to the Manual form; the host navigates away (which stops the server).
     LaunchedEffect(payloads) { payloads.collect(onPayloadReceived) }
     DisposableEffect(Unit) { onDispose { onStopListener() } }
 

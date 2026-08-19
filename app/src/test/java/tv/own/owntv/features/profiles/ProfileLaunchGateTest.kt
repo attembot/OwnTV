@@ -7,6 +7,25 @@ import org.junit.Test
 /** Regression tests for the cold-start ordering between DataStore and Room. */
 class ProfileLaunchGateTest {
     @Test
+    fun `only one unlocked profile bypasses the launch gate`() {
+        assertFalse(profileGateRequired(listOf(fakeProfile(1L))))
+        assertTrue(profileGateRequired(listOf(fakeProfile(1L).copy(pinHash = "locked"))))
+        assertTrue(profileGateRequired(listOf(fakeProfile(1L), fakeProfile(2L))))
+    }
+
+    @Test
+    fun `single unlocked profile enters shell immediately without authentication`() {
+        assertTrue(
+            shellMayCompose(
+                profileState = ProfileLoadState.Loaded(listOf(fakeProfile(42L))),
+                activeProfileId = 42L,
+                authenticatedProfileId = null,
+                gateRequired = false,
+            ),
+        )
+    }
+
+    @Test
     fun `active locked id arriving before Room cannot compose the shell`() {
         assertFalse(
             shellMayCompose(

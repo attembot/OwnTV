@@ -11,11 +11,17 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import tv.own.owntv.core.i18n.LocaleStore
 import tv.own.owntv.features.home.HomeConfig
 import tv.own.owntv.player.SurroundMode
@@ -30,7 +36,32 @@ import tv.own.owntv.ui.theme.UiZoom
 /** Per-profile startup landing (Phase 3 / v4.0.0). LAST_CHANNEL also covers "auto-play my channel" since
  *  it's always the one you last watched. */
 enum class StartupMode {
-    HOME, LAST_CHANNEL, FAVORITES
+    HOME, LAST_CHANNEL, FAVORITES, SPECIFIC_CHANNEL
+}
+
+data class StartupChannelRef(
+    val sourceId: Long,
+    val remoteId: String?,
+    val name: String,
+    val itemId: Long,
+) {
+    fun toJson(): org.json.JSONObject = org.json.JSONObject()
+        .put("sourceId", sourceId)
+        .putOpt("remoteId", remoteId)
+        .put("name", name)
+        .put("itemId", itemId)
+
+    companion object {
+        fun fromJson(raw: String?): StartupChannelRef? = runCatching {
+            val o = org.json.JSONObject(raw ?: return null)
+            StartupChannelRef(
+                sourceId = o.getLong("sourceId").takeIf { it > 0L } ?: return null,
+                remoteId = o.optString("remoteId").takeIf { it.isNotBlank() },
+                name = o.getString("name").takeIf { it.isNotBlank() } ?: return null,
+                itemId = o.optLong("itemId", -1L),
+            )
+        }.getOrNull()
+    }
 }
 
 /**
@@ -94,6 +125,12 @@ object SeekSteps {
  */
 class SettingsRepository(private val context: Context, private val localeStore: LocaleStore) {
 
+    /**
+     * Scope for the warm settings snapshots below. Lives as long as this singleton — deliberately never
+     * cancelled, because the alternative is paying a DataStore read on every metadata resolve.
+     */
+    private val repoScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     /** Result of importing the optional locale field without allowing bad backup data to abort the restore. */
     data class SettingsImportResult(
         val localePresent: Boolean = false,
@@ -129,6 +166,8 @@ class SettingsRepository(private val context: Context, private val localeStore: 
         val POPUP_FONT_FAMILY = stringPreferencesKey("popup_font_family")
         val ACCENT = stringPreferencesKey("accent_color")
         val ACCENT_CUSTOM = stringPreferencesKey("accent_custom")
+        val FOCUS_HIGHLIGHT = stringPreferencesKey("focus_highlight_color")
+        val FOCUS_HIGHLIGHT_WIDTH = intPreferencesKey("focus_highlight_width")
         val AVATAR_ID = intPreferencesKey("avatar_id")
         val ACTIVE_PROFILE = longPreferencesKey("active_profile_id")
         val DEFAULT_SOURCE = longPreferencesKey("default_source_id")
@@ -173,7 +212,9 @@ class SettingsRepository(private val context: Context, private val localeStore: 
         val ANDROID_TV_HOME = booleanPreferencesKey("android_tv_home")
         // Video Player Settings
         val HW_DECODING = booleanPreferencesKey("hw_decoding")
-        val VOD_PREFER_EXO = booleanPreferencesKey("vod_prefer_exo")
+        val VOD_PREFER_EXO = booleanPreferencesKey("vod_prefer_exo") // legacy; read for migration only
+        val LIVE_ENGINE = stringPreferencesKey("live_engine")
+        val VOD_ENGINE = stringPreferencesKey("vod_engine")
         val MEASURED_STREAM_STATS = booleanPreferencesKey("measured_stream_stats")
         val DETAILED_DIAGNOSTICS = booleanPreferencesKey("detailed_diagnostics")
         val DIRECT_TUNE = booleanPreferencesKey("direct_tune")
@@ -195,6 +236,7 @@ class SettingsRepository(private val context: Context, private val localeStore: 
         // Subtitle appearance (#96): off by default so every renderer keeps its stock look —
         // notably the embedded broadcaster styling of Live TV CEA-608/teletext cues.
         val SUB_STYLE_ENABLED = booleanPreferencesKey("sub_style_enabled")
+        val SUB_FONT = stringPreferencesKey("sub_font")
         val SUB_COLOR = stringPreferencesKey("sub_color")
         val SUB_POSITION = stringPreferencesKey("sub_position")
         val SUB_BG_OPACITY = intPreferencesKey("sub_bg_opacity")
@@ -224,6 +266,7 @@ class SettingsRepository(private val context: Context, private val localeStore: 
         val RECENT_SEARCHES = stringPreferencesKey("recent_searches")
         val LAST_LIVE_CHANNEL = androidx.datastore.preferences.core.longPreferencesKey("last_live_channel")
         val VOD_VIEW_MODE = stringPreferencesKey("vod_view_mode")
+        val EPISODE_VIEW_MODE = stringPreferencesKey("episode_view_mode")
         // Global proxy (Approach 1 — one app-wide HTTP proxy). HTTP only; no per-source override yet.
         val PROXY_ENABLED = booleanPreferencesKey("proxy_enabled")
         val PROXY_HOST = stringPreferencesKey("proxy_host")
@@ -245,6 +288,8 @@ class SettingsRepository(private val context: Context, private val localeStore: 
         val METADATA_MODE = stringPreferencesKey("metadata_mode")
         val TMDB_API_KEY = stringPreferencesKey("tmdb_api_key")
         val METADATA_SERVER_URL = stringPreferencesKey("metadata_server_url")
+        val OPEN_SUBTITLES_API_KEY = stringPreferencesKey("open_subtitles_api_key")
+        val OPEN_SUBTITLES_SERVER_URL = stringPreferencesKey("open_subtitles_server_url")
         // TMDB content language (ISO 639-1, optionally with region — e.g. "el", "pt-BR"). Blank = the
         // TMDB default (en-US), which is what every install used before this setting existed, so leaving
         // it blank keeps existing users' metadata exactly as it was. "auto" = follow the device locale.
@@ -325,6 +370,24 @@ class SettingsRepository(private val context: Context, private val localeStore: 
     }
     suspend fun setStartupMode(profileId: Long, mode: StartupMode) {
         context.dataStore.edit { it[stringPreferencesKey("startup_mode_$profileId")] = mode.name }
+    }
+
+    fun startupChannel(profileId: Long): Flow<StartupChannelRef?> = prefsFlow { prefs ->
+        StartupChannelRef.fromJson(prefs[stringPreferencesKey("startup_channel_$profileId")])
+    }
+
+    suspend fun setStartupChannel(profileId: Long, channel: StartupChannelRef?) {
+        context.dataStore.edit { prefs ->
+            val key = stringPreferencesKey("startup_channel_$profileId")
+            if (channel == null) prefs.remove(key) else prefs[key] = channel.toJson().toString()
+        }
+    }
+
+    suspend fun setSpecificStartupChannel(profileId: Long, channel: StartupChannelRef) {
+        context.dataStore.edit { prefs ->
+            prefs[stringPreferencesKey("startup_channel_$profileId")] = channel.toJson().toString()
+            prefs[stringPreferencesKey("startup_mode_$profileId")] = StartupMode.SPECIFIC_CHANNEL.name
+        }
     }
 
     // --- Customize Categories & Items: optional per-profile PIN lock on the screen (so hidden items can't
@@ -532,6 +595,15 @@ class SettingsRepository(private val context: Context, private val localeStore: 
         context.dataStore.edit { it[Keys.METADATA_SERVER_URL] = url.trim() }
     }
 
+    val openSubtitlesApiKey: Flow<String> = prefsFlow { it[Keys.OPEN_SUBTITLES_API_KEY] ?: "" }
+    suspend fun setOpenSubtitlesApiKey(key: String) { context.dataStore.edit { it[Keys.OPEN_SUBTITLES_API_KEY] = key.trim() } }
+
+    val openSubtitlesServerUrl: Flow<String> = prefsFlow { it[Keys.OPEN_SUBTITLES_SERVER_URL] ?: "" }
+    suspend fun setOpenSubtitlesServerUrl(url: String) { context.dataStore.edit { it[Keys.OPEN_SUBTITLES_SERVER_URL] = url.trim() } }
+
+    suspend fun currentOpenSubtitlesApiKey(): String = context.dataStore.data.first()[Keys.OPEN_SUBTITLES_API_KEY] ?: ""
+    suspend fun currentOpenSubtitlesServerUrl(): String = context.dataStore.data.first()[Keys.OPEN_SUBTITLES_SERVER_URL] ?: ""
+
     /**
      * TMDB content language. Blank = TMDB's own default (en-US) — the pre-existing behaviour, so an
      * upgrade never silently changes anyone's metadata. "auto" = follow the device locale, resolved at
@@ -561,8 +633,31 @@ class SettingsRepository(private val context: Context, private val localeStore: 
         )
     }
 
-    /** One-shot read of the current metadata config (used by TmdbProvider per call). */
-    suspend fun metadataConfig(): tv.own.owntv.core.metadata.MetadataConfig = metadataConfigFlow.first()
+    /**
+     * Hot snapshot of [metadataConfigFlow], kept warm by one long-lived collector.
+     *
+     * Measured on the owner's TV: a fresh `first()` on a DataStore flow costs **74–128 ms**, and the
+     * metadata layer reads this on every resolve — once per episode focus, once per season switch,
+     * once per browsed title. That dominated everything else in the path, database queries included.
+     * One collector turns each of those into an in-memory field read.
+     */
+    private val metadataConfigState: StateFlow<tv.own.owntv.core.metadata.MetadataConfig?> =
+        metadataConfigFlow.stateIn(repoScope, SharingStarted.Eagerly, null)
+
+    /** Same treatment, for the other value the metadata path reads on every resolve. */
+    private val activeProfileIdState: StateFlow<Long?> =
+        prefsFlow { it[Keys.ACTIVE_PROFILE] ?: -1L }.stateIn(repoScope, SharingStarted.Eagerly, null)
+
+    /**
+     * One-shot read of the current metadata config (used by TmdbProvider per call). Served from the
+     * warm snapshot; falls back to a direct read only before the collector's first emission.
+     */
+    suspend fun metadataConfig(): tv.own.owntv.core.metadata.MetadataConfig =
+        metadataConfigState.value ?: metadataConfigFlow.first()
+
+    /** Cheap counterpart to collecting [activeProfileId], for the same per-resolve hot path. */
+    suspend fun activeProfileIdNow(): Long = activeProfileIdState.value ?: activeProfileId.first()
+
 
     // --- Catch-up (archive) playback ---
 
@@ -709,6 +804,18 @@ class SettingsRepository(private val context: Context, private val localeStore: 
         context.dataStore.edit { it[Keys.VOD_VIEW_MODE] = mode.name }
     }
 
+    /**
+     * How the episode list inside a show is drawn. LIST (default) is the text rows; GRID is a wall of
+     * 16:9 episode stills. Global rather than per-series: a layout preference is about how the user
+     * likes to browse, and storing it per show would mean setting it again for every show they open.
+     */
+    val episodeViewMode: Flow<VodViewMode> = prefsFlow { prefs ->
+        prefs[Keys.EPISODE_VIEW_MODE]?.let { runCatching { VodViewMode.valueOf(it) }.getOrNull() } ?: VodViewMode.LIST
+    }
+    suspend fun setEpisodeViewMode(mode: VodViewMode) {
+        context.dataStore.edit { it[Keys.EPISODE_VIEW_MODE] = mode.name }
+    }
+
     val sortGuide: Flow<GuideSort> = prefsFlow { prefs ->
         prefs[Keys.SORT_GUIDE]?.let { runCatching { GuideSort.valueOf(it) }.getOrNull() } ?: GuideSort.LIVE_TV
     }
@@ -726,14 +833,57 @@ class SettingsRepository(private val context: Context, private val localeStore: 
         context.dataStore.edit { it[Keys.HW_DECODING] = enabled }
     }
 
-    /** Preferred engine for Movies & Series (VOD). Off (default) = mpv first with an automatic ExoPlayer
-     *  fallback; on = ExoPlayer first with an automatic mpv fallback. mpv is the default because it has
-     *  the wider codec support (DTS/TrueHD audio, odd containers) and the A/V-sync nudge; ExoPlayer-first
-     *  is for devices/providers where mpv's path can't open streams that ExoPlayer plays fine. */
-    val vodPreferExo: Flow<Boolean> = prefsFlow { it[Keys.VOD_PREFER_EXO] ?: false }
+    /**
+     * Which engine Live TV starts a channel on, and whether it may hand over to the other one.
+     *
+     * Default is [EnginePreference.EXO_FIRST] — ExoPlayer opens far faster, which is what channel
+     * surfing is made of, and it is the only engine with live closed captions; mpv catches what it
+     * cannot play. The other three exist because that automatic handover is not always wanted:
+     *
+     *  - **mpv first** for a panel or a TV where ExoPlayer is the one that usually loses.
+     *  - **The two "only" modes** for anyone who has established that the second engine never works for
+     *    them. A handover costs a stop, a surface release and a re-open — several seconds of black on
+     *    every unplayable channel — so paying it for an engine that was never going to help is pure loss.
+     *    "Only" still keeps that engine's own `.m3u8` → `.ts` step; what it drops is the other engine.
+     *
+     * A channel pinned with the HUD "compatibility mode" toggle ignores this setting — see [ForceMpvStore].
+     */
+    val liveEnginePreference: Flow<tv.own.owntv.player.EnginePreference> = prefsFlow { prefs ->
+        prefs[Keys.LIVE_ENGINE]?.let { runCatching { tv.own.owntv.player.EnginePreference.valueOf(it) }.getOrNull() }
+            ?: tv.own.owntv.player.EnginePreference.EXO_FIRST
+    }
 
-    suspend fun setVodPreferExo(enabled: Boolean) {
-        context.dataStore.edit { it[Keys.VOD_PREFER_EXO] = enabled }
+    suspend fun setLiveEnginePreference(preference: tv.own.owntv.player.EnginePreference) {
+        context.dataStore.edit { it[Keys.LIVE_ENGINE] = preference.name }
+    }
+
+    /**
+     * Which engine Movies & Series start on, and whether it may hand over to the other one.
+     *
+     * Default is [EnginePreference.MPV_FIRST] — the opposite of Live TV's, deliberately: a film is one
+     * long open where breadth of codec support beats speed of opening, and mpv has the wider set
+     * (DTS/TrueHD audio, odd containers) plus the A/V-sync nudge. ExoPlayer-first is for devices and
+     * providers where mpv's path can't open files ExoPlayer plays fine.
+     *
+     * The two "only" modes drop the automatic handover for anyone whose second engine never works —
+     * see [liveEnginePreference] for the reasoning, which is identical. Two caveats specific to VOD:
+     * ExoPlayer cannot decode DTS/TrueHD at all (the handoff is refused rather than attempted, so
+     * "only ExoPlayer" means those files simply don't play), and the image-subtitle handoff to
+     * ExoPlayer is not a fallback — it stays available in both "only" modes, since it is the only way
+     * PGS/VOBSUB subtitles are ever rendered.
+     *
+     * Migrated in place from the older `vod_prefer_exo` switch, which is still read when the new key
+     * has never been written: on → [EnginePreference.EXO_FIRST], off → [EnginePreference.MPV_FIRST].
+     * Nobody's playback changes on upgrade.
+     */
+    val vodEnginePreference: Flow<tv.own.owntv.player.EnginePreference> = prefsFlow { prefs ->
+        prefs[Keys.VOD_ENGINE]?.let { runCatching { tv.own.owntv.player.EnginePreference.valueOf(it) }.getOrNull() }
+            ?: if (prefs[Keys.VOD_PREFER_EXO] == true) tv.own.owntv.player.EnginePreference.EXO_FIRST
+            else tv.own.owntv.player.EnginePreference.MPV_FIRST
+    }
+
+    suspend fun setVodEnginePreference(preference: tv.own.owntv.player.EnginePreference) {
+        context.dataStore.edit { it[Keys.VOD_ENGINE] = preference.name }
     }
 
     /** Measure live fps / bitrate / dropped frames for the stream-info overlay. On (default) = the
@@ -923,6 +1073,17 @@ class SettingsRepository(private val context: Context, private val localeStore: 
 
     suspend fun setSubtitleStyleEnabled(enabled: Boolean) {
         context.dataStore.edit { it[Keys.SUB_STYLE_ENABLED] = enabled }
+    }
+
+    /** Null leaves the renderer's own or embedded subtitle font untouched. */
+    val subtitleFont: Flow<AppFontFamily?> = prefsFlow { prefs ->
+        prefs[Keys.SUB_FONT]?.let { stored -> AppFontFamily.entries.firstOrNull { it.name == stored } }
+    }
+
+    suspend fun setSubtitleFont(font: AppFontFamily?) {
+        context.dataStore.edit { prefs ->
+            if (font == null) prefs.remove(Keys.SUB_FONT) else prefs[Keys.SUB_FONT] = font.name
+        }
     }
 
     /** Subtitle text color as "#RRGGBB"; blank ([SubtitleStyle.COLOR_DEFAULT]) = untouched. */
@@ -1456,6 +1617,21 @@ class SettingsRepository(private val context: Context, private val localeStore: 
         context.dataStore.edit { it[Keys.ACCENT_CUSTOM] = hex.trim() }
     }
 
+    // --- Focus highlight (#121): the ring around whatever the remote is pointing at ---
+    /** Focus ring color as a hex string; blank = follow the accent (the shipped behaviour). */
+    val focusHighlight: Flow<String> = prefsFlow { it[Keys.FOCUS_HIGHLIGHT] ?: "" }
+
+    /** Focus ring width in dp; 2 dp is the shipped default. */
+    val focusHighlightWidth: Flow<Int> = prefsFlow { it[Keys.FOCUS_HIGHLIGHT_WIDTH] ?: 2 }
+
+    suspend fun setFocusHighlight(hex: String) {
+        context.dataStore.edit { it[Keys.FOCUS_HIGHLIGHT] = hex.trim() }
+    }
+
+    suspend fun setFocusHighlightWidth(dp: Int) {
+        context.dataStore.edit { it[Keys.FOCUS_HIGHLIGHT_WIDTH] = dp }
+    }
+
     // --- Glass effect: background image + which surfaces go translucent + how translucent ---
     /** Absolute path to the user's background image (copied into app-private storage); blank = off. */
     val bgImagePath: Flow<String> = prefsFlow { it[Keys.BG_IMAGE_PATH] ?: "" }
@@ -1581,10 +1757,11 @@ class SettingsRepository(private val context: Context, private val localeStore: 
     // keys (active profile, default source, refresh-on-startup) — those ride with the sources backup.
 
     private val backupStringKeys = listOf(
-        Keys.THEME_MODE, Keys.ACCENT, Keys.ACCENT_CUSTOM, Keys.DEFAULT_ZOOM,
+        Keys.THEME_MODE, Keys.ACCENT, Keys.ACCENT_CUSTOM, Keys.FOCUS_HIGHLIGHT, Keys.DEFAULT_ZOOM,
         Keys.MAIN_FONT_FAMILY, Keys.POPUP_FONT_FAMILY,
         Keys.PREF_AUDIO_LANG, Keys.PREF_SUB_LANG, Keys.SUB_SEARCH_LANGS, Keys.SORT_LIVE, Keys.SORT_GUIDE, Keys.SORT_MOVIES,
         Keys.SORT_SERIES, Keys.RESUME_MODE, Keys.CATCHUP_TZ, Keys.CATCHUP_PLAYER, Keys.ANIMATION_LEVEL, Keys.VOD_VIEW_MODE,
+        Keys.EPISODE_VIEW_MODE,
         Keys.WEATHER_LOCATION, Keys.RECENT_SEARCHES,
         // Global proxy — non-secret fields only. The proxy password (Keys.PROXY_PASS) is NEVER part of
         // this whitelist; it is handled separately by BackupManager (encrypted or omitted).
@@ -1592,6 +1769,7 @@ class SettingsRepository(private val context: Context, private val localeStore: 
         // TMDB metadata: source mode + self-host URL. The user's own TMDB API key (Keys.TMDB_API_KEY) is a
         // secret and is deliberately NOT backed up in plaintext (same policy as the proxy password).
         Keys.METADATA_SERVER_URL, Keys.METADATA_MODE, Keys.METADATA_LANGUAGE,
+        Keys.OPEN_SUBTITLES_SERVER_URL,
         // Download folder. Backed up so a same-device reinstall keeps the chosen folder; on a different
         // device a path that no longer exists is harmless — StorageAccess.resolveRoot falls back to app
         // storage, so a stale restore never breaks downloads.
@@ -1610,6 +1788,7 @@ class SettingsRepository(private val context: Context, private val localeStore: 
         // Subtitle appearance: text color and screen position (toggle is a bool key, size a float
         // key, background transparency an int key).
         Keys.SUB_COLOR,
+        Keys.SUB_FONT,
         Keys.SUB_POSITION,
         // Custom DNS — not secret, backed up alongside proxy
         Keys.DNS_HOST, Keys.DNS_DOH_URL,
@@ -1621,7 +1800,7 @@ class SettingsRepository(private val context: Context, private val localeStore: 
         // The STATIC-mode hidden set rides with backup so a reinstall keeps the user's hidden icons.
         Keys.NAV_MENU_HIDDEN,
     )
-    private val backupIntKeys = listOf(Keys.DEFAULT_VOLUME, Keys.SEEK_STEP_SEC, Keys.LIVE_REWIND_STEP_SEC, Keys.UI_ZOOM_PCT, Keys.FONT_SIZE_PCT, Keys.AUDIO_DELAY_MS, Keys.CATCHUP_OFFSET_MIN, Keys.EPG_OFFSET_MIN, Keys.PROXY_PORT, Keys.DNS_PORT, Keys.CH_NAV_UP_SKIP, Keys.CH_NAV_DOWN_SKIP, Keys.MINI_PLAYER_SIZE_PCT, Keys.LIVE_LATENCY_CUSTOM_SECS, Keys.LIVE_PREROLL_SECS, Keys.GLASS_SCOPE, Keys.GLASS_ALPHA, Keys.GLASS_BLUR, Keys.GLASS_HIGHLIGHT, Keys.SUB_BG_OPACITY,
+    private val backupIntKeys = listOf(Keys.FOCUS_HIGHLIGHT_WIDTH, Keys.DEFAULT_VOLUME, Keys.SEEK_STEP_SEC, Keys.LIVE_REWIND_STEP_SEC, Keys.UI_ZOOM_PCT, Keys.FONT_SIZE_PCT, Keys.AUDIO_DELAY_MS, Keys.CATCHUP_OFFSET_MIN, Keys.EPG_OFFSET_MIN, Keys.PROXY_PORT, Keys.DNS_PORT, Keys.CH_NAV_UP_SKIP, Keys.CH_NAV_DOWN_SKIP, Keys.MINI_PLAYER_SIZE_PCT, Keys.LIVE_LATENCY_CUSTOM_SECS, Keys.LIVE_PREROLL_SECS, Keys.GLASS_SCOPE, Keys.GLASS_ALPHA, Keys.GLASS_BLUR, Keys.GLASS_HIGHLIGHT, Keys.SUB_BG_OPACITY,
         Keys.PANEL_W_LIVE_CAT, Keys.PANEL_W_LIVE_LIST, Keys.PANEL_W_LIVE_PREVIEW,
         Keys.PANEL_W_MOVIES_CAT, Keys.PANEL_W_MOVIES_LIST, Keys.PANEL_W_MOVIES_PREVIEW,
         Keys.PANEL_W_SERIES_CAT, Keys.PANEL_W_SERIES_LIST, Keys.PANEL_W_SERIES_PREVIEW)
@@ -1640,10 +1819,29 @@ class SettingsRepository(private val context: Context, private val localeStore: 
     )
     private val backupFloatKeys = listOf(Keys.SUB_SCALE)
 
+    /**
+     * "Remember last category" values (see the REMEMBER_CAT_* toggles, which are backed up as plain
+     * booleans above). These need a filter rather than a straight whitelist entry, so they live apart:
+     * a provider folder is stored as "FOLDER:<Room category id>", and Room content ids are recreated
+     * by every sync (the catalog is clear-then-insert), so that value means nothing on another device
+     * — restoring it would land the user in an arbitrary category. The stable forms travel:
+     * "ALL" / "FAV" / "HIST" and "CUSTOM:<uuid>", a user-created category whose id really is portable.
+     *
+     * `last_live_channel` is deliberately absent for the same reason and has no stable form at all:
+     * it is a Room channel id, so there is nothing here worth carrying.
+     */
+    private val backupLastCategoryKeys = listOf(
+        Keys.LAST_LIVE_CATEGORY, Keys.LAST_MOVIES_CATEGORY, Keys.LAST_SERIES_CATEGORY,
+    )
+
+    private fun isPortableCategoryKey(value: String): Boolean =
+        value == "ALL" || value == "FAV" || value == "HIST" || value.startsWith("CUSTOM:")
+
     suspend fun exportSettings(): org.json.JSONObject {
         val p = context.dataStore.data.first()
         return org.json.JSONObject().apply {
             backupStringKeys.forEach { k -> p[k]?.let { put(k.name, it) } }
+            backupLastCategoryKeys.forEach { k -> p[k]?.takeIf(::isPortableCategoryKey)?.let { put(k.name, it) } }
             backupStringSetKeys.forEach { k -> p[k]?.let { put(k.name, org.json.JSONArray(it)) } }
             backupIntKeys.forEach { k -> p[k]?.let { put(k.name, it) } }
             backupBoolKeys.forEach { k -> p[k]?.let { put(k.name, it) } }
@@ -1658,6 +1856,12 @@ class SettingsRepository(private val context: Context, private val localeStore: 
     suspend fun importSettings(o: org.json.JSONObject): SettingsImportResult {
         context.dataStore.edit { prefs ->
             backupStringKeys.forEach { k -> if (o.has(k.name)) prefs[k] = o.getString(k.name) }
+            // Guarded on read as well as on write: a file written by another build (or edited by hand)
+            // must not be able to restore a "FOLDER:<id>" that points at whatever this device's sync
+            // happens to have put behind that number.
+            backupLastCategoryKeys.forEach { k ->
+                if (o.has(k.name)) o.getString(k.name).takeIf(::isPortableCategoryKey)?.let { prefs[k] = it }
+            }
             backupStringSetKeys.forEach { k ->
                 if (o.has(k.name)) prefs[k] = o.getJSONArray(k.name).let { arr -> buildSet { for (i in 0 until arr.length()) add(arr.getString(i)) } }
             }
@@ -1740,6 +1944,18 @@ class SettingsRepository(private val context: Context, private val localeStore: 
         return out
     }
 
+    /** Exports stable per-profile Live channel startup targets. */
+    suspend fun exportStartupChannels(): org.json.JSONObject {
+        val prefix = "startup_channel_"
+        val out = org.json.JSONObject()
+        context.dataStore.data.first().asMap().forEach { (k, v) ->
+            if (k.name.startsWith(prefix) && v is String) {
+                StartupChannelRef.fromJson(v)?.let { out.put(k.name.removePrefix(prefix), it.toJson()) }
+            }
+        }
+        return out
+    }
+
     /** Exports all per-profile Home config blobs as { "<profileId>": { ... } }. */
     suspend fun exportHomeConfigs(): org.json.JSONObject {
         val prefix = "home_config_"
@@ -1762,6 +1978,38 @@ class SettingsRepository(private val context: Context, private val localeStore: 
                 val mode = o.optString(key).takeIf { it.isNotEmpty() } ?: return@forEach
                 if (runCatching { StartupMode.valueOf(mode) }.isSuccess) {
                     prefs[stringPreferencesKey("startup_mode_$pid")] = mode
+                }
+            }
+        }
+    }
+
+    /** Restores startup targets after profile/source ids have been remapped by backup import. */
+    suspend fun importStartupChannels(
+        o: org.json.JSONObject,
+        existingProfileIds: Set<Long>,
+        sourceIdMap: Map<Long, Long>,
+    ) {
+        context.dataStore.edit { prefs ->
+            o.keys().forEach { key ->
+                val pid = key.toLongOrNull() ?: return@forEach
+                if (pid !in existingProfileIds) return@forEach
+                val raw = o.optJSONObject(key)?.toString() ?: return@forEach
+                val ref = StartupChannelRef.fromJson(raw) ?: return@forEach
+                val mappedSourceId = sourceIdMap[ref.sourceId] ?: return@forEach
+                prefs[stringPreferencesKey("startup_channel_$pid")] =
+                    ref.copy(sourceId = mappedSourceId, itemId = -1L).toJson().toString()
+            }
+        }
+    }
+
+    /** A restored specific-channel mode must never point at an absent or unmapped source target. */
+    suspend fun repairSpecificStartupModes(profileIds: Set<Long>) {
+        context.dataStore.edit { prefs ->
+            profileIds.forEach { profileId ->
+                val modeKey = stringPreferencesKey("startup_mode_$profileId")
+                if (prefs[modeKey] == StartupMode.SPECIFIC_CHANNEL.name) {
+                    val channel = StartupChannelRef.fromJson(prefs[stringPreferencesKey("startup_channel_$profileId")])
+                    if (channel == null) prefs[modeKey] = StartupMode.HOME.name
                 }
             }
         }

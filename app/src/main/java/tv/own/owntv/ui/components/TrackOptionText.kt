@@ -4,7 +4,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import tv.own.owntv.R
-import tv.own.owntv.player.ExternalSubtitleSource
 import tv.own.owntv.player.TrackLabelKind
 import tv.own.owntv.player.TrackOption
 import java.util.Locale
@@ -30,13 +29,9 @@ fun TrackOption.displayLabel(): String {
         TrackLabelKind.AUDIO -> stringResource(R.string.player_audio_track_number, displayNumber())
         TrackLabelKind.SUBTITLE -> stringResource(R.string.player_subtitle_track_number, displayNumber())
     }
-    val base = raw ?: language ?: fallback
-    val source = when (externalSource) {
-        ExternalSubtitleSource.LOCAL -> stringResource(R.string.setup_local_file)
-        ExternalSubtitleSource.OPENSUBTITLES -> stringResource(R.string.settings_open_subtitles)
-        null -> null
-    }
-    return listOfNotNull(base, source).joinToString(stringResource(R.string.player_metadata_separator))
+    // External subs already carry their source in the raw label's `OS_`/`LOCAL_` prefix (see
+    // SubtitleTrackLabel), so appending a source word here would state it twice on every row.
+    return raw ?: language ?: fallback
 }
 
 private fun TrackOption.displayNumber(): Int = (typeIndex.takeIf { it >= 0 } ?: mpvId) + 1

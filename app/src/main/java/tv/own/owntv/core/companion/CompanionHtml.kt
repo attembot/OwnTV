@@ -8,7 +8,7 @@ import tv.own.owntv.core.model.SourceType
 
 /**
  * Localized HTML renderer for the companion web UI. Markup, CSS and protocol identifiers remain
- * here; every sentence or label visible to the phone is resolved from Android resources first.
+ * here; every sentence or label visible to the remote browser is resolved from Android resources first.
  */
 internal object CompanionHtml {
 
@@ -85,6 +85,15 @@ internal object CompanionHtml {
         val continueLabel = s(R.string.companion_continue)
         val pinMismatch = s(R.string.companion_pin_mismatch)
 
+        val tmdbTitle = s(R.string.companion_tmdb_page_title)
+        val tmdbHeading = s(R.string.companion_tmdb_heading)
+        val tmdbDescription = s(R.string.companion_tmdb_description)
+        val tmdbGetKey = s(R.string.companion_tmdb_get_key)
+        val tmdbKeyLabel = s(R.string.settings_tmdb_api_key)
+        val tmdbInvalid = s(R.string.companion_tmdb_invalid)
+        val tmdbSentBody = s(R.string.companion_tmdb_sent_body)
+        val tmdbSentLink = s(R.string.companion_tmdb_sent_link)
+
         val addTitle = s(R.string.companion_add_page_title)
         val addHeading = s(R.string.companion_add_heading)
         val addDescription = s(R.string.companion_add_description)
@@ -99,6 +108,8 @@ internal object CompanionHtml {
         val serverExample = s(R.string.setup_server_example)
         val playlistUrl = s(R.string.setup_playlist_url_local_file)
         val playlistExample = s(R.string.setup_playlist_example)
+        val playlistFile = s(R.string.companion_playlist_file)
+        val playlistUrlOrFile = s(R.string.companion_playlist_url_or_file)
         val portalUrl = s(R.string.setup_portal_url)
         val portalExample = s(R.string.setup_portal_example)
         val username = s(R.string.setup_username)
@@ -230,18 +241,20 @@ internal object CompanionHtml {
                 <button class="go" type="submit">${c.sendToTv.h()}</button>
               </form>
 
-              <form class="panel" data-k="m3u" method="post" action="/m3u?pin=$pin">
+              <form class="panel" id="m3uForm" data-k="m3u" method="post" action="/m3u?pin=$pin">
                 <input type="hidden" name="type" value="m3u">
                 <div class="grid">
                   <label>${c.name.h()} <input name="name" placeholder="${c.defaultPlaylist.h()}"></label>
                   ${autoRefreshSelect(c)}
                 </div>
-                <label>${c.playlistUrl.h()} <input name="server" placeholder="${c.playlistExample.h()}" required></label>
+                <label>${c.playlistUrl.h()} <input id="m3uUrl" name="server" placeholder="${c.playlistExample.h()}"></label>
+                <label>${c.playlistFile.h()} <input id="m3uFile" type="file" accept=".m3u,.m3u8,audio/x-mpegurl,application/vnd.apple.mpegurl,text/plain"></label>
                 <label>${c.userAgent.h()} <input name="userAgent" placeholder="${c.optional.h()}"></label>
                 <label>${c.epgUrl.h()} <input name="epgUrl" placeholder="${c.optional.h()}"></label>
                 <input type="hidden" name="isDefault" value="false">
                 <label class="check"><input type="checkbox" name="isDefault" value="true"> ${c.defaultPlaylistLabel.h()}</label>
-                <button class="go" type="submit">${c.sendToTv.h()}</button>
+                <button class="go" id="m3uSend" type="submit">${c.sendToTv.h()}</button>
+                <p id="m3uStatus" class="hint"></p>
               </form>
 
               <form class="panel" data-k="stalker" method="post" action="/stalker?pin=$pin">
@@ -278,6 +291,35 @@ internal object CompanionHtml {
                 tabs.forEach(function(x){x.classList.toggle('active',x===t)});
                 panels.forEach(function(p){p.classList.toggle('active',p.getAttribute('data-k')===k)});
               });});
+              // M3U panel only. With no file chosen this stays a plain form post, exactly as before.
+              // With a file chosen the browser reads it as text and posts it as JSON, because a file
+              // input cannot travel in a normal urlencoded body and the TV has no multipart parser.
+              var mf=document.getElementById('m3uFile'), mu=document.getElementById('m3uUrl'),
+                  mb=document.getElementById('m3uSend'), ms=document.getElementById('m3uStatus');
+              document.getElementById('m3uForm').addEventListener('submit',function(ev){
+                var file=mf.files&&mf.files[0];
+                if(!file){
+                  if(!(mu.value||'').trim()){ms.textContent=${c.playlistUrlOrFile.js()};ev.preventDefault();return false;}
+                  return true; // URL only — let the browser submit the form the old way.
+                }
+                ev.preventDefault();
+                mb.disabled=true; ms.textContent=${c.sending.js()};
+                var body={};
+                new FormData(document.getElementById('m3uForm')).forEach(function(v,k){body[k]=v;});
+                var r=new FileReader();
+                r.onload=function(){
+                  body.playlistFile=r.result; body.playlistFileName=file.name;
+                  fetch('/m3u?pin=$pin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+                    .then(function(res){
+                      if(res.ok){document.open();res.text().then(function(t){document.write(t);document.close();});}
+                      else{mb.disabled=false;ms.textContent=${c.uploadFailed.js()}.replace('__STATUS__',String(res.status));}
+                    })
+                    .catch(function(){mb.disabled=false;ms.textContent=${c.couldNotReach.js()};});
+                };
+                r.onerror=function(){mb.disabled=false;ms.textContent=${c.couldNotRead.js()};};
+                r.readAsText(file);
+                return false;
+              });
             </script>
         """.trimIndent())
     }
@@ -350,6 +392,106 @@ internal object CompanionHtml {
               });
             </script>
         """.trimIndent()
+    }
+
+    /**
+     * One-field page: paste a TMDB API key and send it to the TV.
+     *
+     * The whole point is that a 32-character key is miserable to type on a remote, which is why
+     * almost nobody switches to their own key. TMDB's own signup is not mobile-optimised either, so
+     * the page links straight to the API settings page rather than making the user find it.
+     */
+    fun tmdbKeyPage(context: Context, pin: String): String {
+        val c = Copy(context)
+        return page(context, c.tmdbTitle, """
+            <div class="card">
+              <h1>${c.tmdbHeading.h()}</h1>
+              <p>${c.tmdbDescription.h()}</p>
+              <p><a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener">${c.tmdbGetKey.h()}</a></p>
+              <form id="f" onsubmit="return false">
+                <label>${c.tmdbKeyLabel.h()} <input id="key" type="text" autocomplete="off"
+                  autocapitalize="off" spellcheck="false" required></label>
+                <button class="go" id="send" type="submit">${c.sendToTv.h()}</button>
+              </form>
+              <p id="status" class="hint"></p>
+            </div>
+            <script>
+              var k=document.getElementById('key'), b=document.getElementById('send'), s=document.getElementById('status');
+              document.getElementById('f').addEventListener('submit',function(){
+                var v=(k.value||'').trim();
+                // Mirror of the server-side check, purely so a typo is caught before a round trip.
+                if(!/^[A-Za-z0-9._-]{16,128}$/.test(v)){s.textContent=${c.tmdbInvalid.js()};return false;}
+                b.disabled=true; s.textContent=${c.sending.js()};
+                fetch('/tmdbkey?pin=$pin',{method:'POST',headers:{'Content-Type':'text/plain'},body:v})
+                  .then(function(res){
+                    if(res.ok){document.open();res.text().then(function(t){document.write(t);document.close();});}
+                    else{b.disabled=false;s.textContent=${c.uploadFailed.js()}.replace('__STATUS__',String(res.status));}
+                  })
+                  .catch(function(){b.disabled=false;s.textContent=${c.couldNotReach.js()};});
+                return false;
+              });
+            </script>
+        """.trimIndent())
+    }
+
+    fun tmdbKeySentPage(context: Context, pin: String): String {
+        val c = Copy(context)
+        return page(context, c.savedTitle, """
+            <div class="card"><h1>${c.savedHeading.h()}</h1>
+              <p>${c.tmdbSentBody.h()}</p><p><a href="/?pin=$pin">${c.tmdbSentLink.h()}</a></p>
+            </div>
+        """.trimIndent())
+    }
+
+    fun serviceConfigPage(context: Context, pin: String, openSubtitles: Boolean): String {
+        val title = context.getString(if (openSubtitles) R.string.settings_open_subtitles_setup_title else R.string.settings_metadata_remote_advanced)
+        val description = context.getString(if (openSubtitles) R.string.companion_open_subtitles_description else R.string.settings_metadata_remote_advanced_description)
+        val keyLabel = context.getString(if (openSubtitles) R.string.settings_open_subtitles_api_key else R.string.settings_tmdb_api_key)
+        val urlLabel = context.getString(R.string.settings_worker_server_url)
+        // OpenSubtitles is an account, not just a key: the credentials are the whole point of doing
+        // this from a browser instead of a remote. TMDB has no account, so it keeps the two fields.
+        val credentialFields = if (!openSubtitles) "" else """
+                <label>${context.getString(R.string.player_subtitles_username).h()} <input id="user" type="text" autocomplete="username" autocapitalize="off" spellcheck="false"></label>
+                <label>${context.getString(R.string.player_subtitles_password).h()} <input id="pass" type="password" autocomplete="current-password"></label>
+        """.trimIndent()
+        // Read back into the POST body only when the fields exist; '' keeps the TMDB body unchanged.
+        val credentialBody = if (!openSubtitles) "" else
+            ",username:(document.getElementById('user').value||''),password:(document.getElementById('pass').value||'')"
+        val send = context.getString(R.string.companion_send_to_tv)
+        val sending = context.getString(R.string.companion_sending)
+        val failed = context.getString(R.string.companion_upload_failed).replace("%1\$d", "__STATUS__")
+        val unreachable = context.getString(R.string.companion_could_not_reach)
+        return page(context, title, """
+            <div class="card">
+              <h1>${title.h()}</h1><p>${description.h()}</p>
+              <form id="f" onsubmit="return false">
+                $credentialFields
+                <label>${keyLabel.h()} <input id="key" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+                <label>${urlLabel.h()} <input id="url" type="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://"></label>
+                <button class="go" id="send" type="submit">${send.h()}</button>
+              </form><p id="status" class="hint"></p>
+            </div>
+            <script>
+              var k=document.getElementById('key'),u=document.getElementById('url'),b=document.getElementById('send'),s=document.getElementById('status');
+              document.getElementById('f').addEventListener('submit',function(){
+                var body=new URLSearchParams({apiKey:(k.value||'').trim(),serverUrl:(u.value||'').trim()$credentialBody}).toString();
+                b.disabled=true;s.textContent=${sending.js()};
+                fetch('/serviceconfig?pin=$pin',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body})
+                  .then(function(res){if(res.ok){return res.text().then(function(t){document.open();document.write(t);document.close();});}b.disabled=false;s.textContent=${failed.js()}.replace('__STATUS__',String(res.status));})
+                  .catch(function(){b.disabled=false;s.textContent=${unreachable.js()};});return false;
+              });
+            </script>
+        """.trimIndent())
+    }
+
+    fun serviceConfigSentPage(context: Context, pin: String): String {
+        val c = Copy(context)
+        return page(context, c.savedTitle, """
+            <div class="card"><h1>${c.savedHeading.h()}</h1>
+              <p>${context.getString(R.string.companion_service_config_sent).h()}</p>
+              <p><a href="/?pin=$pin">${context.getString(R.string.companion_service_config_again).h()}</a></p>
+            </div>
+        """.trimIndent())
     }
 
     fun imageSentPage(context: Context, pin: String): String {

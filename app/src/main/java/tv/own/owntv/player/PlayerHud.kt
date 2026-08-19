@@ -106,7 +106,7 @@ private const val DIRECT_TUNE_FEEDBACK_MS = 1_500L
 private const val DIRECT_TUNE_PLAYBACK_WAIT_MS = 8_000L
 private const val MAX_DIRECT_TUNE_DIGITS = 5
 
-internal enum class HudDialog { NONE, AUDIO, SUBS, SPEED, ZOOM, VOLUME, SUB_TIMING }
+internal enum class HudDialog { NONE, AUDIO, SUBS, SPEED, ZOOM, VOLUME, SUB_TIMING, JUMP_BACK }
 
 /** What the top-left channel OSD shows for direct tune: the digits being typed, the channel a number
  *  resolved to, or a failure message. All three render as the same card as the channel OSD. */
@@ -142,6 +142,13 @@ fun PlayerHud(
     onForwardLive: (() -> Unit)? = null,
     onGoToLive: (() -> Unit)? = null,
     onScrubLive: ((Int) -> Unit)? = null, // timeline scrub: +sec = back, −sec = toward live
+    // "Go back to…": aim at a point in the archive instead of nudging toward it with rewind. Null =
+    // not a catch-up channel. [jumpBackOptions] is read when the list opens so its clock times are
+    // computed against the moment the user asked, not the moment the HUD was composed.
+    jumpBackOptions: (() -> List<Int>)? = null,
+    onJumpBack: ((Int) -> Unit)? = null,
+    // Archive depth of the current channel, for the exact-time picker's day/HH:MM bounds.
+    jumpBackWindowSec: (() -> Int)? = null,
     timeshiftOffsetSec: Int? = null,
     // Direct tune: enter a provider channel number to switch channels. Null = disabled (not live / no channel).
     onTuneToNumber: (suspend (Int) -> DirectTuneResult)? = null,
@@ -180,6 +187,9 @@ fun PlayerHud(
     // (the EPG data lives in LiveViewModel, not the player). Rendered on the right edge whenever the
     // controls are visible, like the top-bar channel card; informational only, never focusable.
     liveEpgCard: (@Composable () -> Unit)? = null,
+    // The archive's own wall-clock instant while catch-up/rewind is playing; null means the picture is
+    // the present, and only the real clock shows. Drives the second, framed clock at top centre.
+    watchingWallMs: Long? = null,
     modifier: Modifier = Modifier,
 ) {
     val layoutDirection = LocalLayoutDirection.current
@@ -516,6 +526,11 @@ fun PlayerHud(
                 player, isLive, listOfNotNull(engineChip) + streamChips.ifEmpty { listOfNotNull(videoRes) }, duration, onBack,
                 modifier = Modifier.align(Alignment.TopStart),
                 trailing = if (error == null) liveEpgCard else null,
+                // Hidden behind an error overlay along with the rest of the chrome: a clock ticking
+                // over a failure message just draws the eye to the wrong thing.
+                centre = if (error == null) {
+                    { PlayerClock(watchingMs = watchingWallMs) }
+                } else null,
             )
 
             // Hide the transport (play/seek/prev/next) and bottom bar while an error is up — the error
@@ -532,6 +547,7 @@ fun PlayerHud(
                     volume = volume, audioCount = audioCount, subCount = subCount, zoomMode = zoomMode,
                     speedLabel = formatSpeed(speed),
                     onScrubLive = onScrubLive, timeshiftOffsetSec = timeshiftOffsetSec,
+                    onOpenJumpBack = if (onJumpBack != null) { { dialog = HudDialog.JUMP_BACK } } else null,
                     compatMode = compatMode, onToggleCompatMode = toggleCompat,
                     vodOnExo = vodOnExo, onToggleVodEngine = toggleVod,
                     onInfo = { showInfo = !showInfo }, infoOn = showInfo,
@@ -688,6 +704,23 @@ fun PlayerHud(
         HudDialog.SPEED -> SpeedDialog(current = speed, onSelect = { player.setSpeed(it); dialog = HudDialog.NONE }, onDismiss = { dialog = HudDialog.NONE })
         HudDialog.ZOOM -> ZoomDialog(current = zoomMode, onSelect = { player.setZoomModeByUser(it); dialog = HudDialog.NONE }, onDismiss = { dialog = HudDialog.NONE })
         HudDialog.VOLUME -> VolumeDialog(player, onDismiss = { dialog = HudDialog.NONE })
+        // "Go back to…". The options are read here, as the list opens, so the clock times shown are
+        // relative to the moment the user asked rather than to when the HUD was first composed.
+        HudDialog.JUMP_BACK -> {
+            val options = remember { jumpBackOptions?.invoke().orEmpty() }
+            val windowSec = remember { jumpBackWindowSec?.invoke() ?: 0 }
+            if (options.isEmpty()) {
+                dialog = HudDialog.NONE
+            } else {
+                tv.own.owntv.features.live.CatchupJumpDialog(
+                    title = stringResource(R.string.content_catchup_jump),
+                    offsetsSec = options,
+                    windowSec = windowSec,
+                    onPick = { dialog = HudDialog.NONE; onJumpBack?.invoke(it) },
+                    onDismiss = { dialog = HudDialog.NONE },
+                )
+            }
+        }
         HudDialog.NONE -> Unit
     }
 }

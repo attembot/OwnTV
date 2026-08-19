@@ -24,6 +24,9 @@ import tv.own.owntv.core.network.HttpClient
 import tv.own.owntv.core.network.StreamHeaders
 import tv.own.owntv.features.settings.data.SettingsRepository
 import tv.own.owntv.features.settings.data.SubtitleStyle
+import tv.own.owntv.ui.theme.AppFontFamily
+import tv.own.owntv.ui.theme.mpvFamilyName
+import tv.own.owntv.ui.theme.subtitleFontResource
 import java.util.Locale
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -50,7 +53,6 @@ data class TrackOption(
     val lang: String? = null,
     val typeIndex: Int = -1,
     val labelKind: TrackLabelKind = TrackLabelKind.AUDIO,
-    val externalSource: ExternalSubtitleSource? = null,
 )
 
 /** Image-based subtitle codecs. They carry no text, so the app-drawn (direct render) overlay can't show
@@ -97,6 +99,8 @@ data class PlaylistItem(
     /** Per-item HTTP headers (M3U `#EXTVLCOPT`/`#EXTHTTP`/`#KODIPROP`), stored `Key: Value` per line.
      *  Applied to whichever engine loads this item; null = the source's own UA/headers only. */
     val httpHeaders: String? = null,
+    /** Widevine/ClearKey licence details (#115); non-null pins this item to ExoPlayer. */
+    val drmConfig: String? = null,
 )
 
 /** Whether prev/next are available in the current queue. */
@@ -177,6 +181,7 @@ class OwnTVPlayer(
         private const val MPV_DEFAULT_SUB_COLOR = "#FFFFFFFF"
         private const val MPV_DEFAULT_SUB_BACK_COLOR = "#00000000"
         private const val MPV_DEFAULT_SUB_SCALE = 1.0
+        private const val MPV_DEFAULT_SUB_FONT = "sans-serif"
 
         /**
          * Routing for an END_FILE that arrives before FILE_LOADED ever did. For a VOD that means the
@@ -556,6 +561,10 @@ class OwnTVPlayer(
     // Per-channel HTTP headers for the item being played (M3U `#EXTVLCOPT`/`#EXTHTTP`/`#KODIPROP`,
     // F16). A `User-Agent` in here overrides the per-source one — it is the more specific setting.
     private var currentHeaders: Map<String, String> = emptyMap()
+    /** This item's DRM licence details (#115), decoded once per load. Non-null means ExoPlayer is the
+     *  only engine that can play it: libmpv has no CDM, so it cannot fetch a key from a licence
+     *  server, and the ladder must never offer mpv. */
+    private var currentDrm: tv.own.owntv.core.drm.DrmConfig? = null
     // The source-level UA for the queue currently loaded (playEpisodes). Each item re-derives
     // currentUserAgent from its own headers and falls back to this.
     private var queueUserAgent: String? = null
@@ -817,7 +826,14 @@ class OwnTVPlayer(
     @Volatile private var livePrerollSecs: Int = 0
     @Volatile private var prerollOverrideSecs: Int? = null
     private fun effectivePrerollSecs(): Int = prerollOverrideSecs ?: livePrerollSecs
-    private var vodPreferExo = false // Movies & Series start on ExoPlayer (mpv becomes the fallback)
+    // The global "Movies & Series player" setting: which engine an item starts on and whether the other
+    // may rescue it. Default mpv-first — see SettingsRepository.vodEnginePreference.
+    @Volatile private var vodEngine = tv.own.owntv.player.EnginePreference.MPV_FIRST
+    // The preference in force for the item currently loaded, after a per-item pin and the HUD toggle
+    // have had their say. Read by the two auto-fallback paths, which is why it is resolved once at load
+    // time rather than recomputed from the setting: the setting can change mid-film, and an item that
+    // started under the old one must keep the fallback rules it started with.
+    @Volatile private var itemEngine = tv.own.owntv.player.EnginePreference.MPV_FIRST
     // Per-item engine pins from the gear toggle (VOD counterpart of Live's compatibility mode) —
     // eagerly mirrored so loadUrl can consult them synchronously.
     @Volatile private var vodPinnedMpv: Set<String> = emptySet()
@@ -829,6 +845,7 @@ class OwnTVPlayer(
     // left on its own "Default" value is likewise never pushed.
     private var subStyleOn = false
     private var subScale = SubtitleStyle.SCALE_DEFAULT.toDouble()
+    private var subFont: AppFontFamily? = null
     private var subColorHex = SubtitleStyle.COLOR_DEFAULT
     private var subPosition = SubtitleStyle.Position.DEFAULT
     private var subBgOpacity = SubtitleStyle.OPACITY_DEFAULT
@@ -962,7 +979,7 @@ class OwnTVPlayer(
         }.launchIn(scope)
         settings.autoPlayNext.onEach { autoPlayNext = it }.launchIn(scope)
         // Applies from the next VOD load.
-        settings.vodPreferExo.onEach { vodPreferExo = it }.launchIn(scope)
+        settings.vodEnginePreference.onEach { vodEngine = it }.launchIn(scope)
         settings.measuredStreamStats.onEach { on ->
             measuredStreamStats = on
             if (!on) exoEngine?.setBitrateTrackingEnabled(false) // turning it off stops any in-flight measuring now
@@ -994,6 +1011,10 @@ class OwnTVPlayer(
             subScale = s.toDouble()
             if (initialized) mpvAsync { applySubtitleStyle() }
         }.launchIn(scope)
+        settings.subtitleFont.onEach { font ->
+            subFont = font
+            if (initialized) mpvAsync { applySubtitleStyle() }
+        }.launchIn(scope)
         settings.subtitleColor.onEach { hex ->
             subColorHex = hex
             if (initialized) mpvAsync { applySubtitleStyle() }
@@ -1020,7 +1041,10 @@ class OwnTVPlayer(
         }.launchIn(scope)
         settings.preferredSubLang.onEach { lang ->
             prefSubLang = lang
-            if (initialized) mpvAsync { setPropertyString("slang", lang) }
+            if (initialized) mpvAsync {
+                setPropertyString("slang", lang)
+                setPropertyString("subs-with-matching-audio", if (lang.isBlank()) "no" else "yes")
+            }
         }.launchIn(scope)
         settings.defaultZoom.onEach { name ->
             defaultZoom = runCatching { ZoomMode.valueOf(name) }.getOrDefault(ZoomMode.FIT)
@@ -1450,6 +1474,10 @@ class OwnTVPlayer(
             // mpv; Exo-as-fallback means mpv already failed this item, so reloading it there would just
             // loop — surface the combined both-engines error.
             when {
+                // "Only ExoPlayer": the user ruled mpv out, so a terminal Exo failure is the answer —
+                // surface it as the single-engine error it is rather than the both-engines one.
+                exoVodFallback && exoPrimaryThisItem && !itemEngine.allowsHandover ->
+                    scope.launch { failExoOnly(failure) }
                 exoVodFallback && exoPrimaryThisItem -> scope.launch { fallbackToMpvVod(failure) }
                 exoVodFallback -> scope.launch { failBothEngines(failure) }
                 else -> scope.launch { revertToMpv(error = failure) }
@@ -1731,6 +1759,7 @@ class OwnTVPlayer(
         // UA/Referer on mpv needs exactly the same on ExoPlayer.
         engine.userAgent = currentUserAgent
         engine.httpHeaders = currentHeaders
+        engine.drmConfig = currentDrm
         val restartGen = loadGeneration
         engine.onAudioFallback = {
             toast(toastRenderer.render(PlaybackFailure.Surround))
@@ -1791,6 +1820,10 @@ class OwnTVPlayer(
      */
     private fun fallbackToExoVod(mpvError: PlaybackFailure, mpvStuck: Boolean): Boolean {
         if (isLiveContent || exoActive || triedExoVodFallback) return false
+        if (!itemEngine.allowsHandover) {
+            android.util.Log.w(TAG, "VOD failed on mpv but the engine setting is mpv-only — no fallback")
+            return false
+        }
         val url = currentUrl ?: return false
         if (attachedSurface == null) return false
         if (!audioCodecSafeForExo()) {
@@ -1897,6 +1930,10 @@ class OwnTVPlayer(
             exoFailureBeforeMpv = null
             deactivateExo() // releases Exo's codec
             triedExoVodFallback = false // re-arm the auto-fallback for the manual choice
+            // The click is a per-item exception to the global setting, so it also re-opens the handover
+            // an "only" mode would otherwise forbid — the user is switching engines by hand precisely
+            // because the one the setting names is not working for this item.
+            itemEngine = tv.own.owntv.player.EnginePreference.MPV_FIRST
             _buffering.value = true
             // Remember the choice for THIS item (like Live's compatibility mode remembers the channel).
             scope.launch { vodEngineStore.pin(currentContentKey ?: url, tv.own.owntv.core.player.VodEnginePin.MPV) }
@@ -1922,6 +1959,7 @@ class OwnTVPlayer(
             exoVodFallback = true
             mpvFailureBeforeFallback = null
             triedExoVodFallback = false
+            itemEngine = tv.own.owntv.player.EnginePreference.EXO_FIRST // see the mpv branch above
             loadGeneration++ // supersede mpv retry/watchdog work for this item
             val gen = loadGeneration
             errorCheckJob?.cancel(); videoCheckJob?.cancel()
@@ -1975,6 +2013,17 @@ class OwnTVPlayer(
         else pendingSeekMs
 
     /** The engine fallback ALSO failed: stop ExoPlayer and surface one combined error. */
+    /** "Only ExoPlayer" and ExoPlayer gave up: mpv is not allowed a turn, so this is the final word.
+     *  Reported as ExoPlayer's own error — telling the user both engines failed would be a lie, and it
+     *  would hide the fact that the engine setting is what stopped the second attempt. */
+    private fun failExoOnly(exoError: PlaybackFailure) {
+        android.util.Log.w(TAG, "VOD failed on ExoPlayer ($exoError) and the engine setting is ExoPlayer-only")
+        deactivateExo()
+        _isPlaying.value = false
+        _buffering.value = false
+        _error.value = exoError
+    }
+
     private fun failBothEngines(exoError: PlaybackFailure) {
         android.util.Log.w(TAG, "VOD failed on BOTH engines — mpv: '$mpvFailureBeforeFallback' / exo: '$exoError'")
         deactivateExo()
@@ -2098,12 +2147,32 @@ class OwnTVPlayer(
         }
     }
 
+    /** Expose bundled UI fonts to libass/fontconfig without shipping duplicate assets. */
+    private fun prepareSubtitleFontsDir(): java.io.File? = runCatching {
+        val dir = java.io.File(context.cacheDir, "subtitle-fonts").apply { mkdirs() }
+        AppFontFamily.entries.forEach { font ->
+            val resource = font.subtitleFontResource
+            if (resource == 0) return@forEach
+            val target = java.io.File(dir, "${font.name.lowercase(Locale.US)}.ttf")
+            if (!target.isFile) {
+                context.resources.openRawResource(resource).use { input ->
+                    target.outputStream().use { output -> input.copyTo(output) }
+                }
+            }
+        }
+        dir
+    }.onFailure {
+        android.util.Log.w(TAG, "Could not prepare subtitle fonts: ${it.message}")
+    }.getOrNull()
+
     private fun ensureInit() {
         if (initialized) return
         val budget = PlayerBudget.of(context)
         playerBudget = budget
         android.util.Log.i(TAG, "PlayerBudget: $budget")
+        val subtitleFontsDir = prepareSubtitleFontsDir()
         mpv = MPVLib.create(context)?.apply {
+            subtitleFontsDir?.let { setOptionString("sub-fonts-dir", it.absolutePath) }
             setOptionString("vo", if (useDirect()) "mediacodec_embed" else "gpu")
             setOptionString("gpu-context", "android")
             setOptionString("hwdec", if (useDirect()) "mediacodec" else "no")
@@ -2166,6 +2235,7 @@ class OwnTVPlayer(
             // is on "Default", leaving mpv's own value in place.
             if (subStyleOn) {
                 if (SubtitleStyle.hasScale(subScale.toFloat())) setOptionString("sub-scale", subScale.toString())
+                subFont?.let { setOptionString("sub-font", it.mpvFamilyName) }
                 if (SubtitleStyle.hasColor(subColorHex)) setOptionString("sub-color", SubtitleStyle.mpvColor(subColorHex))
                 if (SubtitleStyle.hasOpacity(subBgOpacity)) setOptionString("sub-back-color", SubtitleStyle.mpvBackColor(subBgOpacity))
                 if (subPosition != SubtitleStyle.Position.DEFAULT) {
@@ -2177,6 +2247,7 @@ class OwnTVPlayer(
             setOptionString("audio-delay", audioDelaySec.toString())
             if (prefAudioLang.isNotBlank()) setOptionString("alang", prefAudioLang)
             if (prefSubLang.isNotBlank()) setOptionString("slang", prefSubLang)
+            setOptionString("subs-with-matching-audio", if (prefSubLang.isBlank()) "no" else "yes")
             // HDR passthrough: signal the source colorspace (incl. HDR10/HLG) to the display surface.
             setOptionString("target-colorspace-hint", if (hdrHint) "yes" else "no")
             init()
@@ -2243,6 +2314,8 @@ class OwnTVPlayer(
         userAgent: String? = null,
         /** Per-channel HTTP headers serialized as `Key: Value` per line (M3U, F16); null for none. */
         httpHeaders: String? = null,
+        /** Widevine/ClearKey licence details (#115); non-null pins the item to ExoPlayer. */
+        drmConfig: String? = null,
         /** P6 — stable engine-pin identity; null keeps the legacy stream-URL key. */
         contentKey: String? = null,
         seasonNumber: Int? = null,
@@ -2258,6 +2331,7 @@ class OwnTVPlayer(
         // installs the live provider on BOTH engines just before calling this.
         if (reconnectProvider != null || !isLive) reconnectUrlProvider = reconnectProvider
         currentHeaders = StreamHeaders.decode(httpHeaders)
+        currentDrm = tv.own.owntv.core.drm.DrmConfig.decode(drmConfig)
         // The channel's own UA wins over the playlist-wide one (F16): a playlist sets one UA for the
         // whole provider, an EXTVLCOPT line sets it for the one restream that needs it.
         currentUserAgent = StreamHeaders.userAgentOf(currentHeaders) ?: userAgent?.takeIf { it.isNotBlank() }
@@ -2324,6 +2398,7 @@ class OwnTVPlayer(
         // Per-item headers replace (never merge with) the previous item's, so a queue that mixes
         // header-carrying and plain episodes can't leak one item's Referer onto the next.
         currentHeaders = StreamHeaders.decode(item.httpHeaders)
+        currentDrm = tv.own.owntv.core.drm.DrmConfig.decode(item.drmConfig)
         currentUserAgent = StreamHeaders.userAgentOf(currentHeaders) ?: queueUserAgent
         tunedUserAgent = queueUserAgent
         tunedHttpHeaders = item.httpHeaders
@@ -2533,12 +2608,27 @@ class OwnTVPlayer(
         // chosen engine. The cost is that a genuinely undecodable file pays its fallback on every open;
         // the user's remedy is the toggle, which is one click and visible.
         val pinKey = meta.contentKey
-        val startOnExo = when {
+        val pinnedToExo: Boolean? = when {
             pinKey != null && pinKey in vodPinnedMpv -> false
             pinKey != null && pinKey in vodPinnedExo -> true
             url in vodPinnedMpv -> { migrateVodPin(url, pinKey); false }
             url in vodPinnedExo -> { migrateVodPin(url, pinKey); true }
-            else -> vodPreferExo
+            else -> null
+        }
+        // #115 — a protected item can only play on ExoPlayer, which has the CDM; mpv has none. That
+        // outranks both the setting and a per-item pin, because the alternative is not a slower route
+        // but no route at all.
+        val drmProtected = currentDrm != null
+        val startOnExo = if (drmProtected) true else pinnedToExo ?: !vodEngine.startsOnMpv
+        // A pin that contradicts an "only" setting re-opens the handover for this one item: the user
+        // named an engine for it *against* the global rule, so locking that item to the engine they
+        // overrode would leave it with no way to reach the one that plays it. Everything else keeps the
+        // setting's own rules, including its refusal to hand over at all.
+        itemEngine = when {
+            drmProtected -> tv.own.owntv.player.EnginePreference.EXO_ONLY
+            vodEngine.allowsHandover || startOnExo == vodEngine.startsOnMpv ->
+                tv.own.owntv.player.EnginePreference.firstOn(onMpv = !startOnExo)
+            else -> vodEngine
         }
         if (!isLive && startOnExo && resetRetries && !isArchive) {
             exoPrimaryThisItem = true
@@ -2935,6 +3025,7 @@ class OwnTVPlayer(
      * A file left entirely on "Default" options keeps its authored styling untouched.
      */
     private fun subStyleOverridesAss(): Boolean = subStyleOn && (
+        subFont != null ||
         SubtitleStyle.hasColor(subColorHex) ||
             SubtitleStyle.hasOpacity(subBgOpacity) ||
             subPosition != SubtitleStyle.Position.DEFAULT
@@ -2955,6 +3046,7 @@ class OwnTVPlayer(
             "sub-scale",
             if (on && SubtitleStyle.hasScale(subScale.toFloat())) subScale else MPV_DEFAULT_SUB_SCALE,
         )
+        setPropertyString("sub-font", if (on) subFont?.mpvFamilyName ?: MPV_DEFAULT_SUB_FONT else MPV_DEFAULT_SUB_FONT)
         setPropertyString(
             "sub-color",
             if (on && SubtitleStyle.hasColor(subColorHex)) SubtitleStyle.mpvColor(subColorHex) else MPV_DEFAULT_SUB_COLOR,
@@ -3556,7 +3648,6 @@ class OwnTVPlayer(
             // Image-based subtitle (PGS/VOBSUB/DVB): mpv's direct path can't draw it — on VOD, selecting
             // it hands playback to ExoPlayer. typeIndex lines the pick up with ExoPlayer's track order.
             val image = type == "sub" && codec?.lowercase() in BITMAP_SUB_CODECS
-            val external = if (type == "sub") sessionExternalSubs.firstOrNull { it.title == title } else null
             out.add(
                 TrackOption(
                     label = title.orEmpty(),
@@ -3567,7 +3658,6 @@ class OwnTVPlayer(
                     lang = lang,
                     typeIndex = typeIndex,
                     labelKind = if (type == "sub") TrackLabelKind.SUBTITLE else TrackLabelKind.AUDIO,
-                    externalSource = external?.source,
                 ),
             )
             typeIndex++

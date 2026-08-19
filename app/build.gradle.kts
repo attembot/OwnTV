@@ -419,6 +419,9 @@ dependencies {
     // sidecar: mpv is stopped first, so the provider only ever sees one connection.
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.exoplayer.hls) // HLS (.m3u8) support for the Live preview engine
+    // DASH (.mpd) — the container protected channels use (#115). DefaultMediaSourceFactory only
+    // builds a DASH source when this is on the classpath; without it a .mpd fails as "unsupported".
+    implementation(libs.androidx.media3.exoplayer.dash)
     implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.datasource.okhttp)
 

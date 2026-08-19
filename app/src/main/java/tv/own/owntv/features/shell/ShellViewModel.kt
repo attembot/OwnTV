@@ -289,6 +289,14 @@ class ShellViewModel(
     val customAccent: StateFlow<String> = settings.customAccent
         .stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
+    /** Focus ring color hex (#121); blank = follow the accent. */
+    val focusHighlight: StateFlow<String> = settings.focusHighlight
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
+
+    /** Focus ring width in dp (#121). */
+    val focusHighlightWidth: StateFlow<Int> = settings.focusHighlightWidth
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 2)
+
     /** Glass effect background image path (app-private); blank = no background (panels solid). */
     val bgImagePath: StateFlow<String> = settings.bgImagePath
         .stateIn(viewModelScope, SharingStarted.Eagerly, "")

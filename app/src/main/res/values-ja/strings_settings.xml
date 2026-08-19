@@ -94,16 +94,31 @@
     <string name="settings_metadata_provider_tmdb_description">プレイリストの情報を優先し、不足部分をTMDBで補完して、出演者、ジャンル、背景画像を追加します。</string>
     <string name="settings_metadata_tmdb_only_description">すべての項目でTMDBを優先し、TMDBに情報がない場合のみプレイリストを使用します。</string>
     <string name="settings_selected">選択中</string>
-    <string name="settings_active_tmdb_source">有効なTMDBソース：<xliff:g id="tier">%1$s</xliff:g></string>
     <string name="settings_metadata_allowance">1日の利用枠</string>
-    <string name="settings_metadata_allowance_row"><xliff:g id="window">%1$s</xliff:g>: 残り <xliff:g id="remaining">%2$d</xliff:g>／<xliff:g id="total">%3$d</xliff:g></string>
-    <string name="settings_metadata_window_minute">1分あたり</string>
-    <string name="settings_metadata_window_hour">1時間あたり</string>
-    <string name="settings_metadata_window_day">本日</string>
-    <plurals name="settings_metadata_allowance_left">
-        <item quantity="other">本日の残り <xliff:g id="remaining">%1$d</xliff:g>／<xliff:g id="total">%2$d</xliff:g> 回</item>
+    <string name="settings_metadata_reset_automatic">自動的にリセットされます</string>
+    <string name="settings_metadata_library_details">ライブラリの詳細</string>
+    <string name="settings_metadata_test_connection">現在の接続をテスト</string>
+    <string name="settings_allowance_available">利用可能</string>
+    <string name="settings_allowance_refills"><xliff:g id="time">%1$s</xliff:g> に回復</string>
+    <string name="settings_allowance_minute">分</string>
+    <string name="settings_allowance_hour">時間</string>
+    <string name="settings_allowance_day">日</string>
+    <plurals name="settings_allowance_value">
+        <item quantity="other">残り <xliff:g id="remaining">%1$d</xliff:g> / <xliff:g id="limit">%2$d</xliff:g></item>
     </plurals>
-    <string name="settings_metadata_allowance_resets"><xliff:g id="time">%1$s</xliff:g> に回復します</string>
+    <string name="settings_metadata_active_source">使用中のソース</string>
+    <string name="settings_metadata_shared_worker_description">OwnTV Worker · 設定不要</string>
+    <string name="settings_metadata_connection">接続</string>
+    <string name="settings_metadata_remote_advanced">詳細なTMDB情報を取得</string>
+    <string name="settings_metadata_remote_advanced_description">共有の既定サービスではなく、独自のTMDB APIキーまたは自分でホストしたWorkerを使います。</string>
+    <string name="settings_metadata_usage_label">使用量</string>
+    <string name="settings_metadata_usage_value"><xliff:g id="min_used">%1$d</xliff:g>/<xliff:g id="min_total">%2$d</xliff:g> 分 · <xliff:g id="hr_used">%3$d</xliff:g>/<xliff:g id="hr_total">%4$d</xliff:g> 時間 · <xliff:g id="day_used">%5$d</xliff:g>/<xliff:g id="day_total">%6$d</xliff:g> 日</string>
+    <string name="settings_metadata_source_label">ソース</string>
+    <string name="settings_metadata_key_label">キー</string>
+    <string name="settings_metadata_server_label">サーバー</string>
+    <string name="settings_metadata_refills_label">回復時刻</string>
+    <string name="settings_metadata_clear_advanced_title">独自のキーの使用をやめますか？</string>
+    <string name="settings_metadata_clear_advanced_message">TMDB APIキーと独自サーバーのアドレスがこの端末から削除され、OwnTVは1日の利用枠がある内蔵の共有サービスに戻ります。</string>
     <string name="settings_metadata_fair_share">内蔵のメタデータサービスはOwnTVを使うすべてのユーザーで共有しているため、各デバイスには1日ごとの利用枠があります。枠を使い切ると、ポスターと説明は回復するまで一時停止します。お使いのプレイリスト自身の情報はこれまでどおり表示されます。独自のTMDB APIキーまたはサーバーを追加すると、この制限はなくなります。無料で、個人キーには実質的に制限がありません。</string>
     <string name="settings_metadata_limit_reached">1日のメタデータ利用枠を使い切りました。設定 → メタデータで独自のTMDBキーを追加すると、この制限がなくなります。</string>
     <string name="settings_metadata_language">メタデータの言語</string>
@@ -111,6 +126,9 @@
     <string name="settings_advanced_options">詳細オプション</string>
     <string name="settings_advanced_metadata_description">共有のデフォルト設定の代わりに、独自のTMDB APIキーまたはセルフホストサーバーを使用します。</string>
     <string name="settings_metadata_server_description">内蔵の共有サーバーを使用する場合は両方を空欄にしてください（セットアップ不要）。TMDBを直接呼び出すには独自のTMDB APIキーを入力し、独自のプロキシ／ミラーを使用するにはセルフホストサーバーのURLを入力します。URLはキーより優先されます。</string>
+    <string name="settings_metadata_key_from_phone">別の端末からキーを取得</string>
+    <string name="settings_metadata_key_from_phone_desc">スマートフォン、タブレット、パソコンでコードを読み取り、そこでTMDBにログインしてキーを送信します。リモコンでの入力は不要です。</string>
+    <string name="settings_metadata_key_received">TMDBキーを受信しました</string>
     <string name="settings_tmdb_api_key">TMDB APIキー（v3）</string>
     <string name="settings_self_host_url">セルフホストサーバーのURL</string>
     <string name="settings_test">テスト</string>
@@ -175,6 +193,15 @@
     <string name="settings_theme_description">ライト、ダーク、またはシステムに従う</string>
     <string name="settings_accent">アクセントカラー</string>
     <string name="settings_accent_description">プリセット、パレット、16進コードで画面の色調を変更</string>
+    <string name="settings_focus_highlight">フォーカスの強調</string>
+    <string name="settings_focus_highlight_description">選択中の項目を囲む枠の色と太さ</string>
+    <string name="settings_focus_highlight_chip"><xliff:g id="color">%1$s</xliff:g> · <xliff:g id="thickness">%2$s</xliff:g></string>
+    <string name="settings_focus_thickness">太さ</string>
+    <string name="settings_focus_width_thin">細い</string>
+    <string name="settings_focus_width_normal">標準</string>
+    <string name="settings_focus_width_thick">太い</string>
+    <string name="settings_focus_width_extra">極太</string>
+    <string name="settings_focus_highlight_sample">フォーカス中</string>
     <string name="settings_glass_effect">ガラス効果</string>
     <string name="settings_glass_description">半透明のすりガラス風パネル、背景画像、透明度</string>
     <string name="settings_ui_zoom">UIズーム</string>
@@ -223,6 +250,8 @@
     <string name="settings_startup_home">ホーム</string>
     <string name="settings_startup_last_channel">最後のチャンネル</string>
     <string name="settings_startup_favorites">ライブ · お気に入り</string>
+    <string name="settings_startup_specific_channel">指定したチャンネル</string>
+    <string name="settings_startup_channel_unavailable">起動チャンネルを利用できません。ホームを開きました。</string>
     <string name="settings_all_history">すべての履歴</string>
     <string name="settings_choose_history">このプロフィールから削除する項目を選択します。プレイリスト、お気に入り、ダウンロードには影響しません。</string>
     <string name="settings_clear_history_confirm"><xliff:g id="scope">%1$s</xliff:g>の履歴を消去しますか？</string>
@@ -293,6 +322,7 @@
     <string name="settings_search_keywords_history">最近視聴したコンテンツ 視聴を続ける 削除</string>
     <string name="settings_search_keywords_theme">ライト ダーク システム</string>
     <string name="settings_search_keywords_accent">色調 パレット 16進数 プリセット</string>
+    <string name="settings_search_keywords_focus">フォーカス 枠 境界線 選択 カーソル 輪郭</string>
     <string name="settings_search_keywords_zoom">拡大縮小 インターフェース サイズ</string>
     <string name="settings_search_keywords_animation">動き 軽快 パフォーマンス</string>
     <string name="settings_search_keywords_weather">トップバー チップ 地点 摂氏 華氏</string>
@@ -366,6 +396,10 @@
     <!-- Translators: Description of the deinterlacing setting. -->
     <string name="settings_deinterlace_description">一部の古いSDチャンネルで動きのある場面に出る櫛状の線をなめらかにします。mpvが自分で映像を描画しているときに適用されるため、変化がない場合はハードウェアデコードをオフにしてください。</string>
     <string name="settings_movies_series_player">映画とシリーズのプレーヤー</string>
+    <string name="settings_live_tv_player">ライブTVのプレーヤー</string>
+    <string name="settings_engine_order"><xliff:g id="first">%1$s</xliff:g>、次に <xliff:g id="second">%2$s</xliff:g></string>
+    <string name="settings_engine_only"><xliff:g id="engine">%1$s</xliff:g> のみ</string>
+    <string name="settings_engine_default"><xliff:g id="option">%1$s</xliff:g>（デフォルト）</string>
     <string name="settings_reset_player_choices">保存したプレーヤーの選択をリセット</string>
     <string name="settings_external_player">外部プレーヤー</string>
     <string name="settings_default_zoom">デフォルトのズーム</string>
@@ -408,7 +442,22 @@
     <string name="settings_preferred_subtitle_language">優先する字幕言語</string>
     <string name="settings_preferred_language_description">利用可能な場合、この字幕トラックを自動選択します。</string>
     <string name="settings_open_subtitles">OpenSubtitles</string>
+    <string name="settings_open_subtitles_connected">接続済み</string>
+    <string name="settings_open_subtitles_reset_in"><xliff:g id="hours">%1$d</xliff:g>時間<xliff:g id="minutes">%2$d</xliff:g>分後</string>
     <string name="settings_open_subtitles_description">サインインすると、字幕の検索とダウンロード、ダウンロード済み字幕の管理ができます。プロフィールごとの設定です。無料のopensubtitles.comアカウントが必要です。</string>
+    <string name="settings_open_subtitles_advanced">詳細オプション</string>
+    <string name="settings_open_subtitles_advanced_description">独自のアプリケーションAPIキー、または自分でホストしたOpenSubtitles Workerを使います。</string>
+    <string name="settings_open_subtitles_setup_title">OpenSubtitlesを設定</string>
+    <string name="settings_open_subtitles_setup_description">OpenSubtitlesのアカウントでサインインします。</string>
+    <string name="settings_open_subtitles_setup_remote">リモート</string>
+    <string name="settings_open_subtitles_setup_remote_description">同じWi-Fiにつながった別の端末（スマートフォン、タブレット、パソコン）のブラウザーで入力します。</string>
+    <string name="settings_open_subtitles_setup_local">ここで入力</string>
+    <string name="settings_open_subtitles_setup_local_description">リモコンを使ってこのテレビで入力します。</string>
+    <string name="settings_open_subtitles_api_key">OpenSubtitlesのアプリケーションAPIキー</string>
+    <string name="settings_worker_server_url">Worker／サーバーのURL</string>
+    <string name="settings_shared">共有</string>
+    <string name="settings_open_subtitles_access_priority">どちらも空欄にするとOwnTVの共有Workerを使います。独自のWorker URLは直接指定したAPIキーより優先されます。アカウントのセッションはプロファイルごとに保持されます。</string>
+    <string name="settings_remove_custom_access">カスタムアクセスを削除</string>
     <string name="settings_audio">音声</string>
     <string name="settings_preferred_audio_language">優先する音声言語</string>
     <string name="settings_audio_sync">音声同期</string>
@@ -440,7 +489,8 @@
     <string name="settings_audio_delay"><xliff:g id="delay">%1$d</xliff:g> ms</string>
     <string name="settings_external_player_description">外部アプリで開くセクションを選択します。</string>
     <string name="settings_audio_delay_value"><xliff:g id="delay">%1$d</xliff:g> ms</string>
-    <string name="settings_movies_player_description">mpv（推奨）は、DTS/TrueHD音声や一般的でないファイルなど、最も幅広い形式に対応し、A/V同期補正も利用できます。映画やエピソードが開始できない場合にのみExoPlayerへ切り替えてください。一部のテレビではmpvで再生できないストリームを再生できますが、DTS/TrueHD音声をデコードできず、A/V同期補正もありません。どちらを選んでも、失敗した場合はもう一方が自動的に試されます。</string>
+    <string name="settings_movies_player_description">mpv（推奨）は対応形式が最も広く、DTS/TrueHD 音声や珍しいファイルに加えて音ズレの補正も備えています。ExoPlayer は一部のテレビで mpv が再生できないストリームを再生できますが、DTS/TrueHD 音声はデコードできず、音ズレの補正もありません。組み合わせの選択肢では、最初のプレーヤーが失敗すると自動的にもう一方を試します。単独のプレーヤーの選択肢では決して試さないため、もう一方がお使いのテレビでどのみち動作しない場合に数秒の黒画面を省けます。</string>
+    <string name="settings_live_player_description">ExoPlayer（推奨）はチャンネルを開くのがはるかに速く、ライブ字幕に対応する唯一のプレーヤーです。mpv は ExoPlayer で再生できないチャンネル、たとえば珍しい音声を含むチャンネルも再生できます。組み合わせの選択肢では、最初のプレーヤーが失敗すると自動的にもう一方を試します。単独のプレーヤーの選択肢では決して試さないため、もう一方がお使いのテレビでどのみち動作しない場合に数秒の黒画面を省けます。プレーヤーで手動で切り替えたチャンネルでは、いずれの場合も選択が保持されます。</string>
     <string name="settings_reset_player_choices_description">プレーヤーで個々の映画やエピソードをmpvとExoPlayerで切り替えると、その選択が次回のために保存されます。リセットすると、すべてが再び上記の設定に従います。ライブチャンネルの保存済みの選択はそのまま残ります。</string>
     <string name="settings_reset_player_choices_none">保存なし</string>
     <plurals name="settings_reset_player_choices_count">
@@ -473,7 +523,7 @@
     <string name="settings_guide_synced">番組表を同期しました</string>
     <string name="settings_guide_sync_failed">番組表の同期に失敗しました</string>
     <string name="settings_restore_remote_title">別のデバイスから復元</string>
-    <string name="settings_restore_remote_description">同じWi-Fi上のスマートフォンまたはノートパソコンでQRコードをスキャンするかURLを開き、このPINを入力してOwnTVのバックアップファイルを選び、「テレビに送信」をタップします。その後、ここで復元する項目を選択します。</string>
+    <string name="settings_restore_remote_description">同じWi-Fi上のスマートフォン、タブレット、パソコンでQRコードをスキャンするかURLを開き、このPINを入力してOwnTVのバックアップファイルを選び、「テレビに送信」をタップします。その後、ここで復元する項目を選択します。</string>
     <string name="settings_opening_server">サーバーを起動中…</string>
     <string name="settings_enter_pin_browser">ブラウザにこのPINを入力してください</string>
     <string name="settings_companion_qr">コンパニオンURLのQRコード</string>
@@ -481,7 +531,7 @@
     <string name="settings_try_again">再試行</string>
     <string name="settings_new_pin">新しいPINでやり直す</string>
     <string name="settings_download_remote_title">別のデバイスにダウンロード</string>
-    <string name="settings_download_remote_description">同じWi-Fi上のスマートフォンまたはノートパソコンでQRコードをスキャンするかURLを開き、このPINを入力して、保管用にバックアップファイルをダウンロードします。</string>
+    <string name="settings_download_remote_description">同じWi-Fi上のスマートフォン、タブレット、パソコンでQRコードをスキャンするかURLを開き、このPINを入力して、保管用にバックアップファイルをダウンロードします。</string>
     <string name="settings_preparing_backup">バックアップを準備中…</string>
     <string name="settings_glass_effect_on">ガラス効果：オン</string>
     <string name="settings_glass_effect_off">ガラス効果：オフ</string>
@@ -672,7 +722,7 @@
     <string name="settings_backup_what_backup">バックアップする項目</string>
     <string name="settings_backup_what_restore">復元する項目</string>
     <string name="settings_backup_encrypt_title">このバックアップを暗号化しますか？</string>
-    <string name="settings_backup_encrypt_message">バックアップパスワードを設定すると、プレイリスト、プロフィール、保存済みパスワードを含むファイル全体が暗号化され、そのパスワードなしでは内容を一切読み取れません。パスワードは安全に保管してください。紛失すると、バックアップを開けなくなります。パスワードを設定しない場合、ファイルは暗号化されず、保存済みパスワードは含まれません。</string>
+    <string name="settings_backup_encrypt_message">バックアップパスワードを設定すると、プレイリスト、プロフィール、保存済みパスワードを含むファイル全体が暗号化され、そのパスワードなしでは内容を一切読み取れません。パスワードは安全に保管してください。紛失すると、バックアップを開けなくなります。パスワードを設定しない場合、ファイルは暗号化されず、保存済みパスワードとPINは含まれません。</string>
     <string name="settings_backup_export_title">バックアップをエクスポート</string>
     <string name="settings_backup_export_message">同じWi-Fi上の別のデバイス（スマートフォンまたはノートパソコン）にバックアップを送信するか、このデバイスのファイルに保存します。</string>
     <string name="settings_backup_restore_title">バックアップを復元</string>
@@ -721,12 +771,12 @@
     <string name="settings_backup_section_settings">アプリ設定</string>
     <string name="settings_backup_section_settings_desc">テーマ、アクセントカラー、プレーヤー、レイアウトの設定</string>
     <string name="settings_backup_saved_to"><xliff:g id="path">%1$s</xliff:g>に保存しました。</string>
-    <string name="settings_backup_saved_to_without_passwords"><xliff:g id="path">%1$s</xliff:g>に保存しました。パスワードは含まれていません。</string>
+    <string name="settings_backup_saved_to_without_passwords"><xliff:g id="path">%1$s</xliff:g>に保存しました。パスワードとPINは含まれていません。</string>
     <plurals name="settings_backup_restored">
         <item quantity="other"><xliff:g id="items">%1$d</xliff:g>件の項目を復元しました。</item>
     </plurals>
     <string name="settings_backup_restore_resync">コンテンツを読み込むには、ソースを再同期してください。</string>
-    <string name="settings_backup_restore_password_note">保存済みのパスワードは「ソース／プロキシ」で再入力してください。</string>
+    <string name="settings_backup_restore_password_note">保存済みのパスワードは「ソース／プロキシ」で、プロフィールのPINと併せて再入力してください。</string>
     <plurals name="settings_backup_skipped_sources">
         <item quantity="other">プレイリストの種類がサポートされていないため、<xliff:g id="count">%1$d</xliff:g>件のソースをスキップしました。</item>
     </plurals>
@@ -935,6 +985,8 @@
     <string name="settings_font_preview">エンターテインメントを、もっとシンプルに。</string>
     <string name="settings_search_keywords_fonts">フォント 文字 サイズ 書体 ポップアップ 読みやすさ アクセシビリティ</string>
     <string name="settings_font_system_sans">システムサンセリフ</string>
+    <string name="settings_font_monospace">等幅フォント</string>
+    <string name="settings_subtitle_font">字幕フォント</string>
     <string name="settings_glass_preset_title">外観プリセット</string>
     <string name="settings_glass_preset_clear">クリア</string>
     <string name="settings_glass_preset_balanced">バランス</string>

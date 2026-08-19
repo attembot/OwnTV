@@ -94,17 +94,32 @@
     <string name="settings_metadata_provider_tmdb_description">आपकी प्लेलिस्ट की जानकारी को प्राथमिकता मिलेगी; TMDB खाली विवरण भरता है और कलाकार, शैलियाँ व पृष्ठभूमि चित्र जोड़ता है।</string>
     <string name="settings_metadata_tmdb_only_description">हर फ़ील्ड के लिए TMDB को प्राथमिकता दें; TMDB पर कुछ न मिलने पर ही अपनी प्लेलिस्ट का उपयोग करें।</string>
     <string name="settings_selected">चयनित</string>
-    <string name="settings_active_tmdb_source">सक्रिय TMDB स्रोत: <xliff:g id="tier">%1$s</xliff:g></string>
     <string name="settings_metadata_allowance">आपका दैनिक हिस्सा</string>
-    <string name="settings_metadata_allowance_row"><xliff:g id="window">%1$s</xliff:g>: <xliff:g id="total">%3$d</xliff:g> में से <xliff:g id="remaining">%2$d</xliff:g> बाकी</string>
-    <string name="settings_metadata_window_minute">प्रति मिनट</string>
-    <string name="settings_metadata_window_hour">प्रति घंटा</string>
-    <string name="settings_metadata_window_day">आज</string>
-    <plurals name="settings_metadata_allowance_left">
-        <item quantity="one">आज <xliff:g id="total">%2$d</xliff:g> में से <xliff:g id="remaining">%1$d</xliff:g> लुकअप बाकी</item>
-        <item quantity="other">आज <xliff:g id="total">%2$d</xliff:g> में से <xliff:g id="remaining">%1$d</xliff:g> लुकअप बाकी</item>
+    <string name="settings_metadata_reset_automatic">स्वतः रीसेट होता है</string>
+    <string name="settings_metadata_library_details">लाइब्रेरी का विवरण</string>
+    <string name="settings_metadata_test_connection">मौजूदा कनेक्शन जाँचें</string>
+    <string name="settings_allowance_available">उपलब्ध</string>
+    <string name="settings_allowance_refills"><xliff:g id="time">%1$s</xliff:g> रिफिल होगा</string>
+    <string name="settings_allowance_minute">मिनट</string>
+    <string name="settings_allowance_hour">घंटा</string>
+    <string name="settings_allowance_day">दिन</string>
+    <plurals name="settings_allowance_value">
+        <item quantity="one"><xliff:g id="remaining">%1$d</xliff:g> / <xliff:g id="limit">%2$d</xliff:g> शेष</item>
+        <item quantity="other"><xliff:g id="remaining">%1$d</xliff:g> / <xliff:g id="limit">%2$d</xliff:g> शेष</item>
     </plurals>
-    <string name="settings_metadata_allowance_resets"><xliff:g id="time">%1$s</xliff:g> बजे फिर से भरेगा</string>
+    <string name="settings_metadata_active_source">सक्रिय स्रोत</string>
+    <string name="settings_metadata_shared_worker_description">OwnTV Worker · कोई सेटअप नहीं</string>
+    <string name="settings_metadata_connection">कनेक्शन</string>
+    <string name="settings_metadata_remote_advanced">उन्नत TMDB जानकारी लें</string>
+    <string name="settings_metadata_remote_advanced_description">साझा डिफ़ॉल्ट के बजाय अपनी TMDB API कुंजी या स्वयं होस्ट किया गया Worker इस्तेमाल करें।</string>
+    <string name="settings_metadata_usage_label">उपयोग</string>
+    <string name="settings_metadata_usage_value"><xliff:g id="min_used">%1$d</xliff:g>/<xliff:g id="min_total">%2$d</xliff:g> मिनट · <xliff:g id="hr_used">%3$d</xliff:g>/<xliff:g id="hr_total">%4$d</xliff:g> घंटा · <xliff:g id="day_used">%5$d</xliff:g>/<xliff:g id="day_total">%6$d</xliff:g> दिन</string>
+    <string name="settings_metadata_source_label">स्रोत</string>
+    <string name="settings_metadata_key_label">कुंजी</string>
+    <string name="settings_metadata_server_label">सर्वर</string>
+    <string name="settings_metadata_refills_label">फिर से भरेगा</string>
+    <string name="settings_metadata_clear_advanced_title">अपनी कुंजी का उपयोग बंद करें?</string>
+    <string name="settings_metadata_clear_advanced_message">आपकी TMDB API कुंजी और आपके सर्वर का पता इस डिवाइस से हटा दिया जाएगा, और OwnTV अपने दैनिक हिस्से वाली अंतर्निहित साझा सेवा पर लौट आएगा।</string>
     <string name="settings_metadata_fair_share">अंतर्निहित मेटाडेटा सेवा OwnTV का उपयोग करने वाले सभी लोगों के बीच साझा है, इसलिए हर डिवाइस को हर दिन अपना हिस्सा मिलता है। हिस्सा खत्म होने पर पोस्टर और विवरण तब तक रुक जाते हैं जब तक वह फिर से न भर जाए — आपकी अपनी प्लेलिस्ट की जानकारी सामान्य रूप से काम करती रहती है। अपनी TMDB API कुंजी या सर्वर जोड़ने पर यह सीमा हट जाती है: यह मुफ़्त है, और निजी कुंजी पर व्यावहारिक रूप से कोई सीमा नहीं है।</string>
     <string name="settings_metadata_limit_reached">आज का मेटाडेटा हिस्सा खत्म हो गया — यह सीमा हटाने के लिए सेटिंग्स → मेटाडेटा में अपनी TMDB कुंजी जोड़ें।</string>
     <string name="settings_metadata_language">मेटाडेटा की भाषा</string>
@@ -112,6 +127,9 @@
     <string name="settings_advanced_options">उन्नत विकल्प</string>
     <string name="settings_advanced_metadata_description">साझा डिफ़ॉल्ट के बजाय अपनी TMDB API कुंजी या स्वयं होस्ट किए गए सर्वर का उपयोग करें।</string>
     <string name="settings_metadata_server_description">पहले से मौजूद साझा सर्वर का उपयोग करने के लिए दोनों को खाली छोड़ें (किसी सेटअप की आवश्यकता नहीं)। TMDB को सीधे कॉल करने के लिए अपनी TMDB API कुंजी दर्ज करें या अपना प्रॉक्सी/मिरर उपयोग करने के लिए स्वयं होस्ट किए गए सर्वर का URL दर्ज करें। URL को कुंजी से अधिक प्राथमिकता मिलती है।</string>
+    <string name="settings_metadata_key_from_phone">दूसरे डिवाइस से कुंजी लें</string>
+    <string name="settings_metadata_key_from_phone_desc">फ़ोन, टैबलेट या कंप्यूटर से कोड स्कैन करें, वहाँ TMDB में साइन इन करें और कुंजी भेजें। रिमोट पर कुछ भी टाइप नहीं करना।</string>
+    <string name="settings_metadata_key_received">TMDB कुंजी मिली</string>
     <string name="settings_tmdb_api_key">TMDB API कुंजी (v3)</string>
     <string name="settings_self_host_url">स्वयं होस्ट किए गए सर्वर का URL</string>
     <string name="settings_test">जाँच</string>
@@ -176,6 +194,15 @@
     <string name="settings_theme_description">हल्की, गहरी या सिस्टम के अनुसार</string>
     <string name="settings_accent">एक्सेंट रंग</string>
     <string name="settings_accent_description">इंटरफ़ेस को रंग दें — प्रीसेट, पैलेट या हेक्स कोड</string>
+    <string name="settings_focus_highlight">फ़ोकस हाइलाइट</string>
+    <string name="settings_focus_highlight_description">चयनित आइटम के चारों ओर के बॉर्डर का रंग और मोटाई</string>
+    <string name="settings_focus_highlight_chip"><xliff:g id="color">%1$s</xliff:g> · <xliff:g id="thickness">%2$s</xliff:g></string>
+    <string name="settings_focus_thickness">मोटाई</string>
+    <string name="settings_focus_width_thin">पतला</string>
+    <string name="settings_focus_width_normal">सामान्य</string>
+    <string name="settings_focus_width_thick">मोटा</string>
+    <string name="settings_focus_width_extra">अतिरिक्त मोटा</string>
+    <string name="settings_focus_highlight_sample">फ़ोकस में</string>
     <string name="settings_glass_effect">ग्लास प्रभाव</string>
     <string name="settings_glass_description">पारदर्शी फ़्रॉस्टेड पैनल, पृष्ठभूमि चित्र और पारदर्शिता</string>
     <string name="settings_ui_zoom">UI ज़ूम</string>
@@ -225,6 +252,8 @@
     <string name="settings_startup_home">होम</string>
     <string name="settings_startup_last_channel">पिछला चैनल</string>
     <string name="settings_startup_favorites">लाइव · पसंदीदा</string>
+    <string name="settings_startup_specific_channel">विशिष्ट चैनल</string>
+    <string name="settings_startup_channel_unavailable">स्टार्टअप चैनल उपलब्ध नहीं है। होम खोला गया।</string>
     <string name="settings_all_history">पूरा इतिहास</string>
     <string name="settings_choose_history">इस प्रोफ़ाइल से क्या हटाना है, चुनें। प्लेलिस्ट, पसंदीदा और डाउनलोड प्रभावित नहीं होंगे।</string>
     <string name="settings_clear_history_confirm"><xliff:g id="scope">%1$s</xliff:g> इतिहास मिटाएँ?</string>
@@ -295,6 +324,7 @@
     <string name="settings_search_keywords_history">हाल में देखे गए जारी रखें हटाएँ</string>
     <string name="settings_search_keywords_theme">हल्की गहरी सिस्टम</string>
     <string name="settings_search_keywords_accent">टिंट पैलेट हेक्स प्रीसेट</string>
+    <string name="settings_search_keywords_focus">फ़ोकस रिंग बॉर्डर चयन कर्सर आउटलाइन</string>
     <string name="settings_search_keywords_zoom">स्केल इंटरफ़ेस आकार</string>
     <string name="settings_search_keywords_animation">गति तेज़ प्रदर्शन</string>
     <string name="settings_search_keywords_weather">शीर्ष बार चिप स्थान सेल्सियस फ़ारेनहाइट</string>
@@ -368,6 +398,10 @@
     <!-- Translators: Description of the deinterlacing setting. -->
     <string name="settings_deinterlace_description">कुछ पुराने SD चैनल हलचल पर जो कंघी जैसी लकीरें दिखाते हैं, उन्हें चिकना करता है। यह mpv इंजन पर तब लागू होता है जब वह खुद तस्वीर बनाता है, इसलिए फ़र्क न दिखे तो हार्डवेयर डिकोडिंग बंद करें।</string>
     <string name="settings_movies_series_player">फ़िल्मों और सीरीज़ का प्लेयर</string>
+    <string name="settings_live_tv_player">लाइव टीवी का प्लेयर</string>
+    <string name="settings_engine_order"><xliff:g id="first">%1$s</xliff:g>, फिर <xliff:g id="second">%2$s</xliff:g></string>
+    <string name="settings_engine_only">केवल <xliff:g id="engine">%1$s</xliff:g></string>
+    <string name="settings_engine_default"><xliff:g id="option">%1$s</xliff:g> (डिफ़ॉल्ट)</string>
     <string name="settings_reset_player_choices">सहेजे गए प्लेयर विकल्प रीसेट करें</string>
     <string name="settings_external_player">बाहरी प्लेयर</string>
     <string name="settings_default_zoom">डिफ़ॉल्ट ज़ूम</string>
@@ -410,7 +444,22 @@
     <string name="settings_preferred_subtitle_language">पसंदीदा सबटाइटल भाषा</string>
     <string name="settings_preferred_language_description">उपलब्ध होने पर यह सबटाइटल ट्रैक अपने-आप चुनें।</string>
     <string name="settings_open_subtitles">OpenSubtitles</string>
+    <string name="settings_open_subtitles_connected">कनेक्टेड</string>
+    <string name="settings_open_subtitles_reset_in"><xliff:g id="hours">%1$d</xliff:g> घं <xliff:g id="minutes">%2$d</xliff:g> मि में</string>
     <string name="settings_open_subtitles_description">सबटाइटल खोजने और डाउनलोड करने तथा डाउनलोड किए गए सबटाइटल प्रबंधित करने के लिए साइन इन करें। यह हर प्रोफ़ाइल के लिए अलग है; एक मुफ़्त opensubtitles.com खाता आवश्यक है।</string>
+    <string name="settings_open_subtitles_advanced">उन्नत विकल्प</string>
+    <string name="settings_open_subtitles_advanced_description">अपनी ऐप्लिकेशन API कुंजी या स्वयं होस्ट किया गया OpenSubtitles Worker इस्तेमाल करें।</string>
+    <string name="settings_open_subtitles_setup_title">OpenSubtitles सेट अप करें</string>
+    <string name="settings_open_subtitles_setup_description">अपने OpenSubtitles खाते से साइन इन करें।</string>
+    <string name="settings_open_subtitles_setup_remote">दूर से</string>
+    <string name="settings_open_subtitles_setup_remote_description">उसी Wi-Fi से जुड़े किसी दूसरे डिवाइस — फ़ोन, टैबलेट या कंप्यूटर — के ब्राउज़र में अपनी जानकारी भरें।</string>
+    <string name="settings_open_subtitles_setup_local">यहाँ दर्ज करें</string>
+    <string name="settings_open_subtitles_setup_local_description">रिमोट की मदद से इसी टीवी पर अपनी जानकारी लिखें।</string>
+    <string name="settings_open_subtitles_api_key">OpenSubtitles ऐप्लिकेशन API कुंजी</string>
+    <string name="settings_worker_server_url">Worker / सर्वर URL</string>
+    <string name="settings_shared">साझा</string>
+    <string name="settings_open_subtitles_access_priority">OwnTV की साझा Worker सेवा उपयोग करने के लिए दोनों खाली छोड़ें। कस्टम Worker URL को सीधी API कुंजी पर प्राथमिकता मिलती है। खाता सत्र हर प्रोफ़ाइल के लिए अलग रहते हैं।</string>
+    <string name="settings_remove_custom_access">कस्टम एक्सेस हटाएँ</string>
     <string name="settings_audio">ऑडियो</string>
     <string name="settings_preferred_audio_language">पसंदीदा ऑडियो भाषा</string>
     <string name="settings_audio_sync">ऑडियो सिंक</string>
@@ -442,7 +491,8 @@
     <string name="settings_audio_delay"><xliff:g id="delay">%1$d</xliff:g> मि.से.</string>
     <string name="settings_external_player_description">चुनें कि कौन-से अनुभाग बाहरी ऐप में खुलेंगे।</string>
     <string name="settings_audio_delay_value"><xliff:g id="delay">%1$d</xliff:g> मि.से.</string>
-    <string name="settings_movies_player_description">mpv (अनुशंसित) सबसे अधिक फ़ॉर्मेट का समर्थन करता है—DTS/TrueHD ऑडियो, असामान्य फ़ाइलें—और इसमें A/V सिंक सुधार भी है। केवल तभी ExoPlayer पर जाएँ जब फ़िल्में या एपिसोड शुरू न हों: कुछ टीवी पर यह ऐसी स्ट्रीम चला सकता है जिन्हें mpv नहीं चला पाता, लेकिन यह DTS/TrueHD ऑडियो डिकोड नहीं कर सकता और इसमें A/V सिंक सुधार नहीं है। आप जो भी चुनें, उसके विफल होने पर दूसरे को अपने-आप आज़माया जाएगा।</string>
+    <string name="settings_movies_player_description">mpv (सुझाया गया) सबसे अधिक फ़ॉर्मैट सपोर्ट करता है — DTS/TrueHD ऑडियो, असामान्य फ़ाइलें — साथ ही A/V सिंक सुधार भी। कुछ टीवी पर ExoPlayer ऐसी स्ट्रीम चला देता है जो mpv नहीं चला पाता, लेकिन यह DTS/TrueHD ऑडियो डिकोड नहीं कर सकता और इसमें A/V सिंक सुधार नहीं है। संयुक्त विकल्पों में पहला विफल होने पर दूसरा प्लेयर अपने आप आज़माया जाता है; एकल-प्लेयर विकल्पों में ऐसा कभी नहीं होता, जिससे दूसरा प्लेयर आपके टीवी पर काम न करने की स्थिति में कुछ सेकंड की काली स्क्रीन बच जाती है।</string>
+    <string name="settings_live_player_description">ExoPlayer (सुझाया गया) चैनल बहुत तेज़ी से खोलता है और लाइव सबटाइटल केवल इसी में हैं। mpv ऐसे चैनल भी चलाता है जो ExoPlayer नहीं चला पाता, जिनमें असामान्य ऑडियो वाले कुछ चैनल भी शामिल हैं। संयुक्त विकल्पों में पहला विफल होने पर दूसरा प्लेयर अपने आप आज़माया जाता है; एकल-प्लेयर विकल्पों में ऐसा कभी नहीं होता, जिससे दूसरा प्लेयर आपके टीवी पर काम न करने की स्थिति में कुछ सेकंड की काली स्क्रीन बच जाती है। प्लेयर में हाथ से बदले गए चैनल पर आपकी पसंद दोनों ही स्थितियों में बनी रहती है।</string>
     <string name="settings_reset_player_choices_description">प्लेयर में किसी एक फ़िल्म या एपिसोड को mpv और ExoPlayer के बीच बदलने पर वह विकल्प अगली बार के लिए सहेज लिया जाता है। रीसेट करने पर सब कुछ फिर से ऊपर दी गई सेटिंग का पालन करेगा। लाइव चैनलों के सहेजे गए विकल्प बने रहते हैं।</string>
     <string name="settings_reset_player_choices_none">कोई सहेजा नहीं गया</string>
     <plurals name="settings_reset_player_choices_count">
@@ -476,7 +526,7 @@
     <string name="settings_guide_synced">टीवी गाइड सिंक हो गया</string>
     <string name="settings_guide_sync_failed">टीवी गाइड सिंक नहीं हो सका</string>
     <string name="settings_restore_remote_title">किसी दूसरे डिवाइस से रीस्टोर करें</string>
-    <string name="settings_restore_remote_description">उसी Wi-Fi से जुड़े फ़ोन या लैपटॉप पर QR स्कैन करें (या URL खोलें), यह PIN दर्ज करें, अपनी OwnTV बैकअप फ़ाइल चुनें और टीवी पर भेजें पर टैप करें। फिर यहाँ चुनें कि क्या रीस्टोर करना है।</string>
+    <string name="settings_restore_remote_description">उसी Wi-Fi से जुड़े फ़ोन, टैबलेट या कंप्यूटर पर QR स्कैन करें (या URL खोलें), यह PIN दर्ज करें, अपनी OwnTV बैकअप फ़ाइल चुनें और टीवी पर भेजें पर टैप करें। फिर यहाँ चुनें कि क्या रीस्टोर करना है।</string>
     <string name="settings_opening_server">सर्वर खोला जा रहा है…</string>
     <string name="settings_enter_pin_browser">ब्राउज़र में यह PIN दर्ज करें</string>
     <string name="settings_companion_qr">सहायक URL का QR कोड</string>
@@ -484,7 +534,7 @@
     <string name="settings_try_again">फिर कोशिश करें</string>
     <string name="settings_new_pin">नए PIN के साथ फिर से शुरू करें</string>
     <string name="settings_download_remote_title">किसी दूसरे डिवाइस पर डाउनलोड करें</string>
-    <string name="settings_download_remote_description">उसी Wi-Fi से जुड़े फ़ोन या लैपटॉप पर QR स्कैन करें (या URL खोलें), यह PIN दर्ज करें और अपनी बैकअप फ़ाइल सुरक्षित रखने के लिए डाउनलोड करें।</string>
+    <string name="settings_download_remote_description">उसी Wi-Fi से जुड़े फ़ोन, टैबलेट या कंप्यूटर पर QR स्कैन करें (या URL खोलें), यह PIN दर्ज करें और अपनी बैकअप फ़ाइल सुरक्षित रखने के लिए डाउनलोड करें।</string>
     <string name="settings_preparing_backup">बैकअप तैयार किया जा रहा है…</string>
     <string name="settings_glass_effect_on">ग्लास प्रभाव: चालू</string>
     <string name="settings_glass_effect_off">ग्लास प्रभाव: बंद</string>
@@ -681,7 +731,7 @@
     <string name="settings_backup_what_backup">बैकअप में क्या रखना है</string>
     <string name="settings_backup_what_restore">क्या रीस्टोर करना है</string>
     <string name="settings_backup_encrypt_title">इस बैकअप को एन्क्रिप्ट करें?</string>
-    <string name="settings_backup_encrypt_message">बैकअप पासवर्ड के साथ पूरी फ़ाइल एन्क्रिप्ट हो जाती है—प्लेलिस्ट, प्रोफ़ाइलें और सहेजे गए पासवर्ड भी—और उस पासवर्ड के बिना इसमें कुछ भी पढ़ा नहीं जा सकता। इसे सुरक्षित रखें: यदि आप इसे खो देते हैं, तो बैकअप बिल्कुल नहीं खोला जा सकेगा। पासवर्ड के बिना फ़ाइल एन्क्रिप्ट नहीं होती और सहेजे गए पासवर्ड इसमें शामिल नहीं किए जाते।</string>
+    <string name="settings_backup_encrypt_message">बैकअप पासवर्ड के साथ पूरी फ़ाइल एन्क्रिप्ट हो जाती है—प्लेलिस्ट, प्रोफ़ाइलें और सहेजे गए पासवर्ड भी—और उस पासवर्ड के बिना इसमें कुछ भी पढ़ा नहीं जा सकता। इसे सुरक्षित रखें: यदि आप इसे खो देते हैं, तो बैकअप बिल्कुल नहीं खोला जा सकेगा। पासवर्ड के बिना फ़ाइल एन्क्रिप्ट नहीं होती और सहेजे गए पासवर्ड व पिन इसमें शामिल नहीं किए जाते।</string>
     <string name="settings_backup_export_title">बैकअप एक्सपोर्ट करें</string>
     <string name="settings_backup_export_message">बैकअप को उसी Wi-Fi से जुड़े दूसरे डिवाइस (फ़ोन या लैपटॉप) पर भेजें या इस डिवाइस पर फ़ाइल के रूप में सहेजें।</string>
     <string name="settings_backup_restore_title">बैकअप रीस्टोर करें</string>
@@ -730,13 +780,13 @@
     <string name="settings_backup_section_settings">ऐप सेटिंग</string>
     <string name="settings_backup_section_settings_desc">थीम, एक्सेंट, प्लेयर और लेआउट प्राथमिकताएँ</string>
     <string name="settings_backup_saved_to"><xliff:g id="path">%1$s</xliff:g> में सहेजा गया।</string>
-    <string name="settings_backup_saved_to_without_passwords"><xliff:g id="path">%1$s</xliff:g> में सहेजा गया। पासवर्ड शामिल नहीं किए गए।</string>
+    <string name="settings_backup_saved_to_without_passwords"><xliff:g id="path">%1$s</xliff:g> में सहेजा गया। पासवर्ड और पिन शामिल नहीं किए गए।</string>
     <plurals name="settings_backup_restored">
         <item quantity="one"><xliff:g id="items">%1$d</xliff:g> आइटम रीस्टोर किया गया।</item>
         <item quantity="other"><xliff:g id="items">%1$d</xliff:g> आइटम रीस्टोर किए गए।</item>
     </plurals>
     <string name="settings_backup_restore_resync">सामग्री लोड करने के लिए अपने स्रोत रीसिंक करें।</string>
-    <string name="settings_backup_restore_password_note">स्रोत/प्रॉक्सी में सभी सहेजे गए पासवर्ड दोबारा दर्ज करें।</string>
+    <string name="settings_backup_restore_password_note">स्रोत/प्रॉक्सी में सभी सहेजे गए पासवर्ड और प्रोफ़ाइल पिन दोबारा दर्ज करें।</string>
     <plurals name="settings_backup_skipped_sources">
         <item quantity="one"><xliff:g id="count">%1$d</xliff:g> स्रोत छोड़ दिया गया क्योंकि उसकी प्लेलिस्ट का प्रकार समर्थित नहीं है।</item>
         <item quantity="other"><xliff:g id="count">%1$d</xliff:g> स्रोत छोड़ दिए गए क्योंकि उनकी प्लेलिस्ट के प्रकार समर्थित नहीं हैं।</item>
@@ -953,6 +1003,8 @@
     <string name="settings_font_preview">मनोरंजन, अब और भी आसान।</string>
     <string name="settings_search_keywords_fonts">फ़ॉन्ट टेक्स्ट आकार टाइपफ़ेस पॉपअप पढ़ना सुगम्यता</string>
     <string name="settings_font_system_sans">सिस्टम सैन्स</string>
+    <string name="settings_font_monospace">मोनोस्पेस</string>
+    <string name="settings_subtitle_font">सबटाइटल फ़ॉन्ट</string>
     <string name="settings_glass_preset_title">दिखावट प्रीसेट</string>
     <string name="settings_glass_preset_clear">स्पष्ट</string>
     <string name="settings_glass_preset_balanced">संतुलित</string>

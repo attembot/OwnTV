@@ -94,16 +94,31 @@
     <string name="settings_metadata_provider_tmdb_description">以播放清單的資訊為準；TMDB 會補齊缺漏，並新增演員、類型和背景圖。</string>
     <string name="settings_metadata_tmdb_only_description">所有欄位優先使用 TMDB；只有 TMDB 沒有資料時才改用播放清單。</string>
     <string name="settings_selected">已選取</string>
-    <string name="settings_active_tmdb_source">使用中的 TMDB 來源：<xliff:g id="tier">%1$s</xliff:g></string>
     <string name="settings_metadata_allowance">每日額度</string>
-    <string name="settings_metadata_allowance_row"><xliff:g id="window">%1$s</xliff:g>：剩餘 <xliff:g id="remaining">%2$d</xliff:g>/<xliff:g id="total">%3$d</xliff:g></string>
-    <string name="settings_metadata_window_minute">每分鐘</string>
-    <string name="settings_metadata_window_hour">每小時</string>
-    <string name="settings_metadata_window_day">今日</string>
-    <plurals name="settings_metadata_allowance_left">
-        <item quantity="other">今日剩餘 <xliff:g id="remaining">%1$d</xliff:g>/<xliff:g id="total">%2$d</xliff:g> 次</item>
+    <string name="settings_metadata_reset_automatic">自動重設</string>
+    <string name="settings_metadata_library_details">媒體庫詳情</string>
+    <string name="settings_metadata_test_connection">測試目前連線</string>
+    <string name="settings_allowance_available">可用</string>
+    <string name="settings_allowance_refills"><xliff:g id="time">%1$s</xliff:g> 恢復</string>
+    <string name="settings_allowance_minute">分鐘</string>
+    <string name="settings_allowance_hour">小時</string>
+    <string name="settings_allowance_day">天</string>
+    <plurals name="settings_allowance_value">
+        <item quantity="other">剩餘 <xliff:g id="remaining">%1$d</xliff:g> / <xliff:g id="limit">%2$d</xliff:g></item>
     </plurals>
-    <string name="settings_metadata_allowance_resets">將於 <xliff:g id="time">%1$s</xliff:g> 恢復</string>
+    <string name="settings_metadata_active_source">目前來源</string>
+    <string name="settings_metadata_shared_worker_description">OwnTV Worker · 無需設定</string>
+    <string name="settings_metadata_connection">連線</string>
+    <string name="settings_metadata_remote_advanced">取得進階 TMDB 資訊</string>
+    <string name="settings_metadata_remote_advanced_description">使用你自己的 TMDB API 金鑰或自建 Worker，而不是共用的預設服務。</string>
+    <string name="settings_metadata_usage_label">用量</string>
+    <string name="settings_metadata_usage_value"><xliff:g id="min_used">%1$d</xliff:g>/<xliff:g id="min_total">%2$d</xliff:g> 分鐘 · <xliff:g id="hr_used">%3$d</xliff:g>/<xliff:g id="hr_total">%4$d</xliff:g> 小時 · <xliff:g id="day_used">%5$d</xliff:g>/<xliff:g id="day_total">%6$d</xliff:g> 天</string>
+    <string name="settings_metadata_source_label">來源</string>
+    <string name="settings_metadata_key_label">金鑰</string>
+    <string name="settings_metadata_server_label">伺服器</string>
+    <string name="settings_metadata_refills_label">恢復時間</string>
+    <string name="settings_metadata_clear_advanced_title">不再使用你自己的金鑰？</string>
+    <string name="settings_metadata_clear_advanced_message">你的 TMDB API 金鑰與自有伺服器位址將從此裝置刪除，OwnTV 將回到帶有每日額度的內建共用服務。</string>
     <string name="settings_metadata_fair_share">內建中繼資料服務由所有 OwnTV 使用者共用，因此每部裝置每天都有自己的額度。用完額度後，海報與簡介會暫停顯示，直到額度恢復；播放清單自帶的資訊不受影響。加入你自己的 TMDB API 金鑰或伺服器即可解除此限制：它是免費的，而且個人金鑰幾乎沒有限制。</string>
     <string name="settings_metadata_limit_reached">今日中繼資料額度已用完 — 在「設定 → 中繼資料」中加入你自己的 TMDB 金鑰即可解除此限制。</string>
     <string name="settings_metadata_language">中繼資料語言</string>
@@ -111,6 +126,9 @@
     <string name="settings_advanced_options">進階選項</string>
     <string name="settings_advanced_metadata_description">使用您自己的 TMDB API 金鑰或自行架設的伺服器，而不使用共用預設值。</string>
     <string name="settings_metadata_server_description">兩者皆留空即可使用內建的共用伺服器（無須設定）。輸入您自己的 TMDB API 金鑰可直接呼叫 TMDB，或輸入自行架設的伺服器 URL 以使用自己的代理伺服器／鏡像。URL 的優先順序高於金鑰。</string>
+    <string name="settings_metadata_key_from_phone">用其他裝置取得金鑰</string>
+    <string name="settings_metadata_key_from_phone_desc">用手機、平板或電腦掃描 QR 碼，在該裝置上登入 TMDB 並傳送金鑰。不需要用遙控器輸入。</string>
+    <string name="settings_metadata_key_received">已接收 TMDB 金鑰</string>
     <string name="settings_tmdb_api_key">TMDB API 金鑰 (v3)</string>
     <string name="settings_self_host_url">自行架設的伺服器 URL</string>
     <string name="settings_test">測試</string>
@@ -175,6 +193,15 @@
     <string name="settings_theme_description">淺色、深色或依照系統</string>
     <string name="settings_accent">強調色</string>
     <string name="settings_accent_description">調整介面色調 — 可使用預設色彩、調色盤或十六進位色碼</string>
+    <string name="settings_focus_highlight">焦點強調</string>
+    <string name="settings_focus_highlight_description">焦點項目周圍外框的顏色與粗細</string>
+    <string name="settings_focus_highlight_chip"><xliff:g id="color">%1$s</xliff:g> · <xliff:g id="thickness">%2$s</xliff:g></string>
+    <string name="settings_focus_thickness">粗細</string>
+    <string name="settings_focus_width_thin">細</string>
+    <string name="settings_focus_width_normal">標準</string>
+    <string name="settings_focus_width_thick">粗</string>
+    <string name="settings_focus_width_extra">超粗</string>
+    <string name="settings_focus_highlight_sample">已選取</string>
     <string name="settings_glass_effect">玻璃效果</string>
     <string name="settings_glass_description">半透明毛玻璃面板、背景圖片和透明度</string>
     <string name="settings_ui_zoom">UI 縮放</string>
@@ -223,6 +250,8 @@
     <string name="settings_startup_home">主畫面</string>
     <string name="settings_startup_last_channel">上一個頻道</string>
     <string name="settings_startup_favorites">直播 · 我的最愛</string>
+    <string name="settings_startup_specific_channel">指定頻道</string>
+    <string name="settings_startup_channel_unavailable">啟動頻道無法使用，已開啟首頁。</string>
     <string name="settings_all_history">所有記錄</string>
     <string name="settings_choose_history">選擇要為此使用者檔案移除的內容。播放清單、我的最愛和下載內容不受影響。</string>
     <string name="settings_clear_history_confirm">要清除<xliff:g id="scope">%1$s</xliff:g>記錄嗎？</string>
@@ -293,6 +322,7 @@
     <string name="settings_search_keywords_history">最近觀看 繼續觀看 移除</string>
     <string name="settings_search_keywords_theme">淺色 深色 系統</string>
     <string name="settings_search_keywords_accent">色調 調色盤 十六進位 預設色彩</string>
+    <string name="settings_search_keywords_focus">焦點 外框 邊框 選取 游標 輪廓</string>
     <string name="settings_search_keywords_zoom">縮放 介面 大小</string>
     <string name="settings_search_keywords_animation">動畫 流暢 效能</string>
     <string name="settings_search_keywords_weather">頂端列 資訊方塊 位置 攝氏 華氏</string>
@@ -366,6 +396,10 @@
     <!-- Translators: Description of the deinterlacing setting. -->
     <string name="settings_deinterlace_description">平滑某些老舊標清頻道在畫面移動時出現的梳狀條紋。僅在 mpv 自行繪製畫面時生效，因此若沒有變化，請關閉硬體解碼。</string>
     <string name="settings_movies_series_player">電影與影集播放器</string>
+    <string name="settings_live_tv_player">電視直播播放器</string>
+    <string name="settings_engine_order">先 <xliff:g id="first">%1$s</xliff:g>，後 <xliff:g id="second">%2$s</xliff:g></string>
+    <string name="settings_engine_only">僅 <xliff:g id="engine">%1$s</xliff:g></string>
+    <string name="settings_engine_default"><xliff:g id="option">%1$s</xliff:g>（預設）</string>
     <string name="settings_reset_player_choices">重設已儲存的播放器選擇</string>
     <string name="settings_external_player">外部播放器</string>
     <string name="settings_default_zoom">預設縮放</string>
@@ -408,7 +442,22 @@
     <string name="settings_preferred_subtitle_language">偏好的字幕語言</string>
     <string name="settings_preferred_language_description">有此字幕軌時自動選取。</string>
     <string name="settings_open_subtitles">OpenSubtitles</string>
+    <string name="settings_open_subtitles_connected">已連線</string>
+    <string name="settings_open_subtitles_reset_in"><xliff:g id="hours">%1$d</xliff:g> 小時 <xliff:g id="minutes">%2$d</xliff:g> 分鐘後</string>
     <string name="settings_open_subtitles_description">登入以搜尋和下載字幕，以及管理已下載的字幕。每個使用者檔案各自設定；需要免費的 opensubtitles.com 帳號。</string>
+    <string name="settings_open_subtitles_advanced">進階選項</string>
+    <string name="settings_open_subtitles_advanced_description">使用你自己的應用程式 API 金鑰或自建的 OpenSubtitles Worker。</string>
+    <string name="settings_open_subtitles_setup_title">設定 OpenSubtitles</string>
+    <string name="settings_open_subtitles_setup_description">使用你的 OpenSubtitles 帳號登入。</string>
+    <string name="settings_open_subtitles_setup_remote">遠端</string>
+    <string name="settings_open_subtitles_setup_remote_description">在同一 Wi-Fi 下另一台裝置（手機、平板或電腦）的瀏覽器中填寫你的資訊。</string>
+    <string name="settings_open_subtitles_setup_local">在此輸入</string>
+    <string name="settings_open_subtitles_setup_local_description">用遙控器在這台電視上輸入你的資訊。</string>
+    <string name="settings_open_subtitles_api_key">OpenSubtitles 應用程式 API 金鑰</string>
+    <string name="settings_worker_server_url">Worker / 伺服器網址</string>
+    <string name="settings_shared">共用</string>
+    <string name="settings_open_subtitles_access_priority">兩項都留空即使用 OwnTV 的共用 Worker。自訂 Worker 網址優先於直接填寫的 API 金鑰。帳號登入狀態仍依設定檔分別儲存。</string>
+    <string name="settings_remove_custom_access">移除自訂存取</string>
     <string name="settings_audio">音訊</string>
     <string name="settings_preferred_audio_language">偏好的音訊語言</string>
     <string name="settings_audio_sync">音訊同步</string>
@@ -440,7 +489,8 @@
     <string name="settings_audio_delay"><xliff:g id="delay">%1$d</xliff:g> 毫秒</string>
     <string name="settings_external_player_description">選擇要在哪些區段中使用外部應用程式開啟內容。</string>
     <string name="settings_audio_delay_value"><xliff:g id="delay">%1$d</xliff:g> 毫秒</string>
-    <string name="settings_movies_player_description">mpv（建議使用）支援最廣泛的格式，包括 DTS/TrueHD 音訊和特殊檔案，並提供音訊／視訊同步修正。只有電影或集數無法開始播放時才切換至 ExoPlayer：在特定電視上，它能播放部分 mpv 無法播放的串流，但無法解碼 DTS/TrueHD 音訊，也不提供音訊／視訊同步修正。無論選擇哪一個，若播放失敗，都會自動嘗試另一個播放器。</string>
+    <string name="settings_movies_player_description">mpv（建議）支援的格式最廣——DTS/TrueHD 音訊、少見的檔案——還帶有音畫同步修正。在某些電視上，ExoPlayer 能播放 mpv 開不了的串流，但它無法解碼 DTS/TrueHD 音訊，也沒有音畫同步修正。組合選項會在第一個播放器失敗時自動改試另一個；單一播放器選項則從不改試，若另一個播放器在你的電視上本來就用不了，這樣可省下幾秒鐘黑畫面。</string>
+    <string name="settings_live_player_description">ExoPlayer（建議）開啟頻道快得多，也是唯一支援直播字幕的播放器。mpv 能播放 ExoPlayer 開不了的頻道，包括一些音訊格式少見的頻道。組合選項會在第一個播放器失敗時自動改試另一個；單一播放器選項則從不改試，若另一個播放器在你的電視上本來就用不了，這樣可省下幾秒鐘黑畫面。在播放器中手動切換過的頻道，兩種情況下都會保留你的選擇。</string>
     <string name="settings_reset_player_choices_description">在播放器中將單一電影或影集在 mpv 與 ExoPlayer 之間切換後，該選擇會儲存下來供下次使用。重設後，所有內容會重新依照上方的設定。直播頻道已儲存的選擇會保留。</string>
     <string name="settings_reset_player_choices_none">未儲存任何選擇</string>
     <plurals name="settings_reset_player_choices_count">
@@ -473,7 +523,7 @@
     <string name="settings_guide_synced">電視節目表已同步</string>
     <string name="settings_guide_sync_failed">電視節目表同步失敗</string>
     <string name="settings_restore_remote_title">從其他裝置還原</string>
-    <string name="settings_restore_remote_description">在連接至相同 Wi-Fi 的手機或筆記型電腦上掃描 QR 圖碼（或開啟網址），輸入此 PIN，選擇您的 OwnTV 備份檔案，然後點選「傳送至電視」。接著您可在此選擇要還原的內容。</string>
+    <string name="settings_restore_remote_description">在連接至相同 Wi-Fi 的手機、平板或電腦上掃描 QR 圖碼（或開啟網址），輸入此 PIN，選擇您的 OwnTV 備份檔案，然後點選「傳送至電視」。接著您可在此選擇要還原的內容。</string>
     <string name="settings_opening_server">正在開啟伺服器…</string>
     <string name="settings_enter_pin_browser">在瀏覽器中輸入此 PIN</string>
     <string name="settings_companion_qr">輔助工具網址的 QR 圖碼</string>
@@ -481,7 +531,7 @@
     <string name="settings_try_again">再試一次</string>
     <string name="settings_new_pin">使用新的 PIN 重新開始</string>
     <string name="settings_download_remote_title">在其他裝置上下載</string>
-    <string name="settings_download_remote_description">在連接至相同 Wi-Fi 的手機或筆記型電腦上掃描 QR 圖碼（或開啟網址），輸入此 PIN，然後下載您的備份檔案並妥善保存。</string>
+    <string name="settings_download_remote_description">在連接至相同 Wi-Fi 的手機、平板或電腦上掃描 QR 圖碼（或開啟網址），輸入此 PIN，然後下載您的備份檔案並妥善保存。</string>
     <string name="settings_preparing_backup">正在準備備份…</string>
     <string name="settings_glass_effect_on">玻璃效果：開啟</string>
     <string name="settings_glass_effect_off">玻璃效果：關閉</string>
@@ -672,7 +722,7 @@
     <string name="settings_backup_what_backup">要備份的內容</string>
     <string name="settings_backup_what_restore">要還原的內容</string>
     <string name="settings_backup_encrypt_title">要加密此備份嗎？</string>
-    <string name="settings_backup_encrypt_message">使用備份密碼後，整個檔案都會加密，包括播放清單、使用者檔案及已儲存的密碼；沒有該密碼就無法讀取其中任何內容。請妥善保管：若遺失密碼，將完全無法開啟備份。若不使用密碼，檔案不會加密，且不會包含已儲存的密碼。</string>
+    <string name="settings_backup_encrypt_message">使用備份密碼後，整個檔案都會加密，包括播放清單、使用者檔案及已儲存的密碼；沒有該密碼就無法讀取其中任何內容。請妥善保管：若遺失密碼，將完全無法開啟備份。若不使用密碼，檔案不會加密，且不會包含已儲存的密碼與 PIN 碼。</string>
     <string name="settings_backup_export_title">匯出備份</string>
     <string name="settings_backup_export_message">將備份傳送至連接相同 Wi-Fi 的其他裝置（手機或筆記型電腦），或將其儲存為此裝置上的檔案。</string>
     <string name="settings_backup_restore_title">還原備份</string>
@@ -721,12 +771,12 @@
     <string name="settings_backup_section_settings">應用程式設定</string>
     <string name="settings_backup_section_settings_desc">主題、強調色、播放器和版面配置偏好設定</string>
     <string name="settings_backup_saved_to">已儲存至 <xliff:g id="path">%1$s</xliff:g>。</string>
-    <string name="settings_backup_saved_to_without_passwords">已儲存至 <xliff:g id="path">%1$s</xliff:g>。未包含密碼。</string>
+    <string name="settings_backup_saved_to_without_passwords">已儲存至 <xliff:g id="path">%1$s</xliff:g>。未包含密碼與 PIN 碼。</string>
     <plurals name="settings_backup_restored">
         <item quantity="other">已還原 <xliff:g id="items">%1$d</xliff:g> 個項目。</item>
     </plurals>
     <string name="settings_backup_restore_resync">請重新同步來源以載入內容。</string>
-    <string name="settings_backup_restore_password_note">請在「來源／Proxy」中重新輸入所有已儲存的密碼。</string>
+    <string name="settings_backup_restore_password_note">請在「來源／Proxy」中重新輸入所有已儲存的密碼，以及各使用者檔案的 PIN 碼。</string>
     <plurals name="settings_backup_skipped_sources">
         <item quantity="other">已略過 <xliff:g id="count">%1$d</xliff:g> 個來源，因為不支援其播放清單類型。</item>
     </plurals>
@@ -935,6 +985,8 @@
     <string name="settings_font_preview">娛樂，從此更簡單。</string>
     <string name="settings_search_keywords_fonts">字型 文字 大小 字體 彈窗 閱讀 無障礙</string>
     <string name="settings_font_system_sans">系統無襯線字型</string>
+    <string name="settings_font_monospace">等寬字型</string>
+    <string name="settings_subtitle_font">字幕字型</string>
     <string name="settings_glass_preset_title">外觀預設</string>
     <string name="settings_glass_preset_clear">清透</string>
     <string name="settings_glass_preset_balanced">平衡</string>

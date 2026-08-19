@@ -39,20 +39,23 @@ restarts, profile changes, and backup/restore. Missing strings safely fall back 
 
 ---
 
-## 📱 Add a playlist from your phone (Remote setup)
+## 📱 Add a playlist from another device (Remote setup)
 
 Typing an Xtream server or a long M3U URL with a TV remote is painful. **Remote setup** lets you fill
-the form on your phone instead.
+the form on another device instead.
 
 1. **Add source → Remote.** In the first‑run wizard or **Settings → Manage sources → Add source**, pick
    **Remote** (the other option, **Manual**, is the type‑it‑here form).
 2. **Open server.** The TV shows a **QR code**, a **URL**, and a **6‑digit PIN**.
-3. **On a phone or laptop on the same Wi‑Fi**, scan the QR (or open the URL). The page asks for the
+3. **On a phone, tablet or computer on the same Wi‑Fi**, scan the QR (or open the URL). The page asks for the
    **PIN** shown on the TV, then shows a form with **Xtream / M3U / Stalker** tabs.
 4. **Fill the form and tap “Send to TV.”** The details appear in the Add Source screen on the TV, with
    the matching type selected and the fields filled. The Stalker tab also carries optional Serial Number,
    Device ID, Device ID2, and Signature values for portals that require advanced device identification.
-5. **Press Start Import on the TV** with the remote — the phone only fills the form; it never starts the
+   On the **M3U** tab you can either type a playlist address **or** press **Or upload a playlist file**
+   and pick an `.m3u` / `.m3u8` file from the computer — useful when the playlist only exists on that
+   machine. The file is sent to the TV and kept there until you import it.
+5. **Press Start Import on the TV** with the remote — the remote browser only fills the form; it never starts the
    import. Leave the Remote screen (Back) and the server stops automatically.
 
 *Security:* the QR contains only the URL, never the PIN; a fresh PIN is generated each time and every
@@ -202,6 +205,9 @@ or **narrow the whole app to just one**.
 ## 📺 Live TV
 
 - **Categories** are in the second column. Long category names **wrap to two lines** so they're never cut off.
+- ⏪ **Catch-up category**: between **History** and **All** sits **Catch-up**, holding every channel your
+  provider keeps a recording for. It only appears if you have such channels. Sorting, the search box and
+  the in-player channel list all work inside it, like any other category.
 - **Live preview**: focus a channel and its video plays in the preview pane (with the **real stream
   resolution**, e.g. `1080p`/`4K`, so a mislabelled "4K" channel can't fool you). Toggle this in
   **Settings → Playback → Live preview**; sound for the preview is **Settings → Playback → Preview audio**.
@@ -290,10 +296,28 @@ or **narrow the whole app to just one**.
   **engine toggle (the ⇄ MPV/EXO pill)** — this **pins that channel to the mpv engine**. The pill always shows
   the engine that's **actually playing** (teal while on mpv, whether you pinned it or OwnTV auto‑switched), and
   **one tap always flips** the engine — a small "Switched to MPV/ExoPlayer" note confirms it. It's **remembered
-  per channel**, so that one channel always uses mpv while everything else stays fast.
-  Picking **ExoPlayer** on a channel that had auto‑switched to mpv is treated as your decision, and OwnTV
-  gives it a real try in both stream formats. If ExoPlayer genuinely can't play that channel at all, it ends
-  up back on mpv rather than leaving you on a spinner — press the toggle again whenever you want to retry.
+  per channel and in both directions**, so that one channel always uses the engine you chose while everything
+  else follows your setting.
+  Your choice **holds for the rest of that channel's playback** — OwnTV will not switch you back a couple of
+  seconds later — and the engine you picked is given a real try in **both stream formats**. The next time you
+  open the channel it starts on your engine again, this time with the full fallback available, so a channel
+  that engine genuinely cannot play still ends up somewhere that plays it instead of on a spinner.
+- 🏛️ **Which engine channels start on is up to you**: **Settings → Video Player → Live TV player**
+  offers **ExoPlayer, then mpv** (the default), **mpv, then ExoPlayer**, **ExoPlayer only** and **mpv only**.
+  The first two just change which engine gets the first go; the **only** choices switch off the automatic
+  handover altogether. That handover costs a few seconds of black screen every time it happens, so if you
+  already know the second engine never works on your TV or with your provider, turning it off makes every
+  failing channel give up quickly instead of stalling. **Only** still tries that engine's own two stream
+  formats — what it drops is the other engine. A channel you pin by hand ignores the setting either way.
+- 🔒 **Protected (DRM) channels** — some providers publish channels locked with **Widevine** or
+  **ClearKey**, with the unlock address written into the playlist. These now play, with nothing for you
+  to set up: the unlocking is done by the component already built into your TV, so there is no key to
+  enter and no licence to buy. Such channels **always use ExoPlayer** (mpv cannot request an unlock
+  key), so the engine toggle is hidden for them and your engine setting does not apply. They also
+  always play inside OwnTV even if you have chosen an external player, because no external player can
+  be given the unlock address. Two caveats, both decided by the device rather than by OwnTV: older or
+  cheaper boxes may only be permitted to play protected channels in **standard definition**, and a few
+  will refuse them entirely.
   **A channel that won't play is worked through every combination.** With two engines and (when **Prefer HLS**
   is on) two stream formats there are four ways to open a channel, and one that defeats a given pairing is
   often fine on another. A failing channel now steps through them in a fixed order, each tried once, starting
@@ -324,6 +348,19 @@ or **narrow the whole app to just one**.
 - ⏪ **Catch‑up / rewind live**: on a channel that supports catch‑up (look for the marker, or use the
   long‑press **Catch‑up** menu), you can **rewind into the provider's archive** and play back from the past,
   then return to live.
+- 🕐 **Go back to…**: on those channels the bottom bar also has a **Go back to…** button. It lists times
+  counted back from now — `21:30`, `19:00`, `Sun 20:00` — so going three hours back is one press rather
+  than holding rewind. The last row, **Choose exact time…**, opens a **day / hour / minute** picker so
+  *yesterday at 10:31* is reachable: press **OK** on the day, hour or minute to step into it, change it
+  with **up / down**, then **OK** or **Back** to step out — left and right move between the three. The
+  picker stops at both ends of your archive, so you can't pick a time that doesn't exist.
+  **None of this needs a TV guide** — the same list appears if you open the long‑press **Catch‑up** menu on
+  a channel with no guide data, in place of the programme list.
+- 🕰️ **Clock, and the programme's own time**: the player shows the time and date at the top centre in every
+  mode. While you're replaying a recording it splits into two: **Programme time** (when what you're
+  watching originally aired, counting forward as it plays) and **Current time**. The guide card also gains
+  a **Playing / Then** row above the live one, showing what was on air at that moment and what followed —
+  so even after jumping to a bare time you can see what you landed on.
 
 ---
 
@@ -388,6 +425,10 @@ or **narrow the whole app to just one**.
 
 - **Grid / List toggle**: switch the poster wall to a compact **List** view (top‑right button) to scan many
   titles at once.
+- 🖼️ **Episode Grid / List toggle**: inside a show, the same button (next to **Sorting**) swaps the episode
+  rows for a wall of **episode pictures**. Your choice applies to every show. Episodes the metadata service
+  doesn't recognise show the show's own artwork with the **episode number** across the middle, so the grid
+  stays readable; in **Provider only** mode every tile looks that way.
 - 🔀 **Page the grid/list with CH+ / CH‑** — see **Live TV** above. Works on the category column and the
   poster grid/list (and the episode list inside a series); long‑press jumps to first/last.
 - **Detail pane**: focus a title to see its **poster, rating, plot** and **Play/Resume · Favourite ·
@@ -421,9 +462,12 @@ or **narrow the whole app to just one**.
   immediately (Movies) or queue all cached episodes (Series). No need to open the detail pane.
 - 📤 **Play with external player via long‑press**: the same long‑press menu can open the movie/episode in an
   external app (VLC, MX Player, …) — one‑off, regardless of the global **External player** setting.
-- 🔧 **Two playback engines with automatic fallback**: movies/episodes play on **mpv** by default (or
-  **ExoPlayer** if you switched the **Movies & Series player** setting). If the chosen engine can't play an
-  item, the **other engine is tried automatically** before any error. Each engine is given both its
+- 🔧 **Two playback engines with automatic fallback**: movies/episodes play on **mpv** by default —
+  **Settings → Video Player → Movies & Series player** offers the same four choices as Live TV
+  (**mpv, then ExoPlayer** by default, **ExoPlayer, then mpv**, **ExoPlayer only**, **mpv only**). If the
+  chosen engine can't play an item, the **other engine is tried automatically** before any error — unless
+  you picked one of the **only** choices, which never switch engines. Note that **ExoPlayer only** cannot
+  play **DTS or TrueHD** audio at all; those files need mpv. Each engine is given both its
   hardware and its software decoder before the other is tried, so a video gets four chances in all. A
   fallback is **never remembered** — the next item, and the same item next time, always starts on the
   engine you chose. You can also switch the **current**
@@ -444,29 +488,43 @@ or **narrow the whole app to just one**.
 
 ## 🎬 TMDB metadata (posters, plots, cast, trailers)
 
-- **Settings → Metadata (TMDB):** pick a **Metadata source** — *Provider only* (no TMDB), *Provider + TMDB*
-  (default; your playlist's info wins, TMDB fills the blanks and adds cast/genres/backdrops), or *TMDB only*
-  (prefer TMDB). Turn on **Advanced options** to use your own TMDB API key or a self-hosted server; otherwise
-  the built-in shared server is used with no setup. A "Test lookup" button verifies it works.
+- **Current layout:** Metadata has its own page. The active source is shown at the top; built-in-service users get separate **minute, hour and day** allowance cards plus refill time. **Get advanced TMDB info via remote** opens a compact popup for a personal API key, Worker/server URL, or QR + PIN remote hand-over. A URL takes priority over a key, and leaving both blank uses OwnTV's shared service.
+
+- **Settings → Metadata (TMDB):** **Metadata source** opens a picker — *Provider only* (no TMDB),
+  *Provider + TMDB* (default; your playlist's info wins, TMDB fills the blanks and adds
+  cast/genres/backdrops), or *TMDB only* (prefer TMDB). Turn on **Advanced options** to use your own TMDB
+  API key or a self-hosted server; otherwise the built-in shared server is used with no setup. A
+  "Test lookup" button verifies it works. Switching **Advanced options** off asks for confirmation and
+  then deletes the saved key and server address, returning you to the shared service.
+- 📊 **Your daily share** (top of the screen) — the built-in metadata service is shared by everyone using
+  OwnTV, so each device gets its own allowance each day: **40 a minute, 150 an hour, 400 a day**, shown as
+  a single **Usage** line with the time it refills. Normal browsing uses a fraction of it. If you do run
+  out, posters and descriptions pause until it refills and OwnTV tells you once — your playlist's own
+  info keeps working as normal throughout. The rows appear only when you are on the shared service: your
+  own key or your own server is your resource and is never counted.
 - 🌍 **Language** — pick the language TMDB descriptions, titles and artwork come back in: **Default
-  (English)**, **Device language**, or one of 40 languages (the list is searchable). Changing it clears
-  the cached metadata so existing movies and series are re-fetched in the new language; your
-  title→TMDB matches are kept, so nothing has to be re-matched.
+  (English)**, **Device language**, or one of 40 languages (the list is searchable). Details are cached
+  **per language**, so switching to another language and back is instant and costs no re-downloads.
 - 💡 **Recommended: use your own TMDB API key** (free for personal / non-commercial use) or a self-hosted
-  server. TMDB keys are typically issued instantly — no waiting period or manual approval — and your own
-  key means you're never affected by shared-server rate limits. Create one at
-  [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api), paste it into **Settings →
-  Metadata → TMDB API key (v3)**, and hit **Test lookup**.
-- 🌐 **Self-host your own metadata server (free):** a ready-to-deploy Cloudflare Worker running the same
-  proxy logic as OwnTV's shared server is in the repo at [`worker/tmdb/`](worker/tmdb/) —
-  [`worker/tmdb/README.md`](worker/tmdb/README.md) has the full
-  step-by-step (deploy with `wrangler`, set your TMDB key as a secret via
-  [`worker/tmdb/wrangler.toml`](worker/tmdb/wrangler.toml) + `wrangler secret put TMDB_KEY`, then paste your
-  `https://….workers.dev` URL into **Settings → Metadata → Custom metadata server URL**). Your key stays
-  on your Cloudflare account, and responses are edge-cached for 30 days.
+  server. Keys are typically issued instantly — no waiting period or manual approval — and a personal key
+  has **practically no daily limit**, so you are never rationed. Create one at
+  [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api) and hit **Test lookup**.
+- 📱 **Get key from another device** — a TMDB key is 32 characters, which is miserable to type with a remote
+  (and TMDB's own signup page is not designed for TV). Under **Advanced options**, pick **Get key from
+  another device**: the TV shows a QR code and a PIN, you open it on a phone, tablet or computer on the same Wi-Fi, sign in to
+  TMDB there, paste the key and send it across. It lands in the key field on the TV — press **Save** to
+  use it. As with the other Remote features, the QR carries only the address, never the PIN.
+- 🌐 **Self-host your own metadata server (free):** a ready-to-deploy Cloudflare Worker is in the repo at
+  [`extras/worker/tmdb/`](worker/tmdb/) — [`extras/worker/tmdb/README.md`](worker/tmdb/README.md) has the
+  full step-by-step (deploy with `wrangler`, set your TMDB key as a secret via
+  [`extras/worker/tmdb/wrangler.toml`](worker/tmdb/wrangler.toml) + `wrangler secret put TMDB_KEY`, then
+  paste your `https://….workers.dev` URL into **Settings → Metadata → Self-host server URL**). Your key
+  stays on your Cloudflare account, responses are edge-cached for 30 days, and a server of your own is
+  never subject to the shared service's daily share.
 - **Movies/Series details:** focus a title to see enriched info in the side pane. **Long-press** a poster for
-  Favorite, Download and **TMDB Details** (a scrollable window with the backdrop, full plot, cast and genres;
-  press **Back** to close). **Single-press** plays.
+  Favorite, Download and **TMDB Details** — a scrollable window with the backdrop, full plot, genres and the
+  **cast as photos** (portraits with names, wrapping across as many rows as needed; actors TMDB has no photo
+  for show their initials). Press **Back** to close. **Single-press** plays.
 - 🙈 **Hide a movie or series:** long-press a title → **Hide** removes it everywhere at once — global Search,
   the section search, its category, the All list, Home rails (Continue Watching / Favourites), the Android TV
   Watch Next row, and Downloads. The downloaded file is kept, and the title comes back the moment you unhide it
@@ -554,8 +612,12 @@ Bring up the controls in any full‑screen player (press OK / a direction). The 
 | **Headphones** | **Audio Mode** — see below. |
 | **Volume** | Quiet streams can be **boosted to 150%** — movies, series and Live TV alike, whichever player they end up on (where the player can't amplify by itself the boost comes from your TV's own audio effect; a TV that doesn't support it stays at 100%). A level you set is **remembered for that channel/film**; everything else starts from **Settings → Video player → Default volume**. **Mute is not remembered**, so nothing ever opens silent. Clear the saved ones with **Reset saved volume**. |
 
+Catch‑up channels also get a **Go back to…** button (a small TV with a replay loop) — see Live TV above.
+
 A few things that need no button:
 
+- **The clock is always at the top centre** — time and date, in every player. On a recording it becomes
+  two: **Programme time** (when it originally aired) and **Current time**.
 - **Remote transport keys work** — play/pause, next and previous from the remote, a headset or a voice
   assistant reach the player. Next/previous move between episodes in a series. With the player closed
   they do nothing to OwnTV.
@@ -584,9 +646,11 @@ with the remaining time.
 
 Some items carry sound and nothing else: a radio station listed among your TV channels, or a
 music‑only file filed under Movies. That is not a fault, and OwnTV plays them normally — but a black
-screen with sound looks exactly like a broken player, so the player shows a small **Audio only**
-plate in the middle of the screen with a short line explaining it. It stays there for as long as the
-item plays, and shrinks to just the music icon in the docked mini‑player.
+screen with sound looks exactly like a broken player. After the stream has played for a few seconds
+without announcing any video track, the player shows a small **Audio only** plate in the middle with
+a short explanation. Waiting avoids briefly labelling a normal channel when its provider announces
+audio before video. The plate stays for as long as a genuine audio‑only item plays, and shrinks to
+just the music icon in the docked mini‑player.
 
 If you see it, nothing is wrong and there is nothing to fix — the item simply has no video in it. It
 is different from Audio Mode above: that one is *you* switching the picture off, this one is the
@@ -595,6 +659,19 @@ stream having none to begin with.
 ---
 
 ## 💬 External subtitles (OpenSubtitles & local files)
+
+- **Settings → OpenSubtitles** is a dedicated main Settings page directly below Metadata. Account status, download allowance, search language, downloaded-subtitle cleanup and advanced access stay together there.
+- **Sign in** first asks how you want to enter your details: **Remote** (fill them in on a phone, tablet
+  or computer on the same Wi-Fi, via the usual QR + PIN companion) or **Enter here** (type them with the
+  remote). Either way you end up on one compact panel holding your username, password, **Stay signed in**,
+  and — underneath, marked optional — a personal OpenSubtitles API key and a custom Worker/server URL.
+  A URL takes priority over a key; leaving both blank uses OwnTV's shared service. Pressing **Sign in**
+  saves the optional fields too, and custom access is included in Backup & Restore.
+- **Advanced options** appears as its own row only once you are signed in, for changing the key or URL
+  later without signing out.
+- If sign-in fails, the message now distinguishes a wrong username or password, a server that answered
+  and refused (it shows the error number), and a genuine connection problem — so "check your internet"
+  is only ever said when that really is the cause.
 
 For **movies and series episodes** (streamed or downloaded), the player's **Subtitles** menu has an
 **ADD SUBTITLES** section:
@@ -610,8 +687,13 @@ For **movies and series episodes** (streamed or downloaded), the player's **Subt
 - **Select local subtitle file** — no account or internet needed. Browse USB/internal storage for a
   `.srt` / `.ass` / `.ssa` / `.vtt` / `.webvtt` file. Non-UTF-8 files (Arabic, etc.) are converted
   automatically, and OwnTV keeps its own copy so the subtitle survives unplugging the USB.
+- **Naming in the Subtitles menu** — downloads are listed as `OS_Korean · WEB-DL.NF`: the source, the
+  language, and the release the subtitle came from, so several downloads in one language can be told
+  apart. Files you imported yourself start with `LOCAL_` instead. The video's own built-in subtitles
+  keep their original names, so they are never confused with your downloads.
 - **ADJUST → Subtitle timing** — nudge the active subtitle **earlier/later** in 0.1 s / 0.5 s steps
-  while the video plays. The offset is saved for that exact subtitle on that title.
+  while the video plays. The offset is saved for that exact subtitle on that title, so each download
+  keeps its own timing.
 - On **replay**, previously downloaded subtitles for the title are re-listed in the Subtitles menu
   (not auto-selected) — pick one and its saved timing comes back too.
 - **Deleting**: long-press a movie/episode → **Delete OpenSub subtitles**, or manage everything in
@@ -679,7 +761,9 @@ For **movies and series episodes** (streamed or downloaded), the player's **Subt
     category lists are **grouped by provider** and each Customize row shows which provider it belongs to.
   - 🔒 **Optional PIN lock**: tap **Set PIN** at the top-right to lock this screen. Once set, opening
     Customize Categories & Items asks for the PIN each time, so nobody else can unhide items or change your category
-    setup. The PIN is per-profile and is **not** included in backups (so a restore can never lock you out).
+    setup. The PIN is per-profile. It rides in a backup **only when you set a backup password** — a
+    four-digit PIN is trivially recovered from an unencrypted file — so a passwordless backup simply
+    doesn't carry it, and restoring one never removes a lock you already have on the device.
     Change or remove it from the **Change PIN** / **Remove lock** buttons at the top-right.
 - **Settings → Theme / Accent colour / UI Zoom**: dark/AMOLED/light, a tint colour, and scale the whole UI.
   - The **Accent colour** dialog has quick presets plus a full colour picker: focus the **hue bar** or the
@@ -688,6 +772,14 @@ For **movies and series episodes** (streamed or downloaded), the player's **Subt
   - ⚠️ Going **below 85% zoom** shows a warning first — lower zoom draws many more items at once, which can
     crash devices with limited memory (e.g. 2 GB TV sticks) with big playlists/EPG. Press **OK** to accept
     and continue, or **Back** to stay at 85%.
+- **Settings → Focus highlight**: the colour and thickness of the ring drawn around whatever your
+  remote is pointing at. Pick from **eight presets**, the full **palette**, or an exact **hex code**,
+  and choose **Thin / Normal / Thick / Extra thick**. A live sample in the dialog shows the result
+  before you commit; **Use this colour** saves and closes, **Reset** goes back to following the accent.
+  - The choice applies everywhere — Live TV, Movies, Series, Home, the TV Guide, Downloads, Search,
+    settings rows, the category column, the navigation rail, buttons, text fields and popups — and it
+    works with the **Glass Effect** on, where the frosted rim takes your colour. Thicker rings also
+    widen the glow around the focused item.
 - **Settings → Glass Effect**: a **frosted‑glass look** — panels turn translucent with a
   real blurred backdrop over an optional **background photo**.
   - Choose an **Appearance preset** from the six-step clarity ladder: **Ultra Clear** (24% tint / 35%
@@ -705,7 +797,7 @@ For **movies and series episodes** (streamed or downloaded), the player's **Subt
     movement. The main **Animations** setting also disables all of this motion when Animations is Off.
   - **Background image — Local or Remote.** **Local** browses USB/device storage for a JPG/PNG/WebP/BMP
     (it's copied into the app, so unplugging the stick can't blank it). **Remote** shows a **PIN + QR** —
-    scan it with your phone on the same Wi‑Fi, enter the PIN, send a photo, and it applies instantly.
+    open it on a phone, tablet or computer on the same Wi‑Fi, enter the PIN, send a photo, and it applies instantly.
     **Clear** removes the background.
   - **Surfaces** toggles the glass per area — content panels, sidebar, preview panes, dialogs & popups,
     top bar, cards, mini‑player — or all at once. Turning everything off turns glass off.
@@ -716,10 +808,10 @@ For **movies and series episodes** (streamed or downloaded), the player's **Subt
     glass rim immediately. During rapid scrolling OwnTV keeps the moving highlight lightweight, then adds
     the full frost after focus settles, avoiding the dark trailing bands older builds could leave behind.
     All glass settings are kept in backups.
-- **Settings → Ambient Glow** (shown only while Glass Effect is off): optionally adds the setup wizard's
-  soft teal aura to the normal solid interface. Glow is off by default. After turning it on, a separate
-  **Slow pulse** option appears so the aura can remain still or breathe gently; Animations Off freezes the
-  pulse. Enabling Glass hides this setting and disables the solid-interface effect.
+- **Settings → Ambient Glow** (shown only with the explicit **Dark** theme while Glass Effect is off):
+  optionally adds the setup wizard's soft teal aura to the normal solid interface. Glow is off by default.
+  With **Slow pulse** off, only the soft aura is shown; turning it on adds the animated circle. Animations
+  Off freezes that motion. Light/System themes and Glass Effect hide the setting and disable the effect.
 - **Updated shell layout:** Live TV, Movies and Series share one rounded browse container with their
   category, content and preview/poster areas inside it. The navigation rail has a matching background plate
   and compact selection beacon. The top bar and rail use less vertical space during normal browsing, then
@@ -740,7 +832,14 @@ For **movies and series episodes** (streamed or downloaded), the player's **Subt
     Movie and series posters re‑flow automatically, so a narrower list just shows fewer per row. Saved in
     backups.
 - **Settings → Animations**: turn interface motion **off** for a snappier feel on lower‑end TV boxes.
-- **Profiles** (Settings → Profiles): multiple viewers, a **Kids mode**, and **PIN locks**.
+- **Profiles** (Settings → Profiles): multiple viewers, a **Kids mode**, and **PIN locks**. Kids mode
+  hides adult provider categories and their items across Live TV, Movies, Series, Home, Search,
+  Catch-up, Downloads, custom categories, Android TV recommendations and direct playback; it also
+  hides the **Guide**. TMDB adult results are excluded only for Kids profiles, never for normal
+  profiles. OwnTV recognizes adult content from provider category/folder names using common
+  multilingual markers such as `18+` and `XXX` (`Adult Swim` is exempt). IPTV formats have no
+  dependable universal adult flag, so misleading or uncategorized provider items cannot always be
+  recognized.
 
 ---
 
@@ -752,9 +851,13 @@ For **movies and series episodes** (streamed or downloaded), the player's **Subt
   Auto‑play · Check for update) flip the most‑used options without opening a sub‑menu.
 - 🧭 **Menu layout** — **Profiles** is the first row; **Live preview / Preview audio** are under
   **Playback**; **App startup** is under **App**; the **Home screen** page is under Content.
+- 🌐 **Custom DNS** (Network → DNS) — use the TV’s normal DNS, choose Google, Cloudflare or Quad9,
+  or enter your own DNS server / DNS‑over‑HTTPS address. Your enabled state and selected server are
+  saved immediately and restored after restarting OwnTV. **Test DNS** checks the current entry before
+  you rely on it.
 - 🔤 **Font customization** (Look & Feel) — open one popup to set the app's text size from **60% to
   140%** in 5% steps and choose separate fonts for the **main interface** and **popups**. Available fonts
-  are **System Sans, Lora, Playfair Display, Dancing Script, and Poppins**. Press **Apply** to save,
+  are **System Sans, Monospace, Lora, Playfair Display, Dancing Script, and Poppins**. Press **Apply** to save,
   **Reset** to return to 100% / System Sans / Lora, or **Back** to discard staged changes. The setting
   works with every interface language; Android supplies compatible fallback characters when a chosen
   font does not contain a language's script. It is app-wide, survives restarts, and is included in
@@ -763,8 +866,14 @@ For **movies and series episodes** (streamed or downloaded), the player's **Subt
   category list in **Customize Categories & Items**) with the remote's **CH+ / CH−** keys. Separate skip
   counts per direction (typed or ±‑stepped), long‑press jumps to first/last, with an advisory warning
   above 50. Turn it off here if your remote maps CH keys elsewhere.
-- 🚀 **App startup** — where each profile opens: **Home**, **Last channel** (auto‑plays the channel you last
-  watched), or **Live · Favorites** (lands you right inside your favourites list).
+- 🚀 **App startup** — where each profile opens: **Home**, **Last channel** (auto‑plays the channel
+  you last watched), **Live · Favorites** (lands you right inside the favourites list), or
+  **Specific channel**. The channel picker is searchable and D-pad friendly. OwnTV remembers a stable
+  profile-specific channel reference (provider ID, then name, then the local row as a fallback), and
+  Backup & Restore carries it to another device. With one unlocked profile, OwnTV starts the channel
+  immediately; with multiple profiles or a PIN lock, profile selection/authentication comes first.
+  A hidden, Kids-restricted, disconnected or missing channel is never auto-played; OwnTV opens Home
+  and shows a message instead.
 - 🗂️ **Browsing & lists** (Content) — six toggles, two for each of **Live TV / Movies / Series**.
   **Remember last category** (on) reopens the section on the category you left instead of *All*.
   **Remember last item** (off) makes each category keep its own scroll position instead of starting at
@@ -847,15 +956,17 @@ For **movies and series episodes** (streamed or downloaded), the player's **Subt
   declare them (most Xtream live TV). Turn it **off** only if a low‑end TV ever stutters — it affects
   the diagnostic numbers only, never the actual video.
 - 🗣️ **Preferred audio / subtitle language** (Video Player Settings) — when a stream carries several
-  tracks, the one in this language is selected for you instead of whatever the provider listed first.
-  It applies on **both players** now, so it works on Live TV as well as movies and episodes, and a
-  change takes effect on what's already playing.
+  tracks, the matching language is selected instead of whichever track the provider listed first.
+  A preferred subtitle is now also turned on automatically across both players — even when the audio
+  uses that same language. Language variants such as English `eng`, `en`, and `en-US` match, while an
+  unrelated subtitle stays off when the preferred language is unavailable. Changes affect current playback.
 - 💬 **Subtitle appearance** (Video Player Settings) — a menu with a preview, a **Customize subtitles**
-  switch, and then **Size**, **Text color**, **Position** (six anchors: top/bottom × left/center/right)
-  and **Background transparency** (None → Solid in 10% steps). **Each one starts at "Default", and
-  Default leaves that aspect alone** — turning the switch on changes nothing until you pick something,
-  so you can set only the background and keep the stream's own colours, including the styling
-  broadcasters embed in Live TV captions. Subtitle size lives here now. Image subtitles
+  switch, and then **Font**, **Size**, **Text color**, **Position** (six anchors: top/bottom ×
+  left/center/right) and **Background transparency** (None → Solid in 10% steps). Font choices are
+  **Default, System Sans, Monospace, Lora, Playfair Display, Dancing Script, and Poppins**, and apply
+  across both players and app-drawn subtitle overlays. **Each option starts at "Default", and Default
+  leaves that aspect alone** — including authored font styling. If you set only the background, the
+  stream's own colours and broadcaster styling remain intact. Image subtitles
   (PGS/VOBSUB/DVB) are pictures and always render as authored.
 - 📤 **External player** (Video Player Settings) — opens a popup with **separate On/Off switches for
   Live TV, Movies and Series**, so you can send live channels to VLC (or MX Player, …) while keeping
@@ -901,28 +1012,41 @@ For **movies and series episodes** (streamed or downloaded), the player's **Subt
 - 🔄 **Check updates on startup** — get notified when a newer version is on GitHub Releases.
 - 💾 **Backup & Restore** — export/restore your profiles, sources, customizations, favorites, history,
   resume positions, **manual Move positions** and app settings. Export starts by asking **which
-  profiles** to include — the file contains only the selected profiles and their data. Including a
-  **PIN-locked profile** that isn't your current one requires entering its PIN; without the PIN it
-  simply stays out of the backup. Then choose the data sections as before. Backups are saved as a
+  profiles** to include — the file contains only the selected profiles and their data. Your **current
+  profile starts ticked**; add the others yourself. Including a **PIN-locked profile** that isn't your
+  current one requires entering its PIN; without the PIN it simply stays out of the backup. Then choose
+  the data sections as before. Backups are saved as a
   single **`owntv-backup.own`** file, which also carries your **background image** (with the App
   settings section) so the wallpaper comes back on the other TV instead of blank. On export you can set
   a **backup password**, which encrypts the **whole file** — playlists, profiles, history and the saved
-  secrets (source & proxy passwords, your own TMDB API key and each profile's **OpenSubtitles login**)
+  secrets (source & proxy passwords, your own TMDB and OpenSubtitles API keys, each profile's
+  **OpenSubtitles login**, and your **profile / Customize PINs**)
   — so nothing in it can be read without that password. **Keep it safe: a protected backup cannot be
   opened at all if you lose the password.** Without a password the file is not encrypted and those
-  secrets are simply left out. Restoring a protected `.own` asks for the password **first**, then shows
+  secrets are simply left out — so after restoring a passwordless backup you re-enter your playlist
+  and proxy passwords, and any profile PINs.
+
+  **OwnTV never uses Android's automatic backup.** Google Drive backup and device-to-device transfer
+  are both switched off for the app, because they would copy the raw database — playlist passwords and
+  API keys included — with no backup password anywhere in the process. This screen is the only way
+  OwnTV data moves between devices, which is what makes the password promise above meaningful. Restoring a protected `.own` asks for the password **first**, then shows
   what's inside; there is no Skip, since nothing can be restored without it. **Older `.json` backups
   still restore** — those ask for the password after you pick the sections, and **Skip** restores
   everything except the saved passwords, as before. **Restore merges — it never deletes your existing profiles or
   sources:** a profile with the same **name** as one already on the device is updated from the backup,
   profiles only in the backup are added, and everything else stays put (that's also why profile names
-  must be unique — the app matches by name). Backups also preserve your **per‑source Auto refresh** choices,
+  must be unique — the app matches by name). A playlist already on the device is updated from the
+  backup — its name, its Live/Movies/Series scope, **Prefer HLS** and its per‑playlist **Pre‑buffer**
+  all come across, not just the credentials. Backups also preserve your **per‑source Auto refresh** choices,
   your **default source**, any **compatibility‑mode / per‑item engine pins** (Live and Movies/Series),
-  your **custom TMDB names** (long‑press → Custom TMDB name) and recent searches,
+  your saved **per‑item zoom and volume**, your **downloaded subtitles** — the files themselves, which
+  subtitle you had chosen per film or episode, and any timing offsets you nudged by hand —
+  your **custom TMDB names** (long‑press → Custom TMDB name), recent searches, your **startup screen**,
+  and which **profile you were using**,
   so a restored setup behaves exactly like the original. Older backup files still restore fine — anything
   they don't contain just keeps its default. (An older OwnTV version cannot read a new `.own` file, so keep
   a `.json` backup if you plan to go back to one.) **Move a backup between TVs over Wi‑Fi:** choose **Restore
-  from another device** (also offered in the setup wizard) to show a PIN + QR — a phone or laptop on the
+  from another device** (also offered in the setup wizard) to show a PIN + QR — a phone, tablet or computer on the
   same network uploads a backup file straight to the TV, which then runs the normal restore. **Send to
   another device** does the reverse, serving the exported backup for a remote device to download. No USB
   stick or cloud needed; the local USB/file flows still work as before.

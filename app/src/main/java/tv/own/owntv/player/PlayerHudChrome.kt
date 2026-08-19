@@ -64,6 +64,9 @@ internal fun TopBar(
     onBack: () -> Unit, modifier: Modifier = Modifier,
     // Live only: the Now/Next guide, rendered at the far end of the same strip.
     trailing: (@Composable () -> Unit)? = null,
+    // The clock. Rendered between two equal-weight halves so it lands on the true centre of the screen
+    // whatever the channel name and guide card happen to be doing on either side of it.
+    centre: (@Composable () -> Unit)? = null,
 ) {
     // Reactive meta so the title row updates instantly on a channel zap (the plain vars aren't observed).
     val meta by player.currentMeta.collectAsStateWithLifecycle()
@@ -79,7 +82,10 @@ internal fun TopBar(
             meta.seasonNumber?.let { add(stringResource(R.string.player_season_number, it)) }
         }.joinToString(stringResource(R.string.content_metadata_separator)).ifBlank { null }
     }
-    Row(modifier = modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier = modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.Top) {
+      // Left half. Equal weight to the right half, so [centre] sits on the real midpoint of the screen
+      // rather than the midpoint of whatever space the title happened to leave over.
+      Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
         CircleButton(OwnTVIcon.BACK, size = 40, onClick = onBack)
         Spacer(Modifier.width(14.dp))
         // Live: the channel logo sits with the channel NAME (identity), not with the programme — so the
@@ -137,10 +143,16 @@ internal fun TopBar(
                 chipRow()
             }
         }
-        if (trailing != null) {
-            Spacer(Modifier.width(28.dp))
-            trailing()
-        }
+      } // end left half
+      if (centre != null) {
+          Spacer(Modifier.width(20.dp))
+          centre()
+          Spacer(Modifier.width(20.dp))
+      }
+      // Right half, pushed to the far edge. Same weight as the left, hence the true centring above.
+      Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.Top) {
+          if (trailing != null) trailing()
+      }
     }
 }
 
@@ -304,7 +316,7 @@ internal fun CenterControls(
 internal fun BottomBar(
     player: PlaybackEngine, isLive: Boolean, position: Long, duration: Long,
     volume: Int, audioCount: Int, subCount: Int, zoomMode: ZoomMode, speedLabel: String,
-    onScrubLive: ((Int) -> Unit)?, timeshiftOffsetSec: Int?,
+    onScrubLive: ((Int) -> Unit)?, timeshiftOffsetSec: Int?, onOpenJumpBack: (() -> Unit)?,
     compatMode: Boolean?, onToggleCompatMode: (() -> Unit)?,
     vodOnExo: Boolean?, onToggleVodEngine: (() -> Unit)?,
     onInfo: (() -> Unit)? = null, infoOn: Boolean = false, onReport: (() -> Unit)? = null,
@@ -374,6 +386,10 @@ internal fun BottomBar(
                 CtrlButton(OwnTVIcon.AUDIO, badge = audioCount.takeIf { it > 1 }) { onOpenDialog(HudDialog.AUDIO) }
                 // Favorite the current channel/movie/series without leaving the stream (teal heart = on).
                 if (onToggleFavorite != null) CtrlButton(OwnTVIcon.FAVORITE, active = favorite) { onToggleFavorite() }
+                // "Go back to…" — jump straight to a time in this channel's archive. Only on catch-up
+                // channels. CATCHUP (a TV with a replay loop): REWIND is already the transport button
+                // beside it, and a plain clock would not say which of the two time controls this is.
+                if (onOpenJumpBack != null) CtrlButton(OwnTVIcon.CATCHUP) { onOpenJumpBack() }
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 // Live "compatibility mode" (Live TV + channels opened from the Guide): pin this channel

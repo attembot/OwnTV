@@ -21,7 +21,7 @@ class BackupViewModel(
     private val companion: tv.own.owntv.core.companion.CompanionController,
 ) : ViewModel() {
 
-    // ---- Remote restore: a phone uploads a backup JSON to the TV over the LAN companion server. ----
+    // ---- Remote restore: another device uploads a backup JSON to the TV over the LAN companion server. ----
     /** Server lifecycle (Idle / Starting / Listening with PIN+QR / Failed) for the remote-restore panel. */
     val remoteState get() = companion.state
 
@@ -33,7 +33,7 @@ class BackupViewModel(
 
     fun stopRemoteRestore() = companion.stop()
 
-    /** Exports to an app-internal cache file, then serves it over the companion server for a phone/laptop
+    /** Exports to an app-internal cache file, then serves it over the companion server for another device
      *  to download. On failure the base screen shows the error; on success the remote panel shows PIN+QR. */
     fun exportRemote(sections: Set<BackupManager.Section>, backupPassword: String?, profileIds: Set<Long>) {
         viewModelScope.launch {

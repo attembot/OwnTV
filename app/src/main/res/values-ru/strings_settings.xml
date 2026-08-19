@@ -94,19 +94,34 @@
     <string name="settings_metadata_provider_tmdb_description">Данные из вашего плейлиста имеют приоритет; TMDB заполняет пробелы и добавляет актёрский состав, жанры и фоновые изображения.</string>
     <string name="settings_metadata_tmdb_only_description">Предпочитать TMDB для каждого поля; использовать данные из плейлиста, только если в TMDB ничего нет.</string>
     <string name="settings_selected">Выбрано</string>
-    <string name="settings_active_tmdb_source">Активный источник TMDB: <xliff:g id="tier">%1$s</xliff:g></string>
     <string name="settings_metadata_allowance">Ваша дневная доля</string>
-    <string name="settings_metadata_allowance_row"><xliff:g id="window">%1$s</xliff:g>: осталось <xliff:g id="remaining">%2$d</xliff:g> из <xliff:g id="total">%3$d</xliff:g></string>
-    <string name="settings_metadata_window_minute">В минуту</string>
-    <string name="settings_metadata_window_hour">В час</string>
-    <string name="settings_metadata_window_day">Сегодня</string>
-    <plurals name="settings_metadata_allowance_left">
-        <item quantity="one">Сегодня остался <xliff:g id="remaining">%1$d</xliff:g> из <xliff:g id="total">%2$d</xliff:g> запрос</item>
-        <item quantity="few">Сегодня осталось <xliff:g id="remaining">%1$d</xliff:g> из <xliff:g id="total">%2$d</xliff:g> запроса</item>
-        <item quantity="many">Сегодня осталось <xliff:g id="remaining">%1$d</xliff:g> из <xliff:g id="total">%2$d</xliff:g> запросов</item>
-        <item quantity="other">Сегодня осталось <xliff:g id="remaining">%1$d</xliff:g> из <xliff:g id="total">%2$d</xliff:g> запроса</item>
+    <string name="settings_metadata_reset_automatic">Сбрасывается автоматически</string>
+    <string name="settings_metadata_library_details">Сведения о библиотеке</string>
+    <string name="settings_metadata_test_connection">Проверить текущее подключение</string>
+    <string name="settings_allowance_available">Доступно</string>
+    <string name="settings_allowance_refills">Пополнится <xliff:g id="time">%1$s</xliff:g></string>
+    <string name="settings_allowance_minute">Минута</string>
+    <string name="settings_allowance_hour">Час</string>
+    <string name="settings_allowance_day">Сутки</string>
+    <plurals name="settings_allowance_value">
+        <item quantity="one">осталось <xliff:g id="remaining">%1$d</xliff:g> / <xliff:g id="limit">%2$d</xliff:g></item>
+        <item quantity="few">осталось <xliff:g id="remaining">%1$d</xliff:g> / <xliff:g id="limit">%2$d</xliff:g></item>
+        <item quantity="many">осталось <xliff:g id="remaining">%1$d</xliff:g> / <xliff:g id="limit">%2$d</xliff:g></item>
+        <item quantity="other">осталось <xliff:g id="remaining">%1$d</xliff:g> / <xliff:g id="limit">%2$d</xliff:g></item>
     </plurals>
-    <string name="settings_metadata_allowance_resets">Обновится в <xliff:g id="time">%1$s</xliff:g></string>
+    <string name="settings_metadata_active_source">Активный источник</string>
+    <string name="settings_metadata_shared_worker_description">OwnTV Worker · без настройки</string>
+    <string name="settings_metadata_connection">Подключение</string>
+    <string name="settings_metadata_remote_advanced">Получить расширенные данные TMDB</string>
+    <string name="settings_metadata_remote_advanced_description">Используйте свой ключ API TMDB или собственный Worker вместо общего сервиса по умолчанию.</string>
+    <string name="settings_metadata_usage_label">Использование</string>
+    <string name="settings_metadata_usage_value"><xliff:g id="min_used">%1$d</xliff:g>/<xliff:g id="min_total">%2$d</xliff:g> мин · <xliff:g id="hr_used">%3$d</xliff:g>/<xliff:g id="hr_total">%4$d</xliff:g> ч · <xliff:g id="day_used">%5$d</xliff:g>/<xliff:g id="day_total">%6$d</xliff:g> день</string>
+    <string name="settings_metadata_source_label">Источник</string>
+    <string name="settings_metadata_key_label">Ключ</string>
+    <string name="settings_metadata_server_label">Сервер</string>
+    <string name="settings_metadata_refills_label">Обновится в</string>
+    <string name="settings_metadata_clear_advanced_title">Перестать использовать свой ключ?</string>
+    <string name="settings_metadata_clear_advanced_message">Ваш ключ API TMDB и адрес вашего сервера будут удалены с этого устройства, а OwnTV вернётся к встроенному общему сервису с его дневной долей.</string>
     <string name="settings_metadata_fair_share">Встроенный сервис метаданных используется всеми пользователями OwnTV, поэтому каждое устройство получает собственную дневную долю. Если вы израсходуете свою долю, постеры и описания приостановятся до её обновления — информация из вашего собственного плейлиста продолжит работать как обычно. Собственный ключ API TMDB или сервер снимает это ограничение: он бесплатный, а у личного ключа практически нет лимита.</string>
     <string name="settings_metadata_limit_reached">Дневная доля метаданных израсходована — добавьте собственный ключ TMDB в разделе «Настройки → Метаданные», чтобы снять это ограничение.</string>
     <string name="settings_metadata_language">Язык метаданных</string>
@@ -114,6 +129,9 @@
     <string name="settings_advanced_options">Дополнительные параметры</string>
     <string name="settings_advanced_metadata_description">Используйте собственный ключ API TMDB или самостоятельно размещённый сервер вместо общего сервера по умолчанию.</string>
     <string name="settings_metadata_server_description">Оставьте оба поля пустыми, чтобы использовать встроенный общий сервер без дополнительной настройки. Введите собственный ключ API TMDB для прямых запросов к TMDB или URL самостоятельно размещённого сервера, чтобы использовать собственный прокси или зеркало. URL имеет приоритет над ключом.</string>
+    <string name="settings_metadata_key_from_phone">Получить ключ с другого устройства</string>
+    <string name="settings_metadata_key_from_phone_desc">Отсканируйте код телефоном, планшетом или компьютером, войдите там в TMDB и отправьте ключ. На пульте ничего вводить не нужно.</string>
+    <string name="settings_metadata_key_received">Ключ TMDB получен</string>
     <string name="settings_tmdb_api_key">Ключ API TMDB (v3)</string>
     <string name="settings_self_host_url">URL самостоятельно размещённого сервера</string>
     <string name="settings_test">Проверка</string>
@@ -178,6 +196,15 @@
     <string name="settings_theme_description">Светлая, тёмная или как в системе</string>
     <string name="settings_accent">Акцентный цвет</string>
     <string name="settings_accent_description">Окраска интерфейса — готовые цвета, палитра или шестнадцатеричный код</string>
+    <string name="settings_focus_highlight">Подсветка фокуса</string>
+    <string name="settings_focus_highlight_description">Цвет и толщина рамки вокруг выбранного элемента</string>
+    <string name="settings_focus_highlight_chip"><xliff:g id="color">%1$s</xliff:g> · <xliff:g id="thickness">%2$s</xliff:g></string>
+    <string name="settings_focus_thickness">Толщина</string>
+    <string name="settings_focus_width_thin">Тонкая</string>
+    <string name="settings_focus_width_normal">Обычная</string>
+    <string name="settings_focus_width_thick">Толстая</string>
+    <string name="settings_focus_width_extra">Очень толстая</string>
+    <string name="settings_focus_highlight_sample">В фокусе</string>
     <string name="settings_glass_effect">Эффект стекла</string>
     <string name="settings_glass_description">Полупрозрачные матовые панели, фоновое изображение и прозрачность</string>
     <string name="settings_ui_zoom">Масштаб интерфейса</string>
@@ -229,6 +256,8 @@
     <string name="settings_startup_home">Главный экран</string>
     <string name="settings_startup_last_channel">Последний канал</string>
     <string name="settings_startup_favorites">Прямой эфир · Избранное</string>
+    <string name="settings_startup_specific_channel">Выбранный канал</string>
+    <string name="settings_startup_channel_unavailable">Стартовый канал недоступен. Открыт главный экран.</string>
     <string name="settings_all_history">Вся история</string>
     <string name="settings_choose_history">Выберите, что удалить для этого профиля. Плейлисты, избранное и загрузки затронуты не будут.</string>
     <string name="settings_clear_history_confirm">Очистить историю «<xliff:g id="scope">%1$s</xliff:g>»?</string>
@@ -299,6 +328,7 @@
     <string name="settings_search_keywords_history">недавно просмотренные продолжить удалить</string>
     <string name="settings_search_keywords_theme">светлая тёмная система</string>
     <string name="settings_search_keywords_accent">оттенок палитра HEX готовый цвет</string>
+    <string name="settings_search_keywords_focus">фокус рамка граница выделение курсор контур</string>
     <string name="settings_search_keywords_zoom">масштаб интерфейс размер</string>
     <string name="settings_search_keywords_animation">движение быстродействие производительность</string>
     <string name="settings_search_keywords_weather">верхняя панель чип местоположение цельсий фаренгейт</string>
@@ -372,6 +402,10 @@
     <!-- Translators: Description of the deinterlacing setting. -->
     <string name="settings_deinterlace_description">Сглаживает гребёнку, которую некоторые старые SD-каналы показывают при движении. Действует в плеере mpv, пока он сам рисует изображение, — если разницы нет, отключите аппаратное декодирование.</string>
     <string name="settings_movies_series_player">Плеер фильмов и сериалов</string>
+    <string name="settings_live_tv_player">Плеер прямого эфира</string>
+    <string name="settings_engine_order"><xliff:g id="first">%1$s</xliff:g>, затем <xliff:g id="second">%2$s</xliff:g></string>
+    <string name="settings_engine_only">Только <xliff:g id="engine">%1$s</xliff:g></string>
+    <string name="settings_engine_default"><xliff:g id="option">%1$s</xliff:g> (по умолчанию)</string>
     <string name="settings_reset_player_choices">Сбросить сохранённый выбор плеера</string>
     <string name="settings_external_player">Внешний плеер</string>
     <string name="settings_default_zoom">Масштаб по умолчанию</string>
@@ -414,7 +448,22 @@
     <string name="settings_preferred_subtitle_language">Предпочитаемый язык субтитров</string>
     <string name="settings_preferred_language_description">Автоматически выбирать эту дорожку субтитров, когда она доступна.</string>
     <string name="settings_open_subtitles">OpenSubtitles</string>
+    <string name="settings_open_subtitles_connected">Подключено</string>
+    <string name="settings_open_subtitles_reset_in">Через <xliff:g id="hours">%1$d</xliff:g> ч <xliff:g id="minutes">%2$d</xliff:g> мин</string>
     <string name="settings_open_subtitles_description">Войдите в аккаунт, чтобы искать, загружать и удалять загруженные субтитры. Настройка задаётся отдельно для каждого профиля; требуется бесплатный аккаунт opensubtitles.com.</string>
+    <string name="settings_open_subtitles_advanced">Дополнительные параметры</string>
+    <string name="settings_open_subtitles_advanced_description">Используйте свой ключ API приложения или собственный OpenSubtitles Worker.</string>
+    <string name="settings_open_subtitles_setup_title">Настройка OpenSubtitles</string>
+    <string name="settings_open_subtitles_setup_description">Войдите в свою учётную запись OpenSubtitles.</string>
+    <string name="settings_open_subtitles_setup_remote">Удалённо</string>
+    <string name="settings_open_subtitles_setup_remote_description">Введите данные в браузере на другом устройстве в той же сети Wi-Fi — телефоне, планшете или компьютере.</string>
+    <string name="settings_open_subtitles_setup_local">Ввести здесь</string>
+    <string name="settings_open_subtitles_setup_local_description">Введите данные на этом телевизоре с помощью пульта.</string>
+    <string name="settings_open_subtitles_api_key">Ключ API приложения OpenSubtitles</string>
+    <string name="settings_worker_server_url">URL-адрес Worker / сервера</string>
+    <string name="settings_shared">Общий</string>
+    <string name="settings_open_subtitles_access_priority">Оставьте оба поля пустыми, чтобы использовать общий Worker OwnTV. Свой URL-адрес Worker имеет приоритет над прямым ключом API. Сеансы учётной записи остаются отдельными для каждого профиля.</string>
+    <string name="settings_remove_custom_access">Удалить свой доступ</string>
     <string name="settings_audio">Звук</string>
     <string name="settings_preferred_audio_language">Предпочитаемый язык звука</string>
     <string name="settings_audio_sync">Синхронизация звука</string>
@@ -446,7 +495,8 @@
     <string name="settings_audio_delay"><xliff:g id="delay">%1$d</xliff:g> мс</string>
     <string name="settings_external_player_description">Выберите разделы, которые будут открываться во внешнем приложении.</string>
     <string name="settings_audio_delay_value"><xliff:g id="delay">%1$d</xliff:g> мс</string>
-    <string name="settings_movies_player_description">mpv (рекомендуется) поддерживает больше всего форматов — звук DTS/TrueHD, нестандартные файлы — и позволяет исправлять рассинхронизацию звука и видео. Переключайтесь на ExoPlayer, только если фильмы или серии не запускаются: на некоторых телевизорах он воспроизводит отдельные потоки, с которыми не справляется mpv, но не может декодировать звук DTS/TrueHD и не позволяет исправить рассинхронизацию звука и видео. Независимо от выбора, при сбое автоматически будет опробован другой плеер.</string>
+    <string name="settings_movies_player_description">mpv (рекомендуется) поддерживает больше всего форматов — звук DTS/TrueHD, необычные файлы — и исправляет рассинхрон звука и видео. На некоторых телевизорах ExoPlayer воспроизводит потоки, которые не даются mpv, но он не декодирует звук DTS/TrueHD и не исправляет рассинхрон. Комбинированные варианты автоматически пробуют второй плеер, когда первый не справился; варианты с одним плеером не делают этого никогда, что экономит несколько секунд чёрного экрана, если второй плеер на вашем телевизоре всё равно не работает.</string>
+    <string name="settings_live_player_description">ExoPlayer (рекомендуется) открывает каналы намного быстрее и единственный поддерживает субтитры в прямом эфире. mpv воспроизводит каналы, которые не даются ExoPlayer, в том числе некоторые с необычным звуком. Комбинированные варианты автоматически пробуют второй плеер, когда первый не справился; варианты с одним плеером не делают этого никогда, что экономит несколько секунд чёрного экрана, если второй плеер на вашем телевизоре всё равно не работает. На канале, переключённом вручную в плеере, ваш выбор сохраняется в любом случае.</string>
     <string name="settings_reset_player_choices_description">Если переключить отдельный фильм или серию между mpv и ExoPlayer прямо в плеере, этот выбор сохраняется на следующий раз. Сброс возвращает всё к настройке выше. Сохранённый выбор для каналов прямого эфира остаётся.</string>
     <string name="settings_reset_player_choices_none">Ничего не сохранено</string>
     <plurals name="settings_reset_player_choices_count">
@@ -482,7 +532,7 @@
     <string name="settings_guide_synced">Программа передач синхронизирована</string>
     <string name="settings_guide_sync_failed">Не удалось синхронизировать программу передач</string>
     <string name="settings_restore_remote_title">Восстановление с другого устройства</string>
-    <string name="settings_restore_remote_description">На телефоне или ноутбуке, подключённом к той же сети Wi-Fi, отсканируйте QR-код (или откройте URL), введите этот PIN, выберите файл резервной копии OwnTV и нажмите «Отправить на ТВ». Затем выберите здесь, что нужно восстановить.</string>
+    <string name="settings_restore_remote_description">На телефоне, планшете или компьютере, подключённом к той же сети Wi-Fi, отсканируйте QR-код (или откройте URL), введите этот PIN, выберите файл резервной копии OwnTV и нажмите «Отправить на ТВ». Затем выберите здесь, что нужно восстановить.</string>
     <string name="settings_opening_server">Запуск сервера…</string>
     <string name="settings_enter_pin_browser">Введите этот PIN в браузере</string>
     <string name="settings_companion_qr">QR-код URL страницы-компаньона</string>
@@ -490,7 +540,7 @@
     <string name="settings_try_again">Повторить</string>
     <string name="settings_new_pin">Начать заново с новым PIN</string>
     <string name="settings_download_remote_title">Загрузка на другое устройство</string>
-    <string name="settings_download_remote_description">На телефоне или ноутбуке, подключённом к той же сети Wi-Fi, отсканируйте QR-код (или откройте URL), введите этот PIN и загрузите файл резервной копии, чтобы сохранить его в надёжном месте.</string>
+    <string name="settings_download_remote_description">На телефоне, планшете или компьютере, подключённом к той же сети Wi-Fi, отсканируйте QR-код (или откройте URL), введите этот PIN и загрузите файл резервной копии, чтобы сохранить его в надёжном месте.</string>
     <string name="settings_preparing_backup">Подготовка резервной копии…</string>
     <string name="settings_glass_effect_on">Эффект стекла: вкл.</string>
     <string name="settings_glass_effect_off">Эффект стекла: выкл.</string>
@@ -699,7 +749,7 @@
     <string name="settings_backup_what_backup">Что включить в резервную копию</string>
     <string name="settings_backup_what_restore">Что восстановить</string>
     <string name="settings_backup_encrypt_title">Зашифровать эту резервную копию?</string>
-    <string name="settings_backup_encrypt_message">Если установить пароль резервной копии, весь файл будет зашифрован — включая плейлисты, профили и сохранённые пароли — и без этого пароля прочитать его содержимое будет невозможно. Храните пароль в надёжном месте: если вы его потеряете, резервную копию нельзя будет открыть. Без пароля файл не шифруется, а сохранённые пароли в него не включаются.</string>
+    <string name="settings_backup_encrypt_message">Если установить пароль резервной копии, весь файл будет зашифрован — включая плейлисты, профили и сохранённые пароли — и без этого пароля прочитать его содержимое будет невозможно. Храните пароль в надёжном месте: если вы его потеряете, резервную копию нельзя будет открыть. Без пароля файл не шифруется, а сохранённые пароли и PIN-коды в него не включаются.</string>
     <string name="settings_backup_export_title">Экспорт резервной копии</string>
     <string name="settings_backup_export_message">Отправьте резервную копию на другое устройство (телефон или ноутбук) в той же сети Wi-Fi либо сохраните её в файл на этом устройстве.</string>
     <string name="settings_backup_restore_title">Восстановление резервной копии</string>
@@ -748,7 +798,7 @@
     <string name="settings_backup_section_settings">Настройки приложения</string>
     <string name="settings_backup_section_settings_desc">Настройки темы, акцентного цвета, плеера и компоновки</string>
     <string name="settings_backup_saved_to">Сохранено в <xliff:g id="path">%1$s</xliff:g>.</string>
-    <string name="settings_backup_saved_to_without_passwords">Сохранено в <xliff:g id="path">%1$s</xliff:g>. Пароли не включены.</string>
+    <string name="settings_backup_saved_to_without_passwords">Сохранено в <xliff:g id="path">%1$s</xliff:g>. Пароли и PIN-коды не включены.</string>
     <plurals name="settings_backup_restored">
         <item quantity="one">Восстановлен <xliff:g id="items">%1$d</xliff:g> элемент.</item>
         <item quantity="few">Восстановлено <xliff:g id="items">%1$d</xliff:g> элемента.</item>
@@ -756,7 +806,7 @@
         <item quantity="other">Восстановлено <xliff:g id="items">%1$d</xliff:g> элемента.</item>
     </plurals>
     <string name="settings_backup_restore_resync">Повторно синхронизируйте источники, чтобы загрузить контент.</string>
-    <string name="settings_backup_restore_password_note">Повторно введите сохранённые пароли в разделе «Источники/Прокси».</string>
+    <string name="settings_backup_restore_password_note">Повторно введите сохранённые пароли в разделе «Источники/Прокси», а также PIN-коды профилей.</string>
     <plurals name="settings_backup_skipped_sources">
         <item quantity="one">Пропущен <xliff:g id="count">%1$d</xliff:g> источник, поскольку тип его плейлиста не поддерживается.</item>
         <item quantity="few">Пропущено <xliff:g id="count">%1$d</xliff:g> источника, поскольку типы их плейлистов не поддерживаются.</item>
@@ -989,6 +1039,8 @@
     <string name="settings_font_preview">Развлечения — это просто.</string>
     <string name="settings_search_keywords_fonts">шрифт текст размер типографика окно чтение доступность</string>
     <string name="settings_font_system_sans">Системный шрифт без засечек</string>
+    <string name="settings_font_monospace">Моноширинный</string>
+    <string name="settings_subtitle_font">Шрифт субтитров</string>
     <string name="settings_glass_preset_title">Предустановка оформления</string>
     <string name="settings_glass_preset_clear">Прозрачное</string>
     <string name="settings_glass_preset_balanced">Сбалансированное</string>

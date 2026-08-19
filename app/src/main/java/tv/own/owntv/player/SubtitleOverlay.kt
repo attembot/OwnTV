@@ -26,6 +26,7 @@ import org.koin.compose.koinInject
 import tv.own.owntv.features.settings.data.SettingsRepository
 import tv.own.owntv.features.settings.data.SubtitleStyle
 import tv.own.owntv.ui.theme.LocalUiFontScaleFactor
+import tv.own.owntv.ui.theme.asComposeFamily
 
 /**
  * App-drawn subtitles for the direct render path: the decoder owns the video surface there, so mpv
@@ -46,6 +47,7 @@ fun SubtitleOverlay(
     // 45%-black box, centred 56dp above the bottom edge.
     val styleOn by settings.subtitleStyleEnabled.collectAsStateWithLifecycle(initialValue = false)
     val scale by settings.subtitleScale.collectAsStateWithLifecycle(initialValue = SubtitleStyle.SCALE_DEFAULT)
+    val font by settings.subtitleFont.collectAsStateWithLifecycle(initialValue = null)
     val colorHex by settings.subtitleColor.collectAsStateWithLifecycle(initialValue = SubtitleStyle.COLOR_DEFAULT)
     val position by settings.subtitlePosition.collectAsStateWithLifecycle(initialValue = SubtitleStyle.Position.DEFAULT)
     val bgOpacity by settings.subtitleBgOpacity.collectAsStateWithLifecycle(initialValue = SubtitleStyle.OPACITY_DEFAULT)
@@ -80,7 +82,7 @@ fun SubtitleOverlay(
                 color = textColor,
                 fontSize = (24 * textScale * sizeScale * uiFontCompensation).sp,
                 lineHeight = (30 * textScale * sizeScale * uiFontCompensation).sp,
-                fontFamily = FontFamily.SansSerif,
+                fontFamily = if (styleOn) font?.asComposeFamily() ?: FontFamily.SansSerif else FontFamily.SansSerif,
                 fontWeight = FontWeight.Medium,
                 shadow = Shadow(color = Color.Black, offset = Offset(0f, 2f), blurRadius = 6f),
             ),

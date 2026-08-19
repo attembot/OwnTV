@@ -211,7 +211,7 @@ fun ManageSourcesScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                         payloads = vm.remotePayloads,
                         onStartListener = { port -> vm.startRemoteListener(port) },
                         onStopListener = { vm.stopRemoteListener() },
-                        // A phone submission hands off to the pre-filled Manual form.
+                        // A remote submission hands off to the pre-filled Manual form.
                         onPayloadReceived = { addMode = AddMode.MANUAL },
                         onBack = { vm.stopRemoteListener(); addMode = null },
                         modifier = Modifier,
@@ -617,5 +617,5 @@ private fun ResyncChoiceDialog(
     }
 }
 
-/** How the user chose to add a source: fill it from a phone (Remote) or type it here (Manual). */
+/** How the user chose to add a source: fill it from another device (Remote) or type it here (Manual). */
 private enum class AddMode { REMOTE, MANUAL }

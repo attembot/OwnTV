@@ -27,11 +27,19 @@ class OpenSubtitlesViewModel(
     private val _state = MutableStateFlow<UiState>(UiState.SignedOut)
     val state: StateFlow<UiState> = _state.asStateFlow()
 
-    enum class ErrorKind { EMPTY_CREDENTIALS, INVALID_CREDENTIALS, NETWORK, REFRESH_NETWORK }
+    enum class ErrorKind { EMPTY_CREDENTIALS, INVALID_CREDENTIALS, SERVER_ERROR, NETWORK, REFRESH_NETWORK }
 
-    /** One-shot error category for the §14 dialogs; wording is resolved by the Compose boundary. */
-    private val _error = MutableStateFlow<ErrorKind?>(null)
-    val error: StateFlow<ErrorKind?> = _error.asStateFlow()
+    /**
+     * One-shot error for the §14 dialogs; wording is resolved by the Compose boundary.
+     * [httpCode] is set only for [ErrorKind.SERVER_ERROR] — a reachable server that refused the
+     * request (403 from the proxy, 429 rate limit, 5xx). Telling that apart from a real transport
+     * failure matters: both used to say "check your internet connection", which sent users with a
+     * perfectly good network chasing the wrong thing.
+     */
+    data class Error(val kind: ErrorKind, val httpCode: Int = 0)
+
+    private val _error = MutableStateFlow<Error?>(null)
+    val error: StateFlow<Error?> = _error.asStateFlow()
 
     init {
         // Show the stored session immediately, then refresh the allowance from the provider.
@@ -53,7 +61,7 @@ class OpenSubtitlesViewModel(
 
     fun signIn(username: String, password: String, staySignedIn: Boolean) {
         if (username.isBlank() || password.isEmpty()) {
-            _error.value = ErrorKind.EMPTY_CREDENTIALS
+            _error.value = Error(ErrorKind.EMPTY_CREDENTIALS)
             return
         }
         viewModelScope.launch {
@@ -63,10 +71,14 @@ class OpenSubtitlesViewModel(
                 .onSuccess { _state.value = UiState.SignedIn(it) }
                 .onFailure { e ->
                     _state.value = UiState.SignedOut
-                    _error.value = if (e is OpenSubtitlesClient.ApiException && e.code == 401) {
-                        ErrorKind.INVALID_CREDENTIALS
-                    } else {
-                        ErrorKind.NETWORK
+                    // Cause only — never the credentials that were submitted.
+                    android.util.Log.w("OpenSubtitles", "sign-in failed: ${e.javaClass.simpleName}: ${e.message}")
+                    val api = e as? OpenSubtitlesClient.ApiException
+                    _error.value = when {
+                        api != null && api.code == 401 -> Error(ErrorKind.INVALID_CREDENTIALS)
+                        // code 0 = a 2xx we couldn't make sense of; that's not a server refusal.
+                        api != null && api.code > 0 -> Error(ErrorKind.SERVER_ERROR, api.code)
+                        else -> Error(ErrorKind.NETWORK)
                     }
                 }
         }
@@ -82,8 +94,8 @@ class OpenSubtitlesViewModel(
                     _state.value = updated?.let { UiState.SignedIn(it) } ?: UiState.SignedOut
                 }
                 .onFailure {
-                    android.util.Log.w("OpenSubtitles", "manual refresh failed: ${it.message}")
-                    _error.value = ErrorKind.REFRESH_NETWORK
+                    android.util.Log.w("OpenSubtitles", "manual refresh failed: ${it.javaClass.simpleName}: ${it.message}")
+                    _error.value = Error(ErrorKind.REFRESH_NETWORK)
                 }
         }
     }

@@ -244,7 +244,14 @@ fun MoviesScreen(
         val sel = selectedMovie
         val idx = if (sel != null) movies.itemSnapshotList.items.indexOfFirst { it.id == sel.id } else -1
         if (idx >= 0) {
-            runCatching { effectiveGridState.scrollToItem(idx) }
+            // Scroll whichever layout is on screen: scrolling only the grid state left LIST view
+            // unscrolled, so a movie further down was never composed and focus fell to the CategoryRail
+            // instead of the film just played. Same defect as the Series back-from-show restore.
+            if (viewMode == SettingsRepository.VodViewMode.LIST) {
+                runCatching { effectiveListState.scrollToItem(idx) }
+            } else {
+                runCatching { effectiveGridState.scrollToItem(idx) }
+            }
             delay(60)
             runCatching { selFocus.requestFocus() }
         }

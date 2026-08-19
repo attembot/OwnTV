@@ -399,7 +399,7 @@ private fun NavItem(
                                 colors.primary.copy(alpha = if (focused) 0.95f else 0.72f),
                                 shape,
                             )
-                            ladder.focusBorder != null -> Modifier.border(Dimens.FocusBorderWidth, ladder.focusBorder, shape)
+                            ladder.focusBorder != null -> Modifier.border(tv.own.owntv.ui.theme.LocalFocusBorderWidth.current, ladder.focusBorder, shape)
                             else -> Modifier
                         }
                     ),

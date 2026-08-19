@@ -94,17 +94,32 @@
     <string name="settings_metadata_provider_tmdb_description">Informasjonen fra spillelisten prioriteres. TMDB fyller ut mangler og legger til skuespillere, sjangre og bakgrunnsbilder.</string>
     <string name="settings_metadata_tmdb_only_description">Foretrekk TMDB for alle felt. Bruk bare spillelisten når TMDB ikke har noe.</string>
     <string name="settings_selected">Valgt</string>
-    <string name="settings_active_tmdb_source">Aktiv TMDB-kilde: <xliff:g id="tier">%1$s</xliff:g></string>
     <string name="settings_metadata_allowance">Din daglige andel</string>
-    <string name="settings_metadata_allowance_row"><xliff:g id="window">%1$s</xliff:g>: <xliff:g id="remaining">%2$d</xliff:g> av <xliff:g id="total">%3$d</xliff:g> igjen</string>
-    <string name="settings_metadata_window_minute">Per minutt</string>
-    <string name="settings_metadata_window_hour">Per time</string>
-    <string name="settings_metadata_window_day">I dag</string>
-    <plurals name="settings_metadata_allowance_left">
-        <item quantity="one"><xliff:g id="remaining">%1$d</xliff:g> av <xliff:g id="total">%2$d</xliff:g> oppslag igjen i dag</item>
-        <item quantity="other"><xliff:g id="remaining">%1$d</xliff:g> av <xliff:g id="total">%2$d</xliff:g> oppslag igjen i dag</item>
+    <string name="settings_metadata_reset_automatic">Nullstilles automatisk</string>
+    <string name="settings_metadata_library_details">Bibliotekdetaljer</string>
+    <string name="settings_metadata_test_connection">Test gjeldende tilkobling</string>
+    <string name="settings_allowance_available">Tilgjengelig</string>
+    <string name="settings_allowance_refills">Fylles på <xliff:g id="time">%1$s</xliff:g></string>
+    <string name="settings_allowance_minute">Minutt</string>
+    <string name="settings_allowance_hour">Time</string>
+    <string name="settings_allowance_day">Dag</string>
+    <plurals name="settings_allowance_value">
+        <item quantity="one"><xliff:g id="remaining">%1$d</xliff:g> / <xliff:g id="limit">%2$d</xliff:g> igjen</item>
+        <item quantity="other"><xliff:g id="remaining">%1$d</xliff:g> / <xliff:g id="limit">%2$d</xliff:g> igjen</item>
     </plurals>
-    <string name="settings_metadata_allowance_resets">Fylles på kl. <xliff:g id="time">%1$s</xliff:g></string>
+    <string name="settings_metadata_active_source">Aktiv kilde</string>
+    <string name="settings_metadata_shared_worker_description">OwnTV Worker · ingen oppsett</string>
+    <string name="settings_metadata_connection">Tilkobling</string>
+    <string name="settings_metadata_remote_advanced">Hent avanserte TMDB-opplysninger</string>
+    <string name="settings_metadata_remote_advanced_description">Bruk din egen TMDB-API-nøkkel eller en selvhostet Worker i stedet for den delte standarden.</string>
+    <string name="settings_metadata_usage_label">Bruk</string>
+    <string name="settings_metadata_usage_value"><xliff:g id="min_used">%1$d</xliff:g>/<xliff:g id="min_total">%2$d</xliff:g> min · <xliff:g id="hr_used">%3$d</xliff:g>/<xliff:g id="hr_total">%4$d</xliff:g> time · <xliff:g id="day_used">%5$d</xliff:g>/<xliff:g id="day_total">%6$d</xliff:g> dag</string>
+    <string name="settings_metadata_source_label">Kilde</string>
+    <string name="settings_metadata_key_label">Nøkkel</string>
+    <string name="settings_metadata_server_label">Server</string>
+    <string name="settings_metadata_refills_label">Fylles på kl.</string>
+    <string name="settings_metadata_clear_advanced_title">Vil du slutte å bruke din egen nøkkel?</string>
+    <string name="settings_metadata_clear_advanced_message">TMDB API-nøkkelen din og adressen til din egen server slettes fra denne enheten, og OwnTV går tilbake til den innebygde delte tjenesten med den daglige andelen.</string>
     <string name="settings_metadata_fair_share">Den innebygde metadatatjenesten deles av alle som bruker OwnTV, så hver enhet får sin egen andel hver dag. Hvis du bruker opp andelen din, settes plakater og beskrivelser på pause til den fylles på igjen — informasjonen fra din egen spilleliste fungerer som normalt. Å legge til din egen TMDB API-nøkkel eller server fjerner grensen: det er gratis, og en personlig nøkkel har praktisk talt ingen grense.</string>
     <string name="settings_metadata_limit_reached">Den daglige metadataandelen din er brukt opp — legg til din egen TMDB-nøkkel under Innstillinger → Metadata for å fjerne denne grensen.</string>
     <string name="settings_metadata_language">Metadataspråk</string>
@@ -112,6 +127,9 @@
     <string name="settings_advanced_options">Avanserte alternativer</string>
     <string name="settings_advanced_metadata_description">Bruk din egen TMDB API-nøkkel eller en egenvertsbasert server i stedet for den delte standardløsningen.</string>
     <string name="settings_metadata_server_description">La begge feltene stå tomme for å bruke den innebygde delte serveren (krever ikke oppsett). Angi din egen TMDB API-nøkkel for å kontakte TMDB direkte, eller en URL til en egenvertsbasert server for å bruke din egen proxy eller speilserver. En URL prioriteres over en nøkkel.</string>
+    <string name="settings_metadata_key_from_phone">Hent nøkkelen fra en annen enhet</string>
+    <string name="settings_metadata_key_from_phone_desc">Skann koden med en telefon, et nettbrett eller en datamaskin, logg inn på TMDB der, og send nøkkelen over. Ingenting å skrive på fjernkontrollen.</string>
+    <string name="settings_metadata_key_received">TMDB-nøkkel mottatt</string>
     <string name="settings_tmdb_api_key">TMDB API-nøkkel (v3)</string>
     <string name="settings_self_host_url">URL til egenvertsbasert server</string>
     <string name="settings_test">Test</string>
@@ -176,6 +194,15 @@
     <string name="settings_theme_description">Lyst, mørkt eller følg systemet</string>
     <string name="settings_accent">Aksentfarge</string>
     <string name="settings_accent_description">Gi grensesnittet en fargetone — bruk forhåndsvalg, palett eller heksadesimal kode</string>
+    <string name="settings_focus_highlight">Fokusmarkering</string>
+    <string name="settings_focus_highlight_description">Farge og tykkelse på rammen rundt det valgte elementet</string>
+    <string name="settings_focus_highlight_chip"><xliff:g id="color">%1$s</xliff:g> · <xliff:g id="thickness">%2$s</xliff:g></string>
+    <string name="settings_focus_thickness">Tykkelse</string>
+    <string name="settings_focus_width_thin">Tynn</string>
+    <string name="settings_focus_width_normal">Normal</string>
+    <string name="settings_focus_width_thick">Tykk</string>
+    <string name="settings_focus_width_extra">Ekstra tykk</string>
+    <string name="settings_focus_highlight_sample">Fokusert</string>
     <string name="settings_glass_effect">Glasseffekt</string>
     <string name="settings_glass_description">Gjennomsiktige, frostede paneler, bakgrunnsbilde og transparens</string>
     <string name="settings_ui_zoom">Zoom i brukergrensesnittet</string>
@@ -225,6 +252,8 @@
     <string name="settings_startup_home">Startskjerm</string>
     <string name="settings_startup_last_channel">Siste kanal</string>
     <string name="settings_startup_favorites">Direkte · Favoritter</string>
+    <string name="settings_startup_specific_channel">Bestemt kanal</string>
+    <string name="settings_startup_channel_unavailable">Oppstartskanalen er ikke tilgjengelig. Hjem ble åpnet.</string>
     <string name="settings_all_history">All historikk</string>
     <string name="settings_choose_history">Velg hva som skal fjernes fra denne profilen. Spillelister, favoritter og nedlastinger påvirkes ikke.</string>
     <string name="settings_clear_history_confirm">Tømme <xliff:g id="scope">%1$s</xliff:g>-historikken?</string>
@@ -295,6 +324,7 @@
     <string name="settings_search_keywords_history">nylig sett fortsett fjern</string>
     <string name="settings_search_keywords_theme">lyst mørkt system</string>
     <string name="settings_search_keywords_accent">fargetone palett heksadesimal forhåndsvalg</string>
+    <string name="settings_search_keywords_focus">fokus ramme kant markering markør omriss</string>
     <string name="settings_search_keywords_zoom">skaler grensesnitt størrelse</string>
     <string name="settings_search_keywords_animation">bevegelse raskere ytelse</string>
     <string name="settings_search_keywords_weather">topplinje brikke sted Celsius Fahrenheit</string>
@@ -368,6 +398,10 @@
     <!-- Translators: Description of the deinterlacing setting. -->
     <string name="settings_deinterlace_description">Jevner ut de kamlignende linjene enkelte gamle SD-kanaler viser ved bevegelse. Gjelder mpv-motoren mens den tegner bildet selv, så slå av maskinvaredekoding hvis det ikke gjør noen forskjell.</string>
     <string name="settings_movies_series_player">Avspiller for filmer og serier</string>
+    <string name="settings_live_tv_player">Avspiller for direkte-TV</string>
+    <string name="settings_engine_order"><xliff:g id="first">%1$s</xliff:g>, deretter <xliff:g id="second">%2$s</xliff:g></string>
+    <string name="settings_engine_only">Bare <xliff:g id="engine">%1$s</xliff:g></string>
+    <string name="settings_engine_default"><xliff:g id="option">%1$s</xliff:g> (standard)</string>
     <string name="settings_reset_player_choices">Tilbakestill lagrede avspillervalg</string>
     <string name="settings_external_player">Ekstern avspiller</string>
     <string name="settings_default_zoom">Standardzoom</string>
@@ -410,7 +444,22 @@
     <string name="settings_preferred_subtitle_language">Foretrukket undertekstspråk</string>
     <string name="settings_preferred_language_description">Velg dette tekstsporet automatisk når det er tilgjengelig.</string>
     <string name="settings_open_subtitles">OpenSubtitles</string>
+    <string name="settings_open_subtitles_connected">Tilkoblet</string>
+    <string name="settings_open_subtitles_reset_in">Om <xliff:g id="hours">%1$d</xliff:g> t <xliff:g id="minutes">%2$d</xliff:g> min</string>
     <string name="settings_open_subtitles_description">Logg på for å søke etter og laste ned undertekster samt administrere nedlastede undertekster. Gjelder per profil. En gratis konto på opensubtitles.com kreves.</string>
+    <string name="settings_open_subtitles_advanced">Avanserte innstillinger</string>
+    <string name="settings_open_subtitles_advanced_description">Bruk din egen applikasjons-API-nøkkel eller en selvhostet OpenSubtitles Worker.</string>
+    <string name="settings_open_subtitles_setup_title">Konfigurer OpenSubtitles</string>
+    <string name="settings_open_subtitles_setup_description">Logg inn med OpenSubtitles-kontoen din.</string>
+    <string name="settings_open_subtitles_setup_remote">Eksternt</string>
+    <string name="settings_open_subtitles_setup_remote_description">Fyll inn opplysningene i en nettleser på en annen enhet på samme Wi-Fi – telefon, nettbrett eller datamaskin.</string>
+    <string name="settings_open_subtitles_setup_local">Skriv inn her</string>
+    <string name="settings_open_subtitles_setup_local_description">Skriv inn opplysningene på denne TV-en med fjernkontrollen.</string>
+    <string name="settings_open_subtitles_api_key">OpenSubtitles applikasjons-API-nøkkel</string>
+    <string name="settings_worker_server_url">Worker-/server-URL</string>
+    <string name="settings_shared">Delt</string>
+    <string name="settings_open_subtitles_access_priority">La begge stå tomme for å bruke OwnTVs delte Worker. En egen Worker-URL har forrang over en direkte API-nøkkel. Kontoøkter er fortsatt profilspesifikke.</string>
+    <string name="settings_remove_custom_access">Fjern egendefinert tilgang</string>
     <string name="settings_audio">Lyd</string>
     <string name="settings_preferred_audio_language">Foretrukket lydspråk</string>
     <string name="settings_audio_sync">Lydsynkronisering</string>
@@ -442,7 +491,8 @@
     <string name="settings_audio_delay"><xliff:g id="delay">%1$d</xliff:g> ms</string>
     <string name="settings_external_player_description">Velg hvilke deler som skal åpnes i en ekstern app.</string>
     <string name="settings_audio_delay_value"><xliff:g id="delay">%1$d</xliff:g> ms</string>
-    <string name="settings_movies_player_description">mpv (anbefalt) har den bredeste formatstøtten – DTS/TrueHD-lyd og uvanlige filer – samt korrigering av lyd-/bildesynkronisering. Bytt bare til ExoPlayer hvis filmer eller episoder ikke starter: Den spiller av enkelte strømmer som mpv ikke kan spille på visse TV-er, men kan ikke dekode DTS/TrueHD-lyd og har ingen korrigering av lyd-/bildesynkronisering. Uansett hvilken du velger, prøves den andre automatisk hvis den valgte mislykkes.</string>
+    <string name="settings_movies_player_description">mpv (anbefales) har den bredeste formatstøtten — DTS/TrueHD-lyd, uvanlige filer — pluss rettingen av A/V-synkronisering. På enkelte TV-er spiller ExoPlayer av strømmer mpv ikke klarer, men den kan ikke dekode DTS/TrueHD-lyd og har ingen A/V-synkronisering. De kombinerte valgene prøver automatisk den andre avspilleren når den første mislykkes; valgene med bare én avspiller gjør det aldri, noe som sparer noen sekunder med svart skjerm hvis den andre avspilleren uansett ikke virker på TV-en din.</string>
+    <string name="settings_live_player_description">ExoPlayer (anbefales) åpner kanaler mye raskere og er den eneste med teksting i direktesendinger. mpv spiller av kanaler ExoPlayer ikke klarer, blant annet noen med uvanlig lyd. De kombinerte valgene prøver automatisk den andre avspilleren når den første mislykkes; valgene med bare én avspiller gjør det aldri, noe som sparer noen sekunder med svart skjerm hvis den andre avspilleren uansett ikke virker på TV-en din. En kanal du bytter manuelt i avspilleren, beholder valget ditt uansett.</string>
     <string name="settings_reset_player_choices_description">Når du bytter en enkelt film eller episode mellom mpv og ExoPlayer i avspilleren, lagres det valget til neste gang. Tilbakestilling gjør at alt følger innstillingen ovenfor igjen. Lagrede valg for direktekanaler beholdes.</string>
     <string name="settings_reset_player_choices_none">Ingen lagret</string>
     <plurals name="settings_reset_player_choices_count">
@@ -476,7 +526,7 @@
     <string name="settings_guide_synced">Programoversikten er synkronisert</string>
     <string name="settings_guide_sync_failed">Synkronisering av programoversikten mislyktes</string>
     <string name="settings_restore_remote_title">Gjenopprett fra en annen enhet</string>
-    <string name="settings_restore_remote_description">Skann QR-koden (eller åpne nettadressen) på en telefon eller bærbar PC på samme Wi-Fi, skriv inn denne PIN-koden, velg OwnTV-sikkerhetskopifilen, og trykk på Send til TV. Deretter velger du hva som skal gjenopprettes her.</string>
+    <string name="settings_restore_remote_description">Skann QR-koden (eller åpne nettadressen) på en telefon, et nettbrett eller en datamaskin på samme Wi-Fi, skriv inn denne PIN-koden, velg OwnTV-sikkerhetskopifilen, og trykk på Send til TV. Deretter velger du hva som skal gjenopprettes her.</string>
     <string name="settings_opening_server">Åpner serveren…</string>
     <string name="settings_enter_pin_browser">Skriv inn denne PIN-koden i nettleseren</string>
     <string name="settings_companion_qr">QR-kode for nettadressen til tilleggstjenesten</string>
@@ -484,7 +534,7 @@
     <string name="settings_try_again">Prøv igjen</string>
     <string name="settings_new_pin">Start på nytt med en ny PIN-kode</string>
     <string name="settings_download_remote_title">Last ned på en annen enhet</string>
-    <string name="settings_download_remote_description">Skann QR-koden (eller åpne nettadressen) på en telefon eller bærbar PC på samme Wi-Fi, skriv inn denne PIN-koden, og last ned sikkerhetskopifilen for å oppbevare den trygt.</string>
+    <string name="settings_download_remote_description">Skann QR-koden (eller åpne nettadressen) på en telefon, et nettbrett eller en datamaskin på samme Wi-Fi, skriv inn denne PIN-koden, og last ned sikkerhetskopifilen for å oppbevare den trygt.</string>
     <string name="settings_preparing_backup">Klargjør sikkerhetskopien…</string>
     <string name="settings_glass_effect_on">Glasseffekt: På</string>
     <string name="settings_glass_effect_off">Glasseffekt: Av</string>
@@ -681,7 +731,7 @@
     <string name="settings_backup_what_backup">Hva som skal sikkerhetskopieres</string>
     <string name="settings_backup_what_restore">Hva som skal gjenopprettes</string>
     <string name="settings_backup_encrypt_title">Kryptere denne sikkerhetskopien?</string>
-    <string name="settings_backup_encrypt_message">Med et passord for sikkerhetskopien krypteres hele filen – inkludert spillelister, profiler og lagrede passord – og ingenting i den kan leses uten dette passordet. Oppbevar det trygt: Hvis du mister det, kan sikkerhetskopien ikke åpnes i det hele tatt. Uten et passord krypteres ikke filen, og lagrede passord utelates.</string>
+    <string name="settings_backup_encrypt_message">Med et passord for sikkerhetskopien krypteres hele filen – inkludert spillelister, profiler og lagrede passord – og ingenting i den kan leses uten dette passordet. Oppbevar det trygt: Hvis du mister det, kan sikkerhetskopien ikke åpnes i det hele tatt. Uten et passord krypteres ikke filen, og lagrede passord og PIN-koder utelates.</string>
     <string name="settings_backup_export_title">Eksporter en sikkerhetskopi</string>
     <string name="settings_backup_export_message">Send sikkerhetskopien til en annen enhet (telefon eller bærbar PC) på samme Wi-Fi, eller lagre den som en fil på denne enheten.</string>
     <string name="settings_backup_restore_title">Gjenopprett en sikkerhetskopi</string>
@@ -730,13 +780,13 @@
     <string name="settings_backup_section_settings">Appinnstillinger</string>
     <string name="settings_backup_section_settings_desc">Innstillinger for tema, aksentfarge, avspiller og oppsett</string>
     <string name="settings_backup_saved_to">Lagret i <xliff:g id="path">%1$s</xliff:g>.</string>
-    <string name="settings_backup_saved_to_without_passwords">Lagret i <xliff:g id="path">%1$s</xliff:g>. Passord ble ikke tatt med.</string>
+    <string name="settings_backup_saved_to_without_passwords">Lagret i <xliff:g id="path">%1$s</xliff:g>. Passord og PIN-koder ble ikke tatt med.</string>
     <plurals name="settings_backup_restored">
         <item quantity="one"><xliff:g id="items">%1$d</xliff:g> element gjenopprettet.</item>
         <item quantity="other"><xliff:g id="items">%1$d</xliff:g> elementer gjenopprettet.</item>
     </plurals>
     <string name="settings_backup_restore_resync">Synkroniser kildene dine på nytt for å laste inn innhold.</string>
-    <string name="settings_backup_restore_password_note">Skriv inn eventuelle lagrede passord på nytt under Kilder/proxy.</string>
+    <string name="settings_backup_restore_password_note">Skriv inn eventuelle lagrede passord og profil-PIN-koder på nytt under Kilder/proxy.</string>
     <plurals name="settings_backup_skipped_sources">
         <item quantity="one"><xliff:g id="count">%1$d</xliff:g> kilde ble hoppet over fordi spillelistetypen ikke støttes.</item>
         <item quantity="other"><xliff:g id="count">%1$d</xliff:g> kilder ble hoppet over fordi spillelistetypene ikke støttes.</item>
@@ -953,6 +1003,8 @@
     <string name="settings_font_preview">Underholdning gjort enkelt.</string>
     <string name="settings_search_keywords_fonts">skrifttype tekst størrelse typografi popup lesing tilgjengelighet</string>
     <string name="settings_font_system_sans">System Sans</string>
+    <string name="settings_font_monospace">Fast bredde</string>
+    <string name="settings_subtitle_font">Skrift for undertekster</string>
     <string name="settings_glass_preset_title">Utseendeforvalg</string>
     <string name="settings_glass_preset_clear">Klar</string>
     <string name="settings_glass_preset_balanced">Balansert</string>

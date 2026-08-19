@@ -199,9 +199,12 @@ class SeriesViewModel(
             if (c.profileId < 0) {
                 flowOf(emptySet())
             } else {
-                combine(categoryDao.observe(c.sourceIds, MediaType.SERIES), custom) { cats, cust ->
-                    if (cust.hiddenCategories.isEmpty()) emptySet()
-                    else cats.filter { CustomizeKeys.category(it) in cust.hiddenCategories }.map { it.id }.toSet()
+                combine(categoryDao.observe(c.sourceIds, MediaType.SERIES), custom, profileDao.observeById(c.profileId)) { cats, cust, profile ->
+                    tv.own.owntv.core.content.AdultCategoryClassifier.hiddenCategoryIds(
+                        cats,
+                        cust.hiddenCategories,
+                        profile?.isKids == true,
+                    )
                 }
             }
         }
@@ -436,11 +439,15 @@ class SeriesViewModel(
                 categoryDao.observe(c.sourceIds, MediaType.SERIES),
                 customize.observe(c.profileId, MediaType.SERIES),
                 sortMode,
-            ) { cats, cust, sort ->
+                profileDao.observeById(c.profileId),
+            ) { cats, cust, sort, profile ->
                 // A–Z also sorts the category folders (custom categories included); manually moved
                 // categories stay pinned first. Custom categories ride the SAME customization keys,
                 // so renames/hides/reorders apply to them with no extra code (#87).
-                val folders = cats.applyCustomizationsWithCustoms(cust, cust.customCategories, alphaRest = sort == SettingsRepository.SortMode.ALPHA)
+                val kids = profile?.isKids == true
+                val visibleCats = if (kids) cats.filterNot { tv.own.owntv.core.content.AdultCategoryClassifier.isAdult(it.name) } else cats
+                val visibleCustoms = if (kids) cust.customCategories.filterNot { tv.own.owntv.core.content.AdultCategoryClassifier.isAdult(it.name) } else cust.customCategories
+                val folders = visibleCats.applyCustomizationsWithCustoms(cust, visibleCustoms, alphaRest = sort == SettingsRepository.SortMode.ALPHA)
                 defaultRail + folders.map { e ->
                     LiveRailItem(
                         key = e.categoryId?.let { LiveKey.Folder(it) } ?: LiveKey.Custom(e.customId!!),
@@ -469,7 +476,7 @@ class SeriesViewModel(
                 if (cust.hiddenItems.isEmpty() && cust.itemNames.isEmpty() && cs.hiddenCats.isEmpty() && movedFrom.isEmpty()) paging
                 else paging.filter { s ->
                     CustomizeKeys.series(s) !in cust.hiddenItems &&
-                        (args.key is LiveKey.Custom || s.categoryId == null || s.categoryId !in cs.hiddenCats) &&
+                        (s.categoryId == null || s.categoryId !in cs.hiddenCats) &&
                         // Moved-out items leave ONLY their origin folder (they stay in All/search).
                         (movedFrom[CustomizeKeys.series(s)]?.let { origin ->
                             args.key !is LiveKey.Folder || origin != folderContextKeys.value[args.key.id]
@@ -676,6 +683,64 @@ class SeriesViewModel(
 
     data class EpisodeMeta(val episodeId: Long, val cache: tv.own.owntv.core.database.entity.MetadataCacheEntity?)
 
+    /** Whether the episode area draws as text rows or a wall of stills. Global, see SettingsRepository. */
+    val episodeViewMode: StateFlow<SettingsRepository.VodViewMode> = settings.episodeViewMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsRepository.VodViewMode.LIST)
+
+    fun setEpisodeViewMode(mode: SettingsRepository.VodViewMode) {
+        viewModelScope.launch { settings.setEpisodeViewMode(mode) }
+    }
+
+    /**
+     * TMDB rows for EVERY episode of the active season, keyed by local episode id — the grid needs all
+     * of them at once, unlike the list which only ever shows the focused episode's still.
+     *
+     * Only collected in grid mode, and only after [GRID_DWELL_MS]: opening a show and immediately
+     * pressing Back should cost nothing, and leaving cancels the fetch outright because `mapLatest`
+     * tears down the previous coroutine. One request covers the whole season (see
+     * `MetadataRepository.resolveSeasonEpisodes`).
+     */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val seasonEpisodeMeta: StateFlow<Map<Long, tv.own.owntv.core.database.entity.MetadataCacheEntity>> =
+        combine(_openedSeries, _selectedSeason, episodes, episodeViewMode, _episodeMetaTick) { show, season, eps, mode, _ ->
+            if (show == null || mode != SettingsRepository.VodViewMode.GRID) {
+                null
+            } else {
+                // Mirror the screen's own fallback: a show whose seasons start at 0 or 2 displays its
+                // first season, and fetching the requested-but-absent season would leave the grid blank.
+                val available = eps.map { it.seasonNumber }.distinct().sorted()
+                val active = if (available.contains(season)) season else available.firstOrNull() ?: season
+                show to eps.filter { it.seasonNumber == active }
+            }
+        }
+            .distinctUntilChanged { a, b ->
+                a?.first?.id == b?.first?.id && a?.second?.map { it.id } == b?.second?.map { it.id }
+            }
+            .flatMapLatest { pair ->
+                kotlinx.coroutines.flow.flow {
+                    if (pair == null || pair.second.isEmpty()) {
+                        emit(emptyMap())
+                        return@flow
+                    }
+                    // 1. Whatever is already cached, immediately. Coming back to a season you have
+                    //    already opened must not blank the tiles while a timer runs — that reads as
+                    //    the pictures reloading, which is what the dwell used to cause on EVERY switch.
+                    val cached = runCatching { metadata.cachedSeasonEpisodes(pair.first, pair.second) }
+                        .getOrDefault(emptyMap())
+                    emit(cached)
+                    // 2. Nothing more to do when the season is already complete — no timer, no request.
+                    if (cached.size >= pair.second.size) return@flow
+                    // 3. Only an INCOMPLETE season waits out the dwell before going to the network, so
+                    //    a show opened by accident still costs nothing.
+                    kotlinx.coroutines.delay(GRID_DWELL_MS)
+                    emit(
+                        runCatching { metadata.resolveSeasonEpisodes(pair.first, pair.second) }
+                            .getOrDefault(cached),
+                    )
+                }
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
     fun openSeries(s: SeriesEntity) {
         _openedSeries.value = s
         _selectedSeason.value = 1 // reset season when opening a different show
@@ -715,6 +780,8 @@ class SeriesViewModel(
         val showId = if (seriesId > 0) seriesId else episode.seriesId
         val show = seriesDao.getSeriesById(showId) ?: return false
         if (episode.seriesId != show.id) return false
+        val pid = currentProfileId() ?: return false
+        if (!tv.own.owntv.core.content.AdultCategoryClassifier.allows(pid, show.categoryId, profileDao, categoryDao)) return false
         seriesRepository.loadEpisodes(show)
         val queue = seriesDao.episodesBySeries(show.id).first()
         if (queue.isEmpty()) return false
@@ -763,6 +830,7 @@ class SeriesViewModel(
         viewModelScope.launch {
             val pid = currentProfileId()
             val show = seriesDao.getSeriesById(episode.seriesId) ?: return@launch
+            if (pid != null && !tv.own.owntv.core.content.AdultCategoryClassifier.allows(pid, show.categoryId, profileDao, categoryDao)) return@launch
             Log.d(TAG, "playEpisodeExternal episodeId=${episode.id}")
             val url = resolvedEpisodeUrlOrNull(episode) ?: return@launch
             externalPlayerLauncher.launch(
@@ -797,10 +865,14 @@ class SeriesViewModel(
         _lastPlayedEpisodeId.value = episode.id
         viewModelScope.launch {
             val pid = currentProfileId()
+            if (pid != null && !tv.own.owntv.core.content.AdultCategoryClassifier.allows(pid, show.categoryId, profileDao, categoryDao)) return@launch
             // External player (global toggle): launch only the selected episode (external players are
             // single-item — no prev/next queue). History is still recorded; resume position and the
             // in-app HUD/progress tick are not, since OwnTV can't observe the external app.
-            if (settings.externalPlayerSeries.first()) {
+            // #115 — a protected item cannot go to an external player: no standard intent extra
+            // carries a licence URL, so the other app would open it and fail on the first segment.
+            // Play it here instead, where the licence request can actually be made.
+            if (settings.externalPlayerSeries.first() && episode.drmConfig == null) {
                 Log.d(TAG, "playEpisodeQueue seriesId=${show.id} episodeId=${episode.id} -> external player")
                 val url = resolvedEpisodeUrlOrNull(episode) ?: return@launch
                 externalPlayerLauncher.launch(
@@ -850,6 +922,7 @@ class SeriesViewModel(
                             { streamUrlResolver.resolve(source, ep.streamUrl, vod = true, episode = ep.episodeNumber) }
                         } else null,
                         httpHeaders = ep.httpHeaders,
+                        drmConfig = ep.drmConfig,
                     )
                 },
                 startIndex = startIndex,
@@ -907,6 +980,8 @@ class SeriesViewModel(
         val ext = episode.containerExt ?: StorageAccess.extOf(episode.streamUrl)
         viewModelScope.launch {
             val pid = currentProfileId() ?: return@launch
+            val actualShow = show ?: seriesDao.getSeriesById(episode.seriesId)
+            if (!tv.own.owntv.core.content.AdultCategoryClassifier.allows(pid, actualShow?.categoryId, profileDao, categoryDao)) return@launch
             downloadManager.enqueue(
                 profileId = pid,
                 mediaType = MediaType.EPISODE,
@@ -924,6 +999,7 @@ class SeriesViewModel(
         val showDir = StorageAccess.sanitize(series.name)
         viewModelScope.launch {
             val pid = currentProfileId() ?: return@launch
+            if (!tv.own.owntv.core.content.AdultCategoryClassifier.allows(pid, series.categoryId, profileDao, categoryDao)) return@launch
             seriesDao.episodesBySeries(series.id).first().forEach { ep ->
                 val ext = ep.containerExt ?: StorageAccess.extOf(ep.streamUrl)
                 downloadManager.enqueue(
@@ -1045,7 +1121,9 @@ class SeriesViewModel(
         val rating = sort == SettingsRepository.SortMode.RATING
         val dateAdded = sort == SettingsRepository.SortMode.DATE_ADDED
         return if (query.isBlank()) when (key) {
-            LiveKey.All -> when {
+            // Catch-up is a Live TV-only rail (channels have archives, series don't), but the rail model
+            // is shared across all three sections — so it degrades to All here rather than existing.
+            LiveKey.All, LiveKey.Catchup -> when {
                 rating -> seriesDao.pagingAllRating(ids)
                 playlist -> seriesDao.pagingAllOriginal(ids)
                 dateAdded -> seriesDao.pagingAllDateAdded(ids)
@@ -1066,7 +1144,7 @@ class SeriesViewModel(
                 }
             }
         } else when (key) {
-            LiveKey.All ->
+            LiveKey.All, LiveKey.Catchup ->
                 if (dateAdded) seriesDao.searchAllDateAdded(query, ids)
                 else seriesDao.searchAll(query, ids)
             LiveKey.Favorites -> seriesDao.searchFavorites(query, c.profileId, ids)
@@ -1081,7 +1159,7 @@ class SeriesViewModel(
     private fun countFlow(key: LiveKey, c: Ctx, hiddenCats: Set<Long>): Flow<Int> {
         val ids = c.sourceIds.ifEmpty { listOf(-1L) }
         return when (key) {
-            LiveKey.All ->
+            LiveKey.All, LiveKey.Catchup ->
                 if (hiddenCats.isEmpty()) seriesDao.countAll(ids)
                 else seriesDao.countAllExcluding(ids, hiddenCats.toList())
             LiveKey.Favorites -> seriesDao.countFavorites(c.profileId, ids)
@@ -1120,6 +1198,15 @@ class SeriesViewModel(
 
     private companion object {
         const val TAG = "OwnTVHome"
+
+        /**
+         * How long the user must stay on a season before the grid fetches its stills. Longer than the
+         * 700 ms focus debounce because this fires on *entering* a show rather than on scrolling, and a
+         * show opened by accident is backed out of well inside a second. Deliberately not longer: at a
+         * few seconds the grid sits empty long enough to look broken, and the user backs out and
+         * re-enters — which costs more requests than it saves.
+         */
+        const val GRID_DWELL_MS = 1_000L
         val defaultRail = listOf(
             LiveRailItem(LiveKey.Favorites, icon = OwnTVIcon.FAVORITE),
             LiveRailItem(LiveKey.History, icon = OwnTVIcon.HISTORY),

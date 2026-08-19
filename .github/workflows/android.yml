@@ -141,6 +141,31 @@ jobs:
             echo "No KEYSTORE_BASE64 secret set — building a debug-signed APK."
           fi
 
+      # Derives this release's edge key for the default metadata/subtitle service. Falls back to the
+      # static OWNTV_EDGE_KEY, then to "" — a fork has neither secret and the app uses its open base
+      # URL, exactly as before.
+      - name: Derive the release edge key
+        env:
+          OWNTV_EDGE_MASTER: ${{ secrets.OWNTV_EDGE_MASTER }}
+          OWNTV_EDGE_KEY: ${{ secrets.OWNTV_EDGE_KEY }}
+          VERSION_NAME: ${{ steps.ver.outputs.name }}
+        run: |
+          if [ -n "$OWNTV_EDGE_MASTER" ]; then
+            # No trailing newline in the input; the server derives it the same way.
+            KEY=$(printf '%s' "$VERSION_NAME" \
+              | openssl dgst -sha256 -hmac "$OWNTV_EDGE_MASTER" -hex \
+              | awk '{print $NF}')
+            echo "::add-mask::$KEY"
+            echo "OWNTV_EDGE_KEY=$KEY" >> "$GITHUB_ENV"
+            echo "Derived the edge key for $VERSION_NAME."
+          elif [ -n "$OWNTV_EDGE_KEY" ]; then
+            echo "::add-mask::$OWNTV_EDGE_KEY"
+            echo "OWNTV_EDGE_KEY=$OWNTV_EDGE_KEY" >> "$GITHUB_ENV"
+            echo "No OWNTV_EDGE_MASTER — using the static edge key."
+          else
+            echo "No edge secret configured (fork build) — the app will use the unprotected base URL."
+          fi
+
       - name: Build APK
         env:
           VERSION_NAME: ${{ steps.ver.outputs.name }}
@@ -148,9 +173,8 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          # Shared secret for the default metadata Worker's edge rule. Forks have no secret and
-          # resolve "" — the app then falls back to the unprotected workers.dev base URL.
-          OWNTV_EDGE_KEY: ${{ secrets.OWNTV_EDGE_KEY }}
+          # OWNTV_EDGE_KEY is exported into $GITHUB_ENV by the step above; app/build.gradle.kts reads
+          # it as the env var it always did.
         run: |
           chmod +x ./gradlew
           if [ -n "$KEYSTORE_FILE" ]; then

@@ -169,6 +169,36 @@ internal class LiveEpgReader(
         result
     }
 
+    /**
+     * What was on [ch] at [atMs], and what followed it — the archive counterpart of [nowNext], for the
+     * "PLAYING / THEN" card shown while a recording is playing.
+     *
+     * Stored-guide only, deliberately: the provider short-EPG APIs report *now and upcoming*, so they
+     * can say nothing about yesterday afternoon. A channel whose guide comes only from that API gets
+     * no archive card, which is correct — there is genuinely no data for the moment being watched.
+     *
+     * Returns null when nothing is known at [atMs], so the caller can simply omit the card.
+     */
+    suspend fun nowNextAt(
+        ch: ChannelEntity,
+        atMs: Long,
+        cust: SectionCustomizations,
+        globalShiftMinutes: Int,
+    ): EpgNowNext? = withContext(Dispatchers.IO) {
+        val epgKey = (cust.epgMatches[CustomizeKeys.channel(ch)] ?: ch.epgChannelId)
+            ?.trim()?.lowercase()?.takeIf { it.isNotEmpty() } ?: return@withContext null
+        // Same shift dance as [nowNext]: stored rows keep the feed's own clock, so look up the shifted
+        // instant and move what comes back, or the card would disagree with the archive it describes.
+        val shift = EpgShift.minutesFor(cust, ch, globalShiftMinutes)
+        val at = EpgShift.toStored(atMs, shift)
+        val playing = epgDao.nowPlaying(epgKey, at)
+        val then = epgDao.upcoming(epgKey, at, 4).first()
+            .firstOrNull { it.startMs > (playing?.startMs ?: 0) }
+        if (playing == null && then == null) return@withContext null
+        fun EpgProgrammeEntity.shifted() = EpgShift.apply(this, shift).toXt()
+        EpgNowNext(playing?.shifted(), then?.shifted())
+    }
+
     /** Recent (already-aired) programmes for a catch-up channel, newest first — drives the Live TV
      *  catch-up picker. Bounded to the EPG we retain (≈ 2 days) and the channel's archive window. */
     suspend fun catchupProgrammes(

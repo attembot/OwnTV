@@ -509,7 +509,7 @@ This rule goes at the top of `docs/i18n.md`, verbatim:
 
 ## `CompanionHtml`: a named non-Compose renderer
 
-`CompanionHtml` produces final user-facing HTML served over the local network to the TV owner's phone, so it must resolve resources outside Compose. It does **not** get a process-wide provider for that privilege.
+`CompanionHtml` produces final user-facing HTML served over the local network to the TV owner's phone, tablet or PC, so it must resolve resources outside Compose. It does **not** get a process-wide provider for that privilege.
 
 At render time:
 
@@ -1089,7 +1089,7 @@ Heavy `<plurals>` work here (`"N channels"`, `"N movies"`, `"N programmes"`, `"N
 
 ### Batch 10. `core/companion/CompanionHtml.kt`
 
-The phone-facing web UI (~25 strings). Category 6. Extract to resources and route through the render-time locale-wrapped context described above. This batch introduces `CompanionHtmlRenderer` or equivalent.
+The remote-facing web UI (~25 strings). Category 6. Extract to resources and route through the render-time locale-wrapped context described above. This batch introduces `CompanionHtmlRenderer` or equivalent.
 
 ### Batch 11. Legacy Android TV launcher, lowest priority
 
@@ -1604,7 +1604,7 @@ This proves the flag lives in an Activity-scoped ViewModel without saved-state r
 
 1. Start the app in English.
 2. Switch to Deutsch **without restarting**.
-3. Open the companion page from a phone.
+3. Open the companion page from another device.
 4. Confirm the generated HTML is German.
 5. Trigger an existing `OwnTVPlayer` system toast and an `ExternalPlayerLauncher` fallback/chooser; confirm fixed OwnTV text is German.
 6. Start a download; confirm the notification uses German and the existing notification channel's visible name updates when the renderer runs.
@@ -1656,7 +1656,7 @@ Also add a second occurrence of an already-baselined literal in the same file an
 - **Subtitle regression** - set the device to Arabic, shift a subtitle in the player, and inspect the written `.srt` on disk: timestamps must be ASCII digits.
 - **Font and tofu checks** - every script in the initial language set renders with real glyphs in
   popups, the language picker endonym column and the audio now-playing bar.
-- **Companion glyphs** - confirm the phone page renders non-Latin scripts without tofu, i.e. the CSS fallback stack works alongside the Lora file it serves.
+- **Companion glyphs** - confirm the remote page renders non-Latin scripts without tofu, i.e. the CSS fallback stack works alongside the Lora file it serves.
 - **Date and number checks** - confirm dates follow the UI locale, the 12/24-hour choice follows the **system** setting, display numbers localise and protocol/persistence numbers stay `Locale.ROOT`.
 - **APK size and memory** - the measurements in the block below, on real 1 GB hardware.
 

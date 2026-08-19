@@ -19,7 +19,7 @@ import tv.own.owntv.core.i18n.LocaleStore
  * [tv.own.owntv.features.setup.SetupViewModel] and [tv.own.owntv.features.settings.SettingsViewModel]
  * share one server instead of each carrying duplicate networking code.
  *
- * The phone only fills the Add Source form; it never starts the import. Each submission is exposed two
+ * The remote browser only fills the Add Source form; it never starts the import. Each submission is exposed two
  * ways:
  *  - [payloads] — a live event stream, used by the Remote screen to know when to hand off; and
  *  - [lastPayload] — the retained latest value, so the Manual form (which subscribes *after* the
@@ -41,16 +41,24 @@ class CompanionController(context: Context, localeStore: LocaleStore) {
     private val _lastPayload = MutableStateFlow<CompanionPayload?>(null)
     val lastPayload: StateFlow<CompanionPayload?> = _lastPayload.asStateFlow()
 
-    /** Backup files uploaded from a phone in [startForBackupRestore] mode, saved to cache and emitted here. */
+    /** Backup files uploaded from the remote device in [startForBackupRestore] mode, saved to cache and emitted here. */
     private val _backups = MutableSharedFlow<File>(extraBufferCapacity = 4)
     val backups: SharedFlow<File> = _backups.asSharedFlow()
 
     /** Cache folder the remote-export flow writes the backup into before serving it for download. */
     val backupExportDir: File get() = File(appContext.cacheDir, "remote-backup-export").apply { mkdirs() }
 
-    /** Image files uploaded from a phone in [startForImageUpload] mode, saved to cache and emitted here. */
+    /** Image files uploaded from the remote device in [startForImageUpload] mode, saved to cache and emitted here. */
     private val _images = MutableSharedFlow<File>(extraBufferCapacity = 4)
     val images: SharedFlow<File> = _images.asSharedFlow()
+
+    /** TMDB API keys handed over from the remote device in [startForTmdbKey] mode. */
+    private val _tmdbKeys = MutableSharedFlow<String>(extraBufferCapacity = 4)
+    val tmdbKeys: SharedFlow<String> = _tmdbKeys.asSharedFlow()
+    private val _tmdbConfigs = MutableSharedFlow<CompanionServiceConfig>(extraBufferCapacity = 4)
+    val tmdbConfigs: SharedFlow<CompanionServiceConfig> = _tmdbConfigs.asSharedFlow()
+    private val _openSubtitlesConfigs = MutableSharedFlow<CompanionServiceConfig>(extraBufferCapacity = 4)
+    val openSubtitlesConfigs: SharedFlow<CompanionServiceConfig> = _openSubtitlesConfigs.asSharedFlow()
 
     /** A fresh 6-digit PIN per [start], so a leaked code is short-lived. */
     @Volatile private var currentPin: String = ""
@@ -69,14 +77,19 @@ class CompanionController(context: Context, localeStore: LocaleStore) {
     /** Starts the add-source companion server (the original Remote add-source flow). */
     fun start(port: Int) = startInternal(port, CompanionMode.ADD_SOURCE)
 
-    /** Starts the companion server in backup-restore mode: the phone uploads a backup JSON, emitted on [backups]. */
+    /** Starts the companion server in backup-restore mode: the remote device uploads a backup JSON, emitted on [backups]. */
     fun startForBackupRestore(port: Int) = startInternal(port, CompanionMode.BACKUP_RESTORE)
 
-    /** Starts the companion server in backup-download mode, serving [file] for the phone to download. */
+    /** Starts the companion server in backup-download mode, serving [file] for the remote device to download. */
     fun startForBackupDownload(port: Int, file: File) = startInternal(port, CompanionMode.BACKUP_DOWNLOAD, file)
 
-    /** Starts the companion server in image-upload mode: the phone sends a background image, emitted on [images]. */
+    /** Starts the companion server in image-upload mode: the remote device sends a background image, emitted on [images]. */
     fun startForImageUpload(port: Int) = startInternal(port, CompanionMode.IMAGE_UPLOAD)
+
+    /** Starts the companion server in TMDB-key mode: the remote device sends an API key, emitted on [tmdbKeys]. */
+    fun startForTmdbKey(port: Int) = startInternal(port, CompanionMode.TMDB_KEY)
+    fun startForTmdbConfig(port: Int) = startInternal(port, CompanionMode.TMDB_CONFIG)
+    fun startForOpenSubtitlesConfig(port: Int) = startInternal(port, CompanionMode.OPEN_SUBTITLES_CONFIG)
 
     private fun startInternal(port: Int, mode: CompanionMode, downloadFile: File? = null) {
         if (port !in 1..65535) {
@@ -92,13 +105,25 @@ class CompanionController(context: Context, localeStore: LocaleStore) {
                 pin = currentPin,
                 fontBytes = loraBytes,
                 mode = mode,
-                onPayload = { payload ->
+                onPayload = { raw ->
+                    // An uploaded playlist becomes a real file on the TV before the payload goes any
+                    // further, so what the Add Source form receives is an ordinary local path.
+                    val payload = savePlaylistUpload(raw)
                     Log.d(TAG, "Received ${payload.type} payload '${payload.name.ifBlank { "(unnamed)" }}' — forwarding to UI")
                     _lastPayload.value = payload
                     _payloads.tryEmit(payload)
                 },
                 onBackup = ::onBackupUploaded,
                 onImage = ::onImageUploaded,
+                // Never logged, at any level: it is the user's own credential.
+                onTmdbKey = { key -> _tmdbKeys.tryEmit(key) },
+                onServiceConfig = { config ->
+                    when (mode) {
+                        CompanionMode.TMDB_CONFIG -> _tmdbConfigs.tryEmit(config)
+                        CompanionMode.OPEN_SUBTITLES_CONFIG -> _openSubtitlesConfigs.tryEmit(config)
+                        else -> Unit
+                    }
+                },
                 downloadFile = downloadFile,
                 onLocked = {
                     // The server has already stopped itself; just reflect it on the TV so the user
@@ -112,7 +137,7 @@ class CompanionController(context: Context, localeStore: LocaleStore) {
                 port = port,
                 urls = urls,
                 pin = currentPin,
-                // The QR encodes the plain URL only — the PIN is typed on the phone's gate page.
+                // The QR encodes the plain URL only — the PIN is typed on the remote device's gate page.
                 qr = CompanionLink.renderQr(CompanionLink.lanUrl(port)),
             )
         } catch (t: Throwable) {
@@ -145,6 +170,48 @@ class CompanionController(context: Context, localeStore: LocaleStore) {
             file
         }.onSuccess { _backups.tryEmit(it) }
             .onFailure { Log.w(TAG, "Failed to persist uploaded backup", it) }
+    }
+
+    /**
+     * Writes a playlist uploaded through the companion page into the app's own storage and returns
+     * the payload with `server` pointing at it. Anything else passes through untouched.
+     *
+     * `filesDir`, not `cacheDir`: the remote browser only *fills* the form — the TV user presses Start Import
+     * later, possibly much later, and the system may evict a cache file in between. The saved path is
+     * absolute, which is exactly what `M3uSyncer` already recognises as a local playlist.
+     *
+     * On a write failure the payload is returned unchanged, so the TV shows an empty URL box rather
+     * than a path to a file that is not there.
+     */
+    private fun savePlaylistUpload(payload: CompanionPayload): CompanionPayload {
+        if (payload.playlistContent.isBlank()) return payload
+        return runCatching {
+            val dir = File(appContext.filesDir, PLAYLIST_UPLOAD_DIR).apply { mkdirs() }
+            // Keep only the newest few: a playlist can be megabytes, and every upload that was never
+            // imported would otherwise sit here forever.
+            dir.listFiles().orEmpty().sortedByDescending { it.lastModified() }
+                .drop(MAX_KEPT_UPLOADS - 1).forEach { it.delete() }
+            val file = File(dir, safePlaylistName(payload.playlistFileName))
+            file.writeText(payload.playlistContent)
+            Log.d(TAG, "Saved uploaded playlist (${file.length()} bytes) → ${file.name}")
+            payload.copy(server = file.absolutePath, playlistContent = "")
+        }.getOrElse {
+            Log.w(TAG, "Failed to save uploaded playlist", it)
+            payload.copy(playlistContent = "")
+        }
+    }
+
+    /**
+     * A filename safe to write: the upload names the file, and the name arrives from a browser. Only
+     * the last path segment is kept and only safe characters survive it, so `../../databases/owntv`
+     * cannot escape the upload directory.
+     */
+    private fun safePlaylistName(raw: String): String {
+        val base = raw.substringAfterLast('/').substringAfterLast('\\')
+            .filter { it.isLetterOrDigit() || it == '.' || it == '-' || it == '_' }
+            .trimStart('.')
+            .takeLast(64)
+        return if (base.length > 4 && base.contains('.')) base else "playlist-${System.currentTimeMillis()}.m3u"
     }
 
     /** Persists an uploaded background image to a cache file and emits it for the settings UI to ingest. */
@@ -184,5 +251,9 @@ class CompanionController(context: Context, localeStore: LocaleStore) {
 
     private companion object {
         const val TAG = "CompanionController"
+
+        /** Under `filesDir`, so an upload survives until the TV user actually imports it. */
+        const val PLAYLIST_UPLOAD_DIR = "companion-playlists"
+        const val MAX_KEPT_UPLOADS = 5
     }
 }

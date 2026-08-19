@@ -12,6 +12,7 @@ import tv.own.owntv.R
 enum class AppFontFamily {
     LORA,
     SYSTEM_SANS,
+    MONOSPACE,
     PLAYFAIR_DISPLAY,
     DANCING_SCRIPT,
     POPPINS;
@@ -83,10 +84,40 @@ private val PoppinsFamily = FontFamily(
 fun AppFontFamily.asComposeFamily(): FontFamily = when (this) {
     AppFontFamily.LORA -> LoraFamily
     AppFontFamily.SYSTEM_SANS -> FontFamily.SansSerif
+    AppFontFamily.MONOSPACE -> FontFamily.Monospace
     AppFontFamily.PLAYFAIR_DISPLAY -> PlayfairDisplayFamily
     AppFontFamily.DANCING_SCRIPT -> DancingScriptFamily
     AppFontFamily.POPPINS -> PoppinsFamily
 }
+
+/** Android/mpv equivalents used by subtitle renderers outside Compose typography. */
+fun AppFontFamily.asAndroidTypeface(context: android.content.Context): android.graphics.Typeface = when (this) {
+    AppFontFamily.SYSTEM_SANS -> android.graphics.Typeface.SANS_SERIF
+    AppFontFamily.MONOSPACE -> android.graphics.Typeface.MONOSPACE
+    else -> androidx.core.content.res.ResourcesCompat.getFont(context, subtitleFontResource)
+        ?: android.graphics.Typeface.SANS_SERIF
+}
+
+val AppFontFamily.subtitleFontResource: Int
+    get() = when (this) {
+        AppFontFamily.LORA -> R.font.lora_variable
+        AppFontFamily.PLAYFAIR_DISPLAY -> R.font.playfair_display_variable
+        AppFontFamily.DANCING_SCRIPT -> R.font.dancing_script_variable
+        AppFontFamily.POPPINS -> R.font.poppins_regular
+        AppFontFamily.SYSTEM_SANS,
+        AppFontFamily.MONOSPACE,
+        -> 0
+    }
+
+val AppFontFamily.mpvFamilyName: String
+    get() = when (this) {
+        AppFontFamily.LORA -> "Lora"
+        AppFontFamily.SYSTEM_SANS -> "sans-serif"
+        AppFontFamily.MONOSPACE -> "monospace"
+        AppFontFamily.PLAYFAIR_DISPLAY -> "Playfair Display"
+        AppFontFamily.DANCING_SCRIPT -> "Dancing Script"
+        AppFontFamily.POPPINS -> "Poppins"
+    }
 
 val LocalMainFontFamily = staticCompositionLocalOf<FontFamily> { FontFamily.SansSerif }
 val LocalPopupFontFamily = staticCompositionLocalOf<FontFamily> { LoraFamily }

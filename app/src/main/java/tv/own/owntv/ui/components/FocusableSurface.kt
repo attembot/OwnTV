@@ -175,6 +175,10 @@ fun FocusableSurface(
         label = "focusContainer",
     )
     val showBorder = showFocusBorder && (focused || visuallySelected)
+    // #121: the user's chosen ring width. A wider ring also opens the glow up with it, so "extra
+    // thick" reads as a halo from sofa distance instead of just a fatter line.
+    val focusBorderWidth = tv.own.owntv.ui.theme.LocalFocusBorderWidth.current
+    val glowScale = focusBorderWidth.value / Dimens.FocusBorderWidth.value
     // Glassy only when a surface is given and it's in the active glass scope. Highlighted glass
     // rows swap the accent focus border for a bright white glass rim (matches the sidebar).
     val borderColor = if (focused) colors.focusBorder else colors.focusBorder.copy(alpha = 0.42f)
@@ -201,7 +205,7 @@ fun FocusableSurface(
                 // mode. The tonal fill + accent boundary are the compact-row focus signal; reserve
                 // the depth shadow for larger cards that do not exhibit the scrolling trail.
                 if (focused && !glassy && !compactFocusableRow) Modifier.shadow(
-                    elevation = glowElevation.dp,
+                    elevation = (glowElevation * glowScale).dp,
                     shape = shape,
                     clip = false,
                     ambientColor = colors.focusGlow,
@@ -233,11 +237,13 @@ fun FocusableSurface(
             .then(
                 when {
                     showBorder && focused && !glassy -> Modifier.border(
-                        Dimens.FocusBorderWidth,
+                        focusBorderWidth,
                         borderColor,
                         shape,
                     )
                     showBorder && visuallySelected && !focused -> Modifier.border(
+                        // The idle "selected" hairline stays thin whatever the focus width: it marks
+                        // where you were, and thickening it too would compete with the live cursor.
                         width = 1.dp,
                         color = colors.focusBorder.copy(alpha = 0.45f),
                         shape = shape,

@@ -31,7 +31,7 @@ import tv.own.owntv.core.model.SourceType
  * submit endpoints). Direct POSTs to `/xtream|/m3u|/stalker` must also carry the PIN (`?pin=` or the
  * `X-Companion-Pin` header) or receive 401. So a stray device on the network cannot push a source.
  *
- * The phone only fills the form; it never starts the import. Submitted details are surfaced via
+ * The remote browser only fills the form; it never starts the import. Submitted details are surfaced via
  * [start]'s onPayload callback, which the host uses to pre-fill Add Source on the TV.
  *
  * Everything HTTP happens off the main thread on [Dispatchers.IO]. Passwords/MAC are never logged.
@@ -81,6 +81,8 @@ class CompanionHttpServer(
     @Volatile private var onPayload: (CompanionPayload) -> Unit = {}
     @Volatile private var onBackup: (String) -> Unit = {}
     @Volatile private var onImage: (bytes: ByteArray, extension: String) -> Unit = { _, _ -> }
+    @Volatile private var onTmdbKey: (String) -> Unit = {}
+    @Volatile private var onServiceConfig: (CompanionServiceConfig) -> Unit = {}
 
     /** The backup file served at `/backup.json` in [CompanionMode.BACKUP_DOWNLOAD] mode. */
     @Volatile private var downloadFile: File? = null
@@ -100,6 +102,8 @@ class CompanionHttpServer(
         onPayload: (CompanionPayload) -> Unit = {},
         onBackup: (String) -> Unit = {},
         onImage: (bytes: ByteArray, extension: String) -> Unit = { _, _ -> },
+        onTmdbKey: (String) -> Unit = {},
+        onServiceConfig: (CompanionServiceConfig) -> Unit = {},
         downloadFile: File? = null,
         onLocked: () -> Unit = {},
     ): List<String> {
@@ -112,6 +116,8 @@ class CompanionHttpServer(
         this.onPayload = onPayload
         this.onBackup = onBackup
         this.onImage = onImage
+        this.onTmdbKey = onTmdbKey
+        this.onServiceConfig = onServiceConfig
         this.downloadFile = downloadFile
         val socket = ServerSocket()
         socket.reuseAddress = true
@@ -234,7 +240,7 @@ class CompanionHttpServer(
             }
 
             // Backup download (BACKUP_DOWNLOAD mode) — PIN required, streams the exported container.
-            // `/backup.json` stays routed here: the old path costs nothing to keep and a phone that
+            // `/backup.json` stays routed here: the old path costs nothing to keep and a remote browser that
             // bookmarked it still works. What it serves is whatever export produced — a `.own` file.
             if (method == "GET" && (path == "/backup.own" || path == "/backup.json")) {
                 val headerPin = headers["x-companion-pin"].orEmpty()
@@ -267,6 +273,56 @@ class CompanionHttpServer(
                 val decoded = decodeImageDataUrl(body) ?: return sendText(socket, 400, localized(R.string.companion_error_invalid_image))
                 onImage(decoded.first, decoded.second)
                 return sendHtml(socket, 200, CompanionHtml.imageSentPage(pageContext, pin))
+            }
+
+            // TMDB key handover (TMDB_KEY mode) — PIN required. Body is the bare key as text.
+            if (method == "POST" && path == "/tmdbkey") {
+                val headerPin = headers["x-companion-pin"].orEmpty()
+                if (!requirePin(queryPin.ifBlank { headerPin })) return sendText(socket, 401, localized(R.string.companion_error_unauthorized))
+                val body = CompanionHttpProtocol.readBody(input, headers, CompanionHttpProtocol.maxBodyBytes(path))
+                    ?: return sendText(socket, 413, localized(R.string.companion_error_body_too_large))
+                val key = body.trim()
+                // Shape check only — the app cannot verify a key without spending a request, and the
+                // Metadata screen already has a "Test lookup" button for that. This just stops obvious
+                // junk (an empty box, a pasted URL) from silently replacing a working key.
+                if (!Regex("^[A-Za-z0-9._-]{16,128}$").matches(key)) {
+                    return sendText(socket, 400, localized(R.string.companion_tmdb_invalid))
+                }
+                onTmdbKey(key)
+                return sendHtml(socket, 200, CompanionHtml.tmdbKeySentPage(pageContext, pin))
+            }
+
+            if (method == "POST" && path == "/serviceconfig") {
+                val headerPin = headers["x-companion-pin"].orEmpty()
+                if (!requirePin(queryPin.ifBlank { headerPin })) return sendText(socket, 401, localized(R.string.companion_error_unauthorized))
+                val body = CompanionHttpProtocol.readBody(input, headers, CompanionHttpProtocol.maxBodyBytes(path))
+                    ?: return sendText(socket, 413, localized(R.string.companion_error_body_too_large))
+                val fields = CompanionHttpProtocol.parseQuery(body)
+                val key = fields["apiKey"].orEmpty().trim()
+                val url = fields["serverUrl"].orEmpty().trim()
+                // Credentials belong to the OpenSubtitles page only; dropped outright in TMDB mode so
+                // a hand-crafted POST can't push an account into a flow that has no use for one.
+                val credentials = mode == CompanionMode.OPEN_SUBTITLES_CONFIG
+                val username = if (credentials) fields["username"].orEmpty().trim() else ""
+                // NOT trimmed: leading/trailing spaces can be part of a password, and silently eating
+                // them would produce an "invalid credentials" the user cannot explain.
+                val password = if (credentials) fields["password"].orEmpty() else ""
+                if (key.isBlank() && url.isBlank() && username.isBlank() && password.isEmpty()) {
+                    return sendText(socket, 400, localized(
+                        if (credentials) R.string.companion_service_config_empty_account
+                        else R.string.companion_service_config_empty
+                    ))
+                }
+                if (key.isNotBlank() && !Regex("^[A-Za-z0-9._-]{8,256}$").matches(key)) return sendText(socket, 400, localized(R.string.companion_service_config_invalid_key))
+                if (url.isNotBlank() && runCatching { java.net.URI(url).let { it.scheme == "https" && !it.host.isNullOrBlank() } }.getOrDefault(false).not()) return sendText(socket, 400, localized(R.string.companion_service_config_invalid_url))
+                // Length-bounded only. A password may legitimately contain anything, and OpenSubtitles
+                // does not publish a username charset — rejecting on a guessed pattern would lock real
+                // accounts out with no way for the user to tell why.
+                if (username.length > 256 || password.length > 256) {
+                    return sendText(socket, 400, localized(R.string.companion_service_config_invalid_credentials))
+                }
+                onServiceConfig(CompanionServiceConfig(key, url, username, password))
+                return sendHtml(socket, 200, CompanionHtml.serviceConfigSentPage(pageContext, pin))
             }
 
             // Source submissions — PIN required (query or header), else 401.
@@ -334,6 +390,9 @@ class CompanionHttpServer(
         CompanionMode.BACKUP_RESTORE -> CompanionHtml.backupUploadPage(context, pin)
         CompanionMode.BACKUP_DOWNLOAD -> CompanionHtml.backupDownloadPage(context, pin)
         CompanionMode.IMAGE_UPLOAD -> CompanionHtml.imageUploadPage(context, pin)
+        CompanionMode.TMDB_KEY -> CompanionHtml.tmdbKeyPage(context, pin)
+        CompanionMode.TMDB_CONFIG -> CompanionHtml.serviceConfigPage(context, pin, openSubtitles = false)
+        CompanionMode.OPEN_SUBTITLES_CONFIG -> CompanionHtml.serviceConfigPage(context, pin, openSubtitles = true)
     }
 
     /**
@@ -417,7 +476,7 @@ class CompanionHttpServer(
 
     /**
      * Companion pages are a named final renderer. Wrap at request/render time rather than retaining
-     * the Application's startup resources: a language change must affect the next phone page without
+     * the Application's startup resources: a language change must affect the next remote page without
      * restarting the server. Context and LocaleStore are mandatory production dependencies, so an
      * instance cannot start listening and fail only when its first page is rendered.
      */

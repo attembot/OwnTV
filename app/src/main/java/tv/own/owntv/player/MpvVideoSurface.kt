@@ -19,6 +19,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import tv.own.owntv.features.settings.data.SettingsRepository
 import tv.own.owntv.features.settings.data.SubtitleStyle
+import tv.own.owntv.ui.theme.asAndroidTypeface
 
 private class MpvSurfaceView(context: Context, private val player: OwnTVPlayer) :
     SurfaceView(context), SurfaceHolder.Callback {
@@ -216,12 +217,14 @@ private fun StyledSubtitleView(cues: List<androidx.media3.common.text.Cue>, modi
     val settings = org.koin.compose.koinInject<SettingsRepository>()
     val styleOn by settings.subtitleStyleEnabled.collectAsStateWithLifecycle(initialValue = false)
     val scale by settings.subtitleScale.collectAsStateWithLifecycle(initialValue = SubtitleStyle.SCALE_DEFAULT)
+    val font by settings.subtitleFont.collectAsStateWithLifecycle(initialValue = null)
     val colorHex by settings.subtitleColor.collectAsStateWithLifecycle(initialValue = SubtitleStyle.COLOR_DEFAULT)
     val position by settings.subtitlePosition.collectAsStateWithLifecycle(initialValue = SubtitleStyle.Position.DEFAULT)
     val bgOpacity by settings.subtitleBgOpacity.collectAsStateWithLifecycle(initialValue = SubtitleStyle.OPACITY_DEFAULT)
 
     val customColor = styleOn && SubtitleStyle.hasColor(colorHex)
     val customBackground = styleOn && SubtitleStyle.hasOpacity(bgOpacity)
+    val customFont = styleOn && font != null
     val customPosition = if (styleOn) position else SubtitleStyle.Position.DEFAULT
     val textScale = if (styleOn) scale else SubtitleStyle.SCALE_DEFAULT
 
@@ -230,7 +233,7 @@ private fun StyledSubtitleView(cues: List<androidx.media3.common.text.Cue>, modi
         factory = { ctx -> androidx.media3.ui.SubtitleView(ctx) },
         update = { view ->
             val stock = androidx.media3.ui.CaptionStyleCompat.DEFAULT
-            if (customColor || customBackground) {
+            if (customColor || customBackground || customFont) {
                 view.setApplyEmbeddedStyles(false)
                 view.setStyle(
                     androidx.media3.ui.CaptionStyleCompat(
@@ -239,7 +242,7 @@ private fun StyledSubtitleView(cues: List<androidx.media3.common.text.Cue>, modi
                         android.graphics.Color.TRANSPARENT,
                         androidx.media3.ui.CaptionStyleCompat.EDGE_TYPE_OUTLINE,
                         android.graphics.Color.BLACK,
-                        null,
+                        if (customFont) font?.asAndroidTypeface(view.context) else null,
                     ),
                 )
             } else {

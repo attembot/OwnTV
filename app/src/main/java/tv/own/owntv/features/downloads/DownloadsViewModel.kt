@@ -33,6 +33,8 @@ class DownloadsViewModel(
     private val downloadDao: DownloadDao,
     private val movieDao: MovieDao,
     private val seriesDao: SeriesDao,
+    private val categoryDao: tv.own.owntv.core.database.dao.CategoryDao,
+    private val profileDao: tv.own.owntv.core.database.dao.ProfileDao,
     private val customize: CustomizationStore,
     private val settings: SettingsRepository,
     private val downloadManager: DownloadManager,
@@ -54,12 +56,13 @@ class DownloadsViewModel(
                 flowOf(emptyList())
             } else {
                 combine(
-                    downloadDao.observeForProfile(pid),
-                    customize.observe(pid, MediaType.MOVIE),
-                    customize.observe(pid, MediaType.SERIES),
-                ) { list, custMovie, custSeries ->
-                    if (custMovie.hiddenItems.isEmpty() && custSeries.hiddenItems.isEmpty()) list
-                    else list.filterNot { isHidden(it, custMovie, custSeries) }
+                downloadDao.observeForProfile(pid),
+                customize.observe(pid, MediaType.MOVIE),
+                customize.observe(pid, MediaType.SERIES),
+                profileDao.observeById(pid),
+            ) { list, custMovie, custSeries, profile ->
+                if (custMovie.hiddenItems.isEmpty() && custSeries.hiddenItems.isEmpty() && profile?.isKids != true) list
+                else list.filterNot { isHidden(it, custMovie, custSeries, profile?.isKids == true) }
                 }
             }
         }
@@ -69,12 +72,18 @@ class DownloadsViewModel(
         d: DownloadEntity,
         custMovie: SectionCustomizations,
         custSeries: SectionCustomizations,
+        isKidsProfile: Boolean,
     ): Boolean = when (d.mediaType) {
-        MediaType.MOVIE -> movieDao.getById(d.itemId)
-            ?.let { CustomizeKeys.movie(it) in custMovie.hiddenItems } ?: false
+        MediaType.MOVIE -> movieDao.getById(d.itemId)?.let { movie ->
+            CustomizeKeys.movie(movie) in custMovie.hiddenItems ||
+                (isKidsProfile && tv.own.owntv.core.content.AdultCategoryClassifier.isAdult(movie.categoryId?.let { categoryDao.getById(it)?.name }))
+        } ?: isKidsProfile
         MediaType.EPISODE -> seriesDao.getEpisodeById(d.itemId)
-            ?.let { ep -> seriesDao.getSeriesById(ep.seriesId)?.let { CustomizeKeys.series(it) in custSeries.hiddenItems } }
-            ?: false
+            ?.let { ep -> seriesDao.getSeriesById(ep.seriesId) }
+            ?.let { series ->
+                CustomizeKeys.series(series) in custSeries.hiddenItems ||
+                    (isKidsProfile && tv.own.owntv.core.content.AdultCategoryClassifier.isAdult(series.categoryId?.let { categoryDao.getById(it)?.name }))
+            } ?: isKidsProfile
         else -> false
     }
 
@@ -97,8 +106,12 @@ class DownloadsViewModel(
     /** Phase B: always play this download in an external player, regardless of the global toggle. */
     fun playExternal(download: DownloadEntity) {
         val path = download.filePath ?: return
-        _lastPlayedId.value = download.id
-        externalPlayerLauncher.launch(path, download.title)
+        viewModelScope.launch {
+            val pid = settings.activeProfileId.first()
+            if (!isDownloadAllowed(download, pid)) return@launch
+            _lastPlayedId.value = download.id
+            externalPlayerLauncher.launch(path, download.title)
+        }
     }
 
     /** Play a completed download from its local file. */
@@ -108,6 +121,8 @@ class DownloadsViewModel(
         viewModelScope.launch {
             // External player (global toggle): share the downloaded file with an external app via its
             // FileProvider URI. Otherwise play it in the built-in player.
+            val pid = settings.activeProfileId.first()
+            if (!isDownloadAllowed(download, pid)) return@launch
             if (settings.externalPlayerFor(download.mediaType).first()) {
                 externalPlayerLauncher.launch(path, download.title)
                 return@launch
@@ -123,6 +138,17 @@ class DownloadsViewModel(
      * when online — carries the optional moviehash enhancer via [localPath]. Best-effort: a download
      * whose source item was deleted just plays without a subtitle context, as before.
      */
+    private suspend fun isDownloadAllowed(download: DownloadEntity, profileId: Long): Boolean = when (download.mediaType) {
+        MediaType.MOVIE -> movieDao.getById(download.itemId)?.let {
+            tv.own.owntv.core.content.AdultCategoryClassifier.allows(profileId, it.categoryId, profileDao, categoryDao)
+        } ?: (profileDao.getById(profileId)?.let { !it.isKids } ?: false)
+        MediaType.EPISODE -> seriesDao.getEpisodeById(download.itemId)
+            ?.let { seriesDao.getSeriesById(it.seriesId) }
+            ?.let { tv.own.owntv.core.content.AdultCategoryClassifier.allows(profileId, it.categoryId, profileDao, categoryDao) }
+            ?: (profileDao.getById(profileId)?.let { !it.isKids } ?: false)
+        else -> true
+    }
+
     private suspend fun setSubtitleContext(download: DownloadEntity, localPath: String) {
         val pid = settings.activeProfileId.first()
         runCatching {

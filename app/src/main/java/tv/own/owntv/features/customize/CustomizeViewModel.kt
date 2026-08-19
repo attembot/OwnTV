@@ -49,6 +49,7 @@ class CustomizeViewModel(
     private val settings: SettingsRepository,
     private val sourceDao: SourceDao,
     private val categoryDao: CategoryDao,
+    private val profileDao: tv.own.owntv.core.database.dao.ProfileDao,
     private val customCategoryDao: CustomCategoryDao,
     private val contentOrderDao: ContentOrderDao,
     private val customize: CustomizationStore,
@@ -116,13 +117,20 @@ class CustomizeViewModel(
                     categoryDao.observe(sourceIds, type),
                     customize.observe(c.profileId, type),
                     sourceDao.observeForProfile(c.profileId),
-                ) { cats, cust, sources ->
+                    profileDao.observeById(c.profileId),
+                ) { cats, cust, sources, profile ->
                     val providerNames = sources.associate { it.id to it.name }.takeIf { sourceIds.size > 1 }
                     val orderIndex = cust.categoryOrder.withIndex().associate { (i, k) -> k to i }
                     // Provider folders + the user's custom combined categories (#87) in ONE list, so
                     // hide/rename/reorder apply uniformly (their keys share the CustomizeKeys
                     // namespace). Custom rows carry categoryId = null and no provider name.
-                    val entries = cust.customCategories.map { cc ->
+                    val visibleCustomCategories = if (profile?.isKids == true) {
+                        cust.customCategories.filterNot { tv.own.owntv.core.content.AdultCategoryClassifier.isAdult(it.name) }
+                    } else cust.customCategories
+                    val visibleProviderCategories = if (profile?.isKids == true) {
+                        cats.filterNot { tv.own.owntv.core.content.AdultCategoryClassifier.isAdult(it.name) }
+                    } else cats
+                    val entries = visibleCustomCategories.map { cc ->
                         CustomizeCatRow(
                             key = cc.id,
                             categoryId = null,
@@ -132,7 +140,7 @@ class CustomizeViewModel(
                             renamed = cc.id in cust.categoryNames,
                             providerName = "Custom",
                         )
-                    } + cats.map { cat ->
+                    } + visibleProviderCategories.map { cat ->
                         val key = CustomizeKeys.category(cat)
                         CustomizeCatRow(
                             key = key,

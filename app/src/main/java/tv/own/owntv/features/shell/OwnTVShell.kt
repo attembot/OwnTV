@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -287,6 +288,7 @@ fun OwnTVShell(
     val zapOverlayTitle = zapListTitle ?: when (zapListKey) {
         LiveKey.Favorites -> stringResource(R.string.content_category_favorites)
         LiveKey.History -> stringResource(R.string.content_category_history)
+        LiveKey.Catchup -> stringResource(R.string.content_catchup)
         else -> stringResource(R.string.content_category_all_channels)
     }
     val showCategoryBrowser by liveVm.showCategoryBrowser.collectAsStateWithLifecycle()
@@ -317,10 +319,10 @@ fun OwnTVShell(
     // Batch 7 — the single most-recent resumable item, surfaced as a shared top-bar "Continue" chip.
     val continueTarget by homeVm.continueTarget.collectAsStateWithLifecycle()
 
-    // "Resume last channel on startup" (opt-in, default off): once when the shell first appears, if enabled
-    // and nothing is playing, jump straight back into the last live channel watched. Reads the setting once
-    // (via first()) so toggling it later in Settings never yanks the user into a channel.
+    // Per-profile startup action runs once when the authenticated shell first appears. With one unlocked
+    // profile that is immediately; profile/PIN gates keep the shell out of composition until authorized.
     val resumeSettings = koinInject<tv.own.owntv.features.settings.data.SettingsRepository>()
+    val startupChannelUnavailable = androidx.compose.ui.res.stringResource(tv.own.owntv.R.string.settings_startup_channel_unavailable)
     LaunchedEffect(Unit) {
         if (playerMode != PlayerMode.NONE) return@LaunchedEffect
         val pid = resumeSettings.activeProfileId.first()
@@ -339,6 +341,39 @@ fun OwnTVShell(
                 onSelectSection(MainSection.LIVE_TV)
                 liveVm.select(tv.own.owntv.features.live.LiveKey.Favorites)
                 restoreFocus = true
+            }
+            tv.own.owntv.features.settings.data.StartupMode.SPECIFIC_CHANNEL -> {
+                val ref = resumeSettings.startupChannel(pid).first()
+                var launch: LauncherLaunch? = null
+                if (ref != null) {
+                    if (!ref.remoteId.isNullOrBlank()) {
+                        launch = launcherIntegrationRepository.resolveLaunch(
+                            pid,
+                            LauncherDeepLink.Live(sourceId = ref.sourceId, remoteId = ref.remoteId),
+                        )
+                    }
+                    if (launch == null) {
+                        launch = launcherIntegrationRepository.resolveLaunch(
+                            pid,
+                            LauncherDeepLink.Live(sourceId = ref.sourceId, name = ref.name),
+                        )
+                    }
+                    if (launch == null && ref.itemId > 0L) {
+                        launch = launcherIntegrationRepository.resolveLaunch(
+                            pid,
+                            LauncherDeepLink.Live(sourceId = ref.sourceId, itemId = ref.itemId),
+                        )
+                    }
+                }
+                val channel = (launch as? LauncherLaunch.Live)?.channel
+                if (channel != null && liveVm.isVisibleToActiveProfile(channel) && playerMode == PlayerMode.NONE) {
+                    zapSource = MainSection.LIVE_TV
+                    liveVm.watchFullscreen(channel, listOf(channel))
+                    playerMode = PlayerMode.FULLSCREEN
+                } else {
+                    onSelectSection(MainSection.HOME)
+                    localSubToast.show(startupChannelUnavailable)
+                }
             }
             tv.own.owntv.features.settings.data.StartupMode.HOME -> Unit
         }
@@ -1081,6 +1116,12 @@ fun OwnTVShell(
                     onForwardLive = if (isTunedLive) liveVm::forwardLive else null,
                     onGoToLive = if (isTunedLive) liveVm::goToLive else null,
                     onScrubLive = if (isTunedLive && canRewindLive) liveVm::scrubLive else null,
+                    jumpBackOptions = if (isTunedLive && canRewindLive) liveVm::currentJumpOptions else null,
+                    onJumpBack = if (isTunedLive && canRewindLive) liveVm::jumpBackTo else null,
+                    jumpBackWindowSec = if (isTunedLive && canRewindLive) liveVm::currentCatchupWindowSec else null,
+                    // Non-null only while an archive is on screen, so movies, episodes and live TV get
+                    // the single real clock and catch-up gets the pair.
+                    watchingWallMs = liveVm.watchingWallMs.collectAsStateWithLifecycle().value,
                     timeshiftOffsetSec = if (isTunedLive) timeshiftOffset else null,
                     // Fork: bump audioTick after the tune resolves — a number-tune retunes the main engine
                     // out-of-band, and the corner may own the sound (same rule as zap / Change main / swap).
@@ -1094,7 +1135,9 @@ fun OwnTVShell(
                     // Hidden while rewound into the archive (same `timeshiftOffset == null` rule direct
                     // tune follows above): switching engine restarts the channel at the live edge, which
                     // threw the user out of the rewind with the HUD still counting "behind live".
-                    onToggleCompatMode = if (isTunedLive && timeshiftOffset == null) liveVm::toggleForceMpv else null,
+                    // Also hidden for a protected channel (#115): only ExoPlayer can license it, so the
+                    // toggle's other position is not a compatibility choice but a guaranteed failure.
+                    onToggleCompatMode = if (isTunedLive && timeshiftOffset == null && previewChannel?.drmConfig == null) liveVm::toggleForceMpv else null,
                     // True PiP corner controls — present only while a second stream is in the corner.
                     // Swap is offered only when the main stream is a promoted live channel (both ExoPlayer),
                     // so the exchange is clean; audio/close are always available with a corner up.
@@ -1130,7 +1173,27 @@ fun OwnTVShell(
                     liveEpgCard = if (isLiveChannel) {
                         {
                             val epg by liveVm.nowNext.collectAsStateWithLifecycle()
-                            tv.own.owntv.features.shell.components.LiveEpgCard(epg = epg)
+                            val archiveEpg by liveVm.archiveNowNext.collectAsStateWithLifecycle()
+                            val watching by liveVm.watchingWallMs.collectAsStateWithLifecycle()
+                            // Stacked: what was on air at the replayed moment, then what is on air now.
+                            // The live row is dimmed while an archive plays — it is context, not the
+                            // thing being watched — and returns to full strength back at the live edge.
+                            androidx.compose.foundation.layout.Column(
+                                horizontalAlignment = androidx.compose.ui.Alignment.End,
+                                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(7.dp),
+                            ) {
+                                if (watching != null) {
+                                    tv.own.owntv.features.shell.components.LiveEpgCard(
+                                        epg = archiveEpg,
+                                        variant = tv.own.owntv.features.shell.components.EpgCardVariant.ARCHIVE,
+                                        atMs = watching,
+                                    )
+                                }
+                                tv.own.owntv.features.shell.components.LiveEpgCard(
+                                    epg = epg,
+                                    modifier = if (watching == null) Modifier else Modifier.alpha(0.55f),
+                                )
+                            }
                         }
                     } else null,
                     modifier = Modifier.fillMaxSize(),

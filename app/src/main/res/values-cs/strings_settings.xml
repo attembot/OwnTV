@@ -94,19 +94,34 @@
     <string name="settings_metadata_provider_tmdb_description">Údaje z playlistu mají přednost; TMDB doplní chybějící informace a přidá obsazení, žánry a obrázky na pozadí.</string>
     <string name="settings_metadata_tmdb_only_description">U všech polí upřednostnit TMDB; údaje z playlistu použít pouze v případě, že TMDB nic nenajde.</string>
     <string name="settings_selected">Vybrané</string>
-    <string name="settings_active_tmdb_source">Aktivní zdroj TMDB: <xliff:g id="tier">%1$s</xliff:g></string>
     <string name="settings_metadata_allowance">Váš denní podíl</string>
-    <string name="settings_metadata_allowance_row"><xliff:g id="window">%1$s</xliff:g>: zbývá <xliff:g id="remaining">%2$d</xliff:g> z <xliff:g id="total">%3$d</xliff:g></string>
-    <string name="settings_metadata_window_minute">Za minutu</string>
-    <string name="settings_metadata_window_hour">Za hodinu</string>
-    <string name="settings_metadata_window_day">Dnes</string>
-    <plurals name="settings_metadata_allowance_left">
-        <item quantity="one">Dnes zbývá <xliff:g id="remaining">%1$d</xliff:g> z <xliff:g id="total">%2$d</xliff:g> vyhledávání</item>
-        <item quantity="few">Dnes zbývají <xliff:g id="remaining">%1$d</xliff:g> z <xliff:g id="total">%2$d</xliff:g> vyhledávání</item>
-        <item quantity="many">Dnes zbývá <xliff:g id="remaining">%1$d</xliff:g> z <xliff:g id="total">%2$d</xliff:g> vyhledávání</item>
-        <item quantity="other">Dnes zbývá <xliff:g id="remaining">%1$d</xliff:g> z <xliff:g id="total">%2$d</xliff:g> vyhledávání</item>
+    <string name="settings_metadata_reset_automatic">Obnovuje se automaticky</string>
+    <string name="settings_metadata_library_details">Podrobnosti knihovny</string>
+    <string name="settings_metadata_test_connection">Otestovat aktuální připojení</string>
+    <string name="settings_allowance_available">Dostupné</string>
+    <string name="settings_allowance_refills">Obnoví se <xliff:g id="time">%1$s</xliff:g></string>
+    <string name="settings_allowance_minute">Minuta</string>
+    <string name="settings_allowance_hour">Hodina</string>
+    <string name="settings_allowance_day">Den</string>
+    <plurals name="settings_allowance_value">
+        <item quantity="one">zbývá <xliff:g id="remaining">%1$d</xliff:g> / <xliff:g id="limit">%2$d</xliff:g></item>
+        <item quantity="few">zbývá <xliff:g id="remaining">%1$d</xliff:g> / <xliff:g id="limit">%2$d</xliff:g></item>
+        <item quantity="many">zbývá <xliff:g id="remaining">%1$d</xliff:g> / <xliff:g id="limit">%2$d</xliff:g></item>
+        <item quantity="other">zbývá <xliff:g id="remaining">%1$d</xliff:g> / <xliff:g id="limit">%2$d</xliff:g></item>
     </plurals>
-    <string name="settings_metadata_allowance_resets">Obnoví se v <xliff:g id="time">%1$s</xliff:g></string>
+    <string name="settings_metadata_active_source">Aktivní zdroj</string>
+    <string name="settings_metadata_shared_worker_description">OwnTV Worker · bez nastavování</string>
+    <string name="settings_metadata_connection">Připojení</string>
+    <string name="settings_metadata_remote_advanced">Získat pokročilé údaje TMDB</string>
+    <string name="settings_metadata_remote_advanced_description">Použijte vlastní klíč TMDB API nebo vlastní Worker místo společného výchozího.</string>
+    <string name="settings_metadata_usage_label">Využití</string>
+    <string name="settings_metadata_usage_value"><xliff:g id="min_used">%1$d</xliff:g>/<xliff:g id="min_total">%2$d</xliff:g> min · <xliff:g id="hr_used">%3$d</xliff:g>/<xliff:g id="hr_total">%4$d</xliff:g> hod. · <xliff:g id="day_used">%5$d</xliff:g>/<xliff:g id="day_total">%6$d</xliff:g> den</string>
+    <string name="settings_metadata_source_label">Zdroj</string>
+    <string name="settings_metadata_key_label">Klíč</string>
+    <string name="settings_metadata_server_label">Server</string>
+    <string name="settings_metadata_refills_label">Obnoví se v</string>
+    <string name="settings_metadata_clear_advanced_title">Přestat používat vlastní klíč?</string>
+    <string name="settings_metadata_clear_advanced_message">Váš klíč API TMDB a adresa vlastního serveru budou z tohoto zařízení smazány a OwnTV se vrátí k vestavěné sdílené službě s jejím denním podílem.</string>
     <string name="settings_metadata_fair_share">Vestavěnou službu metadat sdílejí všichni uživatelé OwnTV, takže každé zařízení dostává každý den vlastní podíl. Pokud svůj podíl vyčerpáte, plakáty a popisy se pozastaví, dokud se podíl neobnoví — informace z vaší vlastní playlistu fungují dál normálně. Přidání vlastního klíče API TMDB nebo serveru toto omezení odstraní: je zdarma a osobní klíč prakticky žádný limit nemá.</string>
     <string name="settings_metadata_limit_reached">Denní podíl metadat je vyčerpán — přidejte v Nastavení → Metadata vlastní klíč TMDB a toto omezení zmizí.</string>
     <string name="settings_metadata_language">Jazyk metadat</string>
@@ -114,6 +129,9 @@
     <string name="settings_advanced_options">Pokročilé možnosti</string>
     <string name="settings_advanced_metadata_description">Používejte místo výchozího sdíleného nastavení vlastní klíč API TMDB nebo vlastní server.</string>
     <string name="settings_metadata_server_description">Chcete-li použít integrovaný sdílený server bez dalšího nastavení, ponechte obě pole prázdná. Chcete-li volat TMDB přímo, zadejte vlastní klíč API TMDB. Případně zadejte URL vlastního serveru a používejte vlastní proxy či zrcadlo. URL má přednost před klíčem.</string>
+    <string name="settings_metadata_key_from_phone">Získat klíč z jiného zařízení</string>
+    <string name="settings_metadata_key_from_phone_desc">Naskenujte kód telefonem, tabletem nebo počítačem, přihlaste se tam k TMDB a odešlete klíč. Na dálkovém ovladači není co psát.</string>
+    <string name="settings_metadata_key_received">Klíč TMDB přijat</string>
     <string name="settings_tmdb_api_key">Klíč API TMDB (v3)</string>
     <string name="settings_self_host_url">URL vlastního serveru</string>
     <string name="settings_test">Test</string>
@@ -178,6 +196,15 @@
     <string name="settings_theme_description">Světlý, tmavý nebo podle systému</string>
     <string name="settings_accent">Barva zvýraznění</string>
     <string name="settings_accent_description">Obarvení rozhraní — předvolby, paleta nebo hexadecimální kód</string>
+    <string name="settings_focus_highlight">Zvýraznění zaměření</string>
+    <string name="settings_focus_highlight_description">Barva a tloušťka rámečku kolem vybrané položky</string>
+    <string name="settings_focus_highlight_chip"><xliff:g id="color">%1$s</xliff:g> · <xliff:g id="thickness">%2$s</xliff:g></string>
+    <string name="settings_focus_thickness">Tloušťka</string>
+    <string name="settings_focus_width_thin">Tenký</string>
+    <string name="settings_focus_width_normal">Normální</string>
+    <string name="settings_focus_width_thick">Silný</string>
+    <string name="settings_focus_width_extra">Velmi silný</string>
+    <string name="settings_focus_highlight_sample">Zaměřeno</string>
     <string name="settings_glass_effect">Efekt skla</string>
     <string name="settings_glass_description">Průsvitné matné panely, obrázek na pozadí a průhlednost</string>
     <string name="settings_ui_zoom">Přiblížení rozhraní</string>
@@ -229,6 +256,8 @@
     <string name="settings_startup_home">Domů</string>
     <string name="settings_startup_last_channel">Poslední kanál</string>
     <string name="settings_startup_favorites">Živé vysílání · Oblíbené</string>
+    <string name="settings_startup_specific_channel">Konkrétní kanál</string>
+    <string name="settings_startup_channel_unavailable">Spouštěcí kanál není dostupný. Byla otevřena domovská obrazovka.</string>
     <string name="settings_all_history">Celou historii</string>
     <string name="settings_choose_history">Zvolte, co se má pro tento profil odstranit. Playlisty, oblíbené ani stahování nebudou ovlivněny.</string>
     <string name="settings_clear_history_confirm">Vymazat historii <xliff:g id="scope">%1$s</xliff:g>?</string>
@@ -299,6 +328,7 @@
     <string name="settings_search_keywords_history">nedávno sledované pokračovat odebrat</string>
     <string name="settings_search_keywords_theme">světlý tmavý systém</string>
     <string name="settings_search_keywords_accent">odstín paleta hex předvolba</string>
+    <string name="settings_search_keywords_focus">zaměření rámeček okraj výběr kurzor obrys</string>
     <string name="settings_search_keywords_zoom">měřítko rozhraní velikost</string>
     <string name="settings_search_keywords_animation">pohyb svižnější výkon</string>
     <string name="settings_search_keywords_weather">horní lišta štítek poloha celsius fahrenheit</string>
@@ -372,6 +402,10 @@
     <!-- Translators: Description of the deinterlacing setting. -->
     <string name="settings_deinterlace_description">Vyhladí hřebenovité čáry, které některé staré SD kanály ukazují při pohybu. Platí pro přehrávač mpv, když sám vykresluje obraz — pokud to nic nezmění, vypněte hardwarové dekódování.</string>
     <string name="settings_movies_series_player">Přehrávač filmů a seriálů</string>
+    <string name="settings_live_tv_player">Přehrávač živého vysílání</string>
+    <string name="settings_engine_order"><xliff:g id="first">%1$s</xliff:g>, poté <xliff:g id="second">%2$s</xliff:g></string>
+    <string name="settings_engine_only">Pouze <xliff:g id="engine">%1$s</xliff:g></string>
+    <string name="settings_engine_default"><xliff:g id="option">%1$s</xliff:g> (výchozí)</string>
     <string name="settings_reset_player_choices">Resetovat uložené volby přehrávače</string>
     <string name="settings_external_player">Externí přehrávač</string>
     <string name="settings_default_zoom">Výchozí přiblížení</string>
@@ -414,7 +448,22 @@
     <string name="settings_preferred_subtitle_language">Preferovaný jazyk titulků</string>
     <string name="settings_preferred_language_description">Automaticky vybrat tuto stopu titulků, pokud je dostupná.</string>
     <string name="settings_open_subtitles">OpenSubtitles</string>
+    <string name="settings_open_subtitles_connected">Připojeno</string>
+    <string name="settings_open_subtitles_reset_in">Za <xliff:g id="hours">%1$d</xliff:g> h <xliff:g id="minutes">%2$d</xliff:g> min</string>
     <string name="settings_open_subtitles_description">Přihlaste se, abyste mohli vyhledávat a stahovat titulky a spravovat stažené titulky. Nastavení platí pro každý profil zvlášť a vyžaduje bezplatný účet na opensubtitles.com.</string>
+    <string name="settings_open_subtitles_advanced">Pokročilé možnosti</string>
+    <string name="settings_open_subtitles_advanced_description">Použijte vlastní aplikační klíč API nebo vlastní OpenSubtitles Worker.</string>
+    <string name="settings_open_subtitles_setup_title">Nastavit OpenSubtitles</string>
+    <string name="settings_open_subtitles_setup_description">Přihlaste se svým účtem OpenSubtitles.</string>
+    <string name="settings_open_subtitles_setup_remote">Vzdáleně</string>
+    <string name="settings_open_subtitles_setup_remote_description">Vyplňte údaje v prohlížeči na jiném zařízení ve stejné Wi-Fi – v telefonu, tabletu nebo počítači.</string>
+    <string name="settings_open_subtitles_setup_local">Zadat zde</string>
+    <string name="settings_open_subtitles_setup_local_description">Zadejte údaje přímo na této TV pomocí dálkového ovladače.</string>
+    <string name="settings_open_subtitles_api_key">Aplikační klíč API pro OpenSubtitles</string>
+    <string name="settings_worker_server_url">Adresa Workeru / serveru</string>
+    <string name="settings_shared">Společné</string>
+    <string name="settings_open_subtitles_access_priority">Pro společný Worker OwnTV nechte obojí prázdné. Vlastní adresa Workeru má přednost před přímým klíčem API. Přihlášení k účtu zůstává specifické pro profil.</string>
+    <string name="settings_remove_custom_access">Odebrat vlastní přístup</string>
     <string name="settings_audio">Zvuk</string>
     <string name="settings_preferred_audio_language">Preferovaný jazyk zvuku</string>
     <string name="settings_audio_sync">Synchronizace zvuku</string>
@@ -446,7 +495,8 @@
     <string name="settings_audio_delay"><xliff:g id="delay">%1$d</xliff:g> ms</string>
     <string name="settings_external_player_description">Vyberte, které sekce se mají otevírat v externí aplikaci.</string>
     <string name="settings_audio_delay_value"><xliff:g id="delay">%1$d</xliff:g> ms</string>
-    <string name="settings_movies_player_description">mpv (doporučeno) podporuje nejširší škálu formátů — zvuk DTS/TrueHD, neobvyklé soubory — a také nabízí opravu synchronizace A/V. Na ExoPlayer přepněte pouze tehdy, pokud se filmy nebo epizody nespustí: na některých televizorech přehraje určité streamy, které mpv přehrát nedokáže, ale neumí dekódovat zvuk DTS/TrueHD a nenabízí opravu synchronizace A/V. Ať zvolíte kterýkoli, při selhání se automaticky vyzkouší druhý.</string>
+    <string name="settings_movies_player_description">mpv (doporučeno) má nejširší podporu formátů — zvuk DTS/TrueHD, neobvyklé soubory — a navíc opravu synchronizace zvuku a obrazu. ExoPlayer na některých televizích přehraje streamy, na které mpv nestačí, neumí však dekódovat zvuk DTS/TrueHD a opravu synchronizace nemá. Kombinované možnosti při selhání prvního přehrávače automaticky zkusí druhý; možnosti s jediným přehrávačem to nedělají nikdy, což ušetří několik vteřin černé obrazovky, pokud druhý přehrávač na vaší televizi stejně nefunguje.</string>
+    <string name="settings_live_player_description">ExoPlayer (doporučeno) otevírá kanály mnohem rychleji a jako jediný zvládá titulky v živém vysílání. mpv přehraje kanály, na které ExoPlayer nestačí, včetně některých s neobvyklým zvukem. Kombinované možnosti při selhání prvního přehrávače automaticky zkusí druhý; možnosti s jediným přehrávačem to nedělají nikdy, což ušetří několik vteřin černé obrazovky, pokud druhý přehrávač na vaší televizi stejně nefunguje. U kanálu přepnutého ručně v přehrávači zůstane vaše volba tak jako tak.</string>
     <string name="settings_reset_player_choices_description">Když v přehrávači přepnete jednotlivý film nebo epizodu mezi mpv a ExoPlayerem, tato volba se uloží pro příště. Reset vrátí vše zpět k nastavení výše. Uložené volby pro živé kanály zůstávají zachovány.</string>
     <string name="settings_reset_player_choices_none">Nic uloženo</string>
     <plurals name="settings_reset_player_choices_count">
@@ -482,7 +532,7 @@
     <string name="settings_guide_synced">TV program synchronizován</string>
     <string name="settings_guide_sync_failed">Synchronizace TV programu se nezdařila</string>
     <string name="settings_restore_remote_title">Obnovit z jiného zařízení</string>
-    <string name="settings_restore_remote_description">Na telefonu nebo notebooku připojeném ke stejné síti Wi-Fi naskenujte QR kód (nebo otevřete adresu URL), zadejte tento PIN, vyberte soubor zálohy OwnTV a klepněte na Odeslat do TV. Potom zde vyberete, co chcete obnovit.</string>
+    <string name="settings_restore_remote_description">Na telefonu, tabletu nebo počítači připojeném ke stejné síti Wi-Fi naskenujte QR kód (nebo otevřete adresu URL), zadejte tento PIN, vyberte soubor zálohy OwnTV a klepněte na Odeslat do TV. Potom zde vyberete, co chcete obnovit.</string>
     <string name="settings_opening_server">Spouštění serveru…</string>
     <string name="settings_enter_pin_browser">Zadejte tento PIN v prohlížeči</string>
     <string name="settings_companion_qr">QR kód adresy URL doprovodné stránky</string>
@@ -490,7 +540,7 @@
     <string name="settings_try_again">Zkusit znovu</string>
     <string name="settings_new_pin">Spustit znovu s novým PIN</string>
     <string name="settings_download_remote_title">Stáhnout na jiném zařízení</string>
-    <string name="settings_download_remote_description">Na telefonu nebo notebooku připojeném ke stejné síti Wi-Fi naskenujte QR kód (nebo otevřete adresu URL), zadejte tento PIN a stáhněte si soubor zálohy, abyste jej mohli bezpečně uchovat.</string>
+    <string name="settings_download_remote_description">Na telefonu, tabletu nebo počítači připojeném ke stejné síti Wi-Fi naskenujte QR kód (nebo otevřete adresu URL), zadejte tento PIN a stáhněte si soubor zálohy, abyste jej mohli bezpečně uchovat.</string>
     <string name="settings_preparing_backup">Příprava zálohy…</string>
     <string name="settings_glass_effect_on">Efekt skla: Zapnuto</string>
     <string name="settings_glass_effect_off">Efekt skla: Vypnuto</string>
@@ -699,7 +749,7 @@
     <string name="settings_backup_what_backup">Co zálohovat</string>
     <string name="settings_backup_what_restore">Co obnovit</string>
     <string name="settings_backup_encrypt_title">Zašifrovat tuto zálohu?</string>
-    <string name="settings_backup_encrypt_message">Pokud nastavíte heslo zálohy, bude zašifrován celý soubor — včetně playlistů, profilů a uložených hesel — a bez tohoto hesla z něj nebude možné nic přečíst. Heslo bezpečně uschovejte: pokud jej ztratíte, zálohu nebude možné vůbec otevřít. Bez hesla nebude soubor zašifrován a uložená hesla v něm nebudou zahrnuta.</string>
+    <string name="settings_backup_encrypt_message">Pokud nastavíte heslo zálohy, bude zašifrován celý soubor — včetně playlistů, profilů a uložených hesel — a bez tohoto hesla z něj nebude možné nic přečíst. Heslo bezpečně uschovejte: pokud jej ztratíte, zálohu nebude možné vůbec otevřít. Bez hesla nebude soubor zašifrován a uložená hesla ani PINy v něm nebudou zahrnuty.</string>
     <string name="settings_backup_export_title">Exportovat zálohu</string>
     <string name="settings_backup_export_message">Odešlete zálohu do jiného zařízení (telefonu nebo notebooku) připojeného ke stejné síti Wi-Fi nebo ji uložte do souboru v tomto zařízení.</string>
     <string name="settings_backup_restore_title">Obnovit zálohu</string>
@@ -748,7 +798,7 @@
     <string name="settings_backup_section_settings">Nastavení aplikace</string>
     <string name="settings_backup_section_settings_desc">Předvolby motivu, barvy zvýraznění, přehrávače a rozvržení</string>
     <string name="settings_backup_saved_to">Uloženo do <xliff:g id="path">%1$s</xliff:g>.</string>
-    <string name="settings_backup_saved_to_without_passwords">Uloženo do <xliff:g id="path">%1$s</xliff:g>. Hesla nebyla zahrnuta.</string>
+    <string name="settings_backup_saved_to_without_passwords">Uloženo do <xliff:g id="path">%1$s</xliff:g>. Hesla ani PINy nebyly zahrnuty.</string>
     <plurals name="settings_backup_restored">
         <item quantity="one">Obnovena <xliff:g id="items">%1$d</xliff:g> položka.</item>
         <item quantity="few">Obnoveny <xliff:g id="items">%1$d</xliff:g> položky.</item>
@@ -756,7 +806,7 @@
         <item quantity="other">Obnoveno <xliff:g id="items">%1$d</xliff:g> položek.</item>
     </plurals>
     <string name="settings_backup_restore_resync">Opětovnou synchronizací zdrojů načtěte obsah.</string>
-    <string name="settings_backup_restore_password_note">V části Zdroje/Proxy znovu zadejte všechna uložená hesla.</string>
+    <string name="settings_backup_restore_password_note">V části Zdroje/Proxy znovu zadejte všechna uložená hesla a případné PINy profilů.</string>
     <plurals name="settings_backup_skipped_sources">
         <item quantity="one"><xliff:g id="count">%1$d</xliff:g> zdroj byl přeskočen, protože jeho typ playlistu není podporován.</item>
         <item quantity="few"><xliff:g id="count">%1$d</xliff:g> zdroje byly přeskočeny, protože jejich typy playlistů nejsou podporovány.</item>
@@ -989,6 +1039,8 @@
     <string name="settings_font_preview">Zábava jednoduše.</string>
     <string name="settings_search_keywords_fonts">písmo text velikost typografie okno čtení přístupnost</string>
     <string name="settings_font_system_sans">Systémové bezpatkové</string>
+    <string name="settings_font_monospace">Neproporcionální</string>
+    <string name="settings_subtitle_font">Písmo titulků</string>
     <string name="settings_glass_preset_title">Předvolba vzhledu</string>
     <string name="settings_glass_preset_clear">Čiré</string>
     <string name="settings_glass_preset_balanced">Vyvážené</string>

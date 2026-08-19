@@ -1,8 +1,15 @@
 /** OwnTV's backwards-compatible TMDB v3 caching gateway. */
 const TMDB_ORIGIN = "https://api.themoviedb.org";
-const METADATA_FRESH_SECONDS = 30 * 24 * 60 * 60;
+// 180 days, matched to the app's own MetadataRepository.POSITIVE_TTL_MS. At 30 days the Worker
+// re-fetched from TMDB on day 31 even though no app would ask again for another five months —
+// buying a re-download of identical JSON. Details for a released title barely change, and the
+// app's "Refetch TMDB details" already exists for the rare case a user wants one sooner.
+const METADATA_FRESH_SECONDS = 180 * 24 * 60 * 60;
 const TRENDING_FRESH_SECONDS = 15 * 60;
-const METADATA_STALE_SECONDS = 90 * 24 * 60 * 60;
+// Must stay ABOVE the fresh window: this is the Cache-Control max-age, so it decides how long the
+// entry survives at the edge at all. Were it lower, the stale-on-outage fallback below could
+// never fire, because the entry would already be gone.
+const METADATA_STALE_SECONDS = 365 * 24 * 60 * 60;
 const TRENDING_STALE_SECONDS = 24 * 60 * 60;
 const UPSTREAM_TIMEOUT_MS = 8_000;
 const MAX_ATTEMPTS = 2;

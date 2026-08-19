@@ -811,7 +811,7 @@ private fun GuideChannelRow(
                 }
                 .focusable()
                 .clip(RoundedCornerShape(10.dp))
-                .then(if (rowSelected) Modifier.border(Dimens.FocusBorderWidth, colors.focusBorder, RoundedCornerShape(10.dp)) else Modifier),
+                .then(if (rowSelected) Modifier.border(tv.own.owntv.ui.theme.LocalFocusBorderWidth.current, colors.focusBorder, RoundedCornerShape(10.dp)) else Modifier),
         ) {
             programmes?.let { progs ->
                 // Catch-up-eligible programmes for this row — precomputed once per render (not per frame).

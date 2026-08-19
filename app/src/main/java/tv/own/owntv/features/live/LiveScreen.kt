@@ -542,6 +542,13 @@ fun LiveScreen(
             channelName = ch.name,
             loadProgrammes = { vm.catchupProgrammes(ch) },
             onPick = { prog -> catchupChannel = null; catchupDetail = ch to prog },
+            jumpOffsetsSec = remember(ch.id) { vm.catchupJumpOptions(ch) },
+            jumpWindowSec = remember(ch.id) { vm.catchupWindowOf(ch) },
+            onJump = { offset ->
+                catchupChannel = null
+                vm.playCatchupAt(ch, offset)
+                if (!externalPlayerOn) onFullscreen()
+            },
             onDismiss = { catchupChannel = null },
         )
     }
@@ -1148,6 +1155,11 @@ private fun CatchupDialog(
     channelName: String,
     loadProgrammes: suspend () -> List<tv.own.owntv.core.database.entity.EpgProgrammeEntity>,
     onPick: (tv.own.owntv.core.database.entity.EpgProgrammeEntity) -> Unit,
+    // Fallback for a channel with an archive but no guide: there are no programmes to name, but the
+    // archive is still there, so offer times instead of the old dead-end "go match your EPG" message.
+    jumpOffsetsSec: List<Int>,
+    jumpWindowSec: Int,
+    onJump: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val colors = OwnTVTheme.colors
@@ -1156,9 +1168,19 @@ private fun CatchupDialog(
         value = runCatching { loadProgrammes() }.getOrDefault(emptyList())
     }
     androidx.activity.compose.BackHandler { onDismiss() }
+    // "Choose exact time…" opens on top of this dialog, same as the player's route into it.
+    var manualTime by remember { mutableStateOf(false) }
+    if (manualTime) {
+        CatchupManualTimeDialog(
+            windowSec = jumpWindowSec,
+            onPick = { manualTime = false; onJump(it) },
+            onDismiss = { manualTime = false },
+        )
+    }
     val firstFocus = remember { FocusRequester() }
     LaunchedEffect(list) {
-        if (list.isNullOrEmpty()) return@LaunchedEffect
+        // Still loading, or nothing focusable at all (no programmes AND no archive to jump into).
+        if (list == null || (list!!.isEmpty() && jumpOffsetsSec.isEmpty())) return@LaunchedEffect
         kotlinx.coroutines.delay(60); runCatching { firstFocus.requestFocus() }
     }
     // Popup(focusable = true) is a hard focus boundary: a stray D-pad press or the Live screen's own
@@ -1181,15 +1203,32 @@ private fun CatchupDialog(
         Column(Modifier.dialogPanel(width = 460.dp, corner = 16.dp, padding = 18.dp, scroll = false)) {
             Text(stringResource(R.string.content_catchup_title, channelName), style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
             Spacer(Modifier.height(2.dp))
-            Text(stringResource(R.string.content_catchup_prompt), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+            val noGuide = list?.isEmpty() == true && jumpOffsetsSec.isNotEmpty()
+            Text(
+                stringResource(if (noGuide) R.string.content_catchup_jump_prompt else R.string.content_catchup_prompt),
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.onSurfaceVariant,
+            )
             Spacer(Modifier.height(12.dp))
             when (val progs = list) {
                 null -> Box(Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) { OwnTVSpinner(sizeDp = 28) }
                 else -> if (progs.isEmpty()) {
-                    Text(
-                        stringResource(R.string.content_catchup_empty),
-                        style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant,
-                    )
+                    // No guide for this channel. The archive still exists, so offer times to jump to;
+                    // only fall back to the "match your EPG" note when there is no archive window either.
+                    if (jumpOffsetsSec.isNotEmpty()) {
+                        CatchupJumpRows(
+                            offsetsSec = jumpOffsetsSec,
+                            firstFocus = firstFocus,
+                            onPick = onJump,
+                            modifier = Modifier.fillMaxWidth().height(listHeight),
+                            onChooseExact = { manualTime = true },
+                        )
+                    } else {
+                        Text(
+                            stringResource(R.string.content_catchup_empty),
+                            style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant,
+                        )
+                    }
                 } else {
                     LazyColumn(Modifier.fillMaxWidth().height(listHeight), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         items(progs, key = { it.id }) { p ->
