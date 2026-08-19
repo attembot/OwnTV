@@ -551,6 +551,9 @@ class LiveViewModel(
             LiveKey.All -> channelDao.allForSources(c.sourceIds, limit)
             LiveKey.Favorites -> channelDao.listFavorites(c.profileId, limit)
             LiveKey.History -> channelDao.listHistory(c.profileId, limit)
+            // v4.2.2 added the Catch-up rail — a filter over ALL, not a stored category, so the
+            // picker browses it through the same `catchup = 1` query the rail's pager uses.
+            LiveKey.Catchup -> channelDao.listCatchup(c.sourceIds, limit)
             is LiveKey.Folder -> channelDao.listByCategory(key.id, limit)
             // v4.1.6 added user-created combined categories; the corner/tile picker browses them too.
             is LiveKey.Custom -> customCategoryDao.snapshotChannels(c.profileId, key.id, c.sourceIds, limit)

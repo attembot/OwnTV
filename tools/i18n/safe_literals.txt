@@ -759,6 +759,7 @@
 1	room-schema	app/src/main/java/tv/own/owntv/core/database/dao/ChannelDao.kt	SELECT * FROM channels WHERE sourceId IN (:sourceIds)
 1	room-schema	app/src/main/java/tv/own/owntv/core/database/dao/ChannelDao.kt	SELECT * FROM channels WHERE sourceId IN (:sourceIds) AND catchup = 1 AND name LIKE '%' || :query || '%' ORDER BY name ASC
 1	room-schema	app/src/main/java/tv/own/owntv/core/database/dao/ChannelDao.kt	SELECT * FROM channels WHERE sourceId IN (:sourceIds) AND catchup = 1 ORDER BY name ASC
+1	sql	app/src/main/java/tv/own/owntv/core/database/dao/ChannelDao.kt	SELECT * FROM channels WHERE sourceId IN (:sourceIds) AND catchup = 1 ORDER BY name ASC LIMIT :limit
 1	room-schema	app/src/main/java/tv/own/owntv/core/database/dao/ChannelDao.kt	SELECT * FROM channels WHERE sourceId IN (:sourceIds) AND catchup = 1 ORDER BY sourceId ASC, sortOrder ASC, name ASC
 2	room-schema	app/src/main/java/tv/own/owntv/core/database/dao/ChannelDao.kt	SELECT * FROM channels WHERE sourceId IN (:sourceIds) AND epgChannelId IS NOT NULL AND epgChannelId != ''
 1	room-schema	app/src/main/java/tv/own/owntv/core/database/dao/ChannelDao.kt	SELECT * FROM channels WHERE sourceId IN (:sourceIds) AND name LIKE '%' || :query || '%' ORDER BY name ASC

@@ -195,6 +195,11 @@ interface ChannelDao {
     @Query("SELECT * FROM channels WHERE sourceId IN (:sourceIds) AND catchup = 1 ORDER BY sourceId ASC, sortOrder ASC, name ASC")
     fun pagingCatchupOriginal(sourceIds: List<Long>): PagingSource<Int, ChannelEntity>
 
+    /** Bounded, one-shot Catch-up list for the in-overlay browse picker (PiP / MultiView) — same
+     *  `catchup = 1` filter and A-Z order as [pagingCatchup], just materialised. */
+    @Query("SELECT * FROM channels WHERE sourceId IN (:sourceIds) AND catchup = 1 ORDER BY name ASC LIMIT :limit")
+    suspend fun listCatchup(sourceIds: List<Long>, limit: Int): List<ChannelEntity>
+
     // --- Manual order (Move) — LEFT JOIN content_order; items with a row come first in their saved
     //     position, the rest fall back to provider/playlist order. ---
     @Query(
