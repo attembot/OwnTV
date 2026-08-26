@@ -46,6 +46,16 @@ data class OwnTVColors(
     val focusBorder: Color,
     val focusGlow: Color,
     val favorite: Color,
+    /**
+     * The accent as it must look on the player's chrome, which is always dark scrim over video no
+     * matter which theme the app is in. [primary] can't be used there: on the light theme it is the
+     * deep tone M3 picks for a light surface (teal becomes #006B5E), which all but disappears against
+     * a dark HUD. This is the same accent resolved for dark surfaces, so the seek bar and the active
+     * buttons stay readable — and on the dark theme it is simply [primary].
+     */
+    val accentOnVideo: Color,
+    /** Text/icon colour for content drawn ON [accentOnVideo] — e.g. the count inside a badge. */
+    val onAccentOnVideo: Color,
 ) {
     // Legacy aliases used by existing components.
     val textPrimary: Color get() = onSurface
@@ -130,6 +140,13 @@ fun ownTvColors(
         onPrimaryContainer = accent.onPrimaryContainer(isDark),
     )
     val primary = roles.primary
+    // Always the dark-surface tone of the same accent: the player HUD is dark chrome in every theme.
+    val onVideoRoles = parseAccentHex(customAccent)?.let { rolesFrom(it, true) } ?: AccentRoles(
+        primary = accent.primary(true),
+        onPrimary = accent.onPrimary(true),
+        primaryContainer = accent.primaryContainer(true),
+        onPrimaryContainer = accent.onPrimaryContainer(true),
+    )
     val focus = parseAccentHex(focusHighlight) ?: primary
     return if (isDark) {
         OwnTVColors(
@@ -160,6 +177,8 @@ fun ownTvColors(
             focusBorder = focus,
             focusGlow = focus.copy(alpha = 0.40f),
             favorite = DarkError,
+            accentOnVideo = onVideoRoles.primary,
+            onAccentOnVideo = onVideoRoles.onPrimary,
         )
     } else {
         OwnTVColors(
@@ -190,6 +209,8 @@ fun ownTvColors(
             focusBorder = focus,
             focusGlow = focus.copy(alpha = 0.28f),
             favorite = LightError,
+            accentOnVideo = onVideoRoles.primary,
+            onAccentOnVideo = onVideoRoles.onPrimary,
         )
     }
 }

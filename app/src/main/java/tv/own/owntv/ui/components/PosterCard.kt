@@ -41,6 +41,7 @@ fun PosterCard(
     progressFraction: Float? = null,
     completed: Boolean = false,
     isFavorite: Boolean = false,
+    providerName: String? = null,
     selected: Boolean = false,
     onFocus: () -> Unit = {},
     onClick: () -> Unit,
@@ -121,6 +122,14 @@ fun PosterCard(
                     )
                 }
 
+                providerName?.let {
+                    ProviderChip(
+                        name = it,
+                        maxWidth = 96.dp,
+                        compact = true,
+                        modifier = Modifier.align(Alignment.BottomStart).padding(start = 6.dp, bottom = 8.dp),
+                    )
+                }
                 if (progressFraction != null && progressFraction > 0f) {
                     Box(
                         modifier = Modifier

@@ -87,7 +87,7 @@ fun NavMenuSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         Spacer(Modifier.height(16.dp))
 
         Row2(
-            icon = OwnTVIcon.THEME,
+            icon = OwnTVIcon.MENU,
             title = stringResource(R.string.settings_behavior),
             desc = when (mode) {
                 SettingsRepository.NavMenuMode.DYNAMIC ->

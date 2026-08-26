@@ -308,6 +308,8 @@ class MainActivity : ComponentActivity() {
                 animationLevel = animationLevel,
                 mainFontFamily = fontCustomization.mainFamily,
                 popupFontFamily = fontCustomization.popupFamily,
+                popupFontSizePercent = fontCustomization.popupFontSizePercent,
+                popupSizePercent = fontCustomization.popupSizePercent,
             ) {
                 val base = LocalDensity.current
                 // Glass is "always on" (Option B): panels go translucent whenever at least one surface is

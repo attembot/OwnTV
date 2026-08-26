@@ -28,7 +28,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import kotlinx.coroutines.delay
 import tv.own.owntv.R
 import tv.own.owntv.ui.theme.OwnTVTheme
 
@@ -42,11 +41,10 @@ fun StreamInfoOverlay(player: PlaybackEngine, modifier: Modifier = Modifier) {
     // Starts empty and is filled by the effect below: the mpv read now happens on the player's own
     // executor, so there is nothing to read synchronously during composition (A-F2).
     var rows by remember { mutableStateOf(emptyList<StreamInfoRow>()) }
+    // Re-read on the player's shared cosmetic beat rather than a timer of its own, so having the overlay
+    // up alongside the position readout costs one wake-up rather than two (see [PlayerHeartbeat]).
     LaunchedEffect(player) {
-        while (true) {
-            rows = player.streamInfo()
-            delay(1_000)
-        }
+        PlayerHeartbeat.beat.collect { rows = player.streamInfo() }
     }
     if (rows.isEmpty()) return
     val colors = OwnTVTheme.colors

@@ -23,6 +23,10 @@
     <string name="settings_movies_keep_watching_description">Visa kort för att återuppta filmer på huvudraden.</string>
     <string name="settings_series_keep_watching">Serier i Fortsätt titta</string>
     <string name="settings_series_keep_watching_description">Visa kort för att återuppta avsnitt på huvudraden.</string>
+    <!-- Translators: Toggle label for playing the highlighted Home item's video in the hero row. -->
+    <string name="settings_hero_preview">Spela upp video på huvudraden</string>
+    <!-- Translators: Description of the hero-row video preview toggle. -->
+    <string name="settings_hero_preview_description">Videon för det markerade objektet spelas upp efter ett ögonblick. Stäng av för att spara ström och minne när du bläddrar på startskärmen.</string>
     <string name="settings_android_tv_home">Android TV-startskärm</string>
     <string name="settings_android_tv_home_description">Visa Fortsätt titta och de senaste livekanalerna på tv:ns startskärm.</string>
     <string name="settings_refresh_now">Uppdatera nu</string>
@@ -63,19 +67,62 @@
     <string name="settings_proxy_connection_failed">Det gick inte att ansluta till proxyn (kontrollera värd/port).</string>
     <string name="settings_proxy_http">Proxyn returnerade HTTP <xliff:g id="code">%1$d</xliff:g></string>
     <string name="settings_proxy_failed">Proxytestet misslyckades.</string>
-    <string name="settings_ch_nav_title">Sidbläddring med CH+-knapparna</string>
-    <string name="settings_ch_nav_description">Bläddra en sida i kategori- eller objektlistan med fjärrkontrollens CH+ / CH−-knappar.</string>
-    <string name="settings_ch_nav_enabled">Använd CH+-knapparna för att bläddra i listor</string>
-    <string name="settings_ch_nav_enabled_description">När funktionen är på hoppar CH+ och CH− i den fokuserade panelen (kategorifältet eller objektlistan samt kategorilistan under Anpassa). När den är avstängd gör knapparna ingenting på dessa skärmar.</string>
-    <string name="settings_ch_nav_up">CH+-hopp (mot den första)</string>
-    <string name="settings_ch_nav_up_description">Hur många objekt ett tryck på CH+ hoppar uppåt. Ett långtryck går alltid till det första objektet.</string>
-    <string name="settings_ch_nav_down">CH−-hopp (mot den sista)</string>
-    <string name="settings_ch_nav_down_description">Hur många objekt ett tryck på CH− hoppar nedåt. Ett långtryck går alltid till det sista objektet.</string>
+    <string name="settings_ch_nav_title">Sidbläddring med CH+/RW · CH−/FF-knapparna</string>
+    <string name="settings_ch_nav_description">Bläddra en sida i kategori- eller objektlistan med fjärrkontrollens CH+/RW / CH−/FF-knappar.</string>
+    <string name="settings_ch_nav_enabled">Använd CH+/RW · CH−/FF-knapparna för att bläddra i listor</string>
+    <string name="settings_ch_nav_enabled_description">När funktionen är på hoppar CH+/RW och CH−/FF i den fokuserade panelen (kategorifältet eller objektlistan samt kategorilistan under Anpassa). När den är avstängd gör knapparna ingenting på dessa skärmar.</string>
+    <string name="settings_ch_nav_up">CH+ / Spola bakåt (mot den första)</string>
+    <string name="settings_ch_nav_up_description">Hur många objekt ett tryck på CH+/RW hoppar uppåt. Ett långtryck går alltid till det första objektet.</string>
+    <string name="settings_ch_nav_down">CH− / Spola framåt (mot den sista)</string>
+    <string name="settings_ch_nav_down_description">Hur många objekt ett tryck på CH−/FF hoppar nedåt. Ett långtryck går alltid till det sista objektet.</string>
     <string name="settings_skip_counts">Antal objekt per hopp</string>
     <string name="settings_how_it_works">Så fungerar det</string>
-    <string name="settings_ch_nav_help">• Hoppen stannar vid listans ändar, så korta listor når slutet med ett enda tryck.\n• Långtryck på CH+ = första objektet, långtryck på CH− = sista objektet.\n• Långtryck är inaktiverat i listan ”Alla” (alla kanaler / filmer / serier) — korta tryck för att hoppa fungerar fortfarande där.\n• Gäller den panel som har fokus — kategorifältet eller objektlistan/rutnätet.\n• Bläddrar även i kategorilistan under Inställningar → Anpassa kategorier och objekt.</string>
+    <string name="settings_ch_nav_help">• Hoppen stannar vid listans ändar, så korta listor når slutet med ett enda tryck.\n• Långtryck på CH+/RW = första objektet, långtryck på CH−/FF = sista objektet.\n• Långtryck är inaktiverat i listan ”Alla” (alla kanaler / filmer / serier) — korta tryck för att hoppa fungerar fortfarande där.\n• Gäller den panel som har fokus — kategorifältet eller objektlistan/rutnätet.\n• Bläddrar även i kategorilistan under Inställningar → Anpassa kategorier och objekt.</string>
+    <string name="settings_remote_shortcuts">Fjärrkontrollsgenvägar</string>
+    <string name="settings_remote_shortcuts_description">Tilldela lediga knappar till navigering, uppspelning och bläddring. Viktiga navigeringsknappar förblir skyddade.</string>
+    <string name="settings_remote_shortcuts_enabled">Använd fjärrkontrollsgenvägar</string>
+    <string name="settings_remote_shortcuts_enabled_description">Stäng av alla egna genvägar utan att radera tilldelningarna</string>
+    <string name="settings_remote_shortcuts_assignments">Knapptilldelningar</string>
+    <string name="settings_remote_shortcuts_add">Lägg till genväg</string>
+    <string name="settings_remote_shortcuts_add_description">Tryck eller håll en ledig knapp och välj sedan åtgärd</string>
+    <string name="settings_remote_shortcuts_reset">Återställ standardgenvägar</string>
+    <string name="settings_remote_shortcuts_reset_description">Återställ bläddring med CH+/CH− och bakåt/framåt; ta bort andra tilldelningar</string>
+    <string name="settings_remote_shortcuts_capture_title">Tryck på en fjärrkontrollsknapp</string>
+    <string name="settings_remote_shortcuts_capture_description">Tryck kort eller håll tills du släpper. Bakåt, styrknapp, OK, volym, Hem och ström kan inte tilldelas.</string>
+    <string name="settings_remote_shortcuts_choose_action">Välj en åtgärd</string>
+    <string name="settings_remote_shortcuts_binding"><xliff:g id="press">%1$s</xliff:g> · <xliff:g id="action">%2$s</xliff:g></string>
+    <string name="settings_remote_shortcuts_short_press">Kort tryck</string>
+    <string name="settings_remote_shortcuts_long_press">Långt tryck</string>
+    <string name="settings_remote_shortcuts_unknown_button">Fjärrkontrollsknapp %1$d</string>
+    <string name="settings_remote_shortcuts_help">• Som standard bläddrar CH+/CH− och bakåt/framåt i listor; håll för första eller sista objektet.
+• Korta och långa tryck kan tilldelas separat.
+• Hoppa till sista är avstängt i mycket stora ”Alla”-listor.
+• Långt tryck på Bakåt fokuserar alltid på Spelas nu och kan inte ändras.
+• Vanligtvis tilldelningsbara knappar är röd/grön/gul/blå, siffror, CH+/CH− och spola bakåt/framåt.
+• Bakåt, styrknapp, OK, volym, Hem och ström är skyddade.
+• Siffergenvägar fungerar vid bläddring; i helskärm har kanalinmatning prioritet.</string>
+    <string name="settings_remote_button_channel_up">Kanal +</string>
+    <string name="settings_remote_button_channel_down">Kanal −</string>
+    <string name="settings_remote_button_rewind">Spola bakåt</string>
+    <string name="settings_remote_button_fast_forward">Spola framåt</string>
+    <string name="settings_remote_button_previous">Föregående</string>
+    <string name="settings_remote_button_next">Nästa</string>
+    <string name="settings_remote_button_menu">Meny</string>
+    <string name="settings_remote_button_red">Röd knapp</string>
+    <string name="settings_remote_button_green">Grön knapp</string>
+    <string name="settings_remote_button_yellow">Gul knapp</string>
+    <string name="settings_remote_button_blue">Blå knapp</string>
+    <string name="settings_remote_action_continue">Fortsätt senast visade</string>
+    <string name="settings_remote_action_focus_now_playing">Fokusera Spelas nu</string>
+    <string name="settings_remote_action_expand_now_playing">Expandera Spelas nu</string>
+    <string name="settings_remote_action_mini_player">Flytta till minispelaren</string>
+    <string name="settings_remote_action_play_pause">Spela eller pausa</string>
+    <string name="settings_remote_action_page_first">Bläddra mot första objekten</string>
+    <string name="settings_remote_action_page_last">Bläddra mot sista objekten</string>
+    <string name="settings_remote_action_jump_first">Gå till första objektet</string>
+    <string name="settings_remote_action_jump_last">Gå till sista objektet</string>
     <string name="settings_large_skips_warning">Stora hopp går förbi korta listor och kan kännas ryckiga på enklare tv-apparater.</string>
-    <string name="settings_ch_nav_picker">Sidbläddring med CH+-knapparna</string>
+    <string name="settings_ch_nav_picker">Sidbläddring med CH+/RW · CH−/FF-knapparna</string>
     <string name="settings_weather">Väder</string>
     <string name="settings_top_bar_weather">Väder i det övre fältet</string>
     <string name="settings_show_weather">Visa väder</string>
@@ -158,7 +205,6 @@
     <string name="settings_quick_check_update">Sök efter uppdatering</string>
     <string name="settings_search_label">Sök i inställningarna</string>
     <string name="settings_search_hint">Sök i inställningarna…</string>
-    <string name="settings_group_general">Allmänt</string>
     <string name="settings_language">Språk</string>
     <string name="settings_language_description">Appens visningsspråk</string>
     <string name="settings_language_system_default">Systemets standardinställning</string>
@@ -168,7 +214,6 @@
     <string name="settings_language_coverage"><xliff:g id="percent">%1$d</xliff:g>%%</string>
     <string name="settings_profile_group">Profil</string>
     <string name="settings_profiles_description">Hantera tittare, barnläge och PIN-lås</string>
-    <string name="settings_content_group">Innehåll</string>
     <string name="settings_playlists">Spellistor</string>
     <string name="settings_playlists_description">Lägg till, omsynkronisera eller ta bort M3U- / Xtream-spellistor</string>
     <string name="settings_epg_sources">EPG-källor</string>
@@ -176,8 +221,14 @@
     <string name="settings_customize">Anpassa kategorier och objekt</string>
     <string name="settings_customize_nav_description">Dölj och visa objekt samt byt namn på och ändra ordning på kategorier</string>
     <string name="settings_sidebar_description_root">Anpassa sidoikoner automatiskt efter spellistan eller dölj specifika ikoner</string>
-    <string name="settings_ch_paging">Sidbläddring med CH+-knapparna</string>
-    <string name="settings_ch_paging_description">Hoppa uppåt/nedåt i kategori- och objektlistorna med CH+ / CH−-knapparna</string>
+    <string name="settings_ch_paging">Fjärrkontrollsgenvägar</string>
+    <string name="settings_ch_paging_description">Tilldela lediga knappar till navigering, uppspelning och bläddring. Viktiga navigeringsknappar förblir skyddade.</string>
+    <!-- Translators: Settings navigation label for the long-press content menus. -->
+    <string name="settings_content_menus_title">Menyer vid långt tryck</string>
+    <!-- Translators: Description of the long-press content menus settings. -->
+    <string name="settings_content_menus_description">Ändra ordningen på åtgärderna i menyerna för kanaler, filmer, serier och avsnitt</string>
+    <!-- Translators: Hint shown above the list when arranging a long-press menu. -->
+    <string name="settings_content_menus_hint">Håll in OK på en åtgärd för att plocka upp den och flytta den sedan upp och ner. Tryck på OK igen för att släppa den.</string>
     <string name="settings_browsing_lists">Bläddring och listor</string>
     <string name="settings_browsing_description">Kom ihåg den senaste kategorin och det senaste objektet i live-tv, filmer och serier</string>
     <string name="settings_home_root">Startskärm</string>
@@ -222,7 +273,7 @@
     <string name="settings_surround_sound">Surroundljud</string>
     <string name="settings_surround_description">Avkoda Dolby/DTS till surroundljud (5.1/7.1) för en riktig 5.1/7.1-mottagare. Låt vara AV för tv-högtalare eller en soundbar med stereo — flerkanalsljud kan göra att ljudet hamnar efter bilden på vissa tv-apparater/soundbar-högtalare. Om synkroniseringen glider justerar du Spelarens ljudmeny → A/V-synkronisering.</string>
     <string name="settings_autoplay_next">Spela upp nästa avsnitt automatiskt</string>
-    <string name="settings_autoplay_next_description">Starta nästa avsnitt automatiskt när ett avsnitt tar slut — och fortsätt till nästa säsong.</string>
+    <string name="settings_autoplay_next_description">Starta nästa avsnitt automatiskt när ett avsnitt tar slut — och fortsätt till nästa säsong. Tv-arkiv fortsätter också till nästa program.</string>
     <string name="settings_catchup">Tv-arkiv</string>
     <plurals name="settings_catchup_supported">
         <item quantity="one"><xliff:g id="count">%1$d</xliff:g> kanal stöder tv-arkiv · tidszon och spelare för uppspelning från arkivet</item>
@@ -302,12 +353,44 @@
     <string name="settings_accent_green">Grön</string>
     <string name="settings_accent_amber">Bärnstensgul</string>
     <string name="settings_group_profile">Profil</string>
-    <string name="settings_group_content">Innehåll</string>
+    <string name="settings_group_sources">Källor och guide</string>
+    <string name="settings_group_layout">Layout</string>
+    <string name="settings_group_content_metadata">Innehåll och metadata</string>
+    <string name="settings_group_data">Data</string>
     <string name="settings_group_appearance">Utseende</string>
     <string name="settings_group_playback">Uppspelning</string>
     <string name="settings_group_network">Nätverk</string>
     <string name="settings_dns">DNS</string>
     <string name="settings_group_app">App</string>
+    <string name="settings_group_summary_profile">Profiler och vem som får se vad</string>
+    <string name="settings_group_summary_sources">Spellistor, tablådata och deras klockor</string>
+    <string name="settings_group_summary_appearance">Tema, accent, glas, rörelse och textstorlek</string>
+    <string name="settings_group_summary_layout">Sidopanel, paneler, listor och startskärmen</string>
+    <string name="settings_group_summary_content_metadata">Namn, bilder och undertexttjänster</string>
+    <string name="settings_group_summary_playback">Videospelaren och dess felloggar</string>
+    <!-- Translators: Video player settings: name of the section holding decoder, HDR and frame-rate settings. -->
+    <string name="settings_vp_section_engine">Motor och bild</string>
+    <!-- Translators: Video player settings: name of the section holding volume, audio language and surround settings. -->
+    <string name="settings_vp_section_sound">Ljud</string>
+    <!-- Translators: Video player settings: name of the section holding resume, auto-play and mini-player settings. -->
+    <string name="settings_vp_section_episodes">Avsnitt och minispelare</string>
+    <!-- Translators: Video player settings: one-line summary under the "Engine &amp; picture" section name. -->
+    <string name="settings_vp_section_engine_summary">Avkodare, HDR, bildfrekvens</string>
+    <!-- Translators: Video player settings: one-line summary under the "Live TV" section name. -->
+    <string name="settings_vp_section_live_summary">Förhandsvisning, nummer, fördröjning</string>
+    <!-- Translators: Video player settings: one-line summary under the "Sound" section name. -->
+    <string name="settings_vp_section_sound_summary">Volym, språk, surround</string>
+    <!-- Translators: Video player settings: one-line summary under the "Subtitles" section name. -->
+    <string name="settings_vp_section_subtitles_summary">Storlek, färg, position</string>
+    <!-- Translators: Video player settings: one-line summary under the "Episodes &amp; mini-player" section name. -->
+    <string name="settings_vp_section_episodes_summary">Automatisk uppspelning och minispelare</string>
+    <!-- Translators: Video player settings: one-line summary under the "Diagnostics" section name. -->
+    <string name="settings_vp_section_diagnostics_summary">Detaljerade spelarloggar</string>
+    <string name="settings_group_summary_network">Proxy och DNS för strömanslutningar</string>
+    <string name="settings_group_summary_data">Säkerhetskopior, nedladdningar och visningshistorik</string>
+    <string name="settings_group_summary_app">Språk, start, uppdateringar och appinfo</string>
+    <string name="settings_group_quick">Snabbval</string>
+    <string name="settings_group_summary_quick">Reglagen du använder mest</string>
     <string name="settings_search_guide_logos">Kanallogotyper i programguiden</string>
     <string name="settings_search_keywords_profiles">tittare barnläge PIN-lås konto</string>
     <string name="settings_search_keywords_playlists">m3u xtream källa synkronisering lägg till ta bort</string>
@@ -426,6 +509,14 @@
     <string name="settings_reset_saved_volume_confirm">Återställa sparad volym?</string>
     <!-- Translators: Confirmation dialog body before forgetting the saved per-item volume. -->
     <string name="settings_reset_saved_volume_confirm_description">Alla kanaler, filmer och avsnitt återgår till standardvolymen. Sparade zoominställningar behålls. Du kan alltid ställa in en enskild titel igen från spelaren.</string>
+    <!-- Translators: Settings row that forgets every per-item audio-sync offset. -->
+    <string name="settings_reset_saved_audio_delay">Återställ sparad A/V-synkronisering</string>
+    <!-- Translators: Description of the reset-saved-audio-sync row. -->
+    <string name="settings_reset_saved_audio_delay_description">Om du väljer ”Kom ihåg den här fördröjningen” i spelaren sparas ljudsynkroniseringen för den kanalen, filmen eller det avsnittet. Återställ gör att allt följer inställningen ovan igen.</string>
+    <!-- Translators: Title of the confirmation dialog for resetting saved audio sync. -->
+    <string name="settings_reset_saved_audio_delay_confirm">Återställa sparad A/V-synkronisering?</string>
+    <!-- Translators: Body of the confirmation dialog for resetting saved audio sync. -->
+    <string name="settings_reset_saved_audio_delay_confirm_description">Varje kanal, film och avsnitt går tillbaka till ljudsynkroniseringen ovan. Sparad zoom och volym behålls. Du kan alltid ställa in en enskild igen från spelaren.</string>
     <!-- Translators: Setting label for how far rewind/forward jumps in a movie or episode. -->
     <string name="settings_seek_step">Spolsteg</string>
     <!-- Translators: Description of the seek step setting. -->
@@ -466,6 +557,7 @@
     <string name="settings_audio_sync_description">Flytta ljudet framåt eller bakåt för att matcha videon. Gäller endast mpv-motorn.</string>
     <string name="settings_live_tv">Live-tv</string>
     <string name="settings_live_latency_description">Hur nära livesändningen uppspelningen ska ligga. Lägre innebär närmare livepunkten men en mindre buffert, så svaga strömmar kan hacka eller återansluta oftare. Gäller nästa kanal du öppnar.</string>
+    <string name="settings_live_latency_bitrate_note">På en kanal med mycket hög bithastighet – särskilt 4K – kan bufferten rymma kortare tid än du har angett, eftersom det finns en gräns för hur mycket video som kan hållas i minnet samtidigt.</string>
     <string name="settings_channel_numbers">Kanalnummer</string>
     <string name="settings_channel_numbers_description">Visa leverantörens kanalnummer bredvid namnet i listan för live-tv, kanallistans överlägg och spelaren – och skriv ett nummer på fjärrkontrollen under uppspelning i helskärm för att gå direkt till den kanalen (OK byter kanal direkt, Tillbaka avbryter). När detta är av döljs alla nummer och sifferknapparna ignoreras. Ingenting går förlorat, och numren återställs när du slår på detta igen.</string>
     <string name="settings_diagnostics">Diagnostik</string>
@@ -622,6 +714,12 @@
     <string name="settings_customize_rename_or_delete_category">Byt namn på eller ta bort kategori</string>
     <string name="settings_customize_new_category">＋ Ny kategori</string>
     <string name="settings_customize_sort_button">Sortering: <xliff:g id="label">%1$s</xliff:g> ▾</string>
+
+    <string name="settings_customize_filter_button">Filter: <xliff:g id="label">%1$s</xliff:g> ▾</string>
+    <string name="settings_customize_filter_title">Filtrera lista</string>
+    <string name="settings_customize_filter_all">Alla</string>
+    <string name="settings_customize_filter_visible">Synliga</string>
+    <string name="settings_customize_filter_hidden">Dolda</string>
     <string name="settings_customize_new_categories_button">Nya kategorier: <xliff:g id="label">%1$s</xliff:g> ▾</string>
     <string name="settings_customize_rename_hint">Gäller endast den här profilen. Lämna tomt för att återställa ”<xliff:g id="name">%1$s</xliff:g>”.</string>
     <string name="settings_customize_remove_pin_title">Ta bort PIN-låset?</string>
@@ -934,8 +1032,18 @@
     <string name="settings_subtitle_color_grey">Grå</string>
     <string name="settings_live_preroll">Förbuffra live-strömmar</string>
     <string name="settings_live_preroll_description">Samla in den här mängden video innan en livekanal börjar spela, och igen efter ett hack. Det är en mängd video, inte en nedräkning. Av ger snabbast möjliga start.</string>
+    <string name="settings_live_tune_timeout">Ge upp en kanal efter</string>
+    <string name="settings_live_tune_timeout_description">Om en livekanal inte har visat någon bild inom den här tiden slutar OwnTV att försöka och säger till, i stället för att lämna en svart skärm medan den betar av alla sina spelare. ”Aldrig” fortsätter att försöka, vilket på en kanal som din leverantör har tagit bort kan ta långt över en minut. Väntetider som leverantören själv ber om räknas inte.</string>
     <string name="settings_live_preroll_per_playlist">Förbuffra per spellista</string>
     <string name="settings_live_preroll_per_playlist_description">Åsidosätt inställningen ovan för en spellista samtidigt som dina andra spellistor förblir snabba.</string>
+    <!-- Translators: Title of the per-playlist Live TV engine override row. -->
+    <string name="settings_live_engine_per_playlist">Spelare för live-tv per spellista</string>
+    <!-- Translators: Description of the per-playlist Live TV engine override row. -->
+    <string name="settings_live_engine_per_playlist_description">Åsidosätt inställningen ovan för en spellista — för en leverantör vars kanaler bara fungerar bra i den ena spelaren.</string>
+    <!-- Translators: Title of the per-playlist Live latency override row. -->
+    <string name="settings_live_latency_per_playlist">Livefördröjning per spellista</string>
+    <!-- Translators: Description of the per-playlist Live latency override row. -->
+    <string name="settings_live_latency_per_playlist_description">Åsidosätt inställningen ovan för en spellista — för en leverantör som behöver en större eller mindre buffert än de andra.</string>
     <plurals name="settings_live_preroll_overrides">
         <item quantity="one"><xliff:g id="count">%1$d</xliff:g> uppsättning</item>
         <item quantity="other"><xliff:g id="count">%1$d</xliff:g> uppsättningar</item>
@@ -999,7 +1107,12 @@
     <string name="settings_main_interface_font">Teckensnitt i huvudgränssnittet</string>
     <string name="settings_popup_font">Teckensnitt i popupfönster</string>
     <string name="settings_choose_font">Välj teckensnitt</string>
-    <string name="settings_font_size_range">Justera apptexten från <xliff:g id="min">%1$d</xliff:g>%% till <xliff:g id="max">%2$d</xliff:g>%%. Undertexter behåller sin egen storlek.</string>
+    <string name="settings_font_size_range">Justera huvudappens text, inte popupfönster, från <xliff:g id="min">%1$d</xliff:g>%% till <xliff:g id="max">%2$d</xliff:g>%%. Undertexter behåller sin egen storlek.</string>
+    <string name="settings_popup_font_size">Teckenstorlek i popupfönster</string>
+    <string name="settings_popup_font_size_description">Ändrar endast text i dialogrutor och menyer</string>
+    <string name="settings_popup_size">Storlek på popupfönster</string>
+    <string name="settings_popup_size_description">Skala dialogrutor och menyer utan att ändra textstorleken</string>
+    <string name="settings_popup_size_range">Skala dialogrutor och menyer (<xliff:g id="min">%1$d</xliff:g>%%–<xliff:g id="max">%2$d</xliff:g>%%).</string>
     <string name="settings_font_preview">Underhållning på ett enklare sätt.</string>
     <string name="settings_search_keywords_fonts">teckensnitt text storlek typografi popup läsning tillgänglighet</string>
     <string name="settings_font_system_sans">System Sans</string>
@@ -1026,8 +1139,59 @@
     <string name="settings_glass_highlight_title">Markeringsstyrka</string>
     <string name="settings_glass_highlight_description">Justera ljuset och kanten på glas i fokus.</string>
     <string name="settings_glass_live_preview">Direkt förhandsvisning</string>
+    <string name="settings_glass_screen_description">Genomskinliga frostade paneler, bakgrundsbild och transparens</string>
+    <string name="settings_glass_master_description">Genomskinliga frostade paneler ovanpå ett bakgrundsfoto eller appens egen bakgrund.</string>
+    <string name="settings_glass_background_image">Välj en bakgrundsbild</string>
+    <string name="settings_glass_surface_transparency_title">Genomskinlighet</string>
+    <string name="settings_glass_background_blur_title">Oskärpa/frostning</string>
+    <string name="settings_glass_section_appearance">Utseende</string>
+    <string name="settings_glass_section_fine_tuning">Avancerade alternativ</string>
+    <string name="settings_glass_section_behavior">Beteende</string>
+    <string name="settings_glass_apply_to">Glasytor</string>
+    <string name="settings_glass_surface_all">Alla</string>
+    <string name="settings_glass_background_action_description">Välj en bakgrundsbild</string>
+    <string name="settings_glass_transparency_short_description">20–100 · 5</string>
+    <string name="settings_glass_blur_short_description">0–100 · 10</string>
+    <string name="settings_glass_highlight_short_description">Justera ljuset och kanten på glas i fokus.</string>
+    <string name="settings_glass_full_transparency_short">Tillåt full genomskinlighet</string>
+    <string name="settings_glass_full_transparency_short_description">Stänger av den automatiska läsbarhetsgränsen för klarast möjliga glas.</string>
+    <string name="settings_glass_depth_effects_short">Djup och skuggor</string>
+    <string name="settings_glass_depth_effects_short_description">Aktiverar fokusljus, subtil parallax och djuprörelse.</string>
+    <string name="settings_glass_reset_balanced">Återställ: Balanserad</string>
     <string name="settings_glass_full_transparency_title">Tillåt full genomskinlighet</string>
     <string name="settings_glass_full_transparency_description">Stänger av den automatiska läsbarhetsgränsen för klarast möjliga glas.</string>
     <string name="settings_glass_depth_title">Djup och skuggor</string>
     <string name="settings_glass_depth_description">Aktiverar fokusljus, subtil parallax och djuprörelse.</string>
+    <string name="settings_header_hint">Vänster: grupper · Höger: deras inställningar · Håll in OK på en rad för att fästa den i Snabbval</string>
+    <string name="settings_spine_eyebrow">Alla grupper</string>
+    <string name="settings_spine_title">Bläddra bland inställningar</string>
+    <string name="settings_spine_hint">Snabbval ligger alltid överst; markören följer gruppen du är i.</string>
+    <string name="settings_spine_foot">Accentfärgen följer ditt fokus</string>
+    <string name="settings_row_menu_pin">Fäst i Snabbval</string>
+    <string name="settings_row_menu_unpin">Ta bort från Snabbval</string>
+    <string name="settings_row_menu_move_up">Flytta upp</string>
+    <string name="settings_row_menu_move_down">Flytta ned</string>
+    <string name="settings_quick_empty_title">Inget är fäst ännu</string>
+    <string name="settings_quick_empty_hint">Håll in OK på en inställning och välj ”Fäst i Snabbval”.</string>
+    <string name="settings_results_title">Resultat</string>
+    <string name="settings_results_summary">Varje träff, var den än ligger — med sin sökväg</string>
+    <plurals name="settings_setting_count">
+        <item quantity="one"><xliff:g id="count">%1$d</xliff:g> inställning</item>
+        <item quantity="other"><xliff:g id="count">%1$d</xliff:g> inställningar</item>
+    </plurals>
+    <plurals name="settings_pinned_count">
+        <item quantity="one"><xliff:g id="count">%1$d</xliff:g> fäst</item>
+        <item quantity="other"><xliff:g id="count">%1$d</xliff:g> fästa</item>
+    </plurals>
+    <plurals name="settings_match_count">
+        <item quantity="one"><xliff:g id="count">%1$d</xliff:g> träff</item>
+        <item quantity="other"><xliff:g id="count">%1$d</xliff:g> träffar</item>
+    </plurals>
+    <string name="settings_guide_width">Kolumnbredder i guiden</string>
+    <string name="settings_guide_width_description">Ändra bredden på kanallistan och EPG-tidslinjen i TV-guiden.</string>
+    <string name="settings_search_keywords_guide_width">guide epg kanal lista tidslinje kolumn panel bredd storlek layout</string>
+    <string name="settings_guide_width_summary">Kanallista %1$d%% · EPG-tidslinje %2$d%%</string>
+    <string name="settings_guide_width_help">• Kanallistan och EPG-tidslinjen delar en rad, så summan måste vara 100%%.\n• En bredare kanallista visar mindre av tidslinjen åt gången; programlängder och tidsskala ändras inte.\n• Båda kolumnerna är minst 10%% breda.\n• Återställ sätter kanallistan till 10%% och EPG-tidslinjen till 90%%.\n• Om anpassning stängs av återställs standardlayouten utan att dina värden tas bort.</string>
+    <string name="settings_guide_width_channels">Kanallista</string>
+    <string name="settings_guide_width_epg">EPG-tidslinje</string>
 </resources>

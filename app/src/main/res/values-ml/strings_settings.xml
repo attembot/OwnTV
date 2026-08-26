@@ -23,6 +23,10 @@
     <string name="settings_movies_keep_watching_description">സിനിമകളുടെ തുടരൽ കാർഡുകൾ പ്രധാന നിരയിൽ കാണിക്കുക.</string>
     <string name="settings_series_keep_watching">കണ്ടുകൊണ്ടിരിക്കുക നിരയിലെ സീരീസ്</string>
     <string name="settings_series_keep_watching_description">എപ്പിസോഡുകളുടെ തുടരൽ കാർഡുകൾ പ്രധാന നിരയിൽ കാണിക്കുക.</string>
+    <!-- Translators: Toggle label for playing the highlighted Home item's video in the hero row. -->
+    <string name="settings_hero_preview">പ്രധാന നിരയിൽ വീഡിയോ പ്ലേ ചെയ്യുക</string>
+    <!-- Translators: Description of the hero-row video preview toggle. -->
+    <string name="settings_hero_preview_description">തിരഞ്ഞെടുത്ത ഇനത്തിന്റെ വീഡിയോ പ്രിവ്യൂ അൽപ്പസമയത്തിനു ശേഷം പ്ലേ ചെയ്യും. ഹോം സ്ക്രീൻ ബ്രൗസ് ചെയ്യുമ്പോൾ ഊർജവും മെമ്മറിയും ലാഭിക്കാൻ ഓഫാക്കുക.</string>
     <string name="settings_android_tv_home">Android TV ഹോം</string>
     <string name="settings_android_tv_home_description">ടിവിയുടെ ഹോം സ്ക്രീനിൽ കണ്ടുകൊണ്ടിരിക്കുക നിരയും സമീപകാല തത്സമയ ചാനലുകളും കാണിക്കുക.</string>
     <string name="settings_refresh_now">ഇപ്പോൾ പുതുക്കുക</string>
@@ -63,19 +67,62 @@
     <string name="settings_proxy_connection_failed">പ്രോക്സിയിലേക്ക് കണക്റ്റ് ചെയ്യാനായില്ല (ഹോസ്റ്റ്/പോർട്ട് പരിശോധിക്കുക).</string>
     <string name="settings_proxy_http">പ്രോക്സി നൽകിയ HTTP നില: <xliff:g id="code">%1$d</xliff:g></string>
     <string name="settings_proxy_failed">പ്രോക്സി പരിശോധന പരാജയപ്പെട്ടു.</string>
-    <string name="settings_ch_nav_title">CH+- കീ ഉപയോഗിച്ചുള്ള പേജിംഗ്</string>
-    <string name="settings_ch_nav_description">റിമോട്ടിലെ CH+ / CH− കീകൾ ഉപയോഗിച്ച് വിഭാഗമോ ഇനങ്ങളുടെ പട്ടികയോ ഓരോ പേജായി നീക്കുക.</string>
-    <string name="settings_ch_nav_enabled">പട്ടികകൾ പേജുകളായി നീക്കാൻ CH+- കീകൾ ഉപയോഗിക്കുക</string>
-    <string name="settings_ch_nav_enabled_description">പ്രവർത്തനക്ഷമമാക്കിയാൽ, ഫോക്കസിലുള്ള പാനലിനുള്ളിൽ CH+ ഉം CH− ഉം ഇനങ്ങൾ മറികടക്കും (വിഭാഗ നിരയോ ഇനങ്ങളുടെ പട്ടികയോ, കൂടാതെ വിഭാഗങ്ങൾ ഇഷ്ടാനുസൃതമാക്കുക പട്ടികയും). പ്രവർത്തനരഹിതമാക്കിയാൽ, ആ സ്ക്രീനുകളിൽ ഈ കീകൾ ഒന്നും ചെയ്യില്ല.</string>
-    <string name="settings_ch_nav_up">CH+ മറികടക്കൽ (ആദ്യത്തേതിലേക്ക്)</string>
-    <string name="settings_ch_nav_up_description">CH+ ഒരിക്കൽ അമർത്തുമ്പോൾ മുകളിലേക്ക് മറികടക്കേണ്ട ഇനങ്ങളുടെ എണ്ണം. ദീർഘനേരം അമർത്തിയാൽ എപ്പോഴും ആദ്യ ഇനത്തിലേക്ക് പോകും.</string>
-    <string name="settings_ch_nav_down">CH− മറികടക്കൽ (അവസാനത്തേതിലേക്ക്)</string>
-    <string name="settings_ch_nav_down_description">CH− ഒരിക്കൽ അമർത്തുമ്പോൾ താഴേക്ക് മറികടക്കേണ്ട ഇനങ്ങളുടെ എണ്ണം. ദീർഘനേരം അമർത്തിയാൽ എപ്പോഴും അവസാന ഇനത്തിലേക്ക് പോകും.</string>
+    <string name="settings_ch_nav_title">CH+/RW · CH−/FF കീ ഉപയോഗിച്ചുള്ള പേജിംഗ്</string>
+    <string name="settings_ch_nav_description">റിമോട്ടിലെ CH+/RW / CH−/FF കീകൾ ഉപയോഗിച്ച് വിഭാഗമോ ഇനങ്ങളുടെ പട്ടികയോ ഓരോ പേജായി നീക്കുക.</string>
+    <string name="settings_ch_nav_enabled">പട്ടികകൾ പേജുകളായി നീക്കാൻ CH+/RW · CH−/FF കീകൾ ഉപയോഗിക്കുക</string>
+    <string name="settings_ch_nav_enabled_description">പ്രവർത്തനക്ഷമമാക്കിയാൽ, ഫോക്കസിലുള്ള പാനലിനുള്ളിൽ CH+/RW ഉം CH−/FF ഉം ഇനങ്ങൾ മറികടക്കും (വിഭാഗ നിരയോ ഇനങ്ങളുടെ പട്ടികയോ, കൂടാതെ വിഭാഗങ്ങൾ ഇഷ്ടാനുസൃതമാക്കുക പട്ടികയും). പ്രവർത്തനരഹിതമാക്കിയാൽ, ആ സ്ക്രീനുകളിൽ ഈ കീകൾ ഒന്നും ചെയ്യില്ല.</string>
+    <string name="settings_ch_nav_up">CH+ / റിവൈൻഡ് മറികടക്കൽ (ആദ്യത്തേതിലേക്ക്)</string>
+    <string name="settings_ch_nav_up_description">CH+/RW ഒരിക്കൽ അമർത്തുമ്പോൾ മുകളിലേക്ക് മറികടക്കേണ്ട ഇനങ്ങളുടെ എണ്ണം. ദീർഘനേരം അമർത്തിയാൽ എപ്പോഴും ആദ്യ ഇനത്തിലേക്ക് പോകും.</string>
+    <string name="settings_ch_nav_down">CH− / ഫാസ്റ്റ് ഫോർവേഡ് മറികടക്കൽ (അവസാനത്തേതിലേക്ക്)</string>
+    <string name="settings_ch_nav_down_description">CH−/FF ഒരിക്കൽ അമർത്തുമ്പോൾ താഴേക്ക് മറികടക്കേണ്ട ഇനങ്ങളുടെ എണ്ണം. ദീർഘനേരം അമർത്തിയാൽ എപ്പോഴും അവസാന ഇനത്തിലേക്ക് പോകും.</string>
     <string name="settings_skip_counts">മറികടക്കേണ്ട എണ്ണം</string>
     <string name="settings_how_it_works">ഇത് പ്രവർത്തിക്കുന്ന വിധം</string>
-    <string name="settings_ch_nav_help">• അറ്റങ്ങളിൽ മറികടക്കൽ പരിമിതപ്പെടുത്തുന്നതിനാൽ ചെറിയ പട്ടികകളിൽ ഒരൊറ്റ അമർത്തലിൽ അറ്റത്തെത്തും.\n• CH+ ദീർഘനേരം അമർത്തുക = ആദ്യ ഇനം, CH− ദീർഘനേരം അമർത്തുക = അവസാന ഇനം.\n• \"എല്ലാം\" പട്ടികയിൽ (എല്ലാ ചാനലുകളും / സിനിമകളും / സീരീസും) ദീർഘനേരം അമർത്തൽ പ്രവർത്തനരഹിതമാണ് — ഹ്രസ്വമായി അമർത്തിയുള്ള മറികടക്കൽ അവിടെയും പ്രവർത്തിക്കും.\n• നിലവിൽ ഫോക്കസുള്ള പാനലിൽ ഇത് ബാധകമാണ് — വിഭാഗ നിരയിലോ ഇനങ്ങളുടെ പട്ടിക/ഗ്രിഡിലോ.\n• ക്രമീകരണങ്ങൾ → വിഭാഗങ്ങളും ഇനങ്ങളും ഇഷ്ടാനുസൃതമാക്കുക എന്നതിലെ വിഭാഗ പട്ടികയും ഇത് പേജുകളായി നീക്കും.</string>
+    <string name="settings_ch_nav_help">• അറ്റങ്ങളിൽ മറികടക്കൽ പരിമിതപ്പെടുത്തുന്നതിനാൽ ചെറിയ പട്ടികകളിൽ ഒരൊറ്റ അമർത്തലിൽ അറ്റത്തെത്തും.\n• CH+/RW ദീർഘനേരം അമർത്തുക = ആദ്യ ഇനം, CH−/FF ദീർഘനേരം അമർത്തുക = അവസാന ഇനം.\n• \"എല്ലാം\" പട്ടികയിൽ (എല്ലാ ചാനലുകളും / സിനിമകളും / സീരീസും) ദീർഘനേരം അമർത്തൽ പ്രവർത്തനരഹിതമാണ് — ഹ്രസ്വമായി അമർത്തിയുള്ള മറികടക്കൽ അവിടെയും പ്രവർത്തിക്കും.\n• നിലവിൽ ഫോക്കസുള്ള പാനലിൽ ഇത് ബാധകമാണ് — വിഭാഗ നിരയിലോ ഇനങ്ങളുടെ പട്ടിക/ഗ്രിഡിലോ.\n• ക്രമീകരണങ്ങൾ → വിഭാഗങ്ങളും ഇനങ്ങളും ഇഷ്ടാനുസൃതമാക്കുക എന്നതിലെ വിഭാഗ പട്ടികയും ഇത് പേജുകളായി നീക്കും.</string>
+    <string name="settings_remote_shortcuts">റിമോട്ട് കുറുക്കുവഴികൾ</string>
+    <string name="settings_remote_shortcuts_description">നാവിഗേഷൻ, പ്ലേബാക്ക്, ബ്രൗസിംഗ് എന്നിവയ്ക്കായി റിമോട്ടിലെ അധിക ബട്ടണുകൾ നൽകുക. പ്രധാന നാവിഗേഷൻ ബട്ടണുകൾ സംരക്ഷിക്കപ്പെടും.</string>
+    <string name="settings_remote_shortcuts_enabled">റിമോട്ട് കുറുക്കുവഴികൾ ഉപയോഗിക്കുക</string>
+    <string name="settings_remote_shortcuts_enabled_description">ബട്ടൺ നിയമനങ്ങൾ മായ്ക്കാതെ എല്ലാ ഇഷ്ടാനുസൃത കുറുക്കുവഴികളും ഓഫാക്കുക</string>
+    <string name="settings_remote_shortcuts_assignments">ബട്ടൺ നിയമനങ്ങൾ</string>
+    <string name="settings_remote_shortcuts_add">കുറുക്കുവഴി ചേർക്കുക</string>
+    <string name="settings_remote_shortcuts_add_description">ഒരു അധിക ബട്ടൺ അമർത്തുകയോ പിടിക്കുകയോ ചെയ്ത ശേഷം അതിന്റെ പ്രവർത്തനം തിരഞ്ഞെടുക്കുക</string>
+    <string name="settings_remote_shortcuts_reset">ഡിഫോൾട്ട് കുറുക്കുവഴികൾ പുനഃസ്ഥാപിക്കുക</string>
+    <string name="settings_remote_shortcuts_reset_description">CH+/CH−, റിവൈൻഡ്/ഫാസ്റ്റ് ഫോർവേഡ് പേജിംഗ് പുനഃസ്ഥാപിച്ച് മറ്റ് നിയമനങ്ങൾ നീക്കുക</string>
+    <string name="settings_remote_shortcuts_capture_title">റിമോട്ട് ബട്ടൺ അമർത്തുക</string>
+    <string name="settings_remote_shortcuts_capture_description">വേഗം അമർത്തുക അല്ലെങ്കിൽ വിടുന്നതുവരെ പിടിക്കുക. ബാക്ക്, ഡി-പാഡ്, OK, വോള്യം, ഹോം, പവർ എന്നിവ നൽകാനാവില്ല.</string>
+    <string name="settings_remote_shortcuts_choose_action">പ്രവർത്തനം തിരഞ്ഞെടുക്കുക</string>
+    <string name="settings_remote_shortcuts_binding"><xliff:g id="press">%1$s</xliff:g> · <xliff:g id="action">%2$s</xliff:g></string>
+    <string name="settings_remote_shortcuts_short_press">ചെറിയ അമർത്തൽ</string>
+    <string name="settings_remote_shortcuts_long_press">ദീർഘ അമർത്തൽ</string>
+    <string name="settings_remote_shortcuts_unknown_button">റിമോട്ട് ബട്ടൺ %1$d</string>
+    <string name="settings_remote_shortcuts_help">• ഡിഫോൾട്ടായി CH+/CH−, റിവൈൻഡ്/ഫാസ്റ്റ് ഫോർവേഡ് ലിസ്റ്റുകൾ പേജ് ചെയ്യും; പിടിച്ചാൽ ആദ്യമോ അവസാനമോ പോകും.
+• ചെറിയതും ദീർഘവുമായ അമർത്തലുകൾ വേർതിരിച്ച് നൽകാം.
+• വളരെ വലിയ ‘എല്ലാം’ ലിസ്റ്റുകളിൽ അവസാനത്തിലേക്കുള്ള ചാട്ടം ഓഫായിരിക്കും.
+• ബാക്ക് ദീർഘമായി അമർത്തുന്നത് എപ്പോഴും ഇപ്പോൾ പ്ലേ ചെയ്യുന്നതിൽ ഫോക്കസ് ചെയ്യും; മാറ്റാനാവില്ല.
+• സാധാരണയായി ചുവപ്പ്/പച്ച/മഞ്ഞ/നീല, നമ്പറുകൾ, CH+/CH−, റിവൈൻഡ്/ഫാസ്റ്റ് ഫോർവേഡ് എന്നിവ നൽകാം.
+• ബാക്ക്, ഡി-പാഡ്, OK, വോള്യം, ഹോം, പവർ എന്നിവ സംരക്ഷിക്കപ്പെടും.
+• ബ്രൗസ് ചെയ്യുമ്പോൾ നമ്പർ ഷോർട്ട്കട്ടുകൾ പ്രവർത്തിക്കും; ഫുൾസ്ക്രീനിൽ ചാനൽ നമ്പറിനാണ് മുൻഗണന.</string>
+    <string name="settings_remote_button_channel_up">ചാനൽ +</string>
+    <string name="settings_remote_button_channel_down">ചാനൽ −</string>
+    <string name="settings_remote_button_rewind">റിവൈൻഡ്</string>
+    <string name="settings_remote_button_fast_forward">ഫാസ്റ്റ് ഫോർവേഡ്</string>
+    <string name="settings_remote_button_previous">മുമ്പത്തെ</string>
+    <string name="settings_remote_button_next">അടുത്തത്</string>
+    <string name="settings_remote_button_menu">മെനു</string>
+    <string name="settings_remote_button_red">ചുവപ്പ് ബട്ടൺ</string>
+    <string name="settings_remote_button_green">പച്ച ബട്ടൺ</string>
+    <string name="settings_remote_button_yellow">മഞ്ഞ ബട്ടൺ</string>
+    <string name="settings_remote_button_blue">നീല ബട്ടൺ</string>
+    <string name="settings_remote_action_continue">അവസാനം കണ്ടത് തുടരുക</string>
+    <string name="settings_remote_action_focus_now_playing">ഇപ്പോൾ പ്ലേ ചെയ്യുന്നതിൽ ഫോക്കസ്</string>
+    <string name="settings_remote_action_expand_now_playing">ഇപ്പോൾ പ്ലേ ചെയ്യുന്നത് വികസിപ്പിക്കുക</string>
+    <string name="settings_remote_action_mini_player">മിനി പ്ലേയറിലേക്ക് മാറ്റുക</string>
+    <string name="settings_remote_action_play_pause">പ്ലേ അല്ലെങ്കിൽ താൽക്കാലിക വിരാമം</string>
+    <string name="settings_remote_action_page_first">ആദ്യ ഇനങ്ങളിലേക്ക് പേജ്</string>
+    <string name="settings_remote_action_page_last">അവസാന ഇനങ്ങളിലേക്ക് പേജ്</string>
+    <string name="settings_remote_action_jump_first">ആദ്യ ഇനത്തിലേക്ക് പോകുക</string>
+    <string name="settings_remote_action_jump_last">അവസാന ഇനത്തിലേക്ക് പോകുക</string>
     <string name="settings_large_skips_warning">വലിയ മറികടക്കൽ മൂല്യങ്ങൾ ചെറിയ പട്ടികകളുടെ അറ്റം കടക്കുകയും ശേഷി കുറഞ്ഞ ടിവികളിൽ ചലനം അസ്വാഭാവികമായി തോന്നുകയും ചെയ്യാം.</string>
-    <string name="settings_ch_nav_picker">CH+- കീ ഉപയോഗിച്ചുള്ള പേജിംഗ്</string>
+    <string name="settings_ch_nav_picker">CH+/RW · CH−/FF കീ ഉപയോഗിച്ചുള്ള പേജിംഗ്</string>
     <string name="settings_weather">കാലാവസ്ഥ</string>
     <string name="settings_top_bar_weather">മുകളിലെ ബാറിലെ കാലാവസ്ഥ</string>
     <string name="settings_show_weather">കാലാവസ്ഥ കാണിക്കുക</string>
@@ -158,7 +205,6 @@
     <string name="settings_quick_check_update">അപ്‌ഡേറ്റിനായി പരിശോധിക്കുക</string>
     <string name="settings_search_label">ക്രമീകരണങ്ങൾ തിരയുക</string>
     <string name="settings_search_hint">ക്രമീകരണങ്ങൾ തിരയുക…</string>
-    <string name="settings_group_general">പൊതുവായത്</string>
     <string name="settings_language">ഭാഷ</string>
     <string name="settings_language_description">ആപ്പിൽ പ്രദർശിപ്പിക്കേണ്ട ഭാഷ</string>
     <string name="settings_language_system_default">സിസ്റ്റം ഡിഫോൾട്ട്</string>
@@ -168,7 +214,6 @@
     <string name="settings_language_coverage"><xliff:g id="percent">%1$d</xliff:g>%%</string>
     <string name="settings_profile_group">പ്രൊഫൈൽ</string>
     <string name="settings_profiles_description">കാണുന്നവരെയും കുട്ടികളുടെ മോഡും PIN ലോക്കുകളും നിയന്ത്രിക്കുക</string>
-    <string name="settings_content_group">ഉള്ളടക്കം</string>
     <string name="settings_playlists">പ്ലേലിസ്റ്റുകൾ</string>
     <string name="settings_playlists_description">M3U / Xtream പ്ലേലിസ്റ്റുകൾ ചേർക്കുക, വീണ്ടും സമന്വയിപ്പിക്കുക, അല്ലെങ്കിൽ നീക്കം ചെയ്യുക</string>
     <string name="settings_epg_sources">EPG ഉറവിടങ്ങൾ</string>
@@ -176,8 +221,14 @@
     <string name="settings_customize">വിഭാഗങ്ങളും ഇനങ്ങളും ഇഷ്ടാനുസൃതമാക്കുക</string>
     <string name="settings_customize_nav_description">ഇനങ്ങൾ മറയ്ക്കുകയും വീണ്ടും കാണിക്കുകയും ചെയ്യുക; വിഭാഗങ്ങളുടെ പേര് മാറ്റുകയും പുനഃക്രമീകരിക്കുകയും ചെയ്യുക</string>
     <string name="settings_sidebar_description_root">സൈഡ് ഐക്കണുകൾ നിങ്ങളുടെ പ്ലേലിസ്റ്റിന് അനുസരിച്ച് സ്വയം മാറ്റുക, അല്ലെങ്കിൽ ചിലത് മറയ്ക്കുക</string>
-    <string name="settings_ch_paging">CH+- കീ ഉപയോഗിച്ചുള്ള പേജിംഗ്</string>
-    <string name="settings_ch_paging_description">CH+ / CH− കീകൾ ഉപയോഗിച്ച് വിഭാഗത്തിന്റെയും ഇനങ്ങളുടെയും പട്ടികകളിൽ മുകളിലേക്കും താഴേക്കും മറികടക്കുക</string>
+    <string name="settings_ch_paging">റിമോട്ട് കുറുക്കുവഴികൾ</string>
+    <string name="settings_ch_paging_description">നാവിഗേഷൻ, പ്ലേബാക്ക്, ബ്രൗസിംഗ് എന്നിവയ്ക്കായി റിമോട്ടിലെ അധിക ബട്ടണുകൾ നൽകുക. പ്രധാന നാവിഗേഷൻ ബട്ടണുകൾ സംരക്ഷിക്കപ്പെടും.</string>
+    <!-- Translators: Settings navigation label for the long-press content menus. -->
+    <string name="settings_content_menus_title">ലോങ്-പ്രസ് മെനുകൾ</string>
+    <!-- Translators: Description of the long-press content menus settings. -->
+    <string name="settings_content_menus_description">ചാനൽ, സിനിമ, സീരീസ്, എപ്പിസോഡ് മെനുകളിലെ പ്രവർത്തനങ്ങൾ പുനഃക്രമീകരിക്കുക</string>
+    <!-- Translators: Hint shown above the list when arranging a long-press menu. -->
+    <string name="settings_content_menus_hint">ഒരു പ്രവർത്തനത്തിൽ OK അമർത്തിപ്പിടിച്ച് അത് എടുക്കുക, മുകളിലേക്കും താഴേക്കും നീക്കുക. വീണ്ടും OK അമർത്തി വയ്ക്കുക.</string>
     <string name="settings_browsing_lists">ബ്രൗസിംഗും പട്ടികകളും</string>
     <string name="settings_browsing_description">തത്സമയ ടിവി, സിനിമകൾ, സീരീസ് എന്നിവയിലെ അവസാന വിഭാഗവും അവസാന ഇനവും ഓർക്കുക</string>
     <string name="settings_home_root">ഹോം സ്ക്രീൻ</string>
@@ -222,7 +273,7 @@
     <string name="settings_surround_sound">സറൗണ്ട് സൗണ്ട്</string>
     <string name="settings_surround_description">യഥാർഥ 5.1/7.1 റിസീവറിനായി Dolby/DTS സറൗണ്ടിലേക്ക് (5.1/7.1) ഡീകോഡ് ചെയ്യുക. ടിവി സ്പീക്കറുകൾക്കോ സ്റ്റീരിയോ സൗണ്ട്ബാറിനോ ഇത് പ്രവർത്തനരഹിതമായി വിടുക — ചില ടിവികളിലും സൗണ്ട്ബാറുകളിലും മൾട്ടിചാനൽ ശബ്ദം വീഡിയോയെക്കാൾ വൈകാൻ ഇടയാക്കാം. സമന്വയം തെറ്റുകയാണെങ്കിൽ പ്ലെയറിലെ ഓഡിയോ മെനു → A/V സമന്വയം ക്രമീകരിക്കുക.</string>
     <string name="settings_autoplay_next">അടുത്ത എപ്പിസോഡ് സ്വയം പ്ലേ ചെയ്യുക</string>
-    <string name="settings_autoplay_next_description">ഒരു എപ്പിസോഡ് അവസാനിക്കുമ്പോൾ അടുത്തത് സ്വയം ആരംഭിക്കുക — തുടർന്ന് അടുത്ത സീസണിലേക്കും കടക്കുക.</string>
+    <string name="settings_autoplay_next_description">ഒരു എപ്പിസോഡ് അവസാനിക്കുമ്പോൾ അടുത്തത് സ്വയം ആരംഭിക്കുക — തുടർന്ന് അടുത്ത സീസണിലേക്കും കടക്കുക. ക്യാച്ച്-അപ്പും അടുത്ത പ്രോഗ്രാമിലേക്ക് തുടരും.</string>
     <string name="settings_catchup">ക്യാച്ച്-അപ്പ്</string>
     <plurals name="settings_catchup_supported">
         <item quantity="one"><xliff:g id="count">%1$d</xliff:g> ചാനൽ ക്യാച്ച്-അപ്പ് പിന്തുണയ്ക്കുന്നു · ആർക്കൈവ് പ്ലേബാക്കിനുള്ള സമയമേഖലയും പ്ലെയറും</item>
@@ -302,12 +353,44 @@
     <string name="settings_accent_green">പച്ച</string>
     <string name="settings_accent_amber">ആംബർ</string>
     <string name="settings_group_profile">പ്രൊഫൈൽ</string>
-    <string name="settings_group_content">ഉള്ളടക്കം</string>
+    <string name="settings_group_sources">ഉറവിടങ്ങളും ഗൈഡും</string>
+    <string name="settings_group_layout">ലേഔട്ട്</string>
+    <string name="settings_group_content_metadata">ഉള്ളടക്കവും മെറ്റാഡാറ്റയും</string>
+    <string name="settings_group_data">ഡാറ്റ</string>
     <string name="settings_group_appearance">രൂപഭാവം</string>
     <string name="settings_group_playback">പ്ലേബാക്ക്</string>
     <string name="settings_group_network">നെറ്റ്‌വർക്ക്</string>
     <string name="settings_dns">DNS</string>
     <string name="settings_group_app">ആപ്പ്</string>
+    <string name="settings_group_summary_profile">പ്രൊഫൈലുകളും ആർക്ക് എന്ത് കാണാമെന്നും</string>
+    <string name="settings_group_summary_sources">പ്ലേലിസ്റ്റുകൾ, ഗൈഡ് ഡാറ്റ, അവയുടെ സമയം</string>
+    <string name="settings_group_summary_appearance">തീം, ആക്സന്റ്, ഗ്ലാസ്, ചലനം, ടെക്സ്റ്റ് വലുപ്പം</string>
+    <string name="settings_group_summary_layout">സൈഡ്‌ബാർ, പാനലുകൾ, ലിസ്റ്റുകൾ, ഹോം സ്ക്രീൻ</string>
+    <string name="settings_group_summary_content_metadata">പേരിടൽ, ചിത്രങ്ങൾ, സബ്ടൈറ്റിൽ സേവനങ്ങൾ</string>
+    <string name="settings_group_summary_playback">വീഡിയോ പ്ലേയറും അതിന്റെ പിശക് ലോഗും</string>
+    <!-- Translators: Video player settings: name of the section holding decoder, HDR and frame-rate settings. -->
+    <string name="settings_vp_section_engine">എൻജിനും ചിത്രവും</string>
+    <!-- Translators: Video player settings: name of the section holding volume, audio language and surround settings. -->
+    <string name="settings_vp_section_sound">ശബ്ദം</string>
+    <!-- Translators: Video player settings: name of the section holding resume, auto-play and mini-player settings. -->
+    <string name="settings_vp_section_episodes">എപ്പിസോഡുകളും മിനി പ്ലേയറും</string>
+    <!-- Translators: Video player settings: one-line summary under the "Engine &amp; picture" section name. -->
+    <string name="settings_vp_section_engine_summary">ഡീകോഡർ, HDR, ഫ്രെയിം റേറ്റ്</string>
+    <!-- Translators: Video player settings: one-line summary under the "Live TV" section name. -->
+    <string name="settings_vp_section_live_summary">പ്രിവ്യൂ, നമ്പറുകൾ, ലേറ്റൻസി</string>
+    <!-- Translators: Video player settings: one-line summary under the "Sound" section name. -->
+    <string name="settings_vp_section_sound_summary">വോളിയം, ഭാഷ, സറൗണ്ട്</string>
+    <!-- Translators: Video player settings: one-line summary under the "Subtitles" section name. -->
+    <string name="settings_vp_section_subtitles_summary">വലുപ്പം, നിറം, സ്ഥാനം</string>
+    <!-- Translators: Video player settings: one-line summary under the "Episodes &amp; mini-player" section name. -->
+    <string name="settings_vp_section_episodes_summary">ഓട്ടോ-പ്ലേയും മിനി പ്ലേയറും</string>
+    <!-- Translators: Video player settings: one-line summary under the "Diagnostics" section name. -->
+    <string name="settings_vp_section_diagnostics_summary">വിശദമായ പ്ലേയർ ലോഗുകൾ</string>
+    <string name="settings_group_summary_network">സ്ട്രീം കണക്ഷനുകൾക്കുള്ള പ്രോക്സിയും DNS-ഉം</string>
+    <string name="settings_group_summary_data">ബാക്കപ്പ്, ഡൗൺലോഡുകൾ, കണ്ട ചരിത്രം</string>
+    <string name="settings_group_summary_app">ഭാഷ, ആരംഭം, അപ്ഡേറ്റുകൾ, ആപ്പ് വിവരം</string>
+    <string name="settings_group_quick">പെട്ടെന്ന്</string>
+    <string name="settings_group_summary_quick">നിങ്ങൾ ഏറ്റവും കൂടുതൽ ഉപയോഗിക്കുന്ന ടോഗിളുകൾ</string>
     <string name="settings_search_guide_logos">ഗൈഡിലെ ചാനൽ ലോഗോകൾ</string>
     <string name="settings_search_keywords_profiles">കാണുന്നവർ കുട്ടികളുടെ മോഡ് PIN ലോക്ക് അക്കൗണ്ട്</string>
     <string name="settings_search_keywords_playlists">M3U Xtream ഉറവിടം സമന്വയിപ്പിക്കൽ ചേർക്കുക നീക്കംചെയ്യുക</string>
@@ -426,6 +509,14 @@
     <string name="settings_reset_saved_volume_confirm">സേവ് ചെയ്ത വോളിയം പുനഃസജ്ജമാക്കണോ?</string>
     <!-- Translators: Confirmation dialog body before forgetting the saved per-item volume. -->
     <string name="settings_reset_saved_volume_confirm_description">എല്ലാ ചാനലുകളും സിനിമകളും എപ്പിസോഡുകളും ഡിഫോൾട്ട് വോളിയത്തിലേക്ക് മടങ്ങും. സേവ് ചെയ്ത സൂം ക്രമീകരണങ്ങൾ നിലനിർത്തും. ഒറ്റ ഇനം എപ്പോൾ വേണമെങ്കിലും പ്ലെയറിൽ നിന്ന് വീണ്ടും സജ്ജമാക്കാം.</string>
+    <!-- Translators: Settings row that forgets every per-item audio-sync offset. -->
+    <string name="settings_reset_saved_audio_delay">സേവ് ചെയ്ത A/V സമന്വയം പുനഃസജ്ജമാക്കുക</string>
+    <!-- Translators: Description of the reset-saved-audio-sync row. -->
+    <string name="settings_reset_saved_audio_delay_description">പ്ലെയറിൽ ‘ഈ കാലതാമസം ഓർത്തുവയ്ക്കുക’ തിരഞ്ഞെടുത്താൽ ആ ചാനലിനോ സിനിമയ്ക്കോ എപ്പിസോഡിനോ ഉള്ള ഓഡിയോ സമന്വയം സേവ് ചെയ്യും. പുനഃസജ്ജമാക്കിയാൽ എല്ലാം വീണ്ടും മുകളിലെ ക്രമീകരണം പിന്തുടരും.</string>
+    <!-- Translators: Title of the confirmation dialog for resetting saved audio sync. -->
+    <string name="settings_reset_saved_audio_delay_confirm">സേവ് ചെയ്ത A/V സമന്വയം പുനഃസജ്ജമാക്കണോ?</string>
+    <!-- Translators: Body of the confirmation dialog for resetting saved audio sync. -->
+    <string name="settings_reset_saved_audio_delay_confirm_description">എല്ലാ ചാനലും സിനിമയും എപ്പിസോഡും മുകളിലെ ഓഡിയോ സമന്വയത്തിലേക്ക് മടങ്ങും. സേവ് ചെയ്ത സൂമും വോളിയവും നിലനിർത്തും. ഒറ്റയ്ക്കുള്ളത് എപ്പോൾ വേണമെങ്കിലും പ്ലെയറിൽ നിന്ന് വീണ്ടും സജ്ജമാക്കാം.</string>
     <!-- Translators: Setting label for how far rewind/forward jumps in a movie or episode. -->
     <string name="settings_seek_step">സീക്ക് സ്റ്റെപ്പ്</string>
     <!-- Translators: Description of the seek step setting. -->
@@ -466,6 +557,7 @@
     <string name="settings_audio_sync_description">വീഡിയോയുമായി പൊരുത്തപ്പെടുത്താൻ ഓഡിയോ നേരത്തെയോ വൈകിയോ ആക്കുക. mpv എൻജിനിൽ മാത്രം ബാധകം.</string>
     <string name="settings_live_tv">തത്സമയ ടിവി</string>
     <string name="settings_live_latency_description">തത്സമയ പ്രക്ഷേപണത്തോട് എത്ര അടുത്തായി പ്ലേ ചെയ്യണം. കുറഞ്ഞ മൂല്യം തത്സമയത്തോട് കൂടുതൽ അടുത്തായിരിക്കും, എന്നാൽ ബഫർ ചെറുതായതിനാൽ ദുർബലമായ സ്ട്രീമുകൾ തടസ്സപ്പെടുകയോ കൂടുതൽ തവണ വീണ്ടും കണക്റ്റ് ചെയ്യുകയോ ചെയ്‌തേക്കാം. അടുത്തതായി തുറക്കുന്ന ചാനലിന് ഇത് ബാധകമാകും.</string>
+    <string name="settings_live_latency_bitrate_note">വളരെ ഉയർന്ന ബിറ്റ്റേറ്റുള്ള ചാനലിൽ — പ്രത്യേകിച്ച് 4K-യിൽ — നിങ്ങൾ ആവശ്യപ്പെട്ടതിലും കുറഞ്ഞ സമയമേ ബഫറിന് സൂക്ഷിക്കാനാകൂ, കാരണം ഒരേസമയം മെമ്മറിയിൽ സൂക്ഷിക്കാവുന്ന വീഡിയോയ്ക്ക് പരിധിയുണ്ട്.</string>
     <string name="settings_channel_numbers">ചാനൽ നമ്പറുകൾ</string>
     <string name="settings_channel_numbers_description">തത്സമയ ടിവി പട്ടികയിലും ചാനൽ പട്ടിക ഓവർലേയിലും പ്ലെയറിലും പേരിന് സമീപം സേവനദാതാവിന്റെ ചാനൽ നമ്പർ കാണിക്കുക — പൂർണ്ണ സ്ക്രീൻ പ്ലേബാക്കിനിടെ റിമോട്ടിൽ ഒരു നമ്പർ ടൈപ്പ് ചെയ്ത് നേരിട്ട് ആ ചാനലിലേക്ക് പോകുകയും ചെയ്യാം (OK അമർത്തിയാൽ ഉടൻ ചാനലിലേക്ക് മാറും, Back അമർത്തിയാൽ റദ്ദാകും). ഓഫാക്കിയാൽ എല്ലാ നമ്പറുകളും മറയ്ക്കുകയും നമ്പർ കീകൾ അവഗണിക്കുകയും ചെയ്യും; ഒന്നും നഷ്ടമാകില്ല, വീണ്ടും ഓണാക്കിയാൽ അവ പുനഃസ്ഥാപിക്കും.</string>
     <string name="settings_diagnostics">ഡയഗ്നോസ്റ്റിക്സ്</string>
@@ -622,6 +714,12 @@
     <string name="settings_customize_rename_or_delete_category">വിഭാഗത്തിന്റെ പേര് മാറ്റുക അല്ലെങ്കിൽ ഇല്ലാതാക്കുക</string>
     <string name="settings_customize_new_category">＋ പുതിയ വിഭാഗം</string>
     <string name="settings_customize_sort_button">ക്രമീകരണം: <xliff:g id="label">%1$s</xliff:g> ▾</string>
+
+    <string name="settings_customize_filter_button">ഫിൽട്ടർ: <xliff:g id="label">%1$s</xliff:g> ▾</string>
+    <string name="settings_customize_filter_title">പട്ടിക ഫിൽട്ടർ ചെയ്യുക</string>
+    <string name="settings_customize_filter_all">എല്ലാം</string>
+    <string name="settings_customize_filter_visible">ദൃശ്യം</string>
+    <string name="settings_customize_filter_hidden">മറച്ചത്</string>
     <string name="settings_customize_new_categories_button">പുതിയ വിഭാഗങ്ങൾ: <xliff:g id="label">%1$s</xliff:g> ▾</string>
     <string name="settings_customize_rename_hint">ഈ പ്രൊഫൈലിന് മാത്രം. “<xliff:g id="name">%1$s</xliff:g>” പുനഃസ്ഥാപിക്കാൻ ശൂന്യമായി വിടുക.</string>
     <string name="settings_customize_remove_pin_title">PIN ലോക്ക് നീക്കംചെയ്യണോ?</string>
@@ -934,8 +1032,18 @@
     <string name="settings_subtitle_color_grey">ചാരനിറം</string>
     <string name="settings_live_preroll">ലൈവ് സ്ട്രീമുകൾ പ്രീ-ബഫർ ചെയ്യുക</string>
     <string name="settings_live_preroll_description">ഒരു ലൈവ് ചാനൽ പ്ലേ ചെയ്യാൻ തുടങ്ങുന്നതിന് മുമ്പ് ഇത്രയും വീഡിയോ ബഫർ ചെയ്യുക, സ്റ്റട്ടറിന് ശേഷവും വീണ്ടും. ഇത് വീഡിയോയുടെ അളവാണ്, കൗണ്ട്ഡൗൺ അല്ല. ഓഫ് ആണെങ്കിൽ ഏറ്റവും വേഗത്തിൽ പ്ലേ ആരംഭിക്കും.</string>
+    <string name="settings_live_tune_timeout">ചാനൽ ഉപേക്ഷിക്കാനുള്ള സമയം</string>
+    <string name="settings_live_tune_timeout_description">ഈ സമയത്തിനുള്ളിൽ ഒരു ലൈവ് ചാനലിൽ ചിത്രം വന്നില്ലെങ്കിൽ, തന്റെ എല്ലാ പ്ലേയറുകളും ഓരോന്നായി പരീക്ഷിച്ച് കറുത്ത സ്ക്രീൻ കാണിച്ചുനിൽക്കുന്നതിനു പകരം OwnTV ശ്രമം നിർത്തി നിങ്ങളോട് പറയും. “ഒരിക്കലും വേണ്ട” എന്നത് ശ്രമം തുടരും; നിങ്ങളുടെ ദാതാവ് നീക്കം ചെയ്ത ചാനലിൽ അതിന് ഒരു മിനിറ്റിലേറെ എടുക്കാം. ദാതാവ് തന്നെ ആവശ്യപ്പെടുന്ന കാത്തിരിപ്പ് ഇതിൽ കണക്കാക്കില്ല.</string>
     <string name="settings_live_preroll_per_playlist">ഓരോ പ്ലേലിസ്റ്റിനും പ്രീ-ബഫർ</string>
     <string name="settings_live_preroll_per_playlist_description">മുകളിലെ ക്രമീകരണം ഒരു പ്ലേലിസ്റ്റിനായി ഓവർറൈഡ് ചെയ്യുക, മറ്റ് പ്ലേലിസ്റ്റുകൾ വേഗത്തിൽ തന്നെ നിലനിർത്തുക.</string>
+    <!-- Translators: Title of the per-playlist Live TV engine override row. -->
+    <string name="settings_live_engine_per_playlist">ഓരോ പ്ലേലിസ്റ്റിനും തത്സമയ ടിവി പ്ലെയർ</string>
+    <!-- Translators: Description of the per-playlist Live TV engine override row. -->
+    <string name="settings_live_engine_per_playlist_description">മുകളിലെ ക്രമീകരണം ഒരു പ്ലേലിസ്റ്റിനായി ഓവർറൈഡ് ചെയ്യുക — ഒരു പ്ലെയറിൽ മാത്രം നന്നായി പ്രവർത്തിക്കുന്ന ചാനലുകളുള്ള ദാതാവിനായി.</string>
+    <!-- Translators: Title of the per-playlist Live latency override row. -->
+    <string name="settings_live_latency_per_playlist">ഓരോ പ്ലേലിസ്റ്റിനും തത്സമയ കാലതാമസം</string>
+    <!-- Translators: Description of the per-playlist Live latency override row. -->
+    <string name="settings_live_latency_per_playlist_description">മുകളിലെ ക്രമീകരണം ഒരു പ്ലേലിസ്റ്റിനായി ഓവർറൈഡ് ചെയ്യുക — മറ്റുള്ളവയേക്കാൾ വലുതോ ചെറുതോ ആയ ബഫർ വേണ്ട ദാതാവിനായി.</string>
     <plurals name="settings_live_preroll_overrides">
         <item quantity="one"><xliff:g id="count">%1$d</xliff:g> സെറ്റ്</item>
         <item quantity="other"><xliff:g id="count">%1$d</xliff:g> സെറ്റ്</item>
@@ -999,7 +1107,12 @@
     <string name="settings_main_interface_font">പ്രധാന ഇന്റർഫേസ് ഫോണ്ട്</string>
     <string name="settings_popup_font">പോപ്പപ്പ് ഫോണ്ട്</string>
     <string name="settings_choose_font">ഫോണ്ട് തിരഞ്ഞെടുക്കുക</string>
-    <string name="settings_font_size_range">ആപ്പിലെ അക്ഷരങ്ങൾ <xliff:g id="min">%1$d</xliff:g>%% മുതൽ <xliff:g id="max">%2$d</xliff:g>%% വരെ ക്രമീകരിക്കുക. സബ്‌ടൈറ്റിലുകൾക്ക് സ്വന്തം വലുപ്പം തുടരും.</string>
+    <string name="settings_font_size_range">പോപ്പപ്പുകളിലേതല്ല, പ്രധാന ആപ്പിലെ അക്ഷരങ്ങൾ <xliff:g id="min">%1$d</xliff:g>%% മുതൽ <xliff:g id="max">%2$d</xliff:g>%% വരെ ക്രമീകരിക്കുക. സബ്‌ടൈറ്റിലുകൾക്ക് സ്വന്തം വലുപ്പം തുടരും.</string>
+    <string name="settings_popup_font_size">പോപ്പപ്പ് ഫോണ്ട് വലുപ്പം</string>
+    <string name="settings_popup_font_size_description">ഡയലോഗുകളിലെയും മെനുകളിലെയും അക്ഷരങ്ങൾ മാത്രം മാറ്റുന്നു</string>
+    <string name="settings_popup_size">പോപ്പപ്പ് വലുപ്പം</string>
+    <string name="settings_popup_size_description">അക്ഷര വലുപ്പം മാറ്റാതെ ഡയലോഗ്, മെനു ബോക്സുകളുടെ വലുപ്പം ക്രമീകരിക്കുക</string>
+    <string name="settings_popup_size_range">ഡയലോഗ്, മെനു ബോക്സുകളുടെ വലുപ്പം ക്രമീകരിക്കുക (<xliff:g id="min">%1$d</xliff:g>%%–<xliff:g id="max">%2$d</xliff:g>%%).</string>
     <string name="settings_font_preview">വിനോദം കൂടുതൽ ലളിതം.</string>
     <string name="settings_search_keywords_fonts">ഫോണ്ട് ടെക്സ്റ്റ് വലുപ്പം ടൈപ്പ്ഫേസ് പോപ്പപ്പ് വായന ആക്സസിബിലിറ്റി</string>
     <string name="settings_font_system_sans">സിസ്റ്റം സാൻസ്</string>
@@ -1026,8 +1139,59 @@
     <string name="settings_glass_highlight_title">ഹൈലൈറ്റ് ശക്തി</string>
     <string name="settings_glass_highlight_description">ഫോക്കസ് ചെയ്ത ഗ്ലാസിന്റെ വെളിച്ചവും അരികും ക്രമീകരിക്കുക.</string>
     <string name="settings_glass_live_preview">തത്സമയ പ്രിവ്യൂ</string>
+    <string name="settings_glass_screen_description">അർദ്ധസുതാര്യമായ മങ്ങിയ പാനലുകൾ, പശ്ചാത്തല ചിത്രം, സുതാര്യത</string>
+    <string name="settings_glass_master_description">ഒരു പശ്ചാത്തല ചിത്രത്തിനോ ആപ്പിന്റെ സ്വന്തം പശ്ചാത്തലത്തിനോ മുകളിലുള്ള അർധസുതാര്യമായ ഫ്രോസ്റ്റഡ് പാനലുകൾ.</string>
+    <string name="settings_glass_background_image">ഒരു പശ്ചാത്തല ചിത്രം തിരഞ്ഞെടുക്കുക</string>
+    <string name="settings_glass_surface_transparency_title">സുതാര്യത</string>
+    <string name="settings_glass_background_blur_title">മങ്ങൽ / ഫ്രോസ്റ്റ്</string>
+    <string name="settings_glass_section_appearance">രൂപഭാവം</string>
+    <string name="settings_glass_section_fine_tuning">വിപുലമായ ഓപ്ഷനുകൾ</string>
+    <string name="settings_glass_section_behavior">പ്രവർത്തനരീതി</string>
+    <string name="settings_glass_apply_to">ഗ്ലാസ് പ്രതലങ്ങൾ</string>
+    <string name="settings_glass_surface_all">എല്ലാം</string>
+    <string name="settings_glass_background_action_description">ഒരു പശ്ചാത്തല ചിത്രം തിരഞ്ഞെടുക്കുക</string>
+    <string name="settings_glass_transparency_short_description">20–100 · 5</string>
+    <string name="settings_glass_blur_short_description">0–100 · 10</string>
+    <string name="settings_glass_highlight_short_description">ഫോക്കസ് ചെയ്ത ഗ്ലാസിന്റെ വെളിച്ചവും അരികും ക്രമീകരിക്കുക.</string>
+    <string name="settings_glass_full_transparency_short">പൂർണ്ണ സുതാര്യത അനുവദിക്കുക</string>
+    <string name="settings_glass_full_transparency_short_description">ഏറ്റവും സുതാര്യമായ ഗ്ലാസിനായി സ്വയമേവയുള്ള വായനാക്ഷമത പരിധി ഓഫാക്കുന്നു.</string>
+    <string name="settings_glass_depth_effects_short">ആഴവും നിഴലുകളും</string>
+    <string name="settings_glass_depth_effects_short_description">ഫോക്കസ് സഞ്ചാര വെളിച്ചം, സൂക്ഷ്മ പാരലാക്സ്, ആഴ ചലനം എന്നിവ പ്രവർത്തനക്ഷമമാക്കുന്നു.</string>
+    <string name="settings_glass_reset_balanced">പുനഃസജ്ജമാക്കുക: സമതുലിതം</string>
     <string name="settings_glass_full_transparency_title">പൂർണ്ണ സുതാര്യത അനുവദിക്കുക</string>
     <string name="settings_glass_full_transparency_description">ഏറ്റവും സുതാര്യമായ ഗ്ലാസിനായി സ്വയമേവയുള്ള വായനാക്ഷമത പരിധി ഓഫാക്കുന്നു.</string>
     <string name="settings_glass_depth_title">ആഴവും നിഴലുകളും</string>
     <string name="settings_glass_depth_description">ഫോക്കസ് സഞ്ചാര വെളിച്ചം, സൂക്ഷ്മ പാരലാക്സ്, ആഴ ചലനം എന്നിവ പ്രവർത്തനക്ഷമമാക്കുന്നു.</string>
+    <string name="settings_header_hint">ഇടത്: ഗ്രൂപ്പുകൾ · വലത്: അവയുടെ ക്രമീകരണങ്ങൾ · ഒരു വരി പെട്ടെന്ന് എന്നതിൽ പിൻ ചെയ്യാൻ OK അമർത്തിപ്പിടിക്കുക</string>
+    <string name="settings_spine_eyebrow">എല്ലാ ഗ്രൂപ്പുകളും</string>
+    <string name="settings_spine_title">ക്രമീകരണങ്ങൾ പരതുക</string>
+    <string name="settings_spine_hint">പെട്ടെന്ന് എപ്പോഴും മുകളിൽ തന്നെ; അടയാളം നിങ്ങൾ നിൽക്കുന്ന ഗ്രൂപ്പിനെ പിന്തുടരും.</string>
+    <string name="settings_spine_foot">ആക്സന്റ് നിറം നിങ്ങളുടെ ഫോക്കസിനെ പിന്തുടരുന്നു</string>
+    <string name="settings_row_menu_pin">പെട്ടെന്ന് എന്നതിൽ പിൻ ചെയ്യുക</string>
+    <string name="settings_row_menu_unpin">പെട്ടെന്ന് എന്നതിൽ നിന്ന് നീക്കുക</string>
+    <string name="settings_row_menu_move_up">മുകളിലേക്ക് നീക്കുക</string>
+    <string name="settings_row_menu_move_down">താഴേക്ക് നീക്കുക</string>
+    <string name="settings_quick_empty_title">ഇതുവരെ ഒന്നും പിൻ ചെയ്തിട്ടില്ല</string>
+    <string name="settings_quick_empty_hint">ഏതെങ്കിലും ക്രമീകരണത്തിൽ OK അമർത്തിപ്പിടിച്ച് “പെട്ടെന്ന് എന്നതിൽ പിൻ ചെയ്യുക” തിരഞ്ഞെടുക്കുക.</string>
+    <string name="settings_results_title">ഫലങ്ങൾ</string>
+    <string name="settings_results_summary">എവിടെയായാലും എല്ലാ പൊരുത്തങ്ങളും — വഴിയോടു കൂടി</string>
+    <plurals name="settings_setting_count">
+        <item quantity="one"><xliff:g id="count">%1$d</xliff:g> ക്രമീകരണം</item>
+        <item quantity="other"><xliff:g id="count">%1$d</xliff:g> ക്രമീകരണങ്ങൾ</item>
+    </plurals>
+    <plurals name="settings_pinned_count">
+        <item quantity="one"><xliff:g id="count">%1$d</xliff:g> പിൻ ചെയ്തു</item>
+        <item quantity="other"><xliff:g id="count">%1$d</xliff:g> പിൻ ചെയ്തു</item>
+    </plurals>
+    <plurals name="settings_match_count">
+        <item quantity="one"><xliff:g id="count">%1$d</xliff:g> പൊരുത്തം</item>
+        <item quantity="other"><xliff:g id="count">%1$d</xliff:g> പൊരുത്തങ്ങൾ</item>
+    </plurals>
+    <string name="settings_guide_width">ഗൈഡ് കോളം വീതികൾ</string>
+    <string name="settings_guide_width_description">ടിവി ഗൈഡിലെ ചാനൽ ലിസ്റ്റിന്റെയും EPG ടൈംലൈനിന്റെയും വീതി മാറ്റുക.</string>
+    <string name="settings_search_keywords_guide_width">ഗൈഡ് epg ചാനൽ ലിസ്റ്റ് ടൈംലൈൻ കോളം പാനൽ വീതി വലുപ്പം ലേഔട്ട്</string>
+    <string name="settings_guide_width_summary">ചാനൽ ലിസ്റ്റ് %1$d%% · EPG ടൈംലൈൻ %2$d%%</string>
+    <string name="settings_guide_width_help">• ചാനൽ ലിസ്റ്റും EPG ടൈംലൈനും ഒരേ വരി പങ്കിടുന്നതിനാൽ ആകെ 100%% ആയിരിക്കണം.\n• ചാനൽ ലിസ്റ്റ് വീതിയാക്കുമ്പോൾ ടൈംലൈനിന്റെ കുറവ് ഭാഗം മാത്രമേ ഒരേസമയം കാണൂ; പ്രോഗ്രാം ദൈർഘ്യവും സമയ സ്കെയിലും മാറില്ല.\n• രണ്ട് കോളങ്ങളും കുറഞ്ഞത് 10%% ആയി തുടരും.\n• റീസെറ്റ് ചാനൽ ലിസ്റ്റ് 10%% ആയും EPG ടൈംലൈൻ 90%% ആയും മാറ്റും.\n• ഇഷ്ടാനുസൃതമാക്കൽ ഓഫാക്കിയാൽ മൂല്യങ്ങൾ നഷ്ടപ്പെടാതെ സാധാരണ ലേഔട്ട് തിരികെ വരും.</string>
+    <string name="settings_guide_width_channels">ചാനൽ ലിസ്റ്റ്</string>
+    <string name="settings_guide_width_epg">EPG ടൈംലൈൻ</string>
 </resources>

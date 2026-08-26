@@ -38,6 +38,7 @@ import tv.own.owntv.core.companion.CompanionServerState
 import tv.own.owntv.ui.components.companionLockedText
 import tv.own.owntv.ui.components.displayText
 import tv.own.owntv.ui.components.OwnTVButton
+import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.OwnTVButtonStyle
 import tv.own.owntv.ui.components.roundedPanel
 import tv.own.owntv.ui.theme.OwnTVTheme
@@ -120,13 +121,13 @@ fun RemoteBackupRestoreScreen(
                     is CompanionServerState.Failed -> {
                         Text(state.failure.displayText(), style = MaterialTheme.typography.bodyMedium, color = Color(0xFFEF4444), textAlign = TextAlign.Center)
                         Spacer(Modifier.height(20.dp))
-                        OwnTVButton(stringResource(R.string.settings_try_again), onClick = { onStart(CompanionLink.DEFAULT_PORT) })
+                        OwnTVButton(stringResource(R.string.settings_try_again), onClick = { onStart(CompanionLink.DEFAULT_PORT) }, icon = OwnTVIcon.REFRESH)
                     }
                     CompanionServerState.Locked -> {
                         Text(companionLockedText(), style = MaterialTheme.typography.bodyMedium, color = Color(0xFFEF4444), textAlign = TextAlign.Center)
                         Spacer(Modifier.height(20.dp))
                         // Restarting mints a fresh PIN, so this is the recovery path — not a retry of a failure.
-                        OwnTVButton(stringResource(R.string.settings_new_pin), onClick = { onStart(CompanionLink.DEFAULT_PORT) })
+                        OwnTVButton(stringResource(R.string.settings_new_pin), onClick = { onStart(CompanionLink.DEFAULT_PORT) }, icon = OwnTVIcon.REFRESH)
                     }
                 }
                 Spacer(Modifier.height(16.dp))

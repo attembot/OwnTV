@@ -13,6 +13,7 @@
     <string name="common_ok">확인</string>
     <string name="common_on">켜짐</string>
     <string name="common_off">꺼짐</string>
+    <string name="common_never">안 함</string>
     <string name="common_exit">종료</string>
     <string name="common_resume">이어보기</string>
     <string name="common_start_over">처음부터 보기</string>
@@ -35,6 +36,7 @@
     <string name="common_nav_guide">편성표</string>
     <string name="common_nav_settings">설정</string>
     <string name="shell_no_source">소스 없음</string>
+    <string name="shell_now_playing">재생 중</string>
     <string name="common_something_went_wrong">문제가 발생했습니다</string>
     <string name="common_move_instructions">▲/▼로 이동 · 확인을 눌러 저장 · 뒤로를 눌러 취소</string>
     <string name="common_number_grouped"><xliff:g id="count">%1$,d</xliff:g></string>

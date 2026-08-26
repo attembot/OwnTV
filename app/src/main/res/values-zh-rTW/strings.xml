@@ -13,6 +13,7 @@
     <string name="common_ok">確定</string>
     <string name="common_on">開啟</string>
     <string name="common_off">關閉</string>
+    <string name="common_never">永不</string>
     <string name="common_exit">離開</string>
     <string name="common_resume">繼續</string>
     <string name="common_start_over">從頭播放</string>
@@ -35,6 +36,7 @@
     <string name="common_nav_guide">節目表</string>
     <string name="common_nav_settings">設定</string>
     <string name="shell_no_source">無來源</string>
+    <string name="shell_now_playing">正在播放</string>
     <string name="common_something_went_wrong">發生錯誤</string>
     <string name="common_move_instructions">▲/▼ 移動 · 確定儲存 · 返回取消</string>
     <string name="common_number_grouped"><xliff:g id="count">%1$,d</xliff:g></string>

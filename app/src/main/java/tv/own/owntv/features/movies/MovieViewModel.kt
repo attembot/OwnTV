@@ -95,13 +95,24 @@ class MovieViewModel(
     private val _moveState = MutableStateFlow<MovieMoveState?>(null)
     val moveState: StateFlow<MovieMoveState?> = _moveState.asStateFlow()
 
-    private data class Ctx(val profileId: Long, val sourceIds: List<Long>)
+    private data class Ctx(
+        val profileId: Long,
+        val sourceIds: List<Long>,
+        val sourceNames: Map<Long, String>,
+    )
     // Observe the active profile's sources reactively so adding/removing a playlist refreshes Movies
     // immediately (was read once at startup, so a new playlist showed nothing until app restart).
     private val ctx: StateFlow<Ctx> = activeProfileSources(settings, sourceDao)
-        .map { aps -> Ctx(aps.profileId, aps.movieSourceIds) }
+        .map { aps ->
+            val ids = aps.movieSourceIds
+            Ctx(aps.profileId, ids, aps.sources.filter { it.id in ids }.associate { it.id to it.name })
+        }
         .distinctUntilChanged()
-        .stateIn(viewModelScope, SharingStarted.Eagerly, Ctx(-1L, emptyList()))
+        .stateIn(viewModelScope, SharingStarted.Eagerly, Ctx(-1L, emptyList(), emptyMap()))
+
+    val providerNames: StateFlow<Map<Long, String>> = ctx
+        .map { c -> c.sourceNames.takeIf { it.size > 1 } ?: emptyMap() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
     private val folderContextKeys: StateFlow<Map<Long, String>> = ctx
         .flatMapLatest { c ->
@@ -336,10 +347,16 @@ class MovieViewModel(
                 val visibleCats = if (kids) cats.filterNot { tv.own.owntv.core.content.AdultCategoryClassifier.isAdult(it.name) } else cats
                 val visibleCustoms = if (kids) cust.customCategories.filterNot { tv.own.owntv.core.content.AdultCategoryClassifier.isAdult(it.name) } else cust.customCategories
                 val folders = visibleCats.applyCustomizationsWithCustoms(cust, visibleCustoms, alphaRest = sort == SettingsRepository.SortMode.ALPHA)
+                val multiSourceNames = c.sourceNames.takeIf { it.size > 1 }.orEmpty()
+                val categoriesById = visibleCats.associateBy { it.id }
                 defaultRail + folders.map { e ->
                     LiveRailItem(
                         key = e.categoryId?.let { LiveKey.Folder(it) } ?: LiveKey.Custom(e.customId!!),
                         title = e.displayName,
+                        providerName = e.categoryId
+                            ?.let(categoriesById::get)
+                            ?.sourceId
+                            ?.let(multiSourceNames::get),
                     )
                 }
             }

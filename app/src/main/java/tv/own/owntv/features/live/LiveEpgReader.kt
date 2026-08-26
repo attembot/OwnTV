@@ -26,6 +26,10 @@ internal const val DEFAULT_CATCHUP_DAYS = 7
 
 private const val CATCHUP_LOOKBACK_CAP_MS = 48L * 60 * 60 * 1000 // bounded by the EPG we retain (~2 days)
 
+// How far past a finished catch-up programme to look for the next one. Beyond this the guide has a
+// gap rather than a next programme, and auto-play stops instead of leaping hours ahead.
+private const val NEXT_PROGRAMME_GAP_CAP_MS = 3L * 60 * 60 * 1000
+
 // Match EPG picker: how many guide channels to scan for name-ranking vs. show in the dialog.
 private const val EPG_PICKER_SCAN_LIMIT = 20_000
 private const val EPG_PICKER_RESULT_LIMIT = 300
@@ -223,6 +227,34 @@ internal class LiveEpgReader(
             .sortedByDescending { it.startMs }      // most recent first
             .take(80)
             .map { EpgShift.apply(it, shift) }
+    }
+
+    /**
+     * The guide entry that follows [afterStopMs] on [ch] — what a finished catch-up programme rolls
+     * into. Null when the guide stops there, or when the gap to the next entry is longer than
+     * [NEXT_PROGRAMME_GAP_CAP_MS]: a channel whose guide resumes tomorrow morning has nothing to
+     * continue with tonight, and jumping hours forward is not "the next programme".
+     *
+     * [afterStopMs] is on the clock the user sees; the result comes back on it too, so the archive URL
+     * built from it asks for the time the programme really aired.
+     */
+    suspend fun programmeAfter(
+        ch: ChannelEntity,
+        afterStopMs: Long,
+        cust: SectionCustomizations,
+        globalShiftMinutes: Int,
+        liveSourceIds: List<Long>,
+    ): EpgProgrammeEntity? = withContext(Dispatchers.IO) {
+        val epgKey = (cust.epgMatches[CustomizeKeys.channel(ch)] ?: ch.epgChannelId)
+            ?.trim()?.lowercase()?.takeIf { it.isNotEmpty() } ?: return@withContext null
+        val shift = EpgShift.minutesFor(cust, ch, globalShiftMinutes)
+        val from = EpgShift.toStored(afterStopMs, shift)
+        val ids = liveSourceIds + epgSourceStore.getAll().map { it.id }
+        epgDao.programmesForChannel(ids, epgKey, from, from + NEXT_PROGRAMME_GAP_CAP_MS)
+            // The query keeps anything still running at [from]; the next programme is the one that
+            // starts at or after it.
+            .firstOrNull { it.startMs >= from }
+            ?.let { EpgShift.apply(it, shift) }
     }
 
     /** Full description for a programme picked in the catch-up dialog. The list query drops it to stay

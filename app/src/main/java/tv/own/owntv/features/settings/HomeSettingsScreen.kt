@@ -55,6 +55,7 @@ fun HomeSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val config by vm.config.collectAsStateWithLifecycle()
     val trendingAvailability by vm.trendingAvailability.collectAsStateWithLifecycle()
     val devRebuild by vm.devRebuild.collectAsStateWithLifecycle()
+    val heroPreviewEnabled by vm.heroPreviewEnabled.collectAsStateWithLifecycle()
     val androidTvHomeEnabled by settingsVm.androidTvHomeEnabled.collectAsStateWithLifecycle()
     val tvHomeRefresh by settingsVm.tvHomeRefresh.collectAsStateWithLifecycle()
     val colors = OwnTVTheme.colors
@@ -199,6 +200,16 @@ fun HomeSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                     onClick = { vm.setHeroInclude(HeroKind.SERIES, !config.heroIncludeSeries) },
                 )
             }
+            item {
+                Row2(
+                    icon = OwnTVIcon.PLAY,
+                    title = stringResource(R.string.settings_hero_preview),
+                    desc = stringResource(R.string.settings_hero_preview_description),
+                    chip = if (heroPreviewEnabled) stringResource(R.string.common_on) else stringResource(R.string.common_off),
+                    primaryChip = heroPreviewEnabled,
+                    onClick = { vm.setHeroPreviewEnabled(!heroPreviewEnabled) },
+                )
+            }
 
             item {
                 Spacer(Modifier.height(6.dp))
@@ -217,7 +228,7 @@ fun HomeSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             if (androidTvHomeEnabled) {
                 item {
                     Row2(
-                        icon = OwnTVIcon.SHARE,
+                        icon = OwnTVIcon.REFRESH,
                         title = stringResource(R.string.settings_refresh_now),
                         desc = stringResource(R.string.settings_refresh_description),
                         chip = when (tvHomeRefresh) {

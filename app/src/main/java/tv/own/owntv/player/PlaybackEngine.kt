@@ -91,6 +91,9 @@ interface PlaybackEngine {
     // VOD-only — sensible no-op / empty defaults for a live engine.
     val position: StateFlow<Long> get() = ZERO_LONG
     val duration: StateFlow<Long> get() = ZERO_LONG
+    /** How far ahead of [position] the engine has data, for the scrub bar's buffer ghost. 0 = unknown,
+     *  which simply draws no ghost — an engine that cannot report it costs nothing. */
+    val bufferedMs: StateFlow<Long> get() = ZERO_LONG
     val speed: StateFlow<Double> get() = ONE_DOUBLE
     val nav: StateFlow<NavState> get() = NO_NAV
     /** Title of the next queued item (in-season next episode), for the HUD next-episode countdown card.
@@ -101,6 +104,10 @@ interface PlaybackEngine {
     /** True when this engine can shift audio against video (mpv's `audio-delay`). ExoPlayer cannot, so
      *  the HUD hides the nudge there. mpv supports it on live too — provider A/V drift is real (F19e). */
     fun audioDelayAvailable(): Boolean = false
+    /** Whether the current item has its own remembered A/V-sync offset (mpv only). */
+    val audioDelayRemembered: StateFlow<Boolean> get() = FALSE_FLOW
+    /** Remember the current A/V-sync offset for this item, or forget it again (mpv only). */
+    fun toggleRememberAudioDelay() {}
     /** Subtitle-timing offset (ms) for the ACTIVE subtitle — VOD only (subtitle plan §8). */
     val subDelayMs: StateFlow<Int> get() = ZERO_INT
     /** Settings → Seek step: how far one press of rewind/forward moves. VOD only; a live engine never
@@ -154,6 +161,7 @@ class MpvPlaybackEngine(private val p: OwnTVPlayer) : PlaybackEngine {
     override fun exitAudioOnly() = p.exitAudioOnly()
     override val position get() = p.position
     override val duration get() = p.duration
+    override val bufferedMs get() = p.bufferedMs
     override val speed get() = p.speed
     override val nav get() = p.nav
     override val nextUpTitle get() = p.nextUpTitle
@@ -181,6 +189,8 @@ class MpvPlaybackEngine(private val p: OwnTVPlayer) : PlaybackEngine {
     override fun refreshStreamChips() = p.refreshStreamChips()
     override fun setSpeed(speed: Double) = p.setSpeed(speed)
     override fun adjustAudioDelay(deltaMs: Int) = p.adjustAudioDelay(deltaMs)
+    override val audioDelayRemembered get() = p.audioDelayRemembered
+    override fun toggleRememberAudioDelay() = p.toggleRememberAudioDelay()
     override fun previous() = p.previous()
     override fun next() = p.next()
     override fun seekBy(deltaMs: Long) = p.seekBy(deltaMs)

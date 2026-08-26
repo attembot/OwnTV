@@ -23,6 +23,10 @@
     <string name="settings_movies_keep_watching_description">Mostre os cartões para continuar filmes na linha de destaque.</string>
     <string name="settings_series_keep_watching">Séries em Continuar assistindo</string>
     <string name="settings_series_keep_watching_description">Mostre os cartões para continuar episódios na linha de destaque.</string>
+    <!-- Translators: Toggle label for playing the highlighted Home item's video in the hero row. -->
+    <string name="settings_hero_preview">Reproduzir vídeo na linha de destaque</string>
+    <!-- Translators: Description of the hero-row video preview toggle. -->
+    <string name="settings_hero_preview_description">A prévia em vídeo do item destacado é reproduzida após um instante. Desative para economizar energia e memória ao navegar pela tela inicial.</string>
     <string name="settings_android_tv_home">Tela inicial do Android TV</string>
     <string name="settings_android_tv_home_description">Mostre Continuar assistindo e os canais ao vivo recentes na tela inicial da TV.</string>
     <string name="settings_refresh_now">Atualizar agora</string>
@@ -63,19 +67,62 @@
     <string name="settings_proxy_connection_failed">Não foi possível conectar ao proxy (verifique o host/a porta).</string>
     <string name="settings_proxy_http">O proxy retornou HTTP <xliff:g id="code">%1$d</xliff:g></string>
     <string name="settings_proxy_failed">Falha no teste do proxy.</string>
-    <string name="settings_ch_nav_title">Paginação pelas teclas CH+/CH−</string>
-    <string name="settings_ch_nav_description">Percorra a lista de categorias ou itens por páginas usando as teclas CH+/CH− do controle remoto.</string>
-    <string name="settings_ch_nav_enabled">Usar as teclas CH+/CH− para paginar listas</string>
-    <string name="settings_ch_nav_enabled_description">Quando ativado, CH+ e CH− avançam no painel em foco (faixa de categorias ou lista de itens, além da lista de categorias em Personalizar). Quando desativado, essas teclas não fazem nada nessas telas.</string>
-    <string name="settings_ch_nav_up">Salto com CH+ (em direção ao primeiro)</string>
-    <string name="settings_ch_nav_up_description">Quantos itens são percorridos para cima ao pressionar CH+ uma vez. Manter pressionado sempre vai para o primeiro item.</string>
-    <string name="settings_ch_nav_down">Salto com CH− (em direção ao último)</string>
-    <string name="settings_ch_nav_down_description">Quantos itens são percorridos para baixo ao pressionar CH− uma vez. Manter pressionado sempre vai para o último item.</string>
+    <string name="settings_ch_nav_title">Paginação pelas teclas CH+/RW · CH−/FF</string>
+    <string name="settings_ch_nav_description">Percorra a lista de categorias ou itens por páginas usando as teclas CH+/RW · CH−/FF do controle remoto.</string>
+    <string name="settings_ch_nav_enabled">Usar as teclas CH+/RW · CH−/FF para paginar listas</string>
+    <string name="settings_ch_nav_enabled_description">Quando ativado, CH+/RW e CH−/FF avançam no painel em foco (faixa de categorias ou lista de itens, além da lista de categorias em Personalizar). Quando desativado, essas teclas não fazem nada nessas telas.</string>
+    <string name="settings_ch_nav_up">Salto com CH+ / Retroceder (em direção ao primeiro)</string>
+    <string name="settings_ch_nav_up_description">Quantos itens são percorridos para cima ao pressionar CH+/RW uma vez. Manter pressionado sempre vai para o primeiro item.</string>
+    <string name="settings_ch_nav_down">Salto com CH− / Avançar (em direção ao último)</string>
+    <string name="settings_ch_nav_down_description">Quantos itens são percorridos para baixo ao pressionar CH−/FF uma vez. Manter pressionado sempre vai para o último item.</string>
     <string name="settings_skip_counts">Contagens de salto</string>
     <string name="settings_how_it_works">Como funciona</string>
-    <string name="settings_ch_nav_help">• Os saltos são limitados nas extremidades, portanto listas curtas chegam ao fim com um único toque.\n• Manter CH+ pressionado = primeiro item; manter CH− pressionado = último item.\n• Manter pressionado fica desativado na lista \"Todos\" (todos os canais/filmes/séries) — os saltos com toques curtos ainda funcionam nela.\n• Aplica-se ao painel que estiver em foco — a faixa de categorias ou a lista/grade de itens.\n• Também percorre por páginas a lista de categorias em Configurações → Personalizar categorias e itens.</string>
+    <string name="settings_ch_nav_help">• Os saltos são limitados nas extremidades, portanto listas curtas chegam ao fim com um único toque.\n• Manter CH+/RW pressionado = primeiro item; manter CH−/FF pressionado = último item.\n• Manter pressionado fica desativado na lista \"Todos\" (todos os canais/filmes/séries) — os saltos com toques curtos ainda funcionam nela.\n• Aplica-se ao painel que estiver em foco — a faixa de categorias ou a lista/grade de itens.\n• Também percorre por páginas a lista de categorias em Configurações → Personalizar categorias e itens.</string>
+    <string name="settings_remote_shortcuts">Atalhos do controle remoto</string>
+    <string name="settings_remote_shortcuts_description">Atribua botões livres à navegação, reprodução e exploração. Os botões essenciais continuam protegidos.</string>
+    <string name="settings_remote_shortcuts_enabled">Usar atalhos do controle remoto</string>
+    <string name="settings_remote_shortcuts_enabled_description">Desative todos os atalhos personalizados sem apagar as atribuições</string>
+    <string name="settings_remote_shortcuts_assignments">Atribuições de botões</string>
+    <string name="settings_remote_shortcuts_add">Adicionar atalho</string>
+    <string name="settings_remote_shortcuts_add_description">Pressione ou segure um botão livre e depois escolha a ação</string>
+    <string name="settings_remote_shortcuts_reset">Restaurar atalhos padrão</string>
+    <string name="settings_remote_shortcuts_reset_description">Restaure a paginação CH+/CH− e retroceder/avançar; remova as outras atribuições</string>
+    <string name="settings_remote_shortcuts_capture_title">Pressione um botão do controle</string>
+    <string name="settings_remote_shortcuts_capture_description">Pressione rapidamente ou segure até soltar. Voltar, direcional, OK, volume, Início e energia não podem ser atribuídos.</string>
+    <string name="settings_remote_shortcuts_choose_action">Escolher uma ação</string>
+    <string name="settings_remote_shortcuts_binding"><xliff:g id="press">%1$s</xliff:g> · <xliff:g id="action">%2$s</xliff:g></string>
+    <string name="settings_remote_shortcuts_short_press">Toque curto</string>
+    <string name="settings_remote_shortcuts_long_press">Toque longo</string>
+    <string name="settings_remote_shortcuts_unknown_button">Botão do controle %1$d</string>
+    <string name="settings_remote_shortcuts_help">• Por padrão, CH+/CH− e retroceder/avançar percorrem listas; segurar salta ao primeiro ou último item.
+• Toques curtos e longos podem ser atribuídos separadamente.
+• Ir ao último continua desativado em listas “Tudo” muito grandes.
+• Segurar Voltar sempre foca Em reprodução e não pode ser alterado.
+• Botões normalmente atribuíveis: vermelho/verde/amarelo/azul, números, CH+/CH− e retroceder/avançar.
+• Voltar, direcional, OK, volume, Início e energia continuam protegidos.
+• Atalhos numéricos funcionam ao navegar; em tela cheia, a entrada de canal tem prioridade.</string>
+    <string name="settings_remote_button_channel_up">Canal +</string>
+    <string name="settings_remote_button_channel_down">Canal −</string>
+    <string name="settings_remote_button_rewind">Retroceder</string>
+    <string name="settings_remote_button_fast_forward">Avanço rápido</string>
+    <string name="settings_remote_button_previous">Anterior</string>
+    <string name="settings_remote_button_next">Próximo</string>
+    <string name="settings_remote_button_menu">Menu</string>
+    <string name="settings_remote_button_red">Botão vermelho</string>
+    <string name="settings_remote_button_green">Botão verde</string>
+    <string name="settings_remote_button_yellow">Botão amarelo</string>
+    <string name="settings_remote_button_blue">Botão azul</string>
+    <string name="settings_remote_action_continue">Continuar o último assistido</string>
+    <string name="settings_remote_action_focus_now_playing">Focar Em reprodução</string>
+    <string name="settings_remote_action_expand_now_playing">Expandir Em reprodução</string>
+    <string name="settings_remote_action_mini_player">Mover para o miniplayer</string>
+    <string name="settings_remote_action_play_pause">Reproduzir ou pausar</string>
+    <string name="settings_remote_action_page_first">Página para os primeiros itens</string>
+    <string name="settings_remote_action_page_last">Página para os últimos itens</string>
+    <string name="settings_remote_action_jump_first">Ir ao primeiro item</string>
+    <string name="settings_remote_action_jump_last">Ir ao último item</string>
     <string name="settings_large_skips_warning">Saltos grandes ultrapassam listas curtas e podem parecer bruscos em TVs de baixo desempenho.</string>
-    <string name="settings_ch_nav_picker">Paginação pelas teclas CH+/CH−</string>
+    <string name="settings_ch_nav_picker">Paginação pelas teclas CH+/RW · CH−/FF</string>
     <string name="settings_weather">Clima</string>
     <string name="settings_top_bar_weather">Clima na barra superior</string>
     <string name="settings_show_weather">Mostrar clima</string>
@@ -159,7 +206,6 @@
     <string name="settings_quick_check_update">Verificar atualização</string>
     <string name="settings_search_label">Pesquisar configurações</string>
     <string name="settings_search_hint">Pesquisar configurações…</string>
-    <string name="settings_group_general">Geral</string>
     <string name="settings_language">Idioma</string>
     <string name="settings_language_description">Idioma de exibição do aplicativo</string>
     <string name="settings_language_system_default">Padrão do sistema</string>
@@ -169,7 +215,6 @@
     <string name="settings_language_coverage"><xliff:g id="percent">%1$d</xliff:g>%%</string>
     <string name="settings_profile_group">Perfil</string>
     <string name="settings_profiles_description">Gerencie espectadores, modo infantil e bloqueios por PIN</string>
-    <string name="settings_content_group">Conteúdo</string>
     <string name="settings_playlists">Listas de reprodução</string>
     <string name="settings_playlists_description">Adicione, ressincronize ou remova listas de reprodução M3U/Xtream</string>
     <string name="settings_epg_sources">Fontes de EPG</string>
@@ -177,8 +222,14 @@
     <string name="settings_customize">Personalizar categorias e itens</string>
     <string name="settings_customize_nav_description">Oculte e reexiba itens, renomeie e reordene categorias</string>
     <string name="settings_sidebar_description_root">Adapte automaticamente os ícones laterais à sua lista de reprodução ou oculte alguns deles</string>
-    <string name="settings_ch_paging">Paginação pelas teclas CH+/CH−</string>
-    <string name="settings_ch_paging_description">Salte para cima/baixo nas listas de categorias e itens usando as teclas CH+/CH−</string>
+    <string name="settings_ch_paging">Atalhos do controle remoto</string>
+    <string name="settings_ch_paging_description">Atribua botões livres à navegação, reprodução e exploração. Os botões essenciais continuam protegidos.</string>
+    <!-- Translators: Settings navigation label for the long-press content menus. -->
+    <string name="settings_content_menus_title">Menus de toque longo</string>
+    <!-- Translators: Description of the long-press content menus settings. -->
+    <string name="settings_content_menus_description">Reordene as ações nos menus de canais, filmes, séries e episódios</string>
+    <!-- Translators: Hint shown above the list when arranging a long-press menu. -->
+    <string name="settings_content_menus_hint">Mantenha OK numa ação para a pegar e mova-a com Cima e Baixo. Prima OK novamente para a largar.</string>
     <string name="settings_browsing_lists">Navegação e listas</string>
     <string name="settings_browsing_description">Lembre a última categoria e o último item em TV ao vivo, filmes e séries</string>
     <string name="settings_home_root">Tela inicial</string>
@@ -223,7 +274,7 @@
     <string name="settings_surround_sound">Som surround</string>
     <string name="settings_surround_description">Decodifique Dolby/DTS para som surround (5.1/7.1) com um receiver 5.1/7.1 de verdade. Deixe DESATIVADO para os alto-falantes da TV ou uma soundbar estéreo — o áudio multicanal pode ficar atrasado em relação ao vídeo em algumas TVs/soundbars. Se perder a sincronização, faça um pequeno ajuste em Áudio, no menu do reprodutor → Sincronização A/V.</string>
     <string name="settings_autoplay_next">Reproduzir próximo episódio automaticamente</string>
-    <string name="settings_autoplay_next_description">Quando um episódio terminar, inicie automaticamente o próximo — e continue na temporada seguinte.</string>
+    <string name="settings_autoplay_next_description">Quando um episódio terminar, inicie automaticamente o próximo — e continue na temporada seguinte. A programação retroativa também continua no próximo programa.</string>
     <string name="settings_catchup">Programação retroativa</string>
     <plurals name="settings_catchup_supported">
         <item quantity="one"><xliff:g id="count">%1$d</xliff:g> canal é compatível com programação retroativa · fuso horário e reprodutor para reprodução do arquivo</item>
@@ -304,12 +355,44 @@
     <string name="settings_accent_green">Verde</string>
     <string name="settings_accent_amber">Âmbar</string>
     <string name="settings_group_profile">Perfil</string>
-    <string name="settings_group_content">Conteúdo</string>
+    <string name="settings_group_sources">Fontes e guia</string>
+    <string name="settings_group_layout">Layout</string>
+    <string name="settings_group_content_metadata">Conteúdo e metadados</string>
+    <string name="settings_group_data">Dados</string>
     <string name="settings_group_appearance">Aparência</string>
     <string name="settings_group_playback">Reprodução</string>
     <string name="settings_group_network">Rede</string>
     <string name="settings_dns">DNS</string>
     <string name="settings_group_app">Aplicativo</string>
+    <string name="settings_group_summary_profile">Perfis e quem pode assistir ao quê</string>
+    <string name="settings_group_summary_sources">Listas, dados do guia e seus relógios</string>
+    <string name="settings_group_summary_appearance">Tema, cor de destaque, vidro, movimento e texto</string>
+    <string name="settings_group_summary_layout">Barra lateral, painéis, listas e tela inicial</string>
+    <string name="settings_group_summary_content_metadata">Nomes, imagens e serviços de legendas</string>
+    <string name="settings_group_summary_playback">O reprodutor de vídeo e seu registro de erros</string>
+    <!-- Translators: Video player settings: name of the section holding decoder, HDR and frame-rate settings. -->
+    <string name="settings_vp_section_engine">Motor e imagem</string>
+    <!-- Translators: Video player settings: name of the section holding volume, audio language and surround settings. -->
+    <string name="settings_vp_section_sound">Som</string>
+    <!-- Translators: Video player settings: name of the section holding resume, auto-play and mini-player settings. -->
+    <string name="settings_vp_section_episodes">Episódios e mini player</string>
+    <!-- Translators: Video player settings: one-line summary under the "Engine &amp; picture" section name. -->
+    <string name="settings_vp_section_engine_summary">Decodificador, HDR, taxa de quadros</string>
+    <!-- Translators: Video player settings: one-line summary under the "Live TV" section name. -->
+    <string name="settings_vp_section_live_summary">Pré-visualização, números, latência</string>
+    <!-- Translators: Video player settings: one-line summary under the "Sound" section name. -->
+    <string name="settings_vp_section_sound_summary">Volume, idioma, surround</string>
+    <!-- Translators: Video player settings: one-line summary under the "Subtitles" section name. -->
+    <string name="settings_vp_section_subtitles_summary">Tamanho, cor, posição</string>
+    <!-- Translators: Video player settings: one-line summary under the "Episodes &amp; mini-player" section name. -->
+    <string name="settings_vp_section_episodes_summary">Reprodução automática e mini player</string>
+    <!-- Translators: Video player settings: one-line summary under the "Diagnostics" section name. -->
+    <string name="settings_vp_section_diagnostics_summary">Registros detalhados do player</string>
+    <string name="settings_group_summary_network">Proxy e DNS para as conexões de transmissão</string>
+    <string name="settings_group_summary_data">Backup, downloads e histórico de exibição</string>
+    <string name="settings_group_summary_app">Idioma, inicialização, atualizações e info do app</string>
+    <string name="settings_group_quick">Rápido</string>
+    <string name="settings_group_summary_quick">Os botões que você mais usa</string>
     <string name="settings_search_guide_logos">Logotipos dos canais no guia</string>
     <string name="settings_search_keywords_profiles">espectadores infantil crianças modo PIN bloqueio conta</string>
     <string name="settings_search_keywords_playlists">M3U Xtream fonte sincronização adicionar remover</string>
@@ -428,6 +511,14 @@
     <string name="settings_reset_saved_volume_confirm">Redefinir o volume salvo?</string>
     <!-- Translators: Confirmation dialog body before forgetting the saved per-item volume. -->
     <string name="settings_reset_saved_volume_confirm_description">Todos os canais, filmes e episódios voltam ao volume padrão. As configurações de zoom salvas são mantidas. Você sempre pode ajustar um item específico pelo reprodutor.</string>
+    <!-- Translators: Settings row that forgets every per-item audio-sync offset. -->
+    <string name="settings_reset_saved_audio_delay">Redefinir a sincronização A/V salva</string>
+    <!-- Translators: Description of the reset-saved-audio-sync row. -->
+    <string name="settings_reset_saved_audio_delay_description">Escolher “Lembrar este atraso” no reprodutor salva a sincronização de áudio para aquele canal, filme ou episódio. Redefinir faz tudo voltar a seguir a configuração acima.</string>
+    <!-- Translators: Title of the confirmation dialog for resetting saved audio sync. -->
+    <string name="settings_reset_saved_audio_delay_confirm">Redefinir a sincronização A/V salva?</string>
+    <!-- Translators: Body of the confirmation dialog for resetting saved audio sync. -->
+    <string name="settings_reset_saved_audio_delay_confirm_description">Cada canal, filme e episódio volta à sincronização de áudio acima. O zoom e o volume salvos são mantidos. Você sempre pode definir um individual novamente pelo reprodutor.</string>
     <!-- Translators: Setting label for how far rewind/forward jumps in a movie or episode. -->
     <string name="settings_seek_step">Salto de avanço</string>
     <!-- Translators: Description of the seek step setting. -->
@@ -468,6 +559,7 @@
     <string name="settings_audio_sync_description">Adiante ou atrase o áudio para sincronizá-lo com o vídeo. Aplica-se apenas ao motor mpv.</string>
     <string name="settings_live_tv">TV ao vivo</string>
     <string name="settings_live_latency_description">Define quão próxima da transmissão ao vivo será a reprodução. Uma latência menor deixa a reprodução mais próxima do ao vivo, mas reduz o buffer; por isso, transmissões fracas podem travar ou se reconectar com mais frequência. Aplica-se ao próximo canal que você abrir.</string>
+    <string name="settings_live_latency_bitrate_note">Em um canal com taxa de bits muito alta — especialmente em 4K — o buffer pode guardar menos tempo do que você pediu, porque há um limite de quanto vídeo pode ficar na memória de uma vez.</string>
     <string name="settings_channel_numbers">Números dos canais</string>
     <string name="settings_channel_numbers_description">Mostre o número de canal do seu provedor ao lado do nome na lista da TV ao vivo, na sobreposição da lista de canais e no reprodutor — e digite um número no controle remoto durante a reprodução em tela cheia para ir diretamente a esse canal (OK sintoniza imediatamente; Voltar cancela). Desativar oculta todos os números e ignora as teclas numéricas; nada é perdido e, ao reativar, os números são restaurados.</string>
     <string name="settings_diagnostics">Diagnóstico</string>
@@ -627,6 +719,12 @@
     <string name="settings_customize_rename_or_delete_category">Renomear ou excluir categoria</string>
     <string name="settings_customize_new_category">＋ Nova categoria</string>
     <string name="settings_customize_sort_button">Ordenar: <xliff:g id="label">%1$s</xliff:g> ▾</string>
+
+    <string name="settings_customize_filter_button">Filtro: <xliff:g id="label">%1$s</xliff:g> ▾</string>
+    <string name="settings_customize_filter_title">Filtrar lista</string>
+    <string name="settings_customize_filter_all">Todos</string>
+    <string name="settings_customize_filter_visible">Visíveis</string>
+    <string name="settings_customize_filter_hidden">Ocultos</string>
     <string name="settings_customize_new_categories_button">Novas categorias: <xliff:g id="label">%1$s</xliff:g> ▾</string>
     <string name="settings_customize_rename_hint">Apenas para este perfil. Deixe em branco para restaurar “<xliff:g id="name">%1$s</xliff:g>”.</string>
     <string name="settings_customize_remove_pin_title">Remover o bloqueio por PIN?</string>
@@ -951,8 +1049,18 @@
     <string name="settings_subtitle_color_grey">Cinza</string>
     <string name="settings_live_preroll">Pré-buffer de streams ao vivo</string>
     <string name="settings_live_preroll_description">Acumula essa quantidade de vídeo antes de um canal ao vivo começar a tocar, e novamente depois de um engasgo. É uma quantidade de vídeo, não uma contagem regressiva. Desligado mantém o início mais rápido possível.</string>
+    <string name="settings_live_tune_timeout">Desistir de um canal após</string>
+    <string name="settings_live_tune_timeout_description">Se um canal ao vivo não mostrar imagem até esse tempo, o OwnTV para de tentar e avisa você, em vez de deixar uma tela preta enquanto passa por todos os seus reprodutores. «Nunca» continua tentando, o que num canal que seu provedor removeu pode levar bem mais de um minuto. As esperas que o provedor pede não são contadas.</string>
     <string name="settings_live_preroll_per_playlist">Pré-buffer por playlist</string>
     <string name="settings_live_preroll_per_playlist_description">Substitui a configuração acima para uma playlist, mantendo suas outras playlists rápidas.</string>
+    <!-- Translators: Title of the per-playlist Live TV engine override row. -->
+    <string name="settings_live_engine_per_playlist">Reprodutor de TV ao vivo por playlist</string>
+    <!-- Translators: Description of the per-playlist Live TV engine override row. -->
+    <string name="settings_live_engine_per_playlist_description">Substitui a configuração acima para uma playlist, para um provedor cujos canais só funcionam bem em um dos reprodutores.</string>
+    <!-- Translators: Title of the per-playlist Live latency override row. -->
+    <string name="settings_live_latency_per_playlist">Latência da transmissão ao vivo por playlist</string>
+    <!-- Translators: Description of the per-playlist Live latency override row. -->
+    <string name="settings_live_latency_per_playlist_description">Substitui a configuração acima para uma playlist, para um provedor que precisa de um buffer maior ou menor que os demais.</string>
     <plurals name="settings_live_preroll_overrides">
         <item quantity="one"><xliff:g id="count">%1$d</xliff:g> conjunto</item>
         <item quantity="many"><xliff:g id="count">%1$d</xliff:g> conjuntos</item>
@@ -1017,7 +1125,12 @@
     <string name="settings_main_interface_font">Fonte da interface principal</string>
     <string name="settings_popup_font">Fonte dos pop-ups</string>
     <string name="settings_choose_font">Escolher fonte</string>
-    <string name="settings_font_size_range">Ajuste o texto do aplicativo de <xliff:g id="min">%1$d</xliff:g>%% a <xliff:g id="max">%2$d</xliff:g>%%. As legendas mantêm seu próprio tamanho.</string>
+    <string name="settings_font_size_range">Ajuste o texto principal do aplicativo, não os pop-ups, de <xliff:g id="min">%1$d</xliff:g>%% a <xliff:g id="max">%2$d</xliff:g>%%. As legendas mantêm seu próprio tamanho.</string>
+    <string name="settings_popup_font_size">Tamanho da fonte dos pop-ups</string>
+    <string name="settings_popup_font_size_description">Altera apenas o texto em caixas de diálogo e menus</string>
+    <string name="settings_popup_size">Tamanho dos pop-ups</string>
+    <string name="settings_popup_size_description">Redimensione caixas de diálogo e menus sem alterar o tamanho do texto</string>
+    <string name="settings_popup_size_range">Redimensione caixas de diálogo e menus (<xliff:g id="min">%1$d</xliff:g>%%–<xliff:g id="max">%2$d</xliff:g>%%).</string>
     <string name="settings_font_preview">Entretenimento de um jeito simples.</string>
     <string name="settings_search_keywords_fonts">fonte texto tamanho tipografia popup leitura acessibilidade</string>
     <string name="settings_font_system_sans">Sans do sistema</string>
@@ -1044,8 +1157,62 @@
     <string name="settings_glass_highlight_title">Intensidade do brilho</string>
     <string name="settings_glass_highlight_description">Ajuste a luz e o contorno do vidro em foco.</string>
     <string name="settings_glass_live_preview">Pré-visualização ao vivo</string>
+    <string name="settings_glass_screen_description">Painéis foscos translúcidos, imagem de fundo e transparência</string>
+    <string name="settings_glass_master_description">Painéis translúcidos de vidro fosco sobre uma foto de fundo ou sobre o próprio fundo do aplicativo.</string>
+    <string name="settings_glass_background_image">Escolha uma imagem de fundo</string>
+    <string name="settings_glass_surface_transparency_title">Transparência</string>
+    <string name="settings_glass_background_blur_title">Desfoque / Efeito fosco</string>
+    <string name="settings_glass_section_appearance">Aparência</string>
+    <string name="settings_glass_section_fine_tuning">Opções avançadas</string>
+    <string name="settings_glass_section_behavior">Comportamento</string>
+    <string name="settings_glass_apply_to">Superfícies de vidro</string>
+    <string name="settings_glass_surface_all">Todos</string>
+    <string name="settings_glass_background_action_description">Escolha uma imagem de fundo</string>
+    <string name="settings_glass_transparency_short_description">20–100 · 5</string>
+    <string name="settings_glass_blur_short_description">0–100 · 10</string>
+    <string name="settings_glass_highlight_short_description">Ajuste a luz e o contorno do vidro em foco.</string>
+    <string name="settings_glass_full_transparency_short">Permitir transparência total</string>
+    <string name="settings_glass_full_transparency_short_description">Desativa o limite automático de legibilidade para obter o vidro mais transparente.</string>
+    <string name="settings_glass_depth_effects_short">Profundidade e sombras</string>
+    <string name="settings_glass_depth_effects_short_description">Ativa a luz que acompanha o foco, a paralaxe subtil e o movimento de profundidade.</string>
+    <string name="settings_glass_reset_balanced">Redefinir: Equilibrado</string>
     <string name="settings_glass_full_transparency_title">Permitir transparência total</string>
     <string name="settings_glass_full_transparency_description">Desativa o limite automático de legibilidade para obter o vidro mais transparente.</string>
     <string name="settings_glass_depth_title">Profundidade e sombras</string>
     <string name="settings_glass_depth_description">Ativa a luz que acompanha o foco, a paralaxe subtil e o movimento de profundidade.</string>
+    <string name="settings_header_hint">À esquerda: grupos · À direita: os ajustes deles · Segure OK numa linha para fixá-la em Rápido</string>
+    <string name="settings_spine_eyebrow">Todos os grupos</string>
+    <string name="settings_spine_title">Explorar ajustes</string>
+    <string name="settings_spine_hint">Rápido fica sempre no topo; a marca acompanha o grupo em que você está.</string>
+    <string name="settings_spine_foot">A cor de destaque segue o seu foco</string>
+    <string name="settings_row_menu_pin">Fixar em Rápido</string>
+    <string name="settings_row_menu_unpin">Remover de Rápido</string>
+    <string name="settings_row_menu_move_up">Mover para cima</string>
+    <string name="settings_row_menu_move_down">Mover para baixo</string>
+    <string name="settings_quick_empty_title">Nada fixado ainda</string>
+    <string name="settings_quick_empty_hint">Mantenha OK pressionado em qualquer ajuste e escolha “Fixar em Rápido”.</string>
+    <string name="settings_results_title">Resultados</string>
+    <string name="settings_results_summary">Cada correspondência, onde quer que esteja — com o caminho</string>
+    <plurals name="settings_setting_count">
+        <item quantity="one"><xliff:g id="count">%1$d</xliff:g> ajuste</item>
+        <item quantity="many"><xliff:g id="count">%1$d</xliff:g> de ajustes</item>
+        <item quantity="other"><xliff:g id="count">%1$d</xliff:g> ajustes</item>
+    </plurals>
+    <plurals name="settings_pinned_count">
+        <item quantity="one"><xliff:g id="count">%1$d</xliff:g> fixado</item>
+        <item quantity="many"><xliff:g id="count">%1$d</xliff:g> de fixados</item>
+        <item quantity="other"><xliff:g id="count">%1$d</xliff:g> fixados</item>
+    </plurals>
+    <plurals name="settings_match_count">
+        <item quantity="one"><xliff:g id="count">%1$d</xliff:g> correspondência</item>
+        <item quantity="many"><xliff:g id="count">%1$d</xliff:g> de correspondências</item>
+        <item quantity="other"><xliff:g id="count">%1$d</xliff:g> correspondências</item>
+    </plurals>
+    <string name="settings_guide_width">Larguras das colunas do guia</string>
+    <string name="settings_guide_width_description">Redimensione a lista de canais e a linha do tempo do EPG no guia de TV.</string>
+    <string name="settings_search_keywords_guide_width">guia epg canal lista linha tempo coluna painel largura tamanho layout</string>
+    <string name="settings_guide_width_summary">Lista de canais %1$d%% · Linha do tempo EPG %2$d%%</string>
+    <string name="settings_guide_width_help">• A lista de canais e a linha do tempo EPG compartilham uma linha, por isso o total deve ser 100%%.\n• Ampliar a lista de canais mostra menos da linha do tempo; a duração dos programas e a escala de tempo não mudam.\n• As duas colunas permanecem com pelo menos 10%%.\n• Redefinir coloca a lista de canais em 10%% e a linha do tempo EPG em 90%%.\n• Desativar a personalização restaura o layout padrão sem apagar seus valores.</string>
+    <string name="settings_guide_width_channels">Lista de canais</string>
+    <string name="settings_guide_width_epg">Linha do tempo EPG</string>
 </resources>

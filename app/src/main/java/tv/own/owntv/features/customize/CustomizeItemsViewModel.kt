@@ -10,6 +10,7 @@ import androidx.paging.PagingData
 import androidx.paging.PagingSource
 import androidx.paging.asItemSnapshotListFlow
 import androidx.paging.cachedIn
+import androidx.paging.filter
 import androidx.paging.map
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -90,8 +91,12 @@ class CustomizeItemsViewModel(
     private val _catInfo = MutableStateFlow<CatInfo?>(null)
     val catInfo: StateFlow<CatInfo?> = _catInfo.asStateFlow()
 
+    private val _visibilityFilter = MutableStateFlow(CustomizeVisibilityFilter.ALL)
+    val visibilityFilter: StateFlow<CustomizeVisibilityFilter> = _visibilityFilter.asStateFlow()
+
     fun open(info: CatInfo) {
         span.cancel() // a stale span from a previous category must never carry over
+        _visibilityFilter.value = CustomizeVisibilityFilter.ALL
         _catInfo.value = info
     }
 
@@ -125,7 +130,7 @@ class CustomizeItemsViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
 
     /** Paged items in this category, with customizations applied (display names, hidden state). */
-    val items: Flow<PagingData<CustomizeItemRow>> = combine(_catInfo, hasOrder, customizeForItems) { ci, ordered, cust ->
+    private val allItems: Flow<PagingData<CustomizeItemRow>> = combine(_catInfo, hasOrder, customizeForItems) { ci, ordered, cust ->
         Triple(ci, ordered, cust)
     }.flatMapLatest { (ci, ordered, cust) ->
         if (ci == null) flowOf(PagingData.empty())
@@ -139,6 +144,15 @@ class CustomizeItemsViewModel(
                 }
         }
     }.cachedIn(viewModelScope)
+
+    val items: Flow<PagingData<CustomizeItemRow>> = combine(allItems, _visibilityFilter) { pagingData, filter ->
+        pagingData.filter { filter.accepts(it.hidden) }
+    }.cachedIn(viewModelScope)
+
+    fun setVisibilityFilter(filter: CustomizeVisibilityFilter) {
+        _visibilityFilter.value = filter
+        span.cancel()
+    }
 
     /** Currently loaded rows (the paged list) — the span machinery computes anchors/ends against
      *  it. The anchor and end of any span are always rows the user pressed on, hence loaded. */

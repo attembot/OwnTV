@@ -34,10 +34,34 @@ object UiFontScale {
     fun factor(percent: Int): Float = clamp(percent) / 100f
 }
 
+/** Text scaling inside popups only. Today's popup text size is 100%. */
+object PopupFontScale {
+    const val MIN = 50
+    const val MAX = 120
+    const val DEFAULT = 100
+    const val STEP = 5
+
+    fun clamp(percent: Int): Int = percent.coerceIn(MIN, MAX)
+    fun factor(percent: Int): Float = clamp(percent) / 100f
+}
+
+/** Geometry scaling for popup panels and controls. Today's popup dimensions are 100%. */
+object PopupSizeScale {
+    const val MIN = 50
+    const val MAX = 120
+    const val DEFAULT = 100
+    const val STEP = 5
+
+    fun clamp(percent: Int): Int = percent.coerceIn(MIN, MAX)
+    fun factor(percent: Int): Float = clamp(percent) / 100f
+}
+
 data class FontCustomization(
     val sizePercent: Int = UiFontScale.DEFAULT,
     val mainFamily: AppFontFamily = AppFontFamily.SYSTEM_SANS,
     val popupFamily: AppFontFamily = AppFontFamily.LORA,
+    val popupFontSizePercent: Int = PopupFontScale.DEFAULT,
+    val popupSizePercent: Int = PopupSizeScale.DEFAULT,
 )
 
 @OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
@@ -122,3 +146,5 @@ val AppFontFamily.mpvFamilyName: String
 val LocalMainFontFamily = staticCompositionLocalOf<FontFamily> { FontFamily.SansSerif }
 val LocalPopupFontFamily = staticCompositionLocalOf<FontFamily> { LoraFamily }
 val LocalUiFontScaleFactor = staticCompositionLocalOf { 1f }
+val LocalPopupFontScaleFactor = staticCompositionLocalOf { 1f }
+val LocalPopupSizeScaleFactor = staticCompositionLocalOf { 1f }

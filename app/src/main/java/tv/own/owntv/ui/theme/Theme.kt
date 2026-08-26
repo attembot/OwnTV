@@ -89,6 +89,8 @@ fun OwnTVTheme(
     animationLevel: AnimationLevel = AnimationLevel.FULL,
     mainFontFamily: AppFontFamily = AppFontFamily.SYSTEM_SANS,
     popupFontFamily: AppFontFamily = AppFontFamily.LORA,
+    popupFontSizePercent: Int = PopupFontScale.DEFAULT,
+    popupSizePercent: Int = PopupSizeScale.DEFAULT,
     content: @Composable () -> Unit,
 ) {
     val useDark = when (themeMode) {
@@ -111,6 +113,8 @@ fun OwnTVTheme(
         LocalAnimationLevel provides animationLevel,
         LocalMainFontFamily provides mainFontFamily.asComposeFamily(),
         LocalPopupFontFamily provides popupFontFamily.asComposeFamily(),
+        LocalPopupFontScaleFactor provides PopupFontScale.factor(popupFontSizePercent),
+        LocalPopupSizeScaleFactor provides PopupSizeScale.factor(popupSizePercent),
     ) {
         MaterialTheme(
             colorScheme = schemeFrom(colors),

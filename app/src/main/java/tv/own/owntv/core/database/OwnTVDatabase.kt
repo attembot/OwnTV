@@ -99,7 +99,7 @@ import tv.own.owntv.core.database.dao.SubtitleDao
         SeriesFtsEntity::class,
         EpisodeFtsEntity::class,
     ],
-    version = 33, // v7: content_order (Move). v8: contentHash + browse/unique indexes. v9: EPG contentHash + natural key. v10: TMDB metadata cache. v11: movies/series rating-sort indexes. v12: metadata_cache trailerKey. v13: metadata_cache logoPath. v14: sources.mac (Stalker portal). v15: external-subtitle cache/selection/timing tables. v16: subtitle_link (downloaded-sub ↔ content). v17: sources.syncLive/Movies/Series (skip-sync enabledScope). v18: series.episodesSyncedAt (episode-cache freshness, S8). v19: epg_channels.iconUrl (XMLTV channel logos). v20: channels (sourceId, number) index for direct tune. v21: series.addedAt + date-added sort indexes. v22: series_sort_order (per-series season/episode order). v23: sources.hlsSupported and sources.preferHls. v24: custom_category_members (user custom categories, #87). v25: sources.livePrerollSecs (per-playlist "Pre-buffer"). v26: channels.catchupType + channels.httpHeaders (M3U catch-up styles + per-channel HTTP headers). v27: sources.maxConnections (Xtream session limit read at sync). v28: movies.httpHeaders + episodes.httpHeaders (per-item M3U HTTP headers). v29: optional Stalker serial/device IDs/signature. v30: source-scoped Now Trending snapshots. v31: indexed provider-title metadata and persistent Trending attempt state. v32: playback_prefs (per-item zoom + volume, keyed by the P6 stable content key). v33: channels/movies/episodes drmConfig (M3U Widevine/ClearKey licence details, #115).
+    version = 35, // v7: content_order (Move). v8: contentHash + browse/unique indexes. v9: EPG contentHash + natural key. v10: TMDB metadata cache. v11: movies/series rating-sort indexes. v12: metadata_cache trailerKey. v13: metadata_cache logoPath. v14: sources.mac (Stalker portal). v15: external-subtitle cache/selection/timing tables. v16: subtitle_link (downloaded-sub ↔ content). v17: sources.syncLive/Movies/Series (skip-sync enabledScope). v18: series.episodesSyncedAt (episode-cache freshness, S8). v19: epg_channels.iconUrl (XMLTV channel logos). v20: channels (sourceId, number) index for direct tune. v21: series.addedAt + date-added sort indexes. v22: series_sort_order (per-series season/episode order). v23: sources.hlsSupported and sources.preferHls. v24: custom_category_members (user custom categories, #87). v25: sources.livePrerollSecs (per-playlist "Pre-buffer"). v26: channels.catchupType + channels.httpHeaders (M3U catch-up styles + per-channel HTTP headers). v27: sources.maxConnections (Xtream session limit read at sync). v28: movies.httpHeaders + episodes.httpHeaders (per-item M3U HTTP headers). v29: optional Stalker serial/device IDs/signature. v30: source-scoped Now Trending snapshots. v31: indexed provider-title metadata and persistent Trending attempt state. v32: playback_prefs (per-item zoom + volume, keyed by the P6 stable content key). v33: channels/movies/episodes drmConfig (M3U Widevine/ClearKey licence details, #115). v34: sources.liveEnginePreference + sources.liveLatencyMode/liveLatencyCustomSecs (per-playlist Live TV engine and Live latency). v35: playback_prefs.audioDelayMs (per-item A/V-sync memory).
 
     exportSchema = true,
 )
@@ -878,6 +878,99 @@ abstract class OwnTVDatabase : RoomDatabase() {
                 healSchema(db)
             }
         }
+
+        /**
+         * v34 → v35: `playback_prefs.audioDelayMs` — the per-item A/V-sync offset the player
+         * remembers, alongside the per-item zoom and volume already in this table (v32).
+         *
+         * Nullable with no default, which is what "no per-item choice, follow the global setting"
+         * means, so every existing row keeps behaving exactly as it does today.
+         *
+         * Last hop, so it carries [healSchema] (standing rule).
+         */
+        val MIGRATION_34_35 = object : androidx.room.migration.Migration(34, 35) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                if (!hasColumn(db, "playback_prefs", "audioDelayMs")) {
+                    db.execSQL("ALTER TABLE `playback_prefs` ADD COLUMN `audioDelayMs` INTEGER")
+                }
+                healSchema(db)
+            }
+        }
+
+        /**
+         * v33 → v34: `sources.liveEnginePreference`, `sources.liveLatencyMode` and
+         * `sources.liveLatencyCustomSecs` — the per-playlist Live TV engine and Live latency overrides.
+         *
+         * All three ride in one version because the latency pair is meaningless split up, and because
+         * the engine choice and the buffer depth are the two halves of "how this provider's live
+         * streams want to be played" — a user setting one almost always looks at the other.
+         *
+         * The two TEXT columns are nullable with no default, which is exactly what "follow the global
+         * setting" means, so every existing row keeps today's behaviour without a data pass. The INTEGER
+         * column takes the same `-1` sentinel `livePrerollSecs` already uses (v25).
+         *
+         * Last hop, so it carries [healSchema] (standing rule).
+         */
+        val MIGRATION_33_34 = object : androidx.room.migration.Migration(33, 34) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                if (!hasColumn(db, "sources", "liveEnginePreference")) {
+                    db.execSQL("ALTER TABLE `sources` ADD COLUMN `liveEnginePreference` TEXT")
+                }
+                if (!hasColumn(db, "sources", "liveLatencyMode")) {
+                    db.execSQL("ALTER TABLE `sources` ADD COLUMN `liveLatencyMode` TEXT")
+                }
+                if (!hasColumn(db, "sources", "liveLatencyCustomSecs")) {
+                    db.execSQL("ALTER TABLE `sources` ADD COLUMN `liveLatencyCustomSecs` INTEGER NOT NULL DEFAULT -1")
+                }
+                healSchema(db)
+            }
+        }
+
+        /**
+         * Every migration, in one place, because there are two callers and they must never disagree:
+         * `databaseModule` (the real database) and `OwnTVDatabaseMigrationTest` (the upgrade-path
+         * proof). The test kept its own copy of this list and it silently fell three versions behind,
+         * which left every migration test unable to even open the database — the one check that
+         * guards against wiping a user's profiles and history was red and nobody could see it.
+         *
+         * Declared below the migrations themselves: a companion `val` initialises in source order, so
+         * referencing them from higher up would capture nulls.
+         */
+        val ALL_MIGRATIONS: Array<androidx.room.migration.Migration> = arrayOf(
+            MIGRATION_1_2,
+            MIGRATION_2_3,
+            MIGRATION_3_4,
+            MIGRATION_4_6,
+            MIGRATION_6_7,
+            MIGRATION_7_8,
+            MIGRATION_8_9,
+            MIGRATION_9_10,
+            MIGRATION_10_11,
+            MIGRATION_11_12,
+            MIGRATION_12_13,
+            MIGRATION_13_14,
+            MIGRATION_14_15,
+            MIGRATION_15_16,
+            MIGRATION_16_17,
+            MIGRATION_17_18,
+            MIGRATION_18_19,
+            MIGRATION_19_20,
+            MIGRATION_20_21,
+            MIGRATION_21_22,
+            MIGRATION_22_23,
+            MIGRATION_23_24,
+            MIGRATION_24_25,
+            MIGRATION_25_26,
+            MIGRATION_26_27,
+            MIGRATION_27_28,
+            MIGRATION_28_29,
+            MIGRATION_29_30,
+            MIGRATION_30_31,
+            MIGRATION_31_32,
+            MIGRATION_32_33,
+            MIGRATION_33_34,
+            MIGRATION_34_35,
+        )
 
         /**
          * Canonical CREATE statements for every NON-unique index Room expects on the four

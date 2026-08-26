@@ -115,7 +115,6 @@ import tv.own.owntv.core.trending.ProviderVariantParser
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import androidx.compose.foundation.layout.widthIn
-import tv.own.owntv.ui.theme.PopupFontTheme
 import java.util.Calendar
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -665,8 +664,7 @@ private fun TrendingHeroSection(
     }
     val seasonCount = (item as? TrendingHomeItem.Series)?.let { seasonCounts[it.series.id] }
 
-    PopupFontTheme {
-      Column(
+    Column(
           modifier = modifier
               .height(538.dp)
               .clip(RoundedCornerShape(18.dp))
@@ -895,7 +893,6 @@ private fun TrendingHeroSection(
                 modifier = Modifier.fillMaxWidth(progress.coerceIn(0f, 1f)).height(3.dp).background(colors.primary),
             )
         }
-      }
     }
 }
 

@@ -26,9 +26,12 @@ import tv.own.owntv.core.i18n.LocaleStore
 import tv.own.owntv.features.home.HomeConfig
 import tv.own.owntv.player.SurroundMode
 import tv.own.owntv.core.util.Pin
+import tv.own.owntv.ui.components.ContentMenu
 import tv.own.owntv.ui.theme.AccentColor
 import tv.own.owntv.ui.theme.AppFontFamily
 import tv.own.owntv.ui.theme.FontCustomization
+import tv.own.owntv.ui.theme.PopupFontScale
+import tv.own.owntv.ui.theme.PopupSizeScale
 import tv.own.owntv.ui.theme.ThemeMode
 import tv.own.owntv.ui.theme.UiFontScale
 import tv.own.owntv.ui.theme.UiZoom
@@ -162,6 +165,8 @@ class SettingsRepository(private val context: Context, private val localeStore: 
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val UI_ZOOM_PCT = intPreferencesKey("ui_zoom_percent")
         val FONT_SIZE_PCT = intPreferencesKey("font_size_percent")
+        val POPUP_FONT_SIZE_PCT = intPreferencesKey("popup_font_size_percent")
+        val POPUP_SIZE_PCT = intPreferencesKey("popup_size_percent")
         val MAIN_FONT_FAMILY = stringPreferencesKey("main_font_family")
         val POPUP_FONT_FAMILY = stringPreferencesKey("popup_font_family")
         val ACCENT = stringPreferencesKey("accent_color")
@@ -187,6 +192,9 @@ class SettingsRepository(private val context: Context, private val localeStore: 
         val RESTORE_IN_PROGRESS = stringPreferencesKey("restore_in_progress")
         val LIVE_PREVIEW = booleanPreferencesKey("live_preview")
         val LIVE_PREVIEW_AUDIO = booleanPreferencesKey("live_preview_audio")
+        // Whether the expanded Home hero plays its video. Unset means "device default" — see
+        // heroPreviewEnabled.
+        val HERO_PREVIEW = booleanPreferencesKey("hero_preview")
         // Docked mini-player: size (% of screen width) and screen corner/edge.
         val MINI_PLAYER_SIZE_PCT = intPreferencesKey("mini_player_size_pct")
         val MINI_PLAYER_POSITION = stringPreferencesKey("mini_player_position")
@@ -194,6 +202,8 @@ class SettingsRepository(private val context: Context, private val localeStore: 
         val LIVE_LATENCY_MODE = stringPreferencesKey("live_latency_mode")
         val LIVE_LATENCY_CUSTOM_SECS = intPreferencesKey("live_latency_custom_secs")
         val LIVE_PREROLL_SECS = intPreferencesKey("live_preroll_secs")
+        // How long a live channel may take to produce a picture before it is called dead. 0 = never.
+        val LIVE_TUNE_TIMEOUT_SECS = intPreferencesKey("live_tune_timeout_secs")
         // v4.1.6 one-shot: reset live latency to the safe Balanced preset. Subsequent user changes are
         // preserved across every later update.
         val LIVE_LATENCY_RESET_416 = booleanPreferencesKey("live_latency_reset_416")
@@ -232,7 +242,11 @@ class SettingsRepository(private val context: Context, private val localeStore: 
         val DEINTERLACE = booleanPreferencesKey("deinterlace")
         val SEEK_STEP_SEC = intPreferencesKey("seek_step_sec")
         val LIVE_REWIND_STEP_SEC = intPreferencesKey("live_rewind_step_sec")
+        /** Legacy single subtitle size, superseded by the two per-engine keys below but still read as
+         *  their default so an existing size survives an upgrade — and still written by nothing. */
         val SUB_SCALE = floatPreferencesKey("sub_scale")
+        val SUB_SCALE_MPV = floatPreferencesKey("sub_scale_mpv")
+        val SUB_SCALE_EXO = floatPreferencesKey("sub_scale_exo")
         // Subtitle appearance (#96): off by default so every renderer keeps its stock look —
         // notably the embedded broadcaster styling of Live TV CEA-608/teletext cues.
         val SUB_STYLE_ENABLED = booleanPreferencesKey("sub_style_enabled")
@@ -247,6 +261,8 @@ class SettingsRepository(private val context: Context, private val localeStore: 
         // off by default, so a search returns every language OpenSubtitles has for the title.
         val SUB_SEARCH_FILTER = booleanPreferencesKey("sub_search_filter")
         val SUB_SEARCH_LANGS = stringPreferencesKey("sub_search_langs")
+        // Settings rows pinned to the Quick group, comma-joined, in display order.
+        val QUICK_PINNED = stringPreferencesKey("settings_quick_pinned")
         // Per-section list sorting ("PLAYLIST" or "ALPHA")
         val SORT_LIVE = stringPreferencesKey("sort_live")
         val SORT_GUIDE = stringPreferencesKey("sort_guide")
@@ -309,6 +325,7 @@ class SettingsRepository(private val context: Context, private val localeStore: 
         val CH_NAV_ENABLED = booleanPreferencesKey("ch_nav_enabled")
         val CH_NAV_UP_SKIP = intPreferencesKey("ch_nav_up_skip")
         val CH_NAV_DOWN_SKIP = intPreferencesKey("ch_nav_down_skip")
+        val REMOTE_SHORTCUT_BINDINGS = stringSetPreferencesKey("remote_shortcut_bindings")
         // Manual panel-width adjustment (v4.3.x): per section (Live/Movies/Series) a master toggle plus
         // one percentage per panel (category rail · item list/grid · preview). 100 = stock width; the
         // three are normalized across the row, so they always fill the screen. See PanelWidths.kt.
@@ -324,6 +341,10 @@ class SettingsRepository(private val context: Context, private val localeStore: 
         val PANEL_W_SERIES_CAT = intPreferencesKey("panel_w_series_cat")
         val PANEL_W_SERIES_LIST = intPreferencesKey("panel_w_series_list")
         val PANEL_W_SERIES_PREVIEW = intPreferencesKey("panel_w_series_preview")
+        // Guide's two-column split (pinned channels · scrollable EPG timeline).
+        val GUIDE_WIDTH_ON = booleanPreferencesKey("guide_width_on")
+        val GUIDE_WIDTH_CHANNELS = intPreferencesKey("guide_width_channels")
+        val GUIDE_WIDTH_EPG = intPreferencesKey("guide_width_epg")
         // "Browsing & lists" — two independent per-section toggles (Live TV / Movies / Series).
         //
         // REMEMBER_LAST_*  = remember last ITEM. OFF (default) = switching category resets the browse list
@@ -1053,11 +1074,27 @@ class SettingsRepository(private val context: Context, private val localeStore: 
     // Each option then has its own "Default" value, so turning the toggle ON still changes nothing
     // until the user picks something: only the options actually set reach a renderer.
 
-    /** Subtitle scale multiplier (mpv sub-scale); [SubtitleStyle.SCALE_DEFAULT] = untouched. */
-    val subtitleScale: Flow<Float> = prefsFlow { it[Keys.SUB_SCALE] ?: SubtitleStyle.SCALE_DEFAULT }
+    // Subtitle size is per engine: mpv and ExoPlayer draw the same multiplier at visibly different
+    // sizes, so one shared value cannot be right for both. Each new key falls back to the legacy
+    // single [Keys.SUB_SCALE] until it is set, so an upgrade keeps the size the user already chose on
+    // both engines and nothing changes until they move one of them.
 
-    suspend fun setSubtitleScale(scale: Float) {
-        context.dataStore.edit { it[Keys.SUB_SCALE] = scale }
+    /** Subtitle scale multiplier for mpv (sub-scale); [SubtitleStyle.SCALE_DEFAULT] = untouched. */
+    val subtitleScaleMpv: Flow<Float> = prefsFlow {
+        it[Keys.SUB_SCALE_MPV] ?: it[Keys.SUB_SCALE] ?: SubtitleStyle.SCALE_DEFAULT
+    }
+
+    suspend fun setSubtitleScaleMpv(scale: Float) {
+        context.dataStore.edit { it[Keys.SUB_SCALE_MPV] = scale }
+    }
+
+    /** Subtitle scale multiplier for the Media3 SubtitleView; [SubtitleStyle.SCALE_DEFAULT] = untouched. */
+    val subtitleScaleExo: Flow<Float> = prefsFlow {
+        it[Keys.SUB_SCALE_EXO] ?: it[Keys.SUB_SCALE] ?: SubtitleStyle.SCALE_DEFAULT
+    }
+
+    suspend fun setSubtitleScaleExo(scale: Float) {
+        context.dataStore.edit { it[Keys.SUB_SCALE_EXO] = scale }
     }
 
     /**
@@ -1137,6 +1174,43 @@ class SettingsRepository(private val context: Context, private val localeStore: 
         context.dataStore.edit { it[Keys.CH_NAV_DOWN_SKIP] = n.coerceIn(1, ChNavLimits.HARD_MAX) }
     }
 
+    /** Configurable remote shortcuts. An absent key means factory defaults; an empty set means none. */
+    val remoteShortcutBindings: Flow<List<RemoteShortcutBinding>> = prefsFlow { prefs ->
+        if (Keys.REMOTE_SHORTCUT_BINDINGS in prefs) {
+            RemoteShortcutBindings.decode(prefs[Keys.REMOTE_SHORTCUT_BINDINGS].orEmpty())
+        } else {
+            RemoteShortcutBindings.defaults
+        }
+    }
+
+    suspend fun setRemoteShortcutBinding(binding: RemoteShortcutBinding) {
+        context.dataStore.edit { prefs ->
+            val current = if (Keys.REMOTE_SHORTCUT_BINDINGS in prefs) {
+                RemoteShortcutBindings.decode(prefs[Keys.REMOTE_SHORTCUT_BINDINGS].orEmpty())
+            } else {
+                RemoteShortcutBindings.defaults
+            }
+            prefs[Keys.REMOTE_SHORTCUT_BINDINGS] =
+                RemoteShortcutBindings.encode(RemoteShortcutBindings.replace(current, binding))
+        }
+    }
+
+    suspend fun removeRemoteShortcutBinding(keyCode: Int, press: RemoteShortcutPress) {
+        context.dataStore.edit { prefs ->
+            val current = if (Keys.REMOTE_SHORTCUT_BINDINGS in prefs) {
+                RemoteShortcutBindings.decode(prefs[Keys.REMOTE_SHORTCUT_BINDINGS].orEmpty())
+            } else {
+                RemoteShortcutBindings.defaults
+            }
+            prefs[Keys.REMOTE_SHORTCUT_BINDINGS] =
+                RemoteShortcutBindings.encode(current.filterNot { it.keyCode == keyCode && it.press == press })
+        }
+    }
+
+    suspend fun resetRemoteShortcutBindings() {
+        context.dataStore.edit { it.remove(Keys.REMOTE_SHORTCUT_BINDINGS) }
+    }
+
     // --- Manual panel widths: per browse section, a master toggle + one percentage per panel ---
     // While the toggle is off the screens keep their stock layout code path entirely, so the feature
     // can't affect anyone who never opens it. Percentages are clamped on both read and write.
@@ -1205,6 +1279,25 @@ class SettingsRepository(private val context: Context, private val localeStore: 
         }
     }
 
+    // --- Guide column widths: toggle + two percentages that must total exactly 100 ---
+    val guideWidthEnabled: Flow<Boolean> = prefsFlow { it[Keys.GUIDE_WIDTH_ON] ?: false }
+
+    val guideWidthShares: Flow<GuideWidthShares?> = prefsFlow { prefs ->
+        val channels = prefs[Keys.GUIDE_WIDTH_CHANNELS]
+        val epg = prefs[Keys.GUIDE_WIDTH_EPG]
+        if (channels == null || epg == null) null
+        else normalizeGuideWidths(GuideWidthShares(channels, epg))
+    }
+
+    suspend fun setGuideWidths(enabled: Boolean, shares: GuideWidthShares) {
+        if (!shares.isValid) return
+        context.dataStore.edit {
+            it[Keys.GUIDE_WIDTH_ON] = enabled
+            it[Keys.GUIDE_WIDTH_CHANNELS] = shares.channels
+            it[Keys.GUIDE_WIDTH_EPG] = shares.epg
+        }
+    }
+
     /** Preferred audio language (ISO code, mpv alang); blank = no preference. */
     val preferredAudioLang: Flow<String> = prefsFlow { it[Keys.PREF_AUDIO_LANG] ?: "" }
 
@@ -1238,6 +1331,36 @@ class SettingsRepository(private val context: Context, private val localeStore: 
     suspend fun setSubSearchLanguages(codes: String) {
         context.dataStore.edit { it[Keys.SUB_SEARCH_LANGS] = codes.trim() }
     }
+
+    /**
+     * The Settings rows the user pinned to the Quick group, in the order they should appear.
+     * Stored as a comma-joined list of row keys. Unknown keys are kept here but ignored when the list
+     * is drawn, so a pin that belongs to a row hidden by the current theme/profile survives.
+     */
+    val quickPinnedKeys: Flow<List<String>> = prefsFlow { prefs ->
+        (prefs[Keys.QUICK_PINNED] ?: DEFAULT_QUICK_PINNED.joinToString(","))
+            .split(',').map { it.trim() }.filter { it.isNotEmpty() }
+    }
+
+    suspend fun setQuickPinnedKeys(keys: List<String>) {
+        context.dataStore.edit { it[Keys.QUICK_PINNED] = keys.joinToString(",") }
+    }
+
+    /**
+     * The order the user arranged one long-press content menu into, as a comma-joined list of action
+     * keys. Empty means "as shipped". Stored per menu — Live, Movies, Series and Episodes are four
+     * independent lists. Keys that no longer exist are ignored on read and actions the list has never
+     * heard of are appended, which is what lets a later release add an action without it vanishing.
+     */
+    fun menuOrder(menu: String): Flow<List<String>> = prefsFlow { prefs ->
+        (prefs[menuOrderKey(menu)] ?: "").split(',').map { it.trim() }.filter { it.isNotEmpty() }
+    }
+
+    suspend fun setMenuOrder(menu: String, keys: List<String>) {
+        context.dataStore.edit { it[menuOrderKey(menu)] = keys.joinToString(",") }
+    }
+
+    private fun menuOrderKey(menu: String) = stringPreferencesKey("settings_menu_order_$menu")
 
     // --- Per-source auto-refresh (Off / Startup / staleness threshold) ---
     // Stored as a JSON map { "<sourceId>": "<EnumName>" } in the owntv_settings DataStore — migration-safe
@@ -1379,6 +1502,24 @@ class SettingsRepository(private val context: Context, private val localeStore: 
         }
     }
 
+    /**
+     * Whether the expanded Home hero plays its video. The hero preview holds a live decoder for as
+     * long as the user browses Home, which is the one piece of background playback that had no off
+     * switch. Defaults on, but off on a low-RAM device — the same test [PlayerBudget] already uses to
+     * decide the player's memory budget, and the devices where a second video pipeline hurts most.
+     */
+    val heroPreviewEnabled: Flow<Boolean> = prefsFlow { it[Keys.HERO_PREVIEW] ?: heroPreviewDefault }
+
+    /** The value [heroPreviewEnabled] reports until the user picks one; also the settings row's
+     *  initial value, so the chip does not read "On" for a frame on a device where it is off. */
+    val heroPreviewDefault: Boolean get() = !lowSpecDevice
+
+    suspend fun setHeroPreviewEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.HERO_PREVIEW] = enabled }
+    }
+
+    private val lowSpecDevice: Boolean by lazy { tv.own.owntv.player.PlayerBudget.of(context).lowSpec }
+
     /** Whether the Live preview plays audio (off by default so browsing stays quiet). */
     val livePreviewAudio: Flow<Boolean> = prefsFlow { it[Keys.LIVE_PREVIEW_AUDIO] ?: false }
 
@@ -1513,6 +1654,12 @@ class SettingsRepository(private val context: Context, private val localeStore: 
                 prefs[Keys.POPUP_FONT_FAMILY],
                 AppFontFamily.LORA,
             ),
+            popupFontSizePercent = PopupFontScale.clamp(
+                prefs[Keys.POPUP_FONT_SIZE_PCT] ?: PopupFontScale.DEFAULT,
+            ),
+            popupSizePercent = PopupSizeScale.clamp(
+                prefs[Keys.POPUP_SIZE_PCT] ?: PopupSizeScale.DEFAULT,
+            ),
         )
     }
 
@@ -1520,6 +1667,8 @@ class SettingsRepository(private val context: Context, private val localeStore: 
     suspend fun setFontCustomization(value: FontCustomization) {
         context.dataStore.edit { prefs ->
             prefs[Keys.FONT_SIZE_PCT] = UiFontScale.clamp(value.sizePercent)
+            prefs[Keys.POPUP_FONT_SIZE_PCT] = PopupFontScale.clamp(value.popupFontSizePercent)
+            prefs[Keys.POPUP_SIZE_PCT] = PopupSizeScale.clamp(value.popupSizePercent)
             prefs[Keys.MAIN_FONT_FAMILY] = value.mainFamily.name
             prefs[Keys.POPUP_FONT_FAMILY] = value.popupFamily.name
         }
@@ -1590,6 +1739,24 @@ class SettingsRepository(private val context: Context, private val localeStore: 
 
     suspend fun setLivePrerollSecs(secs: Int) {
         context.dataStore.edit { it[Keys.LIVE_PREROLL_SECS] = secs.coerceIn(0, 30) }
+    }
+
+    /**
+     * "Give up after": how long a live channel may take to produce a picture before OwnTV stops trying
+     * and shows the error, however many engine/format combinations the fallback ladder has left.
+     *
+     * 0 = Never, the behaviour before this setting existed: each rung keeps its own timeout and nothing
+     * bounds their sum, which on a removed channel is about a minute and a half of black screen. Kept as
+     * an escape hatch for a genuinely slow panel. A provider's own `Retry-After` countdown is never
+     * charged against this.
+     */
+    val liveTuneTimeoutSecs: Flow<Int> = prefsFlow { prefs ->
+        (prefs[Keys.LIVE_TUNE_TIMEOUT_SECS] ?: tv.own.owntv.player.LiveLadder.DEFAULT_BUDGET_SECS)
+            .coerceIn(0, 60)
+    }
+
+    suspend fun setLiveTuneTimeoutSecs(secs: Int) {
+        context.dataStore.edit { it[Keys.LIVE_TUNE_TIMEOUT_SECS] = secs.coerceIn(0, 60) }
     }
 
     /** Effective live buffer in seconds the engines apply (null = keep engine defaults, i.e. Balanced). */
@@ -1758,6 +1925,9 @@ class SettingsRepository(private val context: Context, private val localeStore: 
 
     private val backupStringKeys = listOf(
         Keys.THEME_MODE, Keys.ACCENT, Keys.ACCENT_CUSTOM, Keys.FOCUS_HIGHLIGHT, Keys.DEFAULT_ZOOM,
+        // Current global engine choices. VOD_PREFER_EXO below is migration-only and cannot represent
+        // all four EnginePreference modes, so the two string values must travel themselves.
+        Keys.LIVE_ENGINE, Keys.VOD_ENGINE,
         Keys.MAIN_FONT_FAMILY, Keys.POPUP_FONT_FAMILY,
         Keys.PREF_AUDIO_LANG, Keys.PREF_SUB_LANG, Keys.SUB_SEARCH_LANGS, Keys.SORT_LIVE, Keys.SORT_GUIDE, Keys.SORT_MOVIES,
         Keys.SORT_SERIES, Keys.RESUME_MODE, Keys.CATCHUP_TZ, Keys.CATCHUP_PLAYER, Keys.ANIMATION_LEVEL, Keys.VOD_VIEW_MODE,
@@ -1795,17 +1965,23 @@ class SettingsRepository(private val context: Context, private val localeStore: 
         // Surround mode (Auto/Stereo only/Surround). The legacy boolean is in backupBoolKeys and stays
         // in sync, but the string is what is read first, so it has to travel too.
         Keys.SURROUND_MODE,
-    )
+        // Settings personalization: Quick pins (including their order) and the independently arranged
+        // action order for each of the four long-press content menus.
+        Keys.QUICK_PINNED,
+    ) + ContentMenu.entries.map { menuOrderKey(it.name.lowercase()) }
     private val backupStringSetKeys = listOf(
         // The STATIC-mode hidden set rides with backup so a reinstall keeps the user's hidden icons.
         Keys.NAV_MENU_HIDDEN,
+        Keys.REMOTE_SHORTCUT_BINDINGS,
     )
-    private val backupIntKeys = listOf(Keys.FOCUS_HIGHLIGHT_WIDTH, Keys.DEFAULT_VOLUME, Keys.SEEK_STEP_SEC, Keys.LIVE_REWIND_STEP_SEC, Keys.UI_ZOOM_PCT, Keys.FONT_SIZE_PCT, Keys.AUDIO_DELAY_MS, Keys.CATCHUP_OFFSET_MIN, Keys.EPG_OFFSET_MIN, Keys.PROXY_PORT, Keys.DNS_PORT, Keys.CH_NAV_UP_SKIP, Keys.CH_NAV_DOWN_SKIP, Keys.MINI_PLAYER_SIZE_PCT, Keys.LIVE_LATENCY_CUSTOM_SECS, Keys.LIVE_PREROLL_SECS, Keys.GLASS_SCOPE, Keys.GLASS_ALPHA, Keys.GLASS_BLUR, Keys.GLASS_HIGHLIGHT, Keys.SUB_BG_OPACITY,
+    private val backupIntKeys = listOf(Keys.FOCUS_HIGHLIGHT_WIDTH, Keys.DEFAULT_VOLUME, Keys.SEEK_STEP_SEC, Keys.LIVE_REWIND_STEP_SEC, Keys.UI_ZOOM_PCT, Keys.FONT_SIZE_PCT, Keys.AUDIO_DELAY_MS, Keys.CATCHUP_OFFSET_MIN, Keys.EPG_OFFSET_MIN, Keys.PROXY_PORT, Keys.DNS_PORT, Keys.CH_NAV_UP_SKIP, Keys.CH_NAV_DOWN_SKIP, Keys.MINI_PLAYER_SIZE_PCT, Keys.LIVE_LATENCY_CUSTOM_SECS, Keys.LIVE_PREROLL_SECS, Keys.LIVE_TUNE_TIMEOUT_SECS, Keys.GLASS_SCOPE, Keys.GLASS_ALPHA, Keys.GLASS_BLUR, Keys.GLASS_HIGHLIGHT, Keys.SUB_BG_OPACITY,
         Keys.PANEL_W_LIVE_CAT, Keys.PANEL_W_LIVE_LIST, Keys.PANEL_W_LIVE_PREVIEW,
         Keys.PANEL_W_MOVIES_CAT, Keys.PANEL_W_MOVIES_LIST, Keys.PANEL_W_MOVIES_PREVIEW,
-        Keys.PANEL_W_SERIES_CAT, Keys.PANEL_W_SERIES_LIST, Keys.PANEL_W_SERIES_PREVIEW)
+            Keys.PANEL_W_SERIES_CAT, Keys.PANEL_W_SERIES_LIST, Keys.PANEL_W_SERIES_PREVIEW,
+        Keys.GUIDE_WIDTH_CHANNELS, Keys.GUIDE_WIDTH_EPG,
+        Keys.POPUP_FONT_SIZE_PCT, Keys.POPUP_SIZE_PCT)
     private val backupBoolKeys = listOf(
-        Keys.LIVE_PREVIEW, Keys.LIVE_PREVIEW_AUDIO, Keys.HDR_ENABLED, Keys.AUTO_FRAME_RATE, Keys.AUTO_FRAME_RATE_PROMPTED, Keys.ANDROID_TV_HOME, Keys.HW_DECODING,
+        Keys.LIVE_PREVIEW, Keys.LIVE_PREVIEW_AUDIO, Keys.HERO_PREVIEW, Keys.HDR_ENABLED, Keys.AUTO_FRAME_RATE, Keys.AUTO_FRAME_RATE_PROMPTED, Keys.ANDROID_TV_HOME, Keys.HW_DECODING,
         Keys.VOD_PREFER_EXO, Keys.MEASURED_STREAM_STATS, Keys.DETAILED_DIAGNOSTICS, Keys.DIRECT_TUNE, Keys.EXTERNAL_PLAYER,
         Keys.EXTERNAL_PLAYER_LIVE, Keys.EXTERNAL_PLAYER_MOVIES, Keys.EXTERNAL_PLAYER_SERIES, Keys.UPDATE_CHECK_ON_START, Keys.SURROUND_SOUND, Keys.AUTO_PLAY_NEXT, Keys.PROXY_ENABLED,
         Keys.WEATHER_ENABLED, Keys.WEATHER_FAHRENHEIT, Keys.RESUME_LAST_CHANNEL, Keys.METADATA_ENABLED, Keys.CH_NAV_ENABLED,
@@ -1813,11 +1989,11 @@ class SettingsRepository(private val context: Context, private val localeStore: 
         Keys.REMEMBER_LAST_LIVE, Keys.REMEMBER_LAST_MOVIES, Keys.REMEMBER_LAST_SERIES,
         Keys.REMEMBER_CAT_LIVE, Keys.REMEMBER_CAT_MOVIES, Keys.REMEMBER_CAT_SERIES,
         Keys.SUB_STYLE_ENABLED, Keys.SUB_SEARCH_FILTER, Keys.DEINTERLACE,
-        Keys.PANEL_W_LIVE_ON, Keys.PANEL_W_MOVIES_ON, Keys.PANEL_W_SERIES_ON,
+            Keys.PANEL_W_LIVE_ON, Keys.PANEL_W_MOVIES_ON, Keys.PANEL_W_SERIES_ON, Keys.GUIDE_WIDTH_ON,
         Keys.AMBIENT_GLOW_ENABLED, Keys.AMBIENT_GLOW_PULSE,
         Keys.GLASS_ALLOW_FULL_TRANSPARENCY, Keys.GLASS_DEPTH_EFFECTS,
     )
-    private val backupFloatKeys = listOf(Keys.SUB_SCALE)
+    private val backupFloatKeys = listOf(Keys.SUB_SCALE, Keys.SUB_SCALE_MPV, Keys.SUB_SCALE_EXO)
 
     /**
      * "Remember last category" values (see the REMEMBER_CAT_* toggles, which are backed up as plain
@@ -1928,6 +2104,12 @@ class SettingsRepository(private val context: Context, private val localeStore: 
 
         /** Backup payload field name for the UI locale tag (read from / written to [LocaleStore]). */
         const val UI_LANGUAGE_KEY = "ui_language"
+
+        /** The six toggles Quick started life with, kept as the out-of-the-box pin list. */
+        val DEFAULT_QUICK_PINNED = listOf(
+            "quick_live_preview", "quick_preview_sound", "quick_channel_numbers",
+            "quick_hdr", "quick_autoplay", "quick_check_update",
+        )
     }
 
     // --- Backup: per-profile startup landing (dynamic "startup_mode_<id>" keys) ---

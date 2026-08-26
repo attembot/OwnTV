@@ -18,6 +18,14 @@ interface HistoryDao {
     @Query("DELETE FROM watch_history WHERE profileId = :profileId AND mediaType = :type AND itemId = :itemId")
     suspend fun remove(profileId: Long, type: MediaType, itemId: Long)
 
+    /** The episode rows belonging to one series — removed alongside the show's own row, so the
+     *  top-bar Continue chip stops offering a show the user just removed from history. */
+    @Query(
+        "DELETE FROM watch_history WHERE profileId = :profileId AND mediaType = 'EPISODE' " +
+            "AND itemId IN (SELECT id FROM episodes WHERE seriesId = :seriesId)",
+    )
+    suspend fun removeSeriesEpisodes(profileId: Long, seriesId: Long)
+
     @Query("DELETE FROM watch_history WHERE profileId = :profileId")
     suspend fun clear(profileId: Long)
 
@@ -59,7 +67,13 @@ interface HistoryDao {
         "DELETE FROM watch_history WHERE profileId = :profileId AND mediaType = :type AND itemId = :itemId AND (" +
             "(:type = 'LIVE'   AND itemId NOT IN (SELECT id FROM channels)) OR " +
             "(:type = 'MOVIE'  AND itemId NOT IN (SELECT id FROM movies))   OR " +
-            "(:type = 'SERIES' AND itemId NOT IN (SELECT id FROM series))" +
+            "(:type = 'SERIES' AND itemId NOT IN (SELECT id FROM series))  OR " +
+            // Resume positions and history are mostly EPISODE rows, and without this branch the
+            // OR-chain was false for every one of them: the orphan was never dropped, while the
+            // relink inserted a fresh row for the new id. Every series re-sync therefore left one
+            // more dead row behind, for ever. Safe to purge: an episode that has not loaded yet is
+            // held in the pending set by the same call and re-inserts when it arrives.
+            "(:type = 'EPISODE' AND itemId NOT IN (SELECT id FROM episodes))" +
             ")",
     )
     suspend fun purgeSnapshotOrphan(profileId: Long, type: MediaType, itemId: Long)

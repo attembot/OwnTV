@@ -40,6 +40,18 @@ data class CustomizeCatRow(
     val providerName: String? = null,
 )
 
+enum class CustomizeVisibilityFilter {
+    ALL,
+    VISIBLE,
+    HIDDEN;
+
+    fun accepts(hidden: Boolean): Boolean = when (this) {
+        ALL -> true
+        VISIBLE -> !hidden
+        HIDDEN -> hidden
+    }
+}
+
 /**
  * Drives Settings → Customize: per-profile hide / rename / reorder of categories (Live/Movies/Series)
  * and the unhide list for hidden Live channels. All edits live in [CustomizationStore] (DataStore),
@@ -90,6 +102,14 @@ class CustomizeViewModel(
     private val _section = MutableStateFlow(MediaType.LIVE)
     val section: StateFlow<MediaType> = _section.asStateFlow()
 
+    private val _visibilityFilter = MutableStateFlow(CustomizeVisibilityFilter.ALL)
+    val visibilityFilter: StateFlow<CustomizeVisibilityFilter> = _visibilityFilter.asStateFlow()
+
+    fun setVisibilityFilter(filter: CustomizeVisibilityFilter) {
+        _visibilityFilter.value = filter
+        span.cancel()
+    }
+
     // --- Span selection (shared machinery, see SpanSelector.kt) ---
 
     private val span = SpanSelector(
@@ -108,8 +128,9 @@ class CustomizeViewModel(
     }
 
     /** Categories of the selected section, in their customized order, including hidden ones. */
-    val rows: StateFlow<List<CustomizeCatRow>> = combine(_section, ctx) { s, c -> s to c }
-        .flatMapLatest { (type, c) ->
+    val rows: StateFlow<List<CustomizeCatRow>> = combine(_section, ctx, _visibilityFilter) { s, c, filter ->
+        Triple(s, c, filter)
+    }.flatMapLatest { (type, c, filter) ->
             if (c.profileId < 0) flowOf(emptyList())
             else {
                 val sourceIds = c.sourceIdsFor(type)
@@ -153,7 +174,8 @@ class CustomizeViewModel(
                         )
                     }
                     val (pinned, rest) = entries.partition { it.key in orderIndex }
-                    pinned.sortedBy { orderIndex.getValue(it.key) } + rest
+                    (pinned.sortedBy { orderIndex.getValue(it.key) } + rest)
+                        .filter { filter.accepts(it.hidden) }
                 }
             }
         }

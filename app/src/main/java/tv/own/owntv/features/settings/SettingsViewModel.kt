@@ -50,6 +50,7 @@ import tv.own.owntv.features.settings.data.ChNavLimits
 import tv.own.owntv.features.settings.data.EpgAutoRefresh
 import tv.own.owntv.features.settings.data.PanelSection
 import tv.own.owntv.features.settings.data.PanelShares
+import tv.own.owntv.features.settings.data.GuideWidthShares
 import tv.own.owntv.features.settings.data.PlaylistAutoRefresh
 import tv.own.owntv.features.settings.data.SettingsRepository
 import tv.own.owntv.features.settings.data.SubtitleStyle
@@ -435,6 +436,12 @@ class SettingsViewModel(
 
     fun clearSavedVolume() { viewModelScope.launch { playbackPrefs.clearVolume() } }
 
+    /** Same again for the per-item A/V-sync offsets (DB v35). */
+    val savedAudioDelayCount: StateFlow<Int> =
+        playbackPrefs.observeAudioDelayCount().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    fun clearSavedAudioDelay() { viewModelScope.launch { playbackPrefs.clearAudioDelay() } }
+
     /** Rewind/forward step in a movie or episode, and the separate one for a live archive. */
     val seekStepSec: StateFlow<Int> = settings.seekStepSec
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.features.settings.data.SeekSteps.DEFAULT_SEEK_STEP_SEC)
@@ -469,6 +476,17 @@ class SettingsViewModel(
     val updateCheckOnStart: StateFlow<Boolean> =
         settings.updateCheckOnStart.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
     fun setUpdateCheckOnStart(enabled: Boolean) { viewModelScope.launch { settings.setUpdateCheckOnStart(enabled) } }
+
+    /** The Settings rows pinned to the Quick group, in display order. */
+    val quickPinnedKeys: StateFlow<List<String>> =
+        settings.quickPinnedKeys.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    fun setQuickPinnedKeys(keys: List<String>) { viewModelScope.launch { settings.setQuickPinnedKeys(keys) } }
+
+    /** The saved order of one long-press content menu; empty = the order the app ships with. */
+    fun menuOrder(menu: tv.own.owntv.ui.components.ContentMenu) = settings.menuOrder(menu.name.lowercase())
+    fun setMenuOrder(menu: tv.own.owntv.ui.components.ContentMenu, keys: List<String>) {
+        viewModelScope.launch { settings.setMenuOrder(menu.name.lowercase(), keys) }
+    }
 
     val resumeLastChannel: StateFlow<Boolean> =
         settings.resumeLastChannel.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
@@ -569,8 +587,12 @@ class SettingsViewModel(
     val subtitleStyleEnabled: StateFlow<Boolean> = settings.subtitleStyleEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
     fun setSubtitleStyleEnabled(enabled: Boolean) { viewModelScope.launch { settings.setSubtitleStyleEnabled(enabled) } }
 
-    val subtitleScale: StateFlow<Float> = settings.subtitleScale.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SubtitleStyle.SCALE_DEFAULT)
-    fun setSubtitleScale(scale: Float) { viewModelScope.launch { settings.setSubtitleScale(scale) } }
+    // One size per engine: the same multiplier reads much larger on ExoPlayer than on mpv.
+    val subtitleScaleExo: StateFlow<Float> = settings.subtitleScaleExo.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SubtitleStyle.SCALE_DEFAULT)
+    fun setSubtitleScaleExo(scale: Float) { viewModelScope.launch { settings.setSubtitleScaleExo(scale) } }
+
+    val subtitleScaleMpv: StateFlow<Float> = settings.subtitleScaleMpv.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SubtitleStyle.SCALE_DEFAULT)
+    fun setSubtitleScaleMpv(scale: Float) { viewModelScope.launch { settings.setSubtitleScaleMpv(scale) } }
 
     val subtitleFont: StateFlow<tv.own.owntv.ui.theme.AppFontFamily?> = settings.subtitleFont
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -595,6 +617,19 @@ class SettingsViewModel(
     fun setChNavUpSkip(n: Int) { viewModelScope.launch { settings.setChNavUpSkip(n) } }
     val chNavDownSkip: StateFlow<Int> = settings.chNavDownSkip.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ChNavLimits.DEFAULT_SKIP)
     fun setChNavDownSkip(n: Int) { viewModelScope.launch { settings.setChNavDownSkip(n) } }
+    val remoteShortcutBindings: StateFlow<List<tv.own.owntv.features.settings.data.RemoteShortcutBinding>> =
+        settings.remoteShortcutBindings.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            tv.own.owntv.features.settings.data.RemoteShortcutBindings.defaults,
+        )
+    fun setRemoteShortcutBinding(binding: tv.own.owntv.features.settings.data.RemoteShortcutBinding) {
+        viewModelScope.launch { settings.setRemoteShortcutBinding(binding) }
+    }
+    fun removeRemoteShortcutBinding(keyCode: Int, press: tv.own.owntv.features.settings.data.RemoteShortcutPress) {
+        viewModelScope.launch { settings.removeRemoteShortcutBinding(keyCode, press) }
+    }
+    fun resetRemoteShortcutBindings() { viewModelScope.launch { settings.resetRemoteShortcutBindings() } }
 
     // --- Manual panel widths: one StateFlow per section, so Live/Movies/Series each read their own ---
     private fun <T> panelFlows(source: (PanelSection) -> kotlinx.coroutines.flow.Flow<T>, initial: T): Map<PanelSection, StateFlow<T>> =
@@ -607,6 +642,14 @@ class SettingsViewModel(
 
     fun setPanelWidths(s: PanelSection, enabled: Boolean, shares: PanelShares) {
         viewModelScope.launch { settings.setPanelWidths(s, enabled, shares) }
+    }
+
+    val guideWidthEnabled: StateFlow<Boolean> = settings.guideWidthEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    val guideWidthShares: StateFlow<GuideWidthShares?> = settings.guideWidthShares
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    fun setGuideWidths(enabled: Boolean, shares: GuideWidthShares) {
+        viewModelScope.launch { settings.setGuideWidths(enabled, shares) }
     }
 
     val preferredAudioLang: StateFlow<String> = settings.preferredAudioLang.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
@@ -755,9 +798,26 @@ class SettingsViewModel(
         viewModelScope.launch { settings.setLivePrerollSecs(secs) }
     }
 
+    /** "Give up on a channel after": the whole-tune budget in seconds (0 = Never). */
+    val liveTuneTimeoutSecs: StateFlow<Int> =
+        settings.liveTuneTimeoutSecs.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.player.LiveLadder.DEFAULT_BUDGET_SECS)
+    fun setLiveTuneTimeoutSecs(secs: Int) {
+        viewModelScope.launch { settings.setLiveTuneTimeoutSecs(secs) }
+    }
+
     /** Per-playlist override of the above. `-1` = follow the global value. */
     fun setSourcePreroll(sourceId: Long, secs: Int) {
         viewModelScope.launch { sourceDao.updateLivePreroll(sourceId, secs) }
+    }
+
+    /** Per-playlist Live TV engine override; `null` = follow the global setting. */
+    fun setSourceLiveEngine(sourceId: Long, preference: String?) {
+        viewModelScope.launch { sourceDao.updateLiveEnginePreference(sourceId, preference) }
+    }
+
+    /** Per-playlist Live latency override; `null` mode = follow the global setting. */
+    fun setSourceLiveLatency(sourceId: Long, mode: String?, customSecs: Int) {
+        viewModelScope.launch { sourceDao.updateLiveLatency(sourceId, mode, customSecs) }
     }
 
     val animationLevel: StateFlow<tv.own.owntv.ui.theme.AnimationLevel> =

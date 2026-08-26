@@ -84,6 +84,7 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val hiddenChannels by vm.hiddenChannels.collectAsStateWithLifecycle()
     val hideNewCategories by vm.hideNewCategories.collectAsStateWithLifecycle()
     val currentSort by vm.currentSort.collectAsStateWithLifecycle()
+    val visibilityFilter by vm.visibilityFilter.collectAsStateWithLifecycle()
     val rangeAnchorKey by vm.rangeAnchorKey.collectAsStateWithLifecycle()
     val rangeMode by vm.rangeMode.collectAsStateWithLifecycle()
     val rangeEndKey by vm.rangeEndKey.collectAsStateWithLifecycle()
@@ -94,6 +95,7 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     var renaming by remember { mutableStateOf<CustomizeCatRow?>(null) }
     var showNewCatPicker by remember { mutableStateOf(false) }
     var showSortPicker by remember { mutableStateOf(false) }
+    var showFilterPicker by remember { mutableStateOf(false) }
     // The category whose Hide button was clicked to close a range — opens the Show/Hide/Cancel prompt.
     var rangeEnd by remember { mutableStateOf<CustomizeCatRow?>(null) }
     // ＋ New category (issue #87): name prompt, then the empty combined category appears in the list.
@@ -110,6 +112,7 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     var pinMismatch by remember { mutableStateOf(false) }
     val firstFocus = remember { FocusRequester() }
     val sortFocus = remember { FocusRequester() }
+    val filterFocus = remember { FocusRequester() }
     val newCategoriesFocus = remember { FocusRequester() }
     val newCatPillFocus = remember { FocusRequester() } // "＋ New category" pill — restore target after its name prompt
     val pinFocus = remember { FocusRequester() }
@@ -118,7 +121,7 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     // Opener row for whichever dialog (new-category picker, rename) is open — restored on close so
     // focus doesn't always jump back to the Live TV section chip.
     var dialogReturn by tv.own.owntv.ui.components.rememberDialogFocusRestore(
-        anyDialogOpen = showNewCatPicker || showSortPicker || renaming != null || creatingCategory ||
+        anyDialogOpen = showNewCatPicker || showSortPicker || showFilterPicker || renaming != null || creatingCategory ||
             deletingCategory != null || rangeEnd != null || editingPin != null,
     )
 
@@ -131,6 +134,10 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     var listPaneFocused by remember { mutableStateOf(false) }
+
+    LaunchedEffect(section) {
+        listState.scrollToItem(0)
+    }
     // Index (within `rows`) of the category row that currently holds focus — the paging anchor.
     var focusedCatIndex by remember { mutableIntStateOf(0) }
     // One FocusRequester per category row, so a jump can land focus on the target row.
@@ -172,7 +179,11 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         return
     }
 
-    LaunchedEffect(Unit) { kotlinx.coroutines.delay(60); runCatching { firstFocus.requestFocus() } }
+    LaunchedEffect(Unit) {
+        vm.setVisibilityFilter(CustomizeVisibilityFilter.ALL)
+        kotlinx.coroutines.delay(60)
+        runCatching { firstFocus.requestFocus() }
+    }
     // Restore focus to the row that opened a dialog (new-category picker / rename / new-category
     // prompt / delete confirm) when it closes — previously closing either always landed on the Live
     // TV section chip (firstFocus).
@@ -244,6 +255,22 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 onClick = { dialogReturn = sortFocus; showSortPicker = true },
                 style = OwnTVButtonStyle.SECONDARY,
                 modifier = Modifier.focusRequester(sortFocus),
+            )
+            Spacer(Modifier.width(10.dp))
+            OwnTVButton(
+                label = stringResource(
+                    R.string.settings_customize_filter_button,
+                    stringResource(
+                        when (visibilityFilter) {
+                            CustomizeVisibilityFilter.ALL -> R.string.settings_customize_filter_all
+                            CustomizeVisibilityFilter.VISIBLE -> R.string.settings_customize_filter_visible
+                            CustomizeVisibilityFilter.HIDDEN -> R.string.settings_customize_filter_hidden
+                        },
+                    ),
+                ),
+                onClick = { dialogReturn = filterFocus; showFilterPicker = true },
+                style = OwnTVButtonStyle.SECONDARY,
+                modifier = Modifier.focusRequester(filterFocus),
             )
             Spacer(Modifier.width(10.dp))
             // New categories pill — same setting as the old Row2, now compact.
@@ -493,6 +520,25 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 showSortPicker = false
             },
             onDismiss = { showSortPicker = false },
+        )
+    }
+
+    if (showFilterPicker) {
+        PickerDialog(
+            title = stringResource(R.string.settings_customize_filter_title),
+            options = listOf(
+                CustomizeVisibilityFilter.ALL.name to stringResource(R.string.settings_customize_filter_all),
+                CustomizeVisibilityFilter.VISIBLE.name to stringResource(R.string.settings_customize_filter_visible),
+                CustomizeVisibilityFilter.HIDDEN.name to stringResource(R.string.settings_customize_filter_hidden),
+            ),
+            selected = visibilityFilter.name,
+            onSelect = { value ->
+                CustomizeVisibilityFilter.entries.firstOrNull { it.name == value }
+                    ?.let(vm::setVisibilityFilter)
+                scope.launch { listState.scrollToItem(0) }
+                showFilterPicker = false
+            },
+            onDismiss = { showFilterPicker = false },
         )
     }
 

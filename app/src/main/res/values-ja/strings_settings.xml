@@ -23,6 +23,10 @@
     <string name="settings_movies_keep_watching_description">映画の再生再開カードをメインの行に表示します。</string>
     <string name="settings_series_keep_watching">「視聴を続ける」にシリーズを表示</string>
     <string name="settings_series_keep_watching_description">エピソードの再生再開カードをメインの行に表示します。</string>
+    <!-- Translators: Toggle label for playing the highlighted Home item's video in the hero row. -->
+    <string name="settings_hero_preview">メインの行で動画を再生</string>
+    <!-- Translators: Description of the hero-row video preview toggle. -->
+    <string name="settings_hero_preview_description">選択中の項目の動画プレビューが少し待ってから再生されます。ホーム画面の閲覧中に電力とメモリを節約するにはオフにします。</string>
     <string name="settings_android_tv_home">Android TVのホーム</string>
     <string name="settings_android_tv_home_description">TVのホーム画面に「視聴を続ける」と最近視聴したライブチャンネルを表示します。</string>
     <string name="settings_refresh_now">今すぐ更新</string>
@@ -63,19 +67,62 @@
     <string name="settings_proxy_connection_failed">プロキシに接続できませんでした（ホスト／ポートを確認してください）。</string>
     <string name="settings_proxy_http">プロキシからHTTP <xliff:g id="code">%1$d</xliff:g>が返されました</string>
     <string name="settings_proxy_failed">プロキシのテストに失敗しました。</string>
-    <string name="settings_ch_nav_title">CH+/CH−キーによるページ移動</string>
-    <string name="settings_ch_nav_description">リモコンのCH+／CH−キーでカテゴリまたは項目の一覧をページ移動します。</string>
-    <string name="settings_ch_nav_enabled">CH+/CH−キーで一覧をページ移動</string>
-    <string name="settings_ch_nav_enabled_description">オンにすると、CH+とCH−でフォーカス中のパネル内（カテゴリレール、項目一覧、または「カテゴリをカスタマイズ」の一覧）をスキップ移動します。オフにすると、これらの画面ではキーを押しても何も起こりません。</string>
-    <string name="settings_ch_nav_up">CH+のスキップ数（先頭方向）</string>
-    <string name="settings_ch_nav_up_description">CH+を1回押したときに上方向へ移動する項目数です。長押しすると常に先頭の項目へ移動します。</string>
-    <string name="settings_ch_nav_down">CH−のスキップ数（末尾方向）</string>
-    <string name="settings_ch_nav_down_description">CH−を1回押したときに下方向へ移動する項目数です。長押しすると常に末尾の項目へ移動します。</string>
+    <string name="settings_ch_nav_title">CH+/RW · CH−/FFキーによるページ移動</string>
+    <string name="settings_ch_nav_description">リモコンのCH+/RW／CH−/FFキーでカテゴリまたは項目の一覧をページ移動します。</string>
+    <string name="settings_ch_nav_enabled">CH+/RW · CH−/FFキーで一覧をページ移動</string>
+    <string name="settings_ch_nav_enabled_description">オンにすると、CH+/RWとCH−/FFでフォーカス中のパネル内（カテゴリレール、項目一覧、または「カテゴリをカスタマイズ」の一覧）をスキップ移動します。オフにすると、これらの画面ではキーを押しても何も起こりません。</string>
+    <string name="settings_ch_nav_up">CH+ / 巻き戻しのスキップ数（先頭方向）</string>
+    <string name="settings_ch_nav_up_description">CH+/RWを1回押したときに上方向へ移動する項目数です。長押しすると常に先頭の項目へ移動します。</string>
+    <string name="settings_ch_nav_down">CH− / 早送りのスキップ数（末尾方向）</string>
+    <string name="settings_ch_nav_down_description">CH−/FFを1回押したときに下方向へ移動する項目数です。長押しすると常に末尾の項目へ移動します。</string>
     <string name="settings_skip_counts">スキップ数</string>
     <string name="settings_how_it_works">動作の仕組み</string>
-    <string name="settings_ch_nav_help">• 末端を越えないようにスキップが制限されるため、短い一覧では1回押すだけで末端に到達します。\n• CH+を長押し＝先頭の項目、CH−を長押し＝末尾の項目。\n• 「すべて」の一覧（全チャンネル／映画／シリーズ）では長押しが無効です。短押しによるスキップは引き続き使用できます。\n• 現在フォーカスがあるパネル（カテゴリレールまたは項目の一覧／グリッド）に適用されます。\n• 「設定」→「カテゴリと項目をカスタマイズ」のカテゴリ一覧でもページ移動できます。</string>
+    <string name="settings_ch_nav_help">• 末端を越えないようにスキップが制限されるため、短い一覧では1回押すだけで末端に到達します。\n• CH+/RWを長押し＝先頭の項目、CH−/FFを長押し＝末尾の項目。\n• 「すべて」の一覧（全チャンネル／映画／シリーズ）では長押しが無効です。短押しによるスキップは引き続き使用できます。\n• 現在フォーカスがあるパネル（カテゴリレールまたは項目の一覧／グリッド）に適用されます。\n• 「設定」→「カテゴリと項目をカスタマイズ」のカテゴリ一覧でもページ移動できます。</string>
+    <string name="settings_remote_shortcuts">リモコンショートカット</string>
+    <string name="settings_remote_shortcuts_description">リモコンの空きボタンにナビゲーション、再生、一覧操作を割り当てます。重要な操作ボタンは保護されます。</string>
+    <string name="settings_remote_shortcuts_enabled">リモコンショートカットを使用</string>
+    <string name="settings_remote_shortcuts_enabled_description">ボタン割り当てを削除せずにカスタムショートカットをすべて無効にします</string>
+    <string name="settings_remote_shortcuts_assignments">ボタンの割り当て</string>
+    <string name="settings_remote_shortcuts_add">ショートカットを追加</string>
+    <string name="settings_remote_shortcuts_add_description">空きボタンを押すか長押しして、実行する操作を選びます</string>
+    <string name="settings_remote_shortcuts_reset">標準ショートカットを復元</string>
+    <string name="settings_remote_shortcuts_reset_description">CH+/CH−と巻き戻し/早送りのページ操作を復元し、ほかの割り当てを削除します</string>
+    <string name="settings_remote_shortcuts_capture_title">リモコンのボタンを押してください</string>
+    <string name="settings_remote_shortcuts_capture_description">短く押すか、離すまで長押しします。戻る、方向、OK、音量、ホーム、電源ボタンは割り当てできません。</string>
+    <string name="settings_remote_shortcuts_choose_action">操作を選択</string>
+    <string name="settings_remote_shortcuts_binding"><xliff:g id="press">%1$s</xliff:g> · <xliff:g id="action">%2$s</xliff:g></string>
+    <string name="settings_remote_shortcuts_short_press">短押し</string>
+    <string name="settings_remote_shortcuts_long_press">長押し</string>
+    <string name="settings_remote_shortcuts_unknown_button">リモコンボタン %1$d</string>
+    <string name="settings_remote_shortcuts_help">• 標準ではCH+/CH−と巻き戻し/早送りで一覧を移動し、長押しで先頭または末尾へ移動します。
+• 短押しと長押しは別々に割り当てできます。
+• 非常に大きい「すべて」一覧では末尾への移動は無効です。
+• 戻るの長押しは常に再生中へフォーカスし、変更できません。
+• 通常は赤/緑/黄/青、数字、CH+/CH−、巻き戻し/早送りを割り当てできます。
+• 戻る、方向、OK、音量、ホーム、電源ボタンは保護されます。
+• 数字ショートカットは閲覧中に動作し、全画面ではチャンネル番号入力が優先されます。</string>
+    <string name="settings_remote_button_channel_up">チャンネル +</string>
+    <string name="settings_remote_button_channel_down">チャンネル −</string>
+    <string name="settings_remote_button_rewind">巻き戻し</string>
+    <string name="settings_remote_button_fast_forward">早送り</string>
+    <string name="settings_remote_button_previous">前へ</string>
+    <string name="settings_remote_button_next">次へ</string>
+    <string name="settings_remote_button_menu">メニュー</string>
+    <string name="settings_remote_button_red">赤ボタン</string>
+    <string name="settings_remote_button_green">緑ボタン</string>
+    <string name="settings_remote_button_yellow">黄ボタン</string>
+    <string name="settings_remote_button_blue">青ボタン</string>
+    <string name="settings_remote_action_continue">最後に見た項目を続ける</string>
+    <string name="settings_remote_action_focus_now_playing">再生中にフォーカス</string>
+    <string name="settings_remote_action_expand_now_playing">再生中を全画面表示</string>
+    <string name="settings_remote_action_mini_player">ミニプレーヤーへ移動</string>
+    <string name="settings_remote_action_play_pause">再生または一時停止</string>
+    <string name="settings_remote_action_page_first">先頭方向へページ移動</string>
+    <string name="settings_remote_action_page_last">末尾方向へページ移動</string>
+    <string name="settings_remote_action_jump_first">最初の項目へ移動</string>
+    <string name="settings_remote_action_jump_last">最後の項目へ移動</string>
     <string name="settings_large_skips_warning">スキップ数が大きいと短い一覧を飛び越え、低性能のTVでは動きがぎこちなく感じられることがあります。</string>
-    <string name="settings_ch_nav_picker">CH+/CH−キーによるページ移動</string>
+    <string name="settings_ch_nav_picker">CH+/RW · CH−/FFキーによるページ移動</string>
     <string name="settings_weather">天気</string>
     <string name="settings_top_bar_weather">トップバーの天気</string>
     <string name="settings_show_weather">天気を表示</string>
@@ -157,7 +204,6 @@
     <string name="settings_quick_check_update">更新を確認</string>
     <string name="settings_search_label">設定を検索</string>
     <string name="settings_search_hint">設定を検索…</string>
-    <string name="settings_group_general">一般</string>
     <string name="settings_language">言語</string>
     <string name="settings_language_description">アプリの表示言語</string>
     <string name="settings_language_system_default">システムのデフォルト</string>
@@ -167,7 +213,6 @@
     <string name="settings_language_coverage"><xliff:g id="percent">%1$d</xliff:g>%%</string>
     <string name="settings_profile_group">プロフィール</string>
     <string name="settings_profiles_description">視聴者、子どもモード、PINロックを管理</string>
-    <string name="settings_content_group">コンテンツ</string>
     <string name="settings_playlists">プレイリスト</string>
     <string name="settings_playlists_description">M3U／Xtreamプレイリストを追加、再同期、削除</string>
     <string name="settings_epg_sources">EPGソース</string>
@@ -175,8 +220,14 @@
     <string name="settings_customize">カテゴリと項目をカスタマイズ</string>
     <string name="settings_customize_nav_description">項目の非表示／再表示、カテゴリ名の変更、並べ替え</string>
     <string name="settings_sidebar_description_root">プレイリストに合わせてサイドアイコンを自動調整するか、特定のアイコンを非表示にします</string>
-    <string name="settings_ch_paging">CH+/CH−キーによるページ移動</string>
-    <string name="settings_ch_paging_description">CH+／CH−キーでカテゴリと項目の一覧を上下にスキップ</string>
+    <string name="settings_ch_paging">リモコンショートカット</string>
+    <string name="settings_ch_paging_description">リモコンの空きボタンにナビゲーション、再生、一覧操作を割り当てます。重要な操作ボタンは保護されます。</string>
+    <!-- Translators: Settings navigation label for the long-press content menus. -->
+    <string name="settings_content_menus_title">長押しメニュー</string>
+    <!-- Translators: Description of the long-press content menus settings. -->
+    <string name="settings_content_menus_description">チャンネル・映画・シリーズ・エピソードのメニューの項目を並べ替えます</string>
+    <!-- Translators: Hint shown above the list when arranging a long-press menu. -->
+    <string name="settings_content_menus_hint">項目で OK を長押しするとつかめます。上下で移動し、もう一度 OK で置きます。</string>
     <string name="settings_browsing_lists">ブラウズと一覧</string>
     <string name="settings_browsing_description">ライブTV、映画、シリーズで最後のカテゴリと項目を記憶</string>
     <string name="settings_home_root">ホーム画面</string>
@@ -221,7 +272,7 @@
     <string name="settings_surround_sound">サラウンドサウンド</string>
     <string name="settings_surround_description">実際の5.1/7.1対応レシーバー向けにDolby/DTSをサラウンド（5.1/7.1）へデコードします。TVスピーカーまたはステレオサウンドバーではオフのままにしてください。一部のTV／サウンドバーでは、マルチチャンネル音声が映像より遅れることがあります。ずれが生じる場合は、プレーヤーの「音声」メニュー→「A/V同期」で微調整してください。</string>
     <string name="settings_autoplay_next">次のエピソードを自動再生</string>
-    <string name="settings_autoplay_next_description">エピソードの終了時に次のエピソードを自動的に開始し、シーズンの最後では次のシーズンに進みます。</string>
+    <string name="settings_autoplay_next_description">エピソードの終了時に次のエピソードを自動的に開始し、シーズンの最後では次のシーズンに進みます。見逃し配信も次の番組へ続けて再生します。</string>
     <string name="settings_catchup">見逃し配信</string>
     <plurals name="settings_catchup_supported">
         <item quantity="other"><xliff:g id="count">%1$d</xliff:g>件のチャンネルが見逃し配信に対応 · アーカイブ再生のタイムゾーンとプレーヤー</item>
@@ -300,12 +351,44 @@
     <string name="settings_accent_green">グリーン</string>
     <string name="settings_accent_amber">アンバー</string>
     <string name="settings_group_profile">プロフィール</string>
-    <string name="settings_group_content">コンテンツ</string>
+    <string name="settings_group_sources">ソースと番組表</string>
+    <string name="settings_group_layout">レイアウト</string>
+    <string name="settings_group_content_metadata">コンテンツとメタデータ</string>
+    <string name="settings_group_data">データ</string>
     <string name="settings_group_appearance">外観</string>
     <string name="settings_group_playback">再生</string>
     <string name="settings_group_network">ネットワーク</string>
     <string name="settings_dns">DNS</string>
     <string name="settings_group_app">アプリ</string>
+    <string name="settings_group_summary_profile">プロフィールと視聴できる範囲</string>
+    <string name="settings_group_summary_sources">プレイリスト、番組表データとその時刻</string>
+    <string name="settings_group_summary_appearance">テーマ、アクセント、ガラス、動き、文字サイズ</string>
+    <string name="settings_group_summary_layout">サイドバー、パネル、一覧、ホーム画面</string>
+    <string name="settings_group_summary_content_metadata">名称、画像、字幕サービス</string>
+    <string name="settings_group_summary_playback">動画プレーヤーとエラーログ</string>
+    <!-- Translators: Video player settings: name of the section holding decoder, HDR and frame-rate settings. -->
+    <string name="settings_vp_section_engine">エンジンと映像</string>
+    <!-- Translators: Video player settings: name of the section holding volume, audio language and surround settings. -->
+    <string name="settings_vp_section_sound">サウンド</string>
+    <!-- Translators: Video player settings: name of the section holding resume, auto-play and mini-player settings. -->
+    <string name="settings_vp_section_episodes">エピソードとミニプレーヤー</string>
+    <!-- Translators: Video player settings: one-line summary under the "Engine &amp; picture" section name. -->
+    <string name="settings_vp_section_engine_summary">デコーダー、HDR、フレームレート</string>
+    <!-- Translators: Video player settings: one-line summary under the "Live TV" section name. -->
+    <string name="settings_vp_section_live_summary">プレビュー、番号、遅延</string>
+    <!-- Translators: Video player settings: one-line summary under the "Sound" section name. -->
+    <string name="settings_vp_section_sound_summary">音量、言語、サラウンド</string>
+    <!-- Translators: Video player settings: one-line summary under the "Subtitles" section name. -->
+    <string name="settings_vp_section_subtitles_summary">サイズ、色、位置</string>
+    <!-- Translators: Video player settings: one-line summary under the "Episodes &amp; mini-player" section name. -->
+    <string name="settings_vp_section_episodes_summary">自動再生とミニプレーヤー</string>
+    <!-- Translators: Video player settings: one-line summary under the "Diagnostics" section name. -->
+    <string name="settings_vp_section_diagnostics_summary">詳細な再生ログ</string>
+    <string name="settings_group_summary_network">ストリーム接続のプロキシと DNS</string>
+    <string name="settings_group_summary_data">バックアップ、ダウンロード、視聴履歴</string>
+    <string name="settings_group_summary_app">言語、起動、更新、アプリ情報</string>
+    <string name="settings_group_quick">クイック</string>
+    <string name="settings_group_summary_quick">よく使う切り替え</string>
     <string name="settings_search_guide_logos">番組表のチャンネルロゴ</string>
     <string name="settings_search_keywords_profiles">視聴者 子どもモード PINロック アカウント</string>
     <string name="settings_search_keywords_playlists">M3U Xtream ソース 同期 追加 削除</string>
@@ -424,6 +507,14 @@
     <string name="settings_reset_saved_volume_confirm">保存した音量をリセットしますか？</string>
     <!-- Translators: Confirmation dialog body before forgetting the saved per-item volume. -->
     <string name="settings_reset_saved_volume_confirm_description">すべてのチャンネル、映画、エピソードがデフォルトの音量に戻ります。保存済みのズーム設定はそのまま残ります。個別の設定は、いつでもプレーヤーから行えます。</string>
+    <!-- Translators: Settings row that forgets every per-item audio-sync offset. -->
+    <string name="settings_reset_saved_audio_delay">保存したA/V同期をリセット</string>
+    <!-- Translators: Description of the reset-saved-audio-sync row. -->
+    <string name="settings_reset_saved_audio_delay_description">プレーヤーで「この遅延を記憶する」を選ぶと、そのチャンネル・映画・エピソードの音声同期が保存されます。リセットするとすべてが上記の設定に戻ります。</string>
+    <!-- Translators: Title of the confirmation dialog for resetting saved audio sync. -->
+    <string name="settings_reset_saved_audio_delay_confirm">保存したA/V同期をリセットしますか？</string>
+    <!-- Translators: Body of the confirmation dialog for resetting saved audio sync. -->
+    <string name="settings_reset_saved_audio_delay_confirm_description">すべてのチャンネル・映画・エピソードが上記の音声同期に戻ります。保存したズームと音量はそのままです。個別の値はいつでもプレーヤーから設定し直せます。</string>
     <!-- Translators: Setting label for how far rewind/forward jumps in a movie or episode. -->
     <string name="settings_seek_step">シークの幅</string>
     <!-- Translators: Description of the seek step setting. -->
@@ -464,6 +555,7 @@
     <string name="settings_audio_sync_description">映像に合うように音声を早めたり遅らせたりします。mpv エンジンにのみ適用されます。</string>
     <string name="settings_live_tv">ライブTV</string>
     <string name="settings_live_latency_description">ライブ放送にどの程度近い位置を再生するかを設定します。低くするとライブに近づきますが、バッファが小さくなるため、不安定なストリームでは途切れや再接続が増えることがあります。次に開くチャンネルから適用されます。</string>
+    <string name="settings_live_latency_bitrate_note">ビットレートが非常に高いチャンネル（特に4K）では、メモリに保持できる映像の量に上限があるため、指定した長さよりも短いぶんしかバッファできないことがあります。</string>
     <string name="settings_channel_numbers">チャンネル番号</string>
     <string name="settings_channel_numbers_description">ライブTVの一覧、チャンネル一覧オーバーレイ、プレーヤーで、名前の横にプロバイダーのチャンネル番号を表示します。また、全画面再生中にリモコンで番号を入力すると、そのチャンネルへ直接切り替えられます（OKを押すとすぐに切り替え、戻るでキャンセル）。オフにするとすべての番号が非表示になり、数字キーも無視されます。データが失われることはなく、オンに戻すと再び表示されます。</string>
     <string name="settings_diagnostics">診断</string>
@@ -617,6 +709,12 @@
     <string name="settings_customize_rename_or_delete_category">カテゴリ名の変更または削除</string>
     <string name="settings_customize_new_category">＋ 新しいカテゴリ</string>
     <string name="settings_customize_sort_button">並べ替え：<xliff:g id="label">%1$s</xliff:g> ▾</string>
+
+    <string name="settings_customize_filter_button">フィルター：<xliff:g id="label">%1$s</xliff:g> ▾</string>
+    <string name="settings_customize_filter_title">一覧を絞り込む</string>
+    <string name="settings_customize_filter_all">すべて</string>
+    <string name="settings_customize_filter_visible">表示</string>
+    <string name="settings_customize_filter_hidden">非表示</string>
     <string name="settings_customize_new_categories_button">新しいカテゴリ：<xliff:g id="label">%1$s</xliff:g> ▾</string>
     <string name="settings_customize_rename_hint">このプロフィールにのみ適用されます。空欄にすると「<xliff:g id="name">%1$s</xliff:g>」に戻ります。</string>
     <string name="settings_customize_remove_pin_title">PINロックを解除しますか？</string>
@@ -917,8 +1015,18 @@
     <string name="settings_subtitle_color_grey">グレー</string>
     <string name="settings_live_preroll">ライブストリームを事前バッファリング</string>
     <string name="settings_live_preroll_description">ライブチャンネルの再生開始前に、この量の映像をバッファリングします。また、カクついた後にもう一度バッファリングします。これは映像の量であり、カウントダウンではありません。オフにすると、最も速く再生を開始できます。</string>
+    <string name="settings_live_tune_timeout">チャンネルを諦めるまでの時間</string>
+    <string name="settings_live_tune_timeout_description">この時間までにライブチャンネルの映像が出ない場合、OwnTV はすべてのプレーヤーを順に試して黒い画面を映し続ける代わりに、試行をやめてお知らせします。「しない」を選ぶと試行を続けるため、プロバイダーが削除したチャンネルでは 1 分をゆうに超えることがあります。プロバイダー側から求められた待ち時間は含みません。</string>
     <string name="settings_live_preroll_per_playlist">プレイリストごとの事前バッファリング</string>
     <string name="settings_live_preroll_per_playlist_description">上記の設定を1つのプレイリストだけ上書きし、他のプレイリストは高速なままにできます。</string>
+    <!-- Translators: Title of the per-playlist Live TV engine override row. -->
+    <string name="settings_live_engine_per_playlist">プレイリストごとのライブTVプレーヤー</string>
+    <!-- Translators: Description of the per-playlist Live TV engine override row. -->
+    <string name="settings_live_engine_per_playlist_description">上記の設定を1つのプレイリストだけ上書きします。片方のプレーヤーでしかうまく再生できないチャンネルを持つ提供元に使います。</string>
+    <!-- Translators: Title of the per-playlist Live latency override row. -->
+    <string name="settings_live_latency_per_playlist">プレイリストごとのライブ遅延</string>
+    <!-- Translators: Description of the per-playlist Live latency override row. -->
+    <string name="settings_live_latency_per_playlist_description">上記の設定を1つのプレイリストだけ上書きします。他より深い、または浅いバッファーが必要な提供元に使います。</string>
     <plurals name="settings_live_preroll_overrides">
         <item quantity="other"><xliff:g id="count">%1$d</xliff:g>件</item>
     </plurals>
@@ -981,7 +1089,12 @@
     <string name="settings_main_interface_font">メイン画面のフォント</string>
     <string name="settings_popup_font">ポップアップのフォント</string>
     <string name="settings_choose_font">フォントを選択</string>
-    <string name="settings_font_size_range">アプリの文字を <xliff:g id="min">%1$d</xliff:g>%%～<xliff:g id="max">%2$d</xliff:g>%% の範囲で調整します。字幕のサイズは変わりません。</string>
+    <string name="settings_font_size_range">ポップアップではなくメイン画面の文字を <xliff:g id="min">%1$d</xliff:g>%%～<xliff:g id="max">%2$d</xliff:g>%% の範囲で調整します。字幕のサイズは変わりません。</string>
+    <string name="settings_popup_font_size">ポップアップのフォントサイズ</string>
+    <string name="settings_popup_font_size_description">ダイアログとメニュー内の文字だけを変更します</string>
+    <string name="settings_popup_size">ポップアップのサイズ</string>
+    <string name="settings_popup_size_description">文字サイズを変えずにダイアログとメニューの枠を拡大・縮小します</string>
+    <string name="settings_popup_size_range">ダイアログとメニューの枠を拡大・縮小します（<xliff:g id="min">%1$d</xliff:g>%%～<xliff:g id="max">%2$d</xliff:g>%%）。</string>
     <string name="settings_font_preview">エンターテインメントを、もっとシンプルに。</string>
     <string name="settings_search_keywords_fonts">フォント 文字 サイズ 書体 ポップアップ 読みやすさ アクセシビリティ</string>
     <string name="settings_font_system_sans">システムサンセリフ</string>
@@ -1008,8 +1121,56 @@
     <string name="settings_glass_highlight_title">ハイライトの強さ</string>
     <string name="settings_glass_highlight_description">フォーカスしたガラスの光と縁を調整します。</string>
     <string name="settings_glass_live_preview">ライブプレビュー</string>
+    <string name="settings_glass_screen_description">半透明のすりガラス風パネル、背景画像、透明度</string>
+    <string name="settings_glass_master_description">背景写真またはアプリ標準の背景の上に、半透明のすりガラス風パネルを表示します。</string>
+    <string name="settings_glass_background_image">背景画像を選択</string>
+    <string name="settings_glass_surface_transparency_title">透明度</string>
+    <string name="settings_glass_background_blur_title">ぼかし／すりガラス</string>
+    <string name="settings_glass_section_appearance">外観</string>
+    <string name="settings_glass_section_fine_tuning">詳細オプション</string>
+    <string name="settings_glass_section_behavior">動作</string>
+    <string name="settings_glass_apply_to">ガラス効果の適用領域</string>
+    <string name="settings_glass_surface_all">すべて</string>
+    <string name="settings_glass_background_action_description">背景画像を選択</string>
+    <string name="settings_glass_transparency_short_description">20–100 · 5</string>
+    <string name="settings_glass_blur_short_description">0–100 · 10</string>
+    <string name="settings_glass_highlight_short_description">フォーカスしたガラスの光と縁を調整します。</string>
+    <string name="settings_glass_full_transparency_short">完全な透明度を許可</string>
+    <string name="settings_glass_full_transparency_short_description">最も透明なガラスにするため、自動の読みやすさ制限を無効にします。</string>
+    <string name="settings_glass_depth_effects_short">奥行きと影</string>
+    <string name="settings_glass_depth_effects_short_description">フォーカス移動ライト、控えめな視差、奥行きの動きを有効にします。</string>
+    <string name="settings_glass_reset_balanced">リセット: バランス</string>
     <string name="settings_glass_full_transparency_title">完全な透明度を許可</string>
     <string name="settings_glass_full_transparency_description">最も透明なガラスにするため、自動の読みやすさ制限を無効にします。</string>
     <string name="settings_glass_depth_title">奥行きと影</string>
     <string name="settings_glass_depth_description">フォーカス移動ライト、控えめな視差、奥行きの動きを有効にします。</string>
+    <string name="settings_header_hint">左：グループ · 右：その設定 · 行を OK 長押しでクイックに固定</string>
+    <string name="settings_spine_eyebrow">すべてのグループ</string>
+    <string name="settings_spine_title">設定を見る</string>
+    <string name="settings_spine_hint">クイックは常に先頭に固定され、目印は今いるグループを追います。</string>
+    <string name="settings_spine_foot">アクセント色はフォーカスに従います</string>
+    <string name="settings_row_menu_pin">クイックに固定</string>
+    <string name="settings_row_menu_unpin">クイックから外す</string>
+    <string name="settings_row_menu_move_up">上へ移動</string>
+    <string name="settings_row_menu_move_down">下へ移動</string>
+    <string name="settings_quick_empty_title">まだ何も固定されていません</string>
+    <string name="settings_quick_empty_hint">設定を OK 長押しして「クイックに固定」を選びます。</string>
+    <string name="settings_results_title">検索結果</string>
+    <string name="settings_results_summary">どこにある項目も、その場所ごと表示します</string>
+    <plurals name="settings_setting_count">
+        <item quantity="other"><xliff:g id="count">%1$d</xliff:g> 件の設定</item>
+    </plurals>
+    <plurals name="settings_pinned_count">
+        <item quantity="other"><xliff:g id="count">%1$d</xliff:g> 件を固定</item>
+    </plurals>
+    <plurals name="settings_match_count">
+        <item quantity="other"><xliff:g id="count">%1$d</xliff:g> 件の一致</item>
+    </plurals>
+    <string name="settings_guide_width">番組ガイドの列幅</string>
+    <string name="settings_guide_width_description">番組ガイドのチャンネル一覧とEPGタイムラインの幅を変更します。</string>
+    <string name="settings_search_keywords_guide_width">ガイド epg チャンネル 一覧 タイムライン 列 パネル 幅 サイズ レイアウト</string>
+    <string name="settings_guide_width_summary">チャンネル一覧 %1$d%% · EPGタイムライン %2$d%%</string>
+    <string name="settings_guide_width_help">• チャンネル一覧とEPGタイムラインは1行を共有するため、合計は100%%にする必要があります。\n• チャンネル一覧を広げると一度に見えるタイムラインは少なくなりますが、番組の長さと時間スケールは変わりません。\n• 両方の列は10%%以上に保たれます。\n• リセットするとチャンネル一覧が10%%、EPGタイムラインが90%%に戻ります。\n• カスタマイズをオフにすると、値を失わずに標準レイアウトへ戻ります。</string>
+    <string name="settings_guide_width_channels">チャンネル一覧</string>
+    <string name="settings_guide_width_epg">EPGタイムライン</string>
 </resources>

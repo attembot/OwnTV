@@ -42,6 +42,14 @@ class HomeSettingsViewModel(
         .flatMapLatest { pid -> if (pid < 0) flowOf(HomeConfig()) else settings.homeConfig(pid) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeConfig())
 
+    /** Whether the expanded Home hero plays its video. Defaults off on low-RAM devices. */
+    val heroPreviewEnabled: StateFlow<Boolean> = settings.heroPreviewEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), settings.heroPreviewDefault)
+
+    fun setHeroPreviewEnabled(enabled: Boolean) {
+        viewModelScope.launch { settings.setHeroPreviewEnabled(enabled) }
+    }
+
     private data class TrendingSettingsData(
         val sourceIds: Set<Long> = emptySet(),
         val states: List<TrendingSnapshotEntity> = emptyList(),

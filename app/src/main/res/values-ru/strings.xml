@@ -13,6 +13,7 @@
     <string name="common_ok">OK</string>
     <string name="common_on">Вкл.</string>
     <string name="common_off">Выкл.</string>
+    <string name="common_never">Никогда</string>
     <string name="common_exit">Выйти</string>
     <string name="common_resume">Продолжить</string>
     <string name="common_start_over">Смотреть с начала</string>
@@ -35,6 +36,7 @@
     <string name="common_nav_guide">Программа передач</string>
     <string name="common_nav_settings">Настройки</string>
     <string name="shell_no_source">Нет источника</string>
+    <string name="shell_now_playing">Сейчас играет</string>
     <string name="common_something_went_wrong">Что-то пошло не так</string>
     <string name="common_move_instructions">▲/▼ — перемещение · OK — сохранить · Назад — отменить</string>
     <string name="common_number_grouped"><xliff:g id="count">%1$,d</xliff:g></string>

@@ -463,7 +463,13 @@ class ShellViewModel(
 
     fun setFontCustomization(value: FontCustomization) {
         viewModelScope.launch {
-            settings.setFontCustomization(value.copy(sizePercent = UiFontScale.clamp(value.sizePercent)))
+            settings.setFontCustomization(
+                value.copy(
+                    sizePercent = UiFontScale.clamp(value.sizePercent),
+                    popupFontSizePercent = tv.own.owntv.ui.theme.PopupFontScale.clamp(value.popupFontSizePercent),
+                    popupSizePercent = tv.own.owntv.ui.theme.PopupSizeScale.clamp(value.popupSizePercent),
+                ),
+            )
         }
     }
 

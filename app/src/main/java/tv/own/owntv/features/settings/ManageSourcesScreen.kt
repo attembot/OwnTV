@@ -551,6 +551,7 @@ private fun CenterStatus(content: @Composable androidx.compose.foundation.layout
 
 @Composable
 internal fun ConfirmDialog(title: String, message: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
     val colors = OwnTVTheme.colors
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
@@ -567,6 +568,7 @@ internal fun ConfirmDialog(title: String, message: String, onConfirm: () -> Unit
                 OwnTVButton(stringResource(R.string.common_delete), onClick = onConfirm)
             }
         }
+    }
     }
 }
 
@@ -589,6 +591,7 @@ private fun ResyncChoiceDialog(
     onClean: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
     val colors = OwnTVTheme.colors
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
@@ -614,6 +617,7 @@ private fun ResyncChoiceDialog(
                 OwnTVButton(stringResource(R.string.common_cancel), onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY, modifier = Modifier.fillMaxWidth())
             }
         }
+    }
     }
 }
 

@@ -23,6 +23,10 @@
     <string name="settings_movies_keep_watching_description">Filmlere devam etme kartlarını öne çıkanlar satırında gösterin.</string>
     <string name="settings_series_keep_watching">İzlemeye Devam Et satırındaki diziler</string>
     <string name="settings_series_keep_watching_description">Bölümlere devam etme kartlarını öne çıkanlar satırında gösterin.</string>
+    <!-- Translators: Toggle label for playing the highlighted Home item's video in the hero row. -->
+    <string name="settings_hero_preview">Öne çıkanlar satırında videoyu oynat</string>
+    <!-- Translators: Description of the hero-row video preview toggle. -->
+    <string name="settings_hero_preview_description">Seçili öğenin video önizlemesi kısa bir süre sonra oynatılır. Ana ekranda gezinirken güç ve bellekten tasarruf etmek için kapatın.</string>
     <string name="settings_android_tv_home">Android TV ana ekranı</string>
     <string name="settings_android_tv_home_description">İzlemeye Devam Et içeriklerini ve son izlenen canlı kanalları TV ana ekranında gösterin.</string>
     <string name="settings_refresh_now">Şimdi yenile</string>
@@ -63,19 +67,62 @@
     <string name="settings_proxy_connection_failed">Proxy\'ye bağlanılamadı (sunucuyu/bağlantı noktasını kontrol edin).</string>
     <string name="settings_proxy_http">Proxy, HTTP <xliff:g id="code">%1$d</xliff:g> kodunu döndürdü</string>
     <string name="settings_proxy_failed">Proxy testi başarısız oldu.</string>
-    <string name="settings_ch_nav_title">CH+/CH− Tuşlarıyla Sayfalama</string>
-    <string name="settings_ch_nav_description">Uzaktan kumandanın CH+ / CH− tuşlarıyla kategori veya öge listesinde sayfalar hâlinde ilerleyin.</string>
-    <string name="settings_ch_nav_enabled">Listelerde sayfalama için CH+/CH− tuşlarını kullan</string>
-    <string name="settings_ch_nav_enabled_description">Açıldığında CH+ ve CH−, odaklanmış panelin içinde atlar (kategori şeridi veya öge listesi ve Kategorileri Özelleştir listesi). Kapatıldığında bu tuşlar söz konusu ekranlarda hiçbir şey yapmaz.</string>
-    <string name="settings_ch_nav_up">CH+ atlama sayısı (başa doğru)</string>
-    <string name="settings_ch_nav_up_description">CH+ tuşuna bir kez basıldığında kaç öge yukarı atlanacağı. Uzun basıldığında her zaman ilk ögeye gidilir.</string>
-    <string name="settings_ch_nav_down">CH− atlama sayısı (sona doğru)</string>
-    <string name="settings_ch_nav_down_description">CH− tuşuna bir kez basıldığında kaç öge aşağı atlanacağı. Uzun basıldığında her zaman son ögeye gidilir.</string>
+    <string name="settings_ch_nav_title">CH+/RW · CH−/FF Tuşlarıyla Sayfalama</string>
+    <string name="settings_ch_nav_description">Uzaktan kumandanın CH+/RW / CH−/FF tuşlarıyla kategori veya öge listesinde sayfalar hâlinde ilerleyin.</string>
+    <string name="settings_ch_nav_enabled">Listelerde sayfalama için CH+/RW · CH−/FF tuşlarını kullan</string>
+    <string name="settings_ch_nav_enabled_description">Açıldığında CH+/RW ve CH−/FF, odaklanmış panelin içinde atlar (kategori şeridi veya öge listesi ve Kategorileri Özelleştir listesi). Kapatıldığında bu tuşlar söz konusu ekranlarda hiçbir şey yapmaz.</string>
+    <string name="settings_ch_nav_up">CH+ / Geri sarma atlaması (başa doğru)</string>
+    <string name="settings_ch_nav_up_description">CH+/RW tuşuna bir kez basıldığında kaç öge yukarı atlanacağı. Uzun basıldığında her zaman ilk ögeye gidilir.</string>
+    <string name="settings_ch_nav_down">CH− / İleri sarma atlaması (sona doğru)</string>
+    <string name="settings_ch_nav_down_description">CH−/FF tuşuna bir kez basıldığında kaç öge aşağı atlanacağı. Uzun basıldığında her zaman son ögeye gidilir.</string>
     <string name="settings_skip_counts">Atlama sayıları</string>
     <string name="settings_how_it_works">Nasıl çalışır?</string>
-    <string name="settings_ch_nav_help">• Atlamalar listenin başında ve sonunda sınırlandırılır; böylece kısa listelerde tek basışta sona ulaşılır.\n• CH+ tuşuna uzun basma = ilk öge, CH− tuşuna uzun basma = son öge.\n• “Tümü” listesinde (tüm kanallar / filmler / diziler) uzun basma devre dışıdır — kısa basarak atlama burada da çalışır.\n• O anda odaklanmış olan panele uygulanır — kategori şeridi veya öge listesi/ızgarası.\n• Ayrıca Ayarlar → Kategorileri ve Ögeleri Özelleştir bölümündeki kategori listesinde sayfalar hâlinde ilerler.</string>
+    <string name="settings_ch_nav_help">• Atlamalar listenin başında ve sonunda sınırlandırılır; böylece kısa listelerde tek basışta sona ulaşılır.\n• CH+/RW tuşuna uzun basma = ilk öge, CH−/FF tuşuna uzun basma = son öge.\n• “Tümü” listesinde (tüm kanallar / filmler / diziler) uzun basma devre dışıdır — kısa basarak atlama burada da çalışır.\n• O anda odaklanmış olan panele uygulanır — kategori şeridi veya öge listesi/ızgarası.\n• Ayrıca Ayarlar → Kategorileri ve Ögeleri Özelleştir bölümündeki kategori listesinde sayfalar hâlinde ilerler.</string>
+    <string name="settings_remote_shortcuts">Kumanda kısayolları</string>
+    <string name="settings_remote_shortcuts_description">Kumandanın boş tuşlarına gezinme, oynatma ve liste işlemleri atayın. Temel gezinme tuşları korunur.</string>
+    <string name="settings_remote_shortcuts_enabled">Kumanda kısayollarını kullan</string>
+    <string name="settings_remote_shortcuts_enabled_description">Tuş atamalarını silmeden tüm özel kısayolları kapat</string>
+    <string name="settings_remote_shortcuts_assignments">Tuş atamaları</string>
+    <string name="settings_remote_shortcuts_add">Kısayol ekle</string>
+    <string name="settings_remote_shortcuts_add_description">Boş bir tuşa basın veya basılı tutun, ardından işlevini seçin</string>
+    <string name="settings_remote_shortcuts_reset">Varsayılan kısayolları geri yükle</string>
+    <string name="settings_remote_shortcuts_reset_description">CH+/CH− ve geri/ileri sayfalamayı geri yükle; diğer atamaları kaldır</string>
+    <string name="settings_remote_shortcuts_capture_title">Bir kumanda tuşuna basın</string>
+    <string name="settings_remote_shortcuts_capture_description">Kısa basın veya bırakana kadar tutun. Geri, yön tuşları, OK, ses, Ana Ekran ve güç atanamaz.</string>
+    <string name="settings_remote_shortcuts_choose_action">Bir eylem seçin</string>
+    <string name="settings_remote_shortcuts_binding"><xliff:g id="press">%1$s</xliff:g> · <xliff:g id="action">%2$s</xliff:g></string>
+    <string name="settings_remote_shortcuts_short_press">Kısa basış</string>
+    <string name="settings_remote_shortcuts_long_press">Uzun basış</string>
+    <string name="settings_remote_shortcuts_unknown_button">Kumanda tuşu %1$d</string>
+    <string name="settings_remote_shortcuts_help">• Varsayılan olarak CH+/CH− ve geri/ileri listelerde sayfalar; basılı tutmak ilk veya son öğeye gider.
+• Kısa ve uzun basışlar ayrı ayrı atanabilir.
+• Çok büyük “Tümü” listelerinde sona atlama kapalı kalır.
+• Geriye uzun basmak her zaman Şimdi Oynatılıyor alanına odaklanır ve değiştirilemez.
+• Genellikle kırmızı/yeşil/sarı/mavi, sayılar, CH+/CH− ve geri/ileri sarma atanabilir.
+• Geri, yön tuşları, OK, ses, Ana Ekran ve güç korunur.
+• Sayı kısayolları gezinirken çalışır; tam ekranda kanal numarası girişi önceliklidir.</string>
+    <string name="settings_remote_button_channel_up">Kanal +</string>
+    <string name="settings_remote_button_channel_down">Kanal −</string>
+    <string name="settings_remote_button_rewind">Geri sar</string>
+    <string name="settings_remote_button_fast_forward">İleri sar</string>
+    <string name="settings_remote_button_previous">Önceki</string>
+    <string name="settings_remote_button_next">Sonraki</string>
+    <string name="settings_remote_button_menu">Menü</string>
+    <string name="settings_remote_button_red">Kırmızı tuş</string>
+    <string name="settings_remote_button_green">Yeşil tuş</string>
+    <string name="settings_remote_button_yellow">Sarı tuş</string>
+    <string name="settings_remote_button_blue">Mavi tuş</string>
+    <string name="settings_remote_action_continue">Son izlenene devam et</string>
+    <string name="settings_remote_action_focus_now_playing">Şimdi Oynatılıyor’a odaklan</string>
+    <string name="settings_remote_action_expand_now_playing">Şimdi Oynatılıyor’u genişlet</string>
+    <string name="settings_remote_action_mini_player">Mini oynatıcıya taşı</string>
+    <string name="settings_remote_action_play_pause">Oynat veya duraklat</string>
+    <string name="settings_remote_action_page_first">İlk öğelere doğru sayfala</string>
+    <string name="settings_remote_action_page_last">Son öğelere doğru sayfala</string>
+    <string name="settings_remote_action_jump_first">İlk öğeye git</string>
+    <string name="settings_remote_action_jump_last">Son öğeye git</string>
     <string name="settings_large_skips_warning">Büyük atlama değerleri kısa listelerin sonunu aşar ve düşük donanımlı TV\'lerde geçişlerin fazla sıçramalı hissedilmesine neden olabilir.</string>
-    <string name="settings_ch_nav_picker">CH+/CH− tuşlarıyla sayfalama</string>
+    <string name="settings_ch_nav_picker">CH+/RW · CH−/FF tuşlarıyla sayfalama</string>
     <string name="settings_weather">Hava durumu</string>
     <string name="settings_top_bar_weather">Üst çubukta hava durumu</string>
     <string name="settings_show_weather">Hava durumunu göster</string>
@@ -158,7 +205,6 @@
     <string name="settings_quick_check_update">Güncellemeleri denetle</string>
     <string name="settings_search_label">Ayarlarda ara</string>
     <string name="settings_search_hint">Ayarlarda ara…</string>
-    <string name="settings_group_general">Genel</string>
     <string name="settings_language">Dil</string>
     <string name="settings_language_description">Uygulamanın görüntüleme dili</string>
     <string name="settings_language_system_default">Sistem varsayılanı</string>
@@ -168,7 +214,6 @@
     <string name="settings_language_coverage"><xliff:g id="percent">%1$d</xliff:g>%%</string>
     <string name="settings_profile_group">Profil</string>
     <string name="settings_profiles_description">İzleyicileri, çocuk modunu ve PIN kilitlerini yönetin</string>
-    <string name="settings_content_group">İçerik</string>
     <string name="settings_playlists">Oynatma listeleri</string>
     <string name="settings_playlists_description">M3U / Xtream oynatma listeleri ekleyin, yeniden eşitleyin veya kaldırın</string>
     <string name="settings_epg_sources">EPG Kaynakları</string>
@@ -176,8 +221,14 @@
     <string name="settings_customize">Kategorileri ve Ögeleri Özelleştir</string>
     <string name="settings_customize_nav_description">Ögeleri gizleyin ve gösterin, kategorileri yeniden adlandırın ve sıralayın</string>
     <string name="settings_sidebar_description_root">Kenar simgelerini oynatma listenize göre otomatik uyarlayın veya belirli simgeleri gizleyin</string>
-    <string name="settings_ch_paging">CH+/CH− Tuşlarıyla Sayfalama</string>
-    <string name="settings_ch_paging_description">CH+ / CH− tuşlarıyla kategori ve öge listelerinde yukarı/aşağı atlayın</string>
+    <string name="settings_ch_paging">Kumanda kısayolları</string>
+    <string name="settings_ch_paging_description">Kumandanın boş tuşlarına gezinme, oynatma ve liste işlemleri atayın. Temel gezinme tuşları korunur.</string>
+    <!-- Translators: Settings navigation label for the long-press content menus. -->
+    <string name="settings_content_menus_title">Uzun basma menüleri</string>
+    <!-- Translators: Description of the long-press content menus settings. -->
+    <string name="settings_content_menus_description">Kanal, film, dizi ve bölüm menülerindeki eylemleri yeniden sıralayın</string>
+    <!-- Translators: Hint shown above the list when arranging a long-press menu. -->
+    <string name="settings_content_menus_hint">Bir eylemi almak için üzerinde OK tuşunu basılı tutun, sonra Yukarı ve Aşağı ile taşıyın. Bırakmak için tekrar OK’a basın.</string>
     <string name="settings_browsing_lists">Gezinme ve listeler</string>
     <string name="settings_browsing_description">Canlı TV, Filmler ve Diziler bölümlerindeki son kategoriyi ve son ögeyi hatırlayın</string>
     <string name="settings_home_root">Ana ekran</string>
@@ -222,7 +273,7 @@
     <string name="settings_surround_sound">Çevresel ses</string>
     <string name="settings_surround_description">Gerçek bir 5.1/7.1 alıcı için Dolby/DTS sesini çevresel sese (5.1/7.1) dönüştürün. TV hoparlörleri veya stereo soundbar kullanıyorsanız KAPALI bırakın — çok kanallı ses bazı TV\'lerde/soundbar\'larda sesin görüntünün gerisinde kalmasına yol açabilir. Eşitleme kayarsa oynatıcının Ses menüsü → A/V eşitleme ayarını hafifçe değiştirin.</string>
     <string name="settings_autoplay_next">Sonraki bölümü otomatik oynat</string>
-    <string name="settings_autoplay_next_description">Bir bölüm sona erdiğinde sonraki bölümü otomatik olarak başlatın — sezon bitince sonraki sezona geçin.</string>
+    <string name="settings_autoplay_next_description">Bir bölüm sona erdiğinde sonraki bölümü otomatik olarak başlatın — sezon bitince sonraki sezona geçin. Geri izleme de sonraki programla devam eder.</string>
     <string name="settings_catchup">Geri izleme</string>
     <plurals name="settings_catchup_supported">
         <item quantity="one"><xliff:g id="count">%1$d</xliff:g> kanal geri izlemeyi destekliyor · arşiv oynatması için saat dilimi ve oynatıcı</item>
@@ -302,12 +353,44 @@
     <string name="settings_accent_green">Yeşil</string>
     <string name="settings_accent_amber">Kehribar</string>
     <string name="settings_group_profile">Profil</string>
-    <string name="settings_group_content">İçerik</string>
+    <string name="settings_group_sources">Kaynaklar ve rehber</string>
+    <string name="settings_group_layout">Düzen</string>
+    <string name="settings_group_content_metadata">İçerik ve meta veriler</string>
+    <string name="settings_group_data">Veriler</string>
     <string name="settings_group_appearance">Görünüm</string>
     <string name="settings_group_playback">Oynatma</string>
     <string name="settings_group_network">Ağ</string>
     <string name="settings_dns">DNS</string>
     <string name="settings_group_app">Uygulama</string>
+    <string name="settings_group_summary_profile">Profiller ve kimin neyi izleyebileceği</string>
+    <string name="settings_group_summary_sources">Oynatma listeleri, rehber verileri ve saatleri</string>
+    <string name="settings_group_summary_appearance">Tema, vurgu, cam, hareket ve yazı boyutu</string>
+    <string name="settings_group_summary_layout">Kenar çubuğu, paneller, listeler ve Ana ekran</string>
+    <string name="settings_group_summary_content_metadata">Adlandırma, görseller ve altyazı hizmetleri</string>
+    <string name="settings_group_summary_playback">Video oynatıcı ve hata kaydı</string>
+    <!-- Translators: Video player settings: name of the section holding decoder, HDR and frame-rate settings. -->
+    <string name="settings_vp_section_engine">Motor ve görüntü</string>
+    <!-- Translators: Video player settings: name of the section holding volume, audio language and surround settings. -->
+    <string name="settings_vp_section_sound">Ses</string>
+    <!-- Translators: Video player settings: name of the section holding resume, auto-play and mini-player settings. -->
+    <string name="settings_vp_section_episodes">Bölümler ve mini oynatıcı</string>
+    <!-- Translators: Video player settings: one-line summary under the "Engine &amp; picture" section name. -->
+    <string name="settings_vp_section_engine_summary">Kod çözücü, HDR, kare hızı</string>
+    <!-- Translators: Video player settings: one-line summary under the "Live TV" section name. -->
+    <string name="settings_vp_section_live_summary">Önizleme, numaralar, gecikme</string>
+    <!-- Translators: Video player settings: one-line summary under the "Sound" section name. -->
+    <string name="settings_vp_section_sound_summary">Ses düzeyi, dil, surround</string>
+    <!-- Translators: Video player settings: one-line summary under the "Subtitles" section name. -->
+    <string name="settings_vp_section_subtitles_summary">Boyut, renk, konum</string>
+    <!-- Translators: Video player settings: one-line summary under the "Episodes &amp; mini-player" section name. -->
+    <string name="settings_vp_section_episodes_summary">Otomatik oynatma ve mini oynatıcı</string>
+    <!-- Translators: Video player settings: one-line summary under the "Diagnostics" section name. -->
+    <string name="settings_vp_section_diagnostics_summary">Ayrıntılı oynatıcı günlükleri</string>
+    <string name="settings_group_summary_network">Yayın bağlantıları için proxy ve DNS</string>
+    <string name="settings_group_summary_data">Yedekleme, indirmeler ve izleme geçmişi</string>
+    <string name="settings_group_summary_app">Dil, açılış, güncellemeler ve uygulama bilgisi</string>
+    <string name="settings_group_quick">Hızlı</string>
+    <string name="settings_group_summary_quick">En sık kullandığınız anahtarlar</string>
     <string name="settings_search_guide_logos">Rehber kanal logoları</string>
     <string name="settings_search_keywords_profiles">izleyiciler çocuk modu PIN kilidi hesap</string>
     <string name="settings_search_keywords_playlists">M3U Xtream kaynak eşitleme ekle kaldır</string>
@@ -426,6 +509,14 @@
     <string name="settings_reset_saved_volume_confirm">Kaydedilen ses düzeyi sıfırlansın mı?</string>
     <!-- Translators: Confirmation dialog body before forgetting the saved per-item volume. -->
     <string name="settings_reset_saved_volume_confirm_description">Her kanal, film ve bölüm varsayılan ses düzeyine döner. Kaydedilen yakınlaştırma ayarları korunur. Tek bir öğeyi istediğiniz zaman oynatıcıdan yeniden ayarlayabilirsiniz.</string>
+    <!-- Translators: Settings row that forgets every per-item audio-sync offset. -->
+    <string name="settings_reset_saved_audio_delay">Kaydedilen ses/görüntü eşitlemesini sıfırla</string>
+    <!-- Translators: Description of the reset-saved-audio-sync row. -->
+    <string name="settings_reset_saved_audio_delay_description">Oynatıcıda “Bu gecikmeyi hatırla” seçildiğinde ses eşitlemesi o kanal, film veya bölüm için kaydedilir. Sıfırlama her şeyin yeniden üstteki ayarı izlemesini sağlar.</string>
+    <!-- Translators: Title of the confirmation dialog for resetting saved audio sync. -->
+    <string name="settings_reset_saved_audio_delay_confirm">Kaydedilen ses/görüntü eşitlemesi sıfırlansın mı?</string>
+    <!-- Translators: Body of the confirmation dialog for resetting saved audio sync. -->
+    <string name="settings_reset_saved_audio_delay_confirm_description">Her kanal, film ve bölüm üstteki ses eşitlemesine döner. Kaydedilen yakınlaştırma ve ses düzeyi korunur. Tek tek olanı istediğiniz zaman oynatıcıdan yeniden ayarlayabilirsiniz.</string>
     <!-- Translators: Setting label for how far rewind/forward jumps in a movie or episode. -->
     <string name="settings_seek_step">Atlama adımı</string>
     <!-- Translators: Description of the seek step setting. -->
@@ -466,6 +557,7 @@
     <string name="settings_audio_sync_description">Görüntüyle eşleşmesi için sesi öne veya geriye kaydırın. Yalnızca mpv motoru için geçerlidir.</string>
     <string name="settings_live_tv">Canlı TV</string>
     <string name="settings_live_latency_description">Yayının canlı yayın noktasına ne kadar yakın oynatılacağı. Daha düşük değer canlı yayına daha yakın ancak daha küçük bir arabellek anlamına gelir; bu nedenle zayıf akışlar daha sık takılabilir veya yeniden bağlanabilir. Açacağınız bir sonraki kanalda uygulanır.</string>
+    <string name="settings_live_latency_bitrate_note">Çok yüksek bit hızına sahip bir kanalda (özellikle 4K) arabellek, istediğinden daha kısa bir süreyi tutabilir; çünkü aynı anda bellekte tutulabilecek video miktarı sınırlıdır.</string>
     <string name="settings_channel_numbers">Kanal numaraları</string>
     <string name="settings_channel_numbers_description">Sağlayıcınızın kanal numarasını Canlı TV listesindeki, kanal listesi ekran katmanındaki ve oynatıcıdaki adın yanında gösterin; ayrıca tam ekran oynatma sırasında doğrudan o kanala geçmek için uzaktan kumandadan bir numara girin (OK anında kanala geçer, Geri iptal eder). Kapalıyken tüm numaralar gizlenir ve sayı tuşları yok sayılır; hiçbir veri kaybolmaz ve tekrar açıldığında numaralar geri gelir.</string>
     <string name="settings_diagnostics">Tanılama</string>
@@ -622,6 +714,12 @@
     <string name="settings_customize_rename_or_delete_category">Kategoriyi yeniden adlandır veya sil</string>
     <string name="settings_customize_new_category">＋ Yeni kategori</string>
     <string name="settings_customize_sort_button">Sırala: <xliff:g id="label">%1$s</xliff:g> ▾</string>
+
+    <string name="settings_customize_filter_button">Filtre: <xliff:g id="label">%1$s</xliff:g> ▾</string>
+    <string name="settings_customize_filter_title">Listeyi filtrele</string>
+    <string name="settings_customize_filter_all">Tümü</string>
+    <string name="settings_customize_filter_visible">Görünür</string>
+    <string name="settings_customize_filter_hidden">Gizli</string>
     <string name="settings_customize_new_categories_button">Yeni kategoriler: <xliff:g id="label">%1$s</xliff:g> ▾</string>
     <string name="settings_customize_rename_hint">Yalnızca bu profil için geçerlidir. “<xliff:g id="name">%1$s</xliff:g>” adını geri yüklemek için boş bırakın.</string>
     <string name="settings_customize_remove_pin_title">PIN kilidi kaldırılsın mı?</string>
@@ -934,8 +1032,18 @@
     <string name="settings_subtitle_color_grey">Gri</string>
     <string name="settings_live_preroll">Canlı yayınları ön arabelleğe al</string>
     <string name="settings_live_preroll_description">Bir canlı kanal oynamaya başlamadan önce ve bir takılma sonrasında bu kadar video biriktirilir. Bu bir video miktarıdır, geri sayım değil. Kapalı, mümkün olan en hızlı başlangıcı sağlar.</string>
+    <string name="settings_live_tune_timeout">Bir kanaldan şu süre sonra vazgeç</string>
+    <string name="settings_live_tune_timeout_description">Bir canlı kanal bu süre içinde görüntü vermediyse, OwnTV tüm oynatıcılarını tek tek denerken siyah ekran bırakmak yerine denemeyi bırakır ve size söyler. “Asla” denemeyi sürdürür; sağlayıcınızın kaldırdığı bir kanalda bu bir dakikayı rahatça aşabilir. Sağlayıcınızın istediği bekleme süreleri sayılmaz.</string>
     <string name="settings_live_preroll_per_playlist">Yayın listesi başına ön arabellek</string>
     <string name="settings_live_preroll_per_playlist_description">Üstteki ayarı bir yayın listesi için geçersiz kılarken diğer yayın listelerinizin hızlı kalmasını sağlar.</string>
+    <!-- Translators: Title of the per-playlist Live TV engine override row. -->
+    <string name="settings_live_engine_per_playlist">Yayın listesi başına canlı TV oynatıcısı</string>
+    <!-- Translators: Description of the per-playlist Live TV engine override row. -->
+    <string name="settings_live_engine_per_playlist_description">Üstteki ayarı bir yayın listesi için geçersiz kılar — kanalları yalnızca oynatıcılardan biriyle düzgün çalışan bir sağlayıcı için.</string>
+    <!-- Translators: Title of the per-playlist Live latency override row. -->
+    <string name="settings_live_latency_per_playlist">Yayın listesi başına canlı yayın gecikmesi</string>
+    <!-- Translators: Description of the per-playlist Live latency override row. -->
+    <string name="settings_live_latency_per_playlist_description">Üstteki ayarı bir yayın listesi için geçersiz kılar — diğerlerinden daha büyük veya daha küçük bir arabellek gereken bir sağlayıcı için.</string>
     <plurals name="settings_live_preroll_overrides">
         <item quantity="one"><xliff:g id="count">%1$d</xliff:g> ayar</item>
         <item quantity="other"><xliff:g id="count">%1$d</xliff:g> ayar</item>
@@ -999,7 +1107,12 @@
     <string name="settings_main_interface_font">Ana arayüz yazı tipi</string>
     <string name="settings_popup_font">Açılır pencere yazı tipi</string>
     <string name="settings_choose_font">Yazı tipi seçin</string>
-    <string name="settings_font_size_range">Uygulama metnini <xliff:g id="min">%1$d</xliff:g>%% ile <xliff:g id="max">%2$d</xliff:g>%% arasında ayarlayın. Altyazılar kendi boyutunu korur.</string>
+    <string name="settings_font_size_range">Açılır pencereleri değil, ana uygulama metnini <xliff:g id="min">%1$d</xliff:g>%% ile <xliff:g id="max">%2$d</xliff:g>%% arasında ayarlayın. Altyazılar kendi boyutunu korur.</string>
+    <string name="settings_popup_font_size">Açılır pencere yazı tipi boyutu</string>
+    <string name="settings_popup_font_size_description">Yalnızca iletişim kutuları ve menülerdeki metni değiştirir</string>
+    <string name="settings_popup_size">Açılır pencere boyutu</string>
+    <string name="settings_popup_size_description">Metin boyutunu değiştirmeden iletişim kutularını ve menüleri ölçeklendirin</string>
+    <string name="settings_popup_size_range">İletişim kutularını ve menüleri ölçeklendirin (<xliff:g id="min">%1$d</xliff:g>%%–<xliff:g id="max">%2$d</xliff:g>%%).</string>
     <string name="settings_font_preview">Eğlence artık daha basit.</string>
     <string name="settings_search_keywords_fonts">yazı tipi metin boyut tipografi pencere okuma erişilebilirlik</string>
     <string name="settings_font_system_sans">Sistem Sans</string>
@@ -1026,8 +1139,59 @@
     <string name="settings_glass_highlight_title">Vurgu gücü</string>
     <string name="settings_glass_highlight_description">Odaktaki camın ışığını ve kenarını ayarlayın.</string>
     <string name="settings_glass_live_preview">Canlı önizleme</string>
+    <string name="settings_glass_screen_description">Yarı saydam buzlu paneller, arka plan görseli ve şeffaflık</string>
+    <string name="settings_glass_master_description">Bir arka plan fotoğrafının veya uygulamanın kendi arka planının üzerinde yarı saydam buzlu paneller.</string>
+    <string name="settings_glass_background_image">Bir arka plan görseli seçin</string>
+    <string name="settings_glass_surface_transparency_title">Saydamlık</string>
+    <string name="settings_glass_background_blur_title">Bulanıklık / Buzlanma</string>
+    <string name="settings_glass_section_appearance">Görünüm</string>
+    <string name="settings_glass_section_fine_tuning">Gelişmiş seçenekler</string>
+    <string name="settings_glass_section_behavior">Davranış</string>
+    <string name="settings_glass_apply_to">Cam yüzeyler</string>
+    <string name="settings_glass_surface_all">Tümü</string>
+    <string name="settings_glass_background_action_description">Bir arka plan görseli seçin</string>
+    <string name="settings_glass_transparency_short_description">20–100 · 5</string>
+    <string name="settings_glass_blur_short_description">0–100 · 10</string>
+    <string name="settings_glass_highlight_short_description">Odaktaki camın ışığını ve kenarını ayarlayın.</string>
+    <string name="settings_glass_full_transparency_short">Tam şeffaflığa izin ver</string>
+    <string name="settings_glass_full_transparency_short_description">Mümkün olan en şeffaf cam için otomatik okunabilirlik sınırını kapatır.</string>
+    <string name="settings_glass_depth_effects_short">Derinlik ve gölgeler</string>
+    <string name="settings_glass_depth_effects_short_description">Odak geçişi ışığını, hafif paralaksı ve derinlik hareketini açar.</string>
+    <string name="settings_glass_reset_balanced">Sıfırla: Dengeli</string>
     <string name="settings_glass_full_transparency_title">Tam şeffaflığa izin ver</string>
     <string name="settings_glass_full_transparency_description">Mümkün olan en şeffaf cam için otomatik okunabilirlik sınırını kapatır.</string>
     <string name="settings_glass_depth_title">Derinlik ve gölgeler</string>
     <string name="settings_glass_depth_description">Odak geçişi ışığını, hafif paralaksı ve derinlik hareketini açar.</string>
+    <string name="settings_header_hint">Solda: gruplar · Sağda: ayarları · Bir satırı Hızlı’ya sabitlemek için OK tuşunu basılı tutun</string>
+    <string name="settings_spine_eyebrow">Tüm gruplar</string>
+    <string name="settings_spine_title">Ayarlara göz atın</string>
+    <string name="settings_spine_hint">Hızlı hep en üstte kalır; işaret bulunduğunuz grubu izler.</string>
+    <string name="settings_spine_foot">Vurgu rengi odağınızı izler</string>
+    <string name="settings_row_menu_pin">Hızlı’ya sabitle</string>
+    <string name="settings_row_menu_unpin">Hızlı’dan kaldır</string>
+    <string name="settings_row_menu_move_up">Yukarı taşı</string>
+    <string name="settings_row_menu_move_down">Aşağı taşı</string>
+    <string name="settings_quick_empty_title">Henüz hiçbir şey sabitlenmedi</string>
+    <string name="settings_quick_empty_hint">Herhangi bir ayarda OK tuşunu basılı tutun ve “Hızlı’ya sabitle” seçeneğini seçin.</string>
+    <string name="settings_results_title">Sonuçlar</string>
+    <string name="settings_results_summary">Nerede olursa olsun her eşleşme — yoluyla birlikte</string>
+    <plurals name="settings_setting_count">
+        <item quantity="one"><xliff:g id="count">%1$d</xliff:g> ayar</item>
+        <item quantity="other"><xliff:g id="count">%1$d</xliff:g> ayar</item>
+    </plurals>
+    <plurals name="settings_pinned_count">
+        <item quantity="one"><xliff:g id="count">%1$d</xliff:g> sabit</item>
+        <item quantity="other"><xliff:g id="count">%1$d</xliff:g> sabit</item>
+    </plurals>
+    <plurals name="settings_match_count">
+        <item quantity="one"><xliff:g id="count">%1$d</xliff:g> eşleşme</item>
+        <item quantity="other"><xliff:g id="count">%1$d</xliff:g> eşleşme</item>
+    </plurals>
+    <string name="settings_guide_width">Rehber sütun genişlikleri</string>
+    <string name="settings_guide_width_description">TV rehberindeki kanal listesi ve EPG zaman çizelgesinin genişliğini değiştirin.</string>
+    <string name="settings_search_keywords_guide_width">rehber epg kanal liste zaman çizelgesi sütun panel genişlik boyut düzen</string>
+    <string name="settings_guide_width_summary">Kanal listesi %1$d%% · EPG zaman çizelgesi %2$d%%</string>
+    <string name="settings_guide_width_help">• Kanal listesi ve EPG zaman çizelgesi aynı satırı paylaşır; toplamları 100%% olmalıdır.\n• Kanal listesini genişletmek zaman çizelgesinin daha azını gösterir; program süreleri ve zaman ölçeği değişmez.\n• Her iki sütun da en az 10%% genişliğinde kalır.\n• Sıfırla, kanal listesini 10%% ve EPG zaman çizelgesini 90%% yapar.\n• Özelleştirmeyi kapatmak, değerlerinizi silmeden standart düzeni geri yükler.</string>
+    <string name="settings_guide_width_channels">Kanal listesi</string>
+    <string name="settings_guide_width_epg">EPG zaman çizelgesi</string>
 </resources>

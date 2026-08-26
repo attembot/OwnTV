@@ -102,13 +102,24 @@ class SeriesViewModel(
     private val _moveState = MutableStateFlow<SeriesMoveState?>(null)
     val moveState: StateFlow<SeriesMoveState?> = _moveState.asStateFlow()
 
-    private data class Ctx(val profileId: Long, val sourceIds: List<Long>)
+    private data class Ctx(
+        val profileId: Long,
+        val sourceIds: List<Long>,
+        val sourceNames: Map<Long, String>,
+    )
     // Observe the active profile's sources reactively so adding/removing a playlist refreshes Series
     // immediately (was read once at startup, so a new playlist showed nothing until app restart).
     private val ctx: StateFlow<Ctx> = activeProfileSources(settings, sourceDao)
-        .map { aps -> Ctx(aps.profileId, aps.seriesSourceIds) }
+        .map { aps ->
+            val ids = aps.seriesSourceIds
+            Ctx(aps.profileId, ids, aps.sources.filter { it.id in ids }.associate { it.id to it.name })
+        }
         .distinctUntilChanged()
-        .stateIn(viewModelScope, SharingStarted.Eagerly, Ctx(-1L, emptyList()))
+        .stateIn(viewModelScope, SharingStarted.Eagerly, Ctx(-1L, emptyList(), emptyMap()))
+
+    val providerNames: StateFlow<Map<Long, String>> = ctx
+        .map { c -> c.sourceNames.takeIf { it.size > 1 } ?: emptyMap() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
     private val folderContextKeys: StateFlow<Map<Long, String>> = ctx
         .flatMapLatest { c ->
@@ -448,10 +459,16 @@ class SeriesViewModel(
                 val visibleCats = if (kids) cats.filterNot { tv.own.owntv.core.content.AdultCategoryClassifier.isAdult(it.name) } else cats
                 val visibleCustoms = if (kids) cust.customCategories.filterNot { tv.own.owntv.core.content.AdultCategoryClassifier.isAdult(it.name) } else cust.customCategories
                 val folders = visibleCats.applyCustomizationsWithCustoms(cust, visibleCustoms, alphaRest = sort == SettingsRepository.SortMode.ALPHA)
+                val multiSourceNames = c.sourceNames.takeIf { it.size > 1 }.orEmpty()
+                val categoriesById = visibleCats.associateBy { it.id }
                 defaultRail + folders.map { e ->
                     LiveRailItem(
                         key = e.categoryId?.let { LiveKey.Folder(it) } ?: LiveKey.Custom(e.customId!!),
                         title = e.displayName,
+                        providerName = e.categoryId
+                            ?.let(categoriesById::get)
+                            ?.sourceId
+                            ?.let(multiSourceNames::get),
                     )
                 }
             }
@@ -1111,6 +1128,11 @@ class SeriesViewModel(
         viewModelScope.launch {
             val pid = currentProfileId() ?: return@launch
             historyDao.remove(pid, MediaType.SERIES, seriesId)
+            // A show is watched one episode at a time, so its trace lives in the EPISODE rows too:
+            // the resume positions Home's Continue watching row is built from, and the episode
+            // history the Continue chip reads. Without these the removed show came straight back.
+            historyDao.removeSeriesEpisodes(pid, seriesId)
+            progressDao.clearSeriesEpisodes(pid, seriesId)
             refreshList() // the History category uses a manual PagingSource — force a rebuild
         }
     }

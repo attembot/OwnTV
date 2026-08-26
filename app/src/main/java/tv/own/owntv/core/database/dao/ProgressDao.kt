@@ -24,6 +24,15 @@ interface ProgressDao {
     @Query("DELETE FROM playback_progress WHERE profileId = :profileId AND mediaType = :type AND itemId = :itemId")
     suspend fun clear(profileId: Long, type: MediaType, itemId: Long)
 
+    /** Every episode resume position for one series. "Remove from history" on a show has to run this
+     *  too: Home's Continue watching row is built from EPISODE progress rows, not from history, so
+     *  clearing the show's history row alone left the episode sitting on the home screen. */
+    @Query(
+        "DELETE FROM playback_progress WHERE profileId = :profileId AND mediaType = 'EPISODE' " +
+            "AND itemId IN (SELECT id FROM episodes WHERE seriesId = :seriesId)",
+    )
+    suspend fun clearSeriesEpisodes(profileId: Long, seriesId: Long)
+
     /** Wipe all resume positions for a profile — drives "Clear watch history" (so Home's continue-watching empties). */
     @Query("DELETE FROM playback_progress WHERE profileId = :profileId")
     suspend fun clearProfile(profileId: Long)
@@ -59,7 +68,13 @@ interface ProgressDao {
         "DELETE FROM playback_progress WHERE profileId = :profileId AND mediaType = :type AND itemId = :itemId AND (" +
             "(:type = 'LIVE'   AND itemId NOT IN (SELECT id FROM channels)) OR " +
             "(:type = 'MOVIE'  AND itemId NOT IN (SELECT id FROM movies))   OR " +
-            "(:type = 'SERIES' AND itemId NOT IN (SELECT id FROM series))" +
+            "(:type = 'SERIES' AND itemId NOT IN (SELECT id FROM series))  OR " +
+            // Resume positions and history are mostly EPISODE rows, and without this branch the
+            // OR-chain was false for every one of them: the orphan was never dropped, while the
+            // relink inserted a fresh row for the new id. Every series re-sync therefore left one
+            // more dead row behind, for ever. Safe to purge: an episode that has not loaded yet is
+            // held in the pending set by the same call and re-inserts when it arrives.
+            "(:type = 'EPISODE' AND itemId NOT IN (SELECT id FROM episodes))" +
             ")",
     )
     suspend fun purgeSnapshotOrphan(profileId: Long, type: MediaType, itemId: Long)

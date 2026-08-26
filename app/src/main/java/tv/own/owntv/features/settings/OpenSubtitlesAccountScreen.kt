@@ -404,7 +404,8 @@ fun OpenSubtitlesAccountScreen(onBack: () -> Unit, modifier: Modifier = Modifier
                 vm.signIn(signInUser.trim(), signInPass, signInStay)
                 signInPass = ""
             },
-            onDismiss = { showSignIn = false; signInUser = ""; signInPass = "" },
+            // Back returns to the local/remote chooser rather than closing both levels.
+            onDismiss = { showSignIn = false; signInPass = ""; showSetupChooser = true },
         )
     }
 

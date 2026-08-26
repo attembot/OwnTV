@@ -23,6 +23,10 @@
     <string name="settings_movies_keep_watching_description">히어로 행에 영화 이어보기 카드를 표시합니다.</string>
     <string name="settings_series_keep_watching">계속 시청하기의 시리즈</string>
     <string name="settings_series_keep_watching_description">히어로 행에 에피소드 이어보기 카드를 표시합니다.</string>
+    <!-- Translators: Toggle label for playing the highlighted Home item's video in the hero row. -->
+    <string name="settings_hero_preview">히어로 행에서 동영상 재생</string>
+    <!-- Translators: Description of the hero-row video preview toggle. -->
+    <string name="settings_hero_preview_description">선택한 항목의 동영상 미리보기가 잠시 후 재생됩니다. 홈 화면을 탐색하는 동안 전력과 메모리를 아끼려면 끄세요.</string>
     <string name="settings_android_tv_home">Android TV 홈</string>
     <string name="settings_android_tv_home_description">TV 홈 화면에 계속 시청하기와 최근 실시간 채널을 표시합니다.</string>
     <string name="settings_refresh_now">지금 새로 고침</string>
@@ -63,19 +67,62 @@
     <string name="settings_proxy_connection_failed">프록시에 연결하지 못했습니다(호스트/포트를 확인하세요).</string>
     <string name="settings_proxy_http">프록시에서 HTTP <xliff:g id="code">%1$d</xliff:g> 상태를 반환했습니다</string>
     <string name="settings_proxy_failed">프록시 테스트에 실패했습니다.</string>
-    <string name="settings_ch_nav_title">CH+/CH− 키 페이지 이동</string>
-    <string name="settings_ch_nav_description">리모컨의 CH+/CH− 키로 카테고리 또는 항목 목록을 페이지 단위로 이동합니다.</string>
-    <string name="settings_ch_nav_enabled">CH+/CH− 키로 목록 페이지 이동</string>
-    <string name="settings_ch_nav_enabled_description">켜면 CH+와 CH−로 포커스된 패널(카테고리 레일 또는 항목 목록, 카테고리 맞춤 설정 목록) 안에서 건너뜁니다. 끄면 해당 화면에서 이 키가 아무 동작도 하지 않습니다.</string>
-    <string name="settings_ch_nav_up">CH+ 건너뛰기(첫 항목 방향)</string>
-    <string name="settings_ch_nav_up_description">CH+를 한 번 눌렀을 때 위로 건너뛸 항목 수입니다. 길게 누르면 항상 첫 항목으로 이동합니다.</string>
-    <string name="settings_ch_nav_down">CH− 건너뛰기(마지막 항목 방향)</string>
-    <string name="settings_ch_nav_down_description">CH−를 한 번 눌렀을 때 아래로 건너뛸 항목 수입니다. 길게 누르면 항상 마지막 항목으로 이동합니다.</string>
+    <string name="settings_ch_nav_title">CH+/RW · CH−/FF 키 페이지 이동</string>
+    <string name="settings_ch_nav_description">리모컨의 CH+/RW · CH−/FF 키로 카테고리 또는 항목 목록을 페이지 단위로 이동합니다.</string>
+    <string name="settings_ch_nav_enabled">CH+/RW · CH−/FF 키로 목록 페이지 이동</string>
+    <string name="settings_ch_nav_enabled_description">켜면 CH+/RW와 CH−/FF로 포커스된 패널(카테고리 레일 또는 항목 목록, 카테고리 맞춤 설정 목록) 안에서 건너뜁니다. 끄면 해당 화면에서 이 키가 아무 동작도 하지 않습니다.</string>
+    <string name="settings_ch_nav_up">CH+ / 되감기 건너뛰기(첫 항목 방향)</string>
+    <string name="settings_ch_nav_up_description">CH+/RW를 한 번 눌렀을 때 위로 건너뛸 항목 수입니다. 길게 누르면 항상 첫 항목으로 이동합니다.</string>
+    <string name="settings_ch_nav_down">CH− / 빨리 감기 건너뛰기(마지막 항목 방향)</string>
+    <string name="settings_ch_nav_down_description">CH−/FF를 한 번 눌렀을 때 아래로 건너뛸 항목 수입니다. 길게 누르면 항상 마지막 항목으로 이동합니다.</string>
     <string name="settings_skip_counts">건너뛸 항목 수</string>
     <string name="settings_how_it_works">작동 방식</string>
-    <string name="settings_ch_nav_help">• 목록 끝을 넘지 않도록 제한되므로 짧은 목록에서는 한 번만 눌러도 끝에 도달합니다.\n• CH+ 길게 누르기 = 첫 항목, CH− 길게 누르기 = 마지막 항목입니다.\n• \"전체\" 목록(모든 채널/영화/시리즈)에서는 길게 누르기가 비활성화되지만 짧게 눌러 건너뛰는 기능은 계속 사용할 수 있습니다.\n• 현재 포커스가 있는 패널, 즉 카테고리 레일 또는 항목 목록/격자에 적용됩니다.\n• 설정 → 카테고리 및 항목 맞춤 설정의 카테고리 목록도 페이지 단위로 이동합니다.</string>
+    <string name="settings_ch_nav_help">• 목록 끝을 넘지 않도록 제한되므로 짧은 목록에서는 한 번만 눌러도 끝에 도달합니다.\n• CH+/RW 길게 누르기 = 첫 항목, CH−/FF 길게 누르기 = 마지막 항목입니다.\n• \"전체\" 목록(모든 채널/영화/시리즈)에서는 길게 누르기가 비활성화되지만 짧게 눌러 건너뛰는 기능은 계속 사용할 수 있습니다.\n• 현재 포커스가 있는 패널, 즉 카테고리 레일 또는 항목 목록/격자에 적용됩니다.\n• 설정 → 카테고리 및 항목 맞춤 설정의 카테고리 목록도 페이지 단위로 이동합니다.</string>
+    <string name="settings_remote_shortcuts">리모컨 바로가기</string>
+    <string name="settings_remote_shortcuts_description">리모컨의 여분 버튼에 탐색, 재생, 목록 작업을 지정합니다. 필수 탐색 버튼은 보호됩니다.</string>
+    <string name="settings_remote_shortcuts_enabled">리모컨 바로가기 사용</string>
+    <string name="settings_remote_shortcuts_enabled_description">버튼 지정을 삭제하지 않고 모든 사용자 바로가기를 끕니다</string>
+    <string name="settings_remote_shortcuts_assignments">버튼 지정</string>
+    <string name="settings_remote_shortcuts_add">바로가기 추가</string>
+    <string name="settings_remote_shortcuts_add_description">여분 버튼을 누르거나 길게 누른 다음 실행할 작업을 선택하세요</string>
+    <string name="settings_remote_shortcuts_reset">기본 바로가기 복원</string>
+    <string name="settings_remote_shortcuts_reset_description">CH+/CH− 및 되감기/빨리 감기 페이지 이동을 복원하고 다른 지정을 삭제합니다</string>
+    <string name="settings_remote_shortcuts_capture_title">리모컨 버튼을 누르세요</string>
+    <string name="settings_remote_shortcuts_capture_description">짧게 누르거나 놓을 때까지 길게 누르세요. 뒤로, 방향, OK, 음량, 홈, 전원 버튼은 지정할 수 없습니다.</string>
+    <string name="settings_remote_shortcuts_choose_action">작업 선택</string>
+    <string name="settings_remote_shortcuts_binding"><xliff:g id="press">%1$s</xliff:g> · <xliff:g id="action">%2$s</xliff:g></string>
+    <string name="settings_remote_shortcuts_short_press">짧게 누르기</string>
+    <string name="settings_remote_shortcuts_long_press">길게 누르기</string>
+    <string name="settings_remote_shortcuts_unknown_button">리모컨 버튼 %1$d</string>
+    <string name="settings_remote_shortcuts_help">• 기본적으로 CH+/CH−와 되감기/빨리 감기는 목록을 페이지 이동하며, 길게 누르면 처음이나 끝으로 이동합니다.
+• 짧게 누르기와 길게 누르기는 따로 지정할 수 있습니다.
+• 매우 큰 ‘전체’ 목록에서는 끝으로 이동이 비활성화됩니다.
+• 뒤로 길게 누르기는 항상 지금 재생 중에 포커스를 두며 변경할 수 없습니다.
+• 일반적으로 빨강/초록/노랑/파랑, 숫자, CH+/CH−, 되감기/빨리 감기를 지정할 수 있습니다.
+• 뒤로, 방향, OK, 음량, 홈, 전원 버튼은 보호됩니다.
+• 숫자 단축키는 탐색 중 작동하며, 전체 화면에서는 채널 번호 입력이 우선합니다.</string>
+    <string name="settings_remote_button_channel_up">채널 +</string>
+    <string name="settings_remote_button_channel_down">채널 −</string>
+    <string name="settings_remote_button_rewind">되감기</string>
+    <string name="settings_remote_button_fast_forward">빨리 감기</string>
+    <string name="settings_remote_button_previous">이전</string>
+    <string name="settings_remote_button_next">다음</string>
+    <string name="settings_remote_button_menu">메뉴</string>
+    <string name="settings_remote_button_red">빨간색 버튼</string>
+    <string name="settings_remote_button_green">녹색 버튼</string>
+    <string name="settings_remote_button_yellow">노란색 버튼</string>
+    <string name="settings_remote_button_blue">파란색 버튼</string>
+    <string name="settings_remote_action_continue">마지막 시청 계속</string>
+    <string name="settings_remote_action_focus_now_playing">지금 재생 중에 포커스</string>
+    <string name="settings_remote_action_expand_now_playing">지금 재생 중 확대</string>
+    <string name="settings_remote_action_mini_player">미니 플레이어로 이동</string>
+    <string name="settings_remote_action_play_pause">재생 또는 일시정지</string>
+    <string name="settings_remote_action_page_first">처음 항목 방향으로 페이지</string>
+    <string name="settings_remote_action_page_last">마지막 항목 방향으로 페이지</string>
+    <string name="settings_remote_action_jump_first">첫 항목으로 이동</string>
+    <string name="settings_remote_action_jump_last">마지막 항목으로 이동</string>
     <string name="settings_large_skips_warning">건너뛸 항목 수가 크면 짧은 목록을 지나칠 수 있고 사양이 낮은 TV에서는 움직임이 불안정하게 느껴질 수 있습니다.</string>
-    <string name="settings_ch_nav_picker">CH+/CH− 키 페이지 이동</string>
+    <string name="settings_ch_nav_picker">CH+/RW · CH−/FF 키 페이지 이동</string>
     <string name="settings_weather">날씨</string>
     <string name="settings_top_bar_weather">상단 표시줄 날씨</string>
     <string name="settings_show_weather">날씨 표시</string>
@@ -157,7 +204,6 @@
     <string name="settings_quick_check_update">업데이트 확인</string>
     <string name="settings_search_label">설정 검색</string>
     <string name="settings_search_hint">설정 검색…</string>
-    <string name="settings_group_general">일반</string>
     <string name="settings_language">언어</string>
     <string name="settings_language_description">앱 표시 언어</string>
     <string name="settings_language_system_default">시스템 기본값</string>
@@ -167,7 +213,6 @@
     <string name="settings_language_coverage"><xliff:g id="percent">%1$d</xliff:g>%%</string>
     <string name="settings_profile_group">프로필</string>
     <string name="settings_profiles_description">시청자, 어린이 모드 및 PIN 잠금 관리</string>
-    <string name="settings_content_group">콘텐츠</string>
     <string name="settings_playlists">플레이리스트</string>
     <string name="settings_playlists_description">M3U/Xtream 플레이리스트 추가, 다시 동기화 또는 삭제</string>
     <string name="settings_epg_sources">EPG 소스</string>
@@ -175,8 +220,14 @@
     <string name="settings_customize">카테고리 및 항목 맞춤 설정</string>
     <string name="settings_customize_nav_description">항목 숨기기/다시 표시, 카테고리 이름 및 순서 변경</string>
     <string name="settings_sidebar_description_root">플레이리스트에 맞게 사이드 아이콘을 자동 조정하거나 특정 아이콘 숨기기</string>
-    <string name="settings_ch_paging">CH+/CH− 키 페이지 이동</string>
-    <string name="settings_ch_paging_description">CH+/CH− 키로 카테고리 및 항목 목록에서 위아래로 건너뛰기</string>
+    <string name="settings_ch_paging">리모컨 바로가기</string>
+    <string name="settings_ch_paging_description">리모컨의 여분 버튼에 탐색, 재생, 목록 작업을 지정합니다. 필수 탐색 버튼은 보호됩니다.</string>
+    <!-- Translators: Settings navigation label for the long-press content menus. -->
+    <string name="settings_content_menus_title">길게 누르기 메뉴</string>
+    <!-- Translators: Description of the long-press content menus settings. -->
+    <string name="settings_content_menus_description">채널·영화·시리즈·에피소드 메뉴의 항목 순서를 바꿉니다</string>
+    <!-- Translators: Hint shown above the list when arranging a long-press menu. -->
+    <string name="settings_content_menus_hint">항목에서 OK를 길게 눌러 집은 뒤 위·아래로 옮기세요. 다시 OK를 누르면 놓입니다.</string>
     <string name="settings_browsing_lists">탐색 및 목록</string>
     <string name="settings_browsing_description">실시간 TV, 영화 및 시리즈에서 마지막 카테고리와 항목 기억</string>
     <string name="settings_home_root">홈 화면</string>
@@ -221,7 +272,7 @@
     <string name="settings_surround_sound">서라운드 사운드</string>
     <string name="settings_surround_description">실제 5.1/7.1 리시버를 사용할 때 Dolby/DTS를 서라운드(5.1/7.1)로 디코딩합니다. TV 스피커나 스테레오 사운드바를 사용한다면 끄세요. 일부 TV/사운드바에서는 다채널 오디오가 영상보다 지연될 수 있습니다. 싱크가 어긋나면 플레이어의 오디오 메뉴 → A/V 동기화에서 미세 조정하세요.</string>
     <string name="settings_autoplay_next">다음 에피소드 자동 재생</string>
-    <string name="settings_autoplay_next_description">에피소드가 끝나면 다음 에피소드를 자동으로 시작하며 다음 시즌까지 이어서 재생합니다.</string>
+    <string name="settings_autoplay_next_description">에피소드가 끝나면 다음 에피소드를 자동으로 시작하며 다음 시즌까지 이어서 재생합니다. 다시보기도 다음 프로그램으로 이어서 재생합니다.</string>
     <string name="settings_catchup">다시보기</string>
     <plurals name="settings_catchup_supported">
         <item quantity="other"><xliff:g id="count">%1$d</xliff:g>개 채널이 다시보기를 지원합니다 · 아카이브 재생용 시간대 및 플레이어</item>
@@ -300,12 +351,44 @@
     <string name="settings_accent_green">초록색</string>
     <string name="settings_accent_amber">호박색</string>
     <string name="settings_group_profile">프로필</string>
-    <string name="settings_group_content">콘텐츠</string>
+    <string name="settings_group_sources">소스 및 편성표</string>
+    <string name="settings_group_layout">레이아웃</string>
+    <string name="settings_group_content_metadata">콘텐츠 및 메타데이터</string>
+    <string name="settings_group_data">데이터</string>
     <string name="settings_group_appearance">화면 스타일</string>
     <string name="settings_group_playback">재생</string>
     <string name="settings_group_network">네트워크</string>
     <string name="settings_dns">DNS</string>
     <string name="settings_group_app">앱</string>
+    <string name="settings_group_summary_profile">프로필과 시청 권한</string>
+    <string name="settings_group_summary_sources">재생목록, 편성표 데이터와 시간</string>
+    <string name="settings_group_summary_appearance">테마, 강조색, 유리, 모션, 글자 크기</string>
+    <string name="settings_group_summary_layout">사이드바, 패널, 목록, 홈 화면</string>
+    <string name="settings_group_summary_content_metadata">이름, 이미지, 자막 서비스</string>
+    <string name="settings_group_summary_playback">동영상 플레이어와 오류 기록</string>
+    <!-- Translators: Video player settings: name of the section holding decoder, HDR and frame-rate settings. -->
+    <string name="settings_vp_section_engine">엔진 및 화면</string>
+    <!-- Translators: Video player settings: name of the section holding volume, audio language and surround settings. -->
+    <string name="settings_vp_section_sound">사운드</string>
+    <!-- Translators: Video player settings: name of the section holding resume, auto-play and mini-player settings. -->
+    <string name="settings_vp_section_episodes">에피소드 및 미니 플레이어</string>
+    <!-- Translators: Video player settings: one-line summary under the "Engine &amp; picture" section name. -->
+    <string name="settings_vp_section_engine_summary">디코더, HDR, 프레임 속도</string>
+    <!-- Translators: Video player settings: one-line summary under the "Live TV" section name. -->
+    <string name="settings_vp_section_live_summary">미리보기, 번호, 지연</string>
+    <!-- Translators: Video player settings: one-line summary under the "Sound" section name. -->
+    <string name="settings_vp_section_sound_summary">볼륨, 언어, 서라운드</string>
+    <!-- Translators: Video player settings: one-line summary under the "Subtitles" section name. -->
+    <string name="settings_vp_section_subtitles_summary">크기, 색상, 위치</string>
+    <!-- Translators: Video player settings: one-line summary under the "Episodes &amp; mini-player" section name. -->
+    <string name="settings_vp_section_episodes_summary">자동 재생 및 미니 플레이어</string>
+    <!-- Translators: Video player settings: one-line summary under the "Diagnostics" section name. -->
+    <string name="settings_vp_section_diagnostics_summary">상세 재생 로그</string>
+    <string name="settings_group_summary_network">스트림 연결용 프록시와 DNS</string>
+    <string name="settings_group_summary_data">백업, 다운로드, 시청 기록</string>
+    <string name="settings_group_summary_app">언어, 시작, 업데이트, 앱 정보</string>
+    <string name="settings_group_quick">빠른 설정</string>
+    <string name="settings_group_summary_quick">가장 자주 쓰는 전환 항목</string>
     <string name="settings_search_guide_logos">편성표 채널 로고</string>
     <string name="settings_search_keywords_profiles">시청자 어린이 모드 PIN 잠금 계정</string>
     <string name="settings_search_keywords_playlists">M3U Xtream 소스 동기화 추가 삭제</string>
@@ -424,6 +507,14 @@
     <string name="settings_reset_saved_volume_confirm">저장된 음량을 초기화할까요?</string>
     <!-- Translators: Confirmation dialog body before forgetting the saved per-item volume. -->
     <string name="settings_reset_saved_volume_confirm_description">모든 채널, 영화, 에피소드가 기본 음량으로 돌아갑니다. 저장된 화면 확대 설정은 유지됩니다. 개별 항목은 언제든지 플레이어에서 다시 설정할 수 있습니다.</string>
+    <!-- Translators: Settings row that forgets every per-item audio-sync offset. -->
+    <string name="settings_reset_saved_audio_delay">저장된 A/V 동기화 초기화</string>
+    <!-- Translators: Description of the reset-saved-audio-sync row. -->
+    <string name="settings_reset_saved_audio_delay_description">플레이어에서 ‘이 지연 시간 기억’을 선택하면 해당 채널, 영화 또는 에피소드의 음성 동기화가 저장됩니다. 초기화하면 모두 위 설정을 다시 따릅니다.</string>
+    <!-- Translators: Title of the confirmation dialog for resetting saved audio sync. -->
+    <string name="settings_reset_saved_audio_delay_confirm">저장된 A/V 동기화를 초기화할까요?</string>
+    <!-- Translators: Body of the confirmation dialog for resetting saved audio sync. -->
+    <string name="settings_reset_saved_audio_delay_confirm_description">모든 채널, 영화, 에피소드가 위의 음성 동기화로 돌아갑니다. 저장된 확대/축소와 음량은 유지됩니다. 개별 값은 언제든 플레이어에서 다시 설정할 수 있습니다.</string>
     <!-- Translators: Setting label for how far rewind/forward jumps in a movie or episode. -->
     <string name="settings_seek_step">탐색 간격</string>
     <!-- Translators: Description of the seek step setting. -->
@@ -464,6 +555,7 @@
     <string name="settings_audio_sync_description">영상에 맞도록 오디오를 앞이나 뒤로 이동합니다. mpv 엔진에만 적용됩니다.</string>
     <string name="settings_live_tv">실시간 TV</string>
     <string name="settings_live_latency_description">실시간 방송과 얼마나 가깝게 재생할지 설정합니다. 낮을수록 실시간에 가까워지지만 버퍼가 작아지므로 불안정한 스트림에서는 끊김이나 재연결이 더 자주 발생할 수 있습니다. 다음에 여는 채널부터 적용됩니다.</string>
+    <string name="settings_live_latency_bitrate_note">비트레이트가 매우 높은 채널에서는(특히 4K) 메모리에 한 번에 담을 수 있는 영상의 양에 한계가 있어, 설정한 시간보다 짧게만 버퍼링될 수 있습니다.</string>
     <string name="settings_channel_numbers">채널 번호</string>
     <string name="settings_channel_numbers_description">실시간 TV 목록, 채널 목록 오버레이 및 플레이어에서 이름 옆에 제공업체의 채널 번호를 표시하고, 전체 화면 재생 중 리모컨으로 번호를 입력하여 해당 채널로 바로 이동합니다(확인을 누르면 즉시 채널이 선택되고 뒤로를 누르면 취소됩니다). 끄면 모든 번호가 숨겨지고 숫자 키 입력이 무시되지만 삭제되는 정보는 없으며, 다시 켜면 번호가 복원됩니다.</string>
     <string name="settings_diagnostics">진단</string>
@@ -617,6 +709,12 @@
     <string name="settings_customize_rename_or_delete_category">카테고리 이름 변경 또는 삭제</string>
     <string name="settings_customize_new_category">＋ 새 카테고리</string>
     <string name="settings_customize_sort_button">정렬: <xliff:g id="label">%1$s</xliff:g> ▾</string>
+
+    <string name="settings_customize_filter_button">필터: <xliff:g id="label">%1$s</xliff:g> ▾</string>
+    <string name="settings_customize_filter_title">목록 필터</string>
+    <string name="settings_customize_filter_all">전체</string>
+    <string name="settings_customize_filter_visible">표시</string>
+    <string name="settings_customize_filter_hidden">숨김</string>
     <string name="settings_customize_new_categories_button">새 카테고리: <xliff:g id="label">%1$s</xliff:g> ▾</string>
     <string name="settings_customize_rename_hint">이 프로필에만 적용됩니다. 비워 두면 “<xliff:g id="name">%1$s</xliff:g>”(으)로 복원됩니다.</string>
     <string name="settings_customize_remove_pin_title">PIN 잠금을 해제하시겠습니까?</string>
@@ -917,8 +1015,18 @@
     <string name="settings_subtitle_color_grey">회색</string>
     <string name="settings_live_preroll">실시간 스트림 미리 버퍼링</string>
     <string name="settings_live_preroll_description">실시간 채널이 재생을 시작하기 전에 이만큼의 영상을 모으고, 끊긴 후에도 다시 모읍니다. 이는 영상 분량이지 카운트다운이 아닙니다. 끄면 가장 빨리 시작할 수 있습니다.</string>
+    <string name="settings_live_tune_timeout">채널 시도를 포기할 시간</string>
+    <string name="settings_live_tune_timeout_description">이 시간까지 실시간 채널에 화면이 나오지 않으면, OwnTV가 가진 재생기를 하나씩 시도하며 검은 화면을 두는 대신 시도를 멈추고 알려 줍니다. ‘안 함’은 계속 시도하므로, 제공업체가 삭제한 채널에서는 1분을 훌쩍 넘길 수 있습니다. 제공업체가 요청한 대기 시간은 포함되지 않습니다.</string>
     <string name="settings_live_preroll_per_playlist">재생목록별 미리 버퍼링</string>
     <string name="settings_live_preroll_per_playlist_description">한 재생목록에 대해서만 위 설정을 재정의하고, 다른 재생목록은 빠르게 유지합니다.</string>
+    <!-- Translators: Title of the per-playlist Live TV engine override row. -->
+    <string name="settings_live_engine_per_playlist">재생목록별 실시간 TV 플레이어</string>
+    <!-- Translators: Description of the per-playlist Live TV engine override row. -->
+    <string name="settings_live_engine_per_playlist_description">위 설정을 한 재생목록에만 재정의합니다. 채널이 한쪽 플레이어에서만 잘 재생되는 제공업체에 사용하세요.</string>
+    <!-- Translators: Title of the per-playlist Live latency override row. -->
+    <string name="settings_live_latency_per_playlist">재생목록별 실시간 지연 시간</string>
+    <!-- Translators: Description of the per-playlist Live latency override row. -->
+    <string name="settings_live_latency_per_playlist_description">위 설정을 한 재생목록에만 재정의합니다. 다른 곳보다 크거나 작은 버퍼가 필요한 제공업체에 사용하세요.</string>
     <plurals name="settings_live_preroll_overrides">
         <item quantity="other"><xliff:g id="count">%1$d</xliff:g>개 설정됨</item>
     </plurals>
@@ -981,7 +1089,12 @@
     <string name="settings_main_interface_font">기본 인터페이스 글꼴</string>
     <string name="settings_popup_font">팝업 글꼴</string>
     <string name="settings_choose_font">글꼴 선택</string>
-    <string name="settings_font_size_range">앱 글자를 <xliff:g id="min">%1$d</xliff:g>%%에서 <xliff:g id="max">%2$d</xliff:g>%%까지 조절합니다. 자막 크기는 그대로 유지됩니다.</string>
+    <string name="settings_font_size_range">팝업이 아닌 기본 앱 글자를 <xliff:g id="min">%1$d</xliff:g>%%에서 <xliff:g id="max">%2$d</xliff:g>%%까지 조절합니다. 자막 크기는 그대로 유지됩니다.</string>
+    <string name="settings_popup_font_size">팝업 글꼴 크기</string>
+    <string name="settings_popup_font_size_description">대화상자와 메뉴의 글자만 변경합니다</string>
+    <string name="settings_popup_size">팝업 크기</string>
+    <string name="settings_popup_size_description">글자 크기를 바꾸지 않고 대화상자와 메뉴 상자의 크기를 조절합니다</string>
+    <string name="settings_popup_size_range">대화상자와 메뉴 상자의 크기를 조절합니다(<xliff:g id="min">%1$d</xliff:g>%%–<xliff:g id="max">%2$d</xliff:g>%%).</string>
     <string name="settings_font_preview">엔터테인먼트를 더 간단하게.</string>
     <string name="settings_search_keywords_fonts">글꼴 텍스트 크기 서체 팝업 읽기 접근성</string>
     <string name="settings_font_system_sans">시스템 산세리프</string>
@@ -1008,8 +1121,56 @@
     <string name="settings_glass_highlight_title">하이라이트 강도</string>
     <string name="settings_glass_highlight_description">포커스된 유리의 빛과 테두리를 조절합니다.</string>
     <string name="settings_glass_live_preview">실시간 미리보기</string>
+    <string name="settings_glass_screen_description">반투명 불투명 유리 패널, 배경 이미지 및 투명도</string>
+    <string name="settings_glass_master_description">배경 사진이나 앱 자체 배경 위에 반투명한 불투명 유리 패널을 표시합니다.</string>
+    <string name="settings_glass_background_image">배경 이미지 선택</string>
+    <string name="settings_glass_surface_transparency_title">투명도</string>
+    <string name="settings_glass_background_blur_title">흐림 / 불투명 효과</string>
+    <string name="settings_glass_section_appearance">화면 스타일</string>
+    <string name="settings_glass_section_fine_tuning">고급 옵션</string>
+    <string name="settings_glass_section_behavior">동작</string>
+    <string name="settings_glass_apply_to">글래스 표면</string>
+    <string name="settings_glass_surface_all">전체</string>
+    <string name="settings_glass_background_action_description">배경 이미지 선택</string>
+    <string name="settings_glass_transparency_short_description">20–100 · 5</string>
+    <string name="settings_glass_blur_short_description">0–100 · 10</string>
+    <string name="settings_glass_highlight_short_description">포커스된 유리의 빛과 테두리를 조절합니다.</string>
+    <string name="settings_glass_full_transparency_short">완전한 투명도 허용</string>
+    <string name="settings_glass_full_transparency_short_description">가장 투명한 유리를 위해 자동 가독성 제한을 끕니다.</string>
+    <string name="settings_glass_depth_effects_short">깊이와 그림자</string>
+    <string name="settings_glass_depth_effects_short_description">포커스 이동 조명, 은은한 시차 및 깊이 움직임을 켭니다.</string>
+    <string name="settings_glass_reset_balanced">초기화: 균형</string>
     <string name="settings_glass_full_transparency_title">완전한 투명도 허용</string>
     <string name="settings_glass_full_transparency_description">가장 투명한 유리를 위해 자동 가독성 제한을 끕니다.</string>
     <string name="settings_glass_depth_title">깊이와 그림자</string>
     <string name="settings_glass_depth_description">포커스 이동 조명, 은은한 시차 및 깊이 움직임을 켭니다.</string>
+    <string name="settings_header_hint">왼쪽: 그룹 · 오른쪽: 해당 설정 · 행에서 OK를 길게 눌러 빠른 설정에 고정</string>
+    <string name="settings_spine_eyebrow">모든 그룹</string>
+    <string name="settings_spine_title">설정 둘러보기</string>
+    <string name="settings_spine_hint">빠른 설정은 항상 맨 위에 있으며 표시가 현재 그룹을 따라갑니다.</string>
+    <string name="settings_spine_foot">강조 색이 포커스를 따라갑니다</string>
+    <string name="settings_row_menu_pin">빠른 설정에 고정</string>
+    <string name="settings_row_menu_unpin">빠른 설정에서 제거</string>
+    <string name="settings_row_menu_move_up">위로 이동</string>
+    <string name="settings_row_menu_move_down">아래로 이동</string>
+    <string name="settings_quick_empty_title">아직 고정된 항목이 없습니다</string>
+    <string name="settings_quick_empty_hint">설정에서 OK를 길게 누른 뒤 “빠른 설정에 고정”을 선택하세요.</string>
+    <string name="settings_results_title">검색 결과</string>
+    <string name="settings_results_summary">어디에 있든 모든 일치 항목 — 경로까지 함께</string>
+    <plurals name="settings_setting_count">
+        <item quantity="other">설정 <xliff:g id="count">%1$d</xliff:g>개</item>
+    </plurals>
+    <plurals name="settings_pinned_count">
+        <item quantity="other"><xliff:g id="count">%1$d</xliff:g>개 고정됨</item>
+    </plurals>
+    <plurals name="settings_match_count">
+        <item quantity="other">일치 <xliff:g id="count">%1$d</xliff:g>개</item>
+    </plurals>
+    <string name="settings_guide_width">가이드 열 너비</string>
+    <string name="settings_guide_width_description">TV 가이드의 채널 목록과 EPG 타임라인 너비를 조절합니다.</string>
+    <string name="settings_search_keywords_guide_width">가이드 epg 채널 목록 타임라인 열 패널 너비 크기 레이아웃</string>
+    <string name="settings_guide_width_summary">채널 목록 %1$d%% · EPG 타임라인 %2$d%%</string>
+    <string name="settings_guide_width_help">• 채널 목록과 EPG 타임라인은 한 행을 공유하므로 합계가 100%%여야 합니다.\n• 채널 목록을 넓히면 한 번에 보이는 타임라인이 줄어들며, 프로그램 길이와 시간 눈금은 바뀌지 않습니다.\n• 두 열은 모두 최소 10%%를 유지합니다.\n• 재설정하면 채널 목록은 10%%, EPG 타임라인은 90%%로 돌아갑니다.\n• 사용자 지정을 끄면 저장한 값을 잃지 않고 표준 가이드 레이아웃으로 돌아갑니다.</string>
+    <string name="settings_guide_width_channels">채널 목록</string>
+    <string name="settings_guide_width_epg">EPG 타임라인</string>
 </resources>

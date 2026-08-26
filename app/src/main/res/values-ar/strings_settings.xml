@@ -23,6 +23,10 @@
     <string name="settings_movies_keep_watching_description">عرض بطاقات استئناف الأفلام في الصف البارز.</string>
     <string name="settings_series_keep_watching">المسلسلات في متابعة المشاهدة</string>
     <string name="settings_series_keep_watching_description">عرض بطاقات استئناف الحلقات في الصف البارز.</string>
+    <!-- Translators: Toggle label for playing the highlighted Home item's video in the hero row. -->
+    <string name="settings_hero_preview">تشغيل الفيديو في الصف البارز</string>
+    <!-- Translators: Description of the hero-row video preview toggle. -->
+    <string name="settings_hero_preview_description">تشغيل معاينة فيديو العنصر المحدّد بعد لحظة. أوقفه لتوفير الطاقة والذاكرة أثناء تصفّح الشاشة الرئيسية.</string>
     <string name="settings_android_tv_home">الشاشة الرئيسية لـ Android TV</string>
     <string name="settings_android_tv_home_description">عرض متابعة المشاهدة والقنوات المباشرة الحديثة على الشاشة الرئيسية للتلفزيون.</string>
     <string name="settings_refresh_now">التحديث الآن</string>
@@ -63,19 +67,62 @@
     <string name="settings_proxy_connection_failed">تعذر الاتصال بالوكيل (تحقق من المضيف/المنفذ).</string>
     <string name="settings_proxy_http">أعاد الوكيل حالة HTTP <xliff:g id="code">%1$d</xliff:g></string>
     <string name="settings_proxy_failed">فشل اختبار الوكيل.</string>
-    <string name="settings_ch_nav_title">التنقل بين الصفحات بمفتاحي CH+-</string>
-    <string name="settings_ch_nav_description">تنقّل بين صفحات قائمة الفئات أو العناصر باستخدام مفتاحي CH+ / CH− في جهاز التحكم عن بُعد.</string>
-    <string name="settings_ch_nav_enabled">استخدام مفتاحي CH+- للتنقل بين صفحات القوائم</string>
-    <string name="settings_ch_nav_enabled_description">عند التفعيل، يتخطى مفتاحا CH+ وCH− عناصر داخل اللوحة قيد التركيز (شريط الفئات أو قائمة العناصر، وكذلك قائمة تخصيص الفئات). وعند التعطيل، لا يفعل هذان المفتاحان شيئًا في تلك الشاشات.</string>
-    <string name="settings_ch_nav_up">تخطي CH+ (نحو الأول)</string>
-    <string name="settings_ch_nav_up_description">عدد العناصر التي تتخطاها ضغطة واحدة على CH+ إلى أعلى. يؤدي الضغط المطوّل دائمًا إلى الانتقال إلى العنصر الأول.</string>
-    <string name="settings_ch_nav_down">تخطي CH− (نحو الأخير)</string>
-    <string name="settings_ch_nav_down_description">عدد العناصر التي تتخطاها ضغطة واحدة على CH− إلى أسفل. يؤدي الضغط المطوّل دائمًا إلى الانتقال إلى العنصر الأخير.</string>
+    <string name="settings_ch_nav_title">التنقل بين الصفحات بمفتاحي CH+/RW · CH−/FF</string>
+    <string name="settings_ch_nav_description">تنقّل بين صفحات قائمة الفئات أو العناصر باستخدام مفتاحي CH+/RW / CH−/FF في جهاز التحكم عن بُعد.</string>
+    <string name="settings_ch_nav_enabled">استخدام مفتاحي CH+/RW · CH−/FF للتنقل بين صفحات القوائم</string>
+    <string name="settings_ch_nav_enabled_description">عند التفعيل، يتخطى مفتاحا CH+/RW وCH−/FF عناصر داخل اللوحة قيد التركيز (شريط الفئات أو قائمة العناصر، وكذلك قائمة تخصيص الفئات). وعند التعطيل، لا يفعل هذان المفتاحان شيئًا في تلك الشاشات.</string>
+    <string name="settings_ch_nav_up">تخطي CH+ / الترجيع (نحو الأول)</string>
+    <string name="settings_ch_nav_up_description">عدد العناصر التي تتخطاها ضغطة واحدة على CH+/RW إلى أعلى. يؤدي الضغط المطوّل دائمًا إلى الانتقال إلى العنصر الأول.</string>
+    <string name="settings_ch_nav_down">تخطي CH− / التقديم السريع (نحو الأخير)</string>
+    <string name="settings_ch_nav_down_description">عدد العناصر التي تتخطاها ضغطة واحدة على CH−/FF إلى أسفل. يؤدي الضغط المطوّل دائمًا إلى الانتقال إلى العنصر الأخير.</string>
     <string name="settings_skip_counts">أعداد التخطي</string>
     <string name="settings_how_it_works">كيفية العمل</string>
-    <string name="settings_ch_nav_help">• يُقيّد التخطي عند طرفي القائمة، لذا تصل القوائم القصيرة إلى نهايتها بضغطة واحدة.\n• الضغط المطوّل على CH+ = العنصر الأول، والضغط المطوّل على CH− = العنصر الأخير.\n• يُعطّل الضغط المطوّل في قائمة \"الكل\" (كل قناة / فيلم / مسلسل) — ويظل التخطي بالضغط القصير متاحًا فيها.\n• ينطبق على اللوحة قيد التركيز حاليًا — شريط الفئات أو قائمة/شبكة العناصر.\n• وينقّل أيضًا بين صفحات قائمة الفئات في الإعدادات ← تخصيص الفئات والعناصر.</string>
+    <string name="settings_ch_nav_help">• يُقيّد التخطي عند طرفي القائمة، لذا تصل القوائم القصيرة إلى نهايتها بضغطة واحدة.\n• الضغط المطوّل على CH+/RW = العنصر الأول، والضغط المطوّل على CH−/FF = العنصر الأخير.\n• يُعطّل الضغط المطوّل في قائمة \"الكل\" (كل قناة / فيلم / مسلسل) — ويظل التخطي بالضغط القصير متاحًا فيها.\n• ينطبق على اللوحة قيد التركيز حاليًا — شريط الفئات أو قائمة/شبكة العناصر.\n• وينقّل أيضًا بين صفحات قائمة الفئات في الإعدادات ← تخصيص الفئات والعناصر.</string>
+    <string name="settings_remote_shortcuts">اختصارات جهاز التحكم</string>
+    <string name="settings_remote_shortcuts_description">عيّن أزرار جهاز التحكم الإضافية لإجراءات التنقل والتشغيل والتصفح. تظل أزرار التنقل الأساسية محمية.</string>
+    <string name="settings_remote_shortcuts_enabled">استخدام اختصارات جهاز التحكم</string>
+    <string name="settings_remote_shortcuts_enabled_description">أوقف كل الاختصارات المخصصة من دون حذف تعيينات الأزرار</string>
+    <string name="settings_remote_shortcuts_assignments">تعيينات الأزرار</string>
+    <string name="settings_remote_shortcuts_add">إضافة اختصار</string>
+    <string name="settings_remote_shortcuts_add_description">اضغط زرًا إضافيًا أو استمر في الضغط عليه، ثم اختر وظيفته</string>
+    <string name="settings_remote_shortcuts_reset">استعادة الاختصارات الافتراضية</string>
+    <string name="settings_remote_shortcuts_reset_description">استعد تنقّل CH+/CH− والترجيع/التقديم السريع واحذف التعيينات الأخرى</string>
+    <string name="settings_remote_shortcuts_capture_title">اضغط زرًا في جهاز التحكم</string>
+    <string name="settings_remote_shortcuts_capture_description">اضغط سريعًا أو استمر حتى تترك الزر. لا يمكن تعيين الرجوع والاتجاهات وموافق والصوت والرئيسية والطاقة.</string>
+    <string name="settings_remote_shortcuts_choose_action">اختيار إجراء</string>
+    <string name="settings_remote_shortcuts_binding"><xliff:g id="press">%1$s</xliff:g> · <xliff:g id="action">%2$s</xliff:g></string>
+    <string name="settings_remote_shortcuts_short_press">ضغطة قصيرة</string>
+    <string name="settings_remote_shortcuts_long_press">ضغطة مطوّلة</string>
+    <string name="settings_remote_shortcuts_unknown_button">زر جهاز التحكم %1$d</string>
+    <string name="settings_remote_shortcuts_help">• افتراضيًا، تتنقل أزرار CH+/CH− والترجيع/التقديم السريع في القوائم، ويؤدي الضغط المطوّل إلى أول عنصر أو آخره.
+• يمكن تعيين الضغط القصير والمطوّل بشكل منفصل.
+• يظل الانتقال إلى الأخير معطّلًا في قوائم «الكل» الكبيرة جدًا.
+• يؤدي الضغط المطوّل على رجوع دائمًا إلى التركيز على قيد التشغيل ولا يمكن تغييره.
+• تشمل الأزرار القابلة للتعيين عادةً الأحمر/الأخضر/الأصفر/الأزرق والأرقام وCH+/CH− والترجيع/التقديم السريع.
+• تظل أزرار الرجوع والاتجاهات وموافق والصوت والرئيسية والطاقة محمية.
+• تعمل اختصارات الأرقام أثناء التصفح؛ وفي ملء الشاشة تكون أولوية إدخال رقم القناة.</string>
+    <string name="settings_remote_button_channel_up">القناة +</string>
+    <string name="settings_remote_button_channel_down">القناة −</string>
+    <string name="settings_remote_button_rewind">ترجيع</string>
+    <string name="settings_remote_button_fast_forward">تقديم سريع</string>
+    <string name="settings_remote_button_previous">السابق</string>
+    <string name="settings_remote_button_next">التالي</string>
+    <string name="settings_remote_button_menu">القائمة</string>
+    <string name="settings_remote_button_red">الزر الأحمر</string>
+    <string name="settings_remote_button_green">الزر الأخضر</string>
+    <string name="settings_remote_button_yellow">الزر الأصفر</string>
+    <string name="settings_remote_button_blue">الزر الأزرق</string>
+    <string name="settings_remote_action_continue">متابعة آخر مشاهدة</string>
+    <string name="settings_remote_action_focus_now_playing">التركيز على قيد التشغيل</string>
+    <string name="settings_remote_action_expand_now_playing">توسيع قيد التشغيل</string>
+    <string name="settings_remote_action_mini_player">النقل إلى المشغّل المصغّر</string>
+    <string name="settings_remote_action_play_pause">تشغيل أو إيقاف مؤقت</string>
+    <string name="settings_remote_action_page_first">التنقل نحو العناصر الأولى</string>
+    <string name="settings_remote_action_page_last">التنقل نحو العناصر الأخيرة</string>
+    <string name="settings_remote_action_jump_first">الانتقال إلى أول عنصر</string>
+    <string name="settings_remote_action_jump_last">الانتقال إلى آخر عنصر</string>
     <string name="settings_large_skips_warning">قد تتجاوز قيم التخطي الكبيرة القوائم القصيرة وقد تبدو الحركة متقطعة على أجهزة التلفزيون منخفضة الإمكانات.</string>
-    <string name="settings_ch_nav_picker">التنقل بين الصفحات بمفتاحي CH+-</string>
+    <string name="settings_ch_nav_picker">التنقل بين الصفحات بمفتاحي CH+/RW · CH−/FF</string>
     <string name="settings_weather">الطقس</string>
     <string name="settings_top_bar_weather">الطقس في الشريط العلوي</string>
     <string name="settings_show_weather">عرض الطقس</string>
@@ -162,7 +209,6 @@
     <string name="settings_quick_check_update">التحقق من وجود تحديث</string>
     <string name="settings_search_label">بحث في الإعدادات</string>
     <string name="settings_search_hint">بحث في الإعدادات…</string>
-    <string name="settings_group_general">عام</string>
     <string name="settings_language">اللغة</string>
     <string name="settings_language_description">لغة عرض التطبيق</string>
     <string name="settings_language_system_default">الإعداد الافتراضي للنظام</string>
@@ -172,7 +218,6 @@
     <string name="settings_language_coverage"><xliff:g id="percent">%1$d</xliff:g>%%</string>
     <string name="settings_profile_group">الملف الشخصي</string>
     <string name="settings_profiles_description">إدارة المشاهدين ووضع الأطفال وأقفال PIN</string>
-    <string name="settings_content_group">المحتوى</string>
     <string name="settings_playlists">قوائم التشغيل</string>
     <string name="settings_playlists_description">إضافة قوائم تشغيل M3U / Xtream أو إعادة مزامنتها أو إزالتها</string>
     <string name="settings_epg_sources">مصادر دليل البرامج الإلكتروني</string>
@@ -180,8 +225,14 @@
     <string name="settings_customize">تخصيص الفئات والعناصر</string>
     <string name="settings_customize_nav_description">إخفاء العناصر وإظهارها وإعادة تسمية الفئات وترتيبها</string>
     <string name="settings_sidebar_description_root">تكييف الأيقونات الجانبية تلقائيًا مع قائمة التشغيل أو إخفاء أيقونات محددة</string>
-    <string name="settings_ch_paging">التنقل بين الصفحات بمفتاحي CH+-</string>
-    <string name="settings_ch_paging_description">التخطي إلى أعلى/أسفل في قوائم الفئات والعناصر باستخدام مفتاحي CH+ / CH−</string>
+    <string name="settings_ch_paging">اختصارات جهاز التحكم</string>
+    <string name="settings_ch_paging_description">عيّن أزرار جهاز التحكم الإضافية لإجراءات التنقل والتشغيل والتصفح. تظل أزرار التنقل الأساسية محمية.</string>
+    <!-- Translators: Settings navigation label for the long-press content menus. -->
+    <string name="settings_content_menus_title">قوائم الضغط المطوّل</string>
+    <!-- Translators: Description of the long-press content menus settings. -->
+    <string name="settings_content_menus_description">أعد ترتيب الإجراءات في قوائم القنوات والأفلام والمسلسلات والحلقات</string>
+    <!-- Translators: Hint shown above the list when arranging a long-press menu. -->
+    <string name="settings_content_menus_hint">اضغط مطوّلًا على «موافق» فوق إجراء لالتقاطه، ثم استخدم الأعلى والأسفل لتحريكه. اضغط «موافق» مرة أخرى لإفلاته.</string>
     <string name="settings_browsing_lists">التصفح والقوائم</string>
     <string name="settings_browsing_description">تذكّر آخر فئة وآخر عنصر في البث التلفزيوني المباشر والأفلام والمسلسلات</string>
     <string name="settings_home_root">الشاشة الرئيسية</string>
@@ -226,7 +277,7 @@
     <string name="settings_surround_sound">الصوت المحيطي</string>
     <string name="settings_surround_description">فك ترميز Dolby/DTS إلى صوت محيطي (5.1/7.1) لجهاز استقبال حقيقي يدعم 5.1/7.1. اتركه متوقفًا لسماعات التلفزيون أو مكبّر صوت استريو — قد يتأخر الصوت متعدد القنوات عن الفيديو في بعض أجهزة التلفزيون/مكبّرات الصوت. إذا انحرفت المزامنة، فاضبط قليلًا قائمة الصوت في المشغّل ← مزامنة A/V.</string>
     <string name="settings_autoplay_next">تشغيل الحلقة التالية تلقائيًا</string>
-    <string name="settings_autoplay_next_description">عند انتهاء حلقة، شغّل الحلقة التالية تلقائيًا — وانتقل إلى الموسم التالي.</string>
+    <string name="settings_autoplay_next_description">عند انتهاء حلقة، شغّل الحلقة التالية تلقائيًا — وانتقل إلى الموسم التالي. كما تتابع مشاهدة البث الفائت إلى البرنامج التالي.</string>
     <string name="settings_catchup">مشاهدة البث الفائت</string>
     <plurals name="settings_catchup_supported">
         <item quantity="zero"><xliff:g id="count">%1$d</xliff:g> قناة تدعم مشاهدة البث الفائت · المنطقة الزمنية والمشغّل لتشغيل الأرشيف</item>
@@ -310,12 +361,44 @@
     <string name="settings_accent_green">أخضر</string>
     <string name="settings_accent_amber">كهرماني</string>
     <string name="settings_group_profile">الملف الشخصي</string>
-    <string name="settings_group_content">المحتوى</string>
+    <string name="settings_group_sources">المصادر ودليل البرامج</string>
+    <string name="settings_group_layout">التخطيط</string>
+    <string name="settings_group_content_metadata">المحتوى والبيانات الوصفية</string>
+    <string name="settings_group_data">البيانات</string>
     <string name="settings_group_appearance">المظهر</string>
     <string name="settings_group_playback">التشغيل</string>
     <string name="settings_group_network">الشبكة</string>
     <string name="settings_dns">DNS</string>
     <string name="settings_group_app">التطبيق</string>
+    <string name="settings_group_summary_profile">الملفات الشخصية ومن يمكنه المشاهدة</string>
+    <string name="settings_group_summary_sources">قوائم التشغيل وبيانات الدليل وساعاتها</string>
+    <string name="settings_group_summary_appearance">السمة واللون المميز والزجاج والحركة وحجم النص</string>
+    <string name="settings_group_summary_layout">الشريط الجانبي واللوحات والقوائم وشاشة البداية</string>
+    <string name="settings_group_summary_content_metadata">التسمية والصور وخدمات الترجمة</string>
+    <string name="settings_group_summary_playback">مشغّل الفيديو وسجل أخطائه</string>
+    <!-- Translators: Video player settings: name of the section holding decoder, HDR and frame-rate settings. -->
+    <string name="settings_vp_section_engine">المحرك والصورة</string>
+    <!-- Translators: Video player settings: name of the section holding volume, audio language and surround settings. -->
+    <string name="settings_vp_section_sound">الصوت</string>
+    <!-- Translators: Video player settings: name of the section holding resume, auto-play and mini-player settings. -->
+    <string name="settings_vp_section_episodes">الحلقات والمشغّل المصغّر</string>
+    <!-- Translators: Video player settings: one-line summary under the "Engine &amp; picture" section name. -->
+    <string name="settings_vp_section_engine_summary">فك التشفير، HDR، معدل الإطارات</string>
+    <!-- Translators: Video player settings: one-line summary under the "Live TV" section name. -->
+    <string name="settings_vp_section_live_summary">المعاينة، الأرقام، زمن التأخير</string>
+    <!-- Translators: Video player settings: one-line summary under the "Sound" section name. -->
+    <string name="settings_vp_section_sound_summary">مستوى الصوت، اللغة، المحيطي</string>
+    <!-- Translators: Video player settings: one-line summary under the "Subtitles" section name. -->
+    <string name="settings_vp_section_subtitles_summary">الحجم، اللون، الموضع</string>
+    <!-- Translators: Video player settings: one-line summary under the "Episodes &amp; mini-player" section name. -->
+    <string name="settings_vp_section_episodes_summary">التشغيل التلقائي والمشغّل المصغّر</string>
+    <!-- Translators: Video player settings: one-line summary under the "Diagnostics" section name. -->
+    <string name="settings_vp_section_diagnostics_summary">سجلات مفصّلة للمشغّل</string>
+    <string name="settings_group_summary_network">الوكيل وDNS لاتصالات البث</string>
+    <string name="settings_group_summary_data">النسخ الاحتياطي والتنزيلات وسجل المشاهدة</string>
+    <string name="settings_group_summary_app">اللغة وبدء التشغيل والتحديثات ومعلومات التطبيق</string>
+    <string name="settings_group_quick">سريع</string>
+    <string name="settings_group_summary_quick">المفاتيح التي تستخدمها أكثر</string>
     <string name="settings_search_guide_logos">شعارات القنوات في الدليل</string>
     <string name="settings_search_keywords_profiles">مشاهدون أطفال وضع قفل PIN حساب</string>
     <string name="settings_search_keywords_playlists">M3U Xtream مصدر مزامنة إضافة إزالة</string>
@@ -434,6 +517,14 @@
     <string name="settings_reset_saved_volume_confirm">إعادة ضبط مستوى الصوت المحفوظ؟</string>
     <!-- Translators: Confirmation dialog body before forgetting the saved per-item volume. -->
     <string name="settings_reset_saved_volume_confirm_description">تعود كل قناة وكل فيلم وكل حلقة إلى مستوى الصوت الافتراضي. أما إعدادات التكبير المحفوظة فتبقى كما هي. يمكنك دائمًا ضبط عنصر واحد مرة أخرى من المشغّل.</string>
+    <!-- Translators: Settings row that forgets every per-item audio-sync offset. -->
+    <string name="settings_reset_saved_audio_delay">إعادة ضبط مزامنة الصوت المحفوظة</string>
+    <!-- Translators: Description of the reset-saved-audio-sync row. -->
+    <string name="settings_reset_saved_audio_delay_description">اختيار «تذكّر هذا التأخير» في المشغّل يحفظ مزامنة الصوت لتلك القناة أو الفيلم أو الحلقة. تعيد إعادة الضبط كل شيء إلى الإعداد أعلاه.</string>
+    <!-- Translators: Title of the confirmation dialog for resetting saved audio sync. -->
+    <string name="settings_reset_saved_audio_delay_confirm">إعادة ضبط مزامنة الصوت المحفوظة؟</string>
+    <!-- Translators: Body of the confirmation dialog for resetting saved audio sync. -->
+    <string name="settings_reset_saved_audio_delay_confirm_description">تعود كل قناة وفيلم وحلقة إلى مزامنة الصوت أعلاه. يتم الاحتفاظ بإعدادات التكبير ومستوى الصوت المحفوظة. يمكنك دائمًا ضبط واحدة منفردة مجددًا من المشغّل.</string>
     <!-- Translators: Setting label for how far rewind/forward jumps in a movie or episode. -->
     <string name="settings_seek_step">خطوة التقديم</string>
     <!-- Translators: Description of the seek step setting. -->
@@ -474,6 +565,7 @@
     <string name="settings_audio_sync_description">قدّم الصوت أو أخّره ليتطابق مع الفيديو. ينطبق على محرك mpv فقط.</string>
     <string name="settings_live_tv">البث التلفزيوني المباشر</string>
     <string name="settings_live_latency_description">مدى قرب التشغيل من البث المباشر. تعني القيمة الأقل قربًا أكبر من البث المباشر، ولكن مع مخزن مؤقت أصغر، لذلك قد تتقطّع عمليات البث الضعيفة أو تعيد الاتصال أكثر. ينطبق ذلك على القناة التالية التي تفتحها.</string>
+    <string name="settings_live_latency_bitrate_note">على قناة ذات معدل بت مرتفع جدًا — وخاصةً بدقة 4K — قد يحتفظ المخزن المؤقت بمدة أقل مما طلبت، لأن هناك حدًا لكمية الفيديو التي يمكن الاحتفاظ بها في الذاكرة دفعة واحدة.</string>
     <string name="settings_channel_numbers">أرقام القنوات</string>
     <string name="settings_channel_numbers_description">اعرض رقم القناة الذي يحدده مزوّدك بجوار الاسم في قائمة البث التلفزيوني المباشر وطبقة قائمة القنوات المتراكبة والمشغّل — وأدخل رقمًا بجهاز التحكم عن بُعد أثناء التشغيل بملء الشاشة للانتقال مباشرةً إلى تلك القناة (ينتقل زر «موافق» فورًا، ويلغي زر «رجوع»). يؤدي إيقاف الخيار إلى إخفاء جميع الأرقام وتجاهل مفاتيح الأرقام؛ ولن تفقد شيئًا، إذ يعيد تشغيله إظهارها.</string>
     <string name="settings_diagnostics">التشخيصات</string>
@@ -642,6 +734,12 @@
     <string name="settings_customize_rename_or_delete_category">إعادة تسمية الفئة أو حذفها</string>
     <string name="settings_customize_new_category">＋ فئة جديدة</string>
     <string name="settings_customize_sort_button">الترتيب: <xliff:g id="label">%1$s</xliff:g> ▾</string>
+
+    <string name="settings_customize_filter_button">التصفية: <xliff:g id="label">%1$s</xliff:g> ▾</string>
+    <string name="settings_customize_filter_title">تصفية القائمة</string>
+    <string name="settings_customize_filter_all">الكل</string>
+    <string name="settings_customize_filter_visible">الظاهرة</string>
+    <string name="settings_customize_filter_hidden">المخفية</string>
     <string name="settings_customize_new_categories_button">الفئات الجديدة: <xliff:g id="label">%1$s</xliff:g> ▾</string>
     <string name="settings_customize_rename_hint">لهذا الملف الشخصي فقط. اتركه فارغًا لاستعادة «<xliff:g id="name">%1$s</xliff:g>».</string>
     <string name="settings_customize_remove_pin_title">هل تريد إزالة قفل PIN؟</string>
@@ -1002,8 +1100,18 @@
     <string name="settings_subtitle_color_grey">رمادي</string>
     <string name="settings_live_preroll">التخزين المسبق للبث المباشر</string>
     <string name="settings_live_preroll_description">اجمع هذا القدر من الفيديو قبل أن تبدأ القناة المباشرة في التشغيل، ومرة أخرى بعد أي توقف مؤقت. هذه كمية فيديو وليست عدًّا تنازليًا. الإيقاف يضمن أسرع بداية ممكنة.</string>
+    <string name="settings_live_tune_timeout">التخلي عن القناة بعد</string>
+    <string name="settings_live_tune_timeout_description">إذا لم تظهر أي صورة على قناة مباشرة خلال هذه المدة، يتوقف OwnTV عن المحاولة ويخبرك بذلك، بدلاً من ترك شاشة سوداء بينما يجرّب كل مشغّل لديه. الخيار «أبدًا» يواصل المحاولة، وقد يستغرق ذلك أكثر من دقيقة على قناة أزالها مزوّدك. لا تُحتسب فترات الانتظار التي يطلبها المزوّد.</string>
     <string name="settings_live_preroll_per_playlist">التخزين المسبق لكل قائمة تشغيل</string>
     <string name="settings_live_preroll_per_playlist_description">تجاوز الإعداد أعلاه لقائمة تشغيل واحدة مع الحفاظ على سرعة بقية قوائم التشغيل.</string>
+    <!-- Translators: Title of the per-playlist Live TV engine override row. -->
+    <string name="settings_live_engine_per_playlist">مشغّل البث المباشر لكل قائمة تشغيل</string>
+    <!-- Translators: Description of the per-playlist Live TV engine override row. -->
+    <string name="settings_live_engine_per_playlist_description">تجاوز الإعداد أعلاه لقائمة تشغيل واحدة، لمزوّد تعمل قنواته جيدًا مع أحد المشغّلين فقط.</string>
+    <!-- Translators: Title of the per-playlist Live latency override row. -->
+    <string name="settings_live_latency_per_playlist">زمن استجابة البث المباشر لكل قائمة تشغيل</string>
+    <!-- Translators: Description of the per-playlist Live latency override row. -->
+    <string name="settings_live_latency_per_playlist_description">تجاوز الإعداد أعلاه لقائمة تشغيل واحدة، لمزوّد يحتاج إلى مخزن مؤقت أكبر أو أصغر من غيره.</string>
     <plurals name="settings_live_preroll_overrides">
         <item quantity="zero"><xliff:g id="count">%1$d</xliff:g> من قوائم التشغيل</item>
         <item quantity="one"><xliff:g id="count">%1$d</xliff:g> من قوائم التشغيل</item>
@@ -1071,7 +1179,12 @@
     <string name="settings_main_interface_font">خط الواجهة الرئيسية</string>
     <string name="settings_popup_font">خط النوافذ المنبثقة</string>
     <string name="settings_choose_font">اختر الخط</string>
-    <string name="settings_font_size_range">اضبط نص التطبيق من <xliff:g id="min">%1$d</xliff:g>%% إلى <xliff:g id="max">%2$d</xliff:g>%%. تحتفظ الترجمة بحجمها الخاص.</string>
+    <string name="settings_font_size_range">اضبط نص واجهة التطبيق الرئيسية، وليس النوافذ المنبثقة، من <xliff:g id="min">%1$d</xliff:g>%% إلى <xliff:g id="max">%2$d</xliff:g>%%. تحتفظ الترجمة بحجمها الخاص.</string>
+    <string name="settings_popup_font_size">حجم خط النوافذ المنبثقة</string>
+    <string name="settings_popup_font_size_description">يغيّر النص في مربعات الحوار والقوائم فقط</string>
+    <string name="settings_popup_size">حجم النوافذ المنبثقة</string>
+    <string name="settings_popup_size_description">غيّر حجم مربعات الحوار والقوائم دون تغيير حجم النص</string>
+    <string name="settings_popup_size_range">غيّر حجم مربعات الحوار والقوائم (<xliff:g id="min">%1$d</xliff:g>%%–<xliff:g id="max">%2$d</xliff:g>%%).</string>
     <string name="settings_font_preview">ترفيه أبسط وأكثر متعة.</string>
     <string name="settings_search_keywords_fonts">خط نص حجم كتابة نوافذ قراءة وصول</string>
     <string name="settings_font_system_sans">خط النظام بلا زوائد</string>
@@ -1098,8 +1211,71 @@
     <string name="settings_glass_highlight_title">قوة الإضاءة</string>
     <string name="settings_glass_highlight_description">اضبط إضاءة الزجاج وحدوده عند التركيز.</string>
     <string name="settings_glass_live_preview">معاينة مباشرة</string>
+    <string name="settings_glass_screen_description">لوحات شفافة ضبابية وصورة خلفية ومستوى الشفافية</string>
+    <string name="settings_glass_master_description">ألواح شفافة ضبابية فوق صورة خلفية، أو فوق خلفية التطبيق نفسه.</string>
+    <string name="settings_glass_background_image">اختيار صورة خلفية</string>
+    <string name="settings_glass_surface_transparency_title">الشفافية</string>
+    <string name="settings_glass_background_blur_title">التمويه / الضبابية</string>
+    <string name="settings_glass_section_appearance">المظهر</string>
+    <string name="settings_glass_section_fine_tuning">خيارات متقدمة</string>
+    <string name="settings_glass_section_behavior">السلوك</string>
+    <string name="settings_glass_apply_to">الأسطح الزجاجية</string>
+    <string name="settings_glass_surface_all">الكل</string>
+    <string name="settings_glass_background_action_description">اختيار صورة خلفية</string>
+    <string name="settings_glass_transparency_short_description">20–100 · 5</string>
+    <string name="settings_glass_blur_short_description">0–100 · 10</string>
+    <string name="settings_glass_highlight_short_description">اضبط إضاءة الزجاج وحدوده عند التركيز.</string>
+    <string name="settings_glass_full_transparency_short">السماح بالشفافية الكاملة</string>
+    <string name="settings_glass_full_transparency_short_description">يعطّل الحد التلقائي للوضوح للحصول على أكثر زجاج شفافية.</string>
+    <string name="settings_glass_depth_effects_short">العمق والظلال</string>
+    <string name="settings_glass_depth_effects_short_description">يفعّل إضاءة انتقال التركيز والمنظور الخفيف وحركة العمق.</string>
+    <string name="settings_glass_reset_balanced">إعادة الضبط: متوازن</string>
     <string name="settings_glass_full_transparency_title">السماح بالشفافية الكاملة</string>
     <string name="settings_glass_full_transparency_description">يعطّل الحد التلقائي للوضوح للحصول على أكثر زجاج شفافية.</string>
     <string name="settings_glass_depth_title">العمق والظلال</string>
     <string name="settings_glass_depth_description">يفعّل إضاءة انتقال التركيز والمنظور الخفيف وحركة العمق.</string>
+    <string name="settings_header_hint">يسارًا: المجموعات · يمينًا: إعداداتها · اضغط مطولاً على صف لتثبيته في سريع</string>
+    <string name="settings_spine_eyebrow">كل المجموعات</string>
+    <string name="settings_spine_title">تصفح الإعدادات</string>
+    <string name="settings_spine_hint">تبقى سريع مثبتة في الأعلى؛ والمؤشر يتبع المجموعة التي أنت فيها.</string>
+    <string name="settings_spine_foot">اللون المميز يتبع تركيزك</string>
+    <string name="settings_row_menu_pin">تثبيت في سريع</string>
+    <string name="settings_row_menu_unpin">إزالة من سريع</string>
+    <string name="settings_row_menu_move_up">نقل لأعلى</string>
+    <string name="settings_row_menu_move_down">نقل لأسفل</string>
+    <string name="settings_quick_empty_title">لا شيء مثبت بعد</string>
+    <string name="settings_quick_empty_hint">اضغط مطولاً على زر OK فوق أي إعداد واختر “تثبيت في سريع”.</string>
+    <string name="settings_results_title">النتائج</string>
+    <string name="settings_results_summary">كل تطابق أينما كان — مع مساره</string>
+    <plurals name="settings_setting_count">
+        <item quantity="zero"><xliff:g id="count">%1$d</xliff:g> إعداد</item>
+        <item quantity="one"><xliff:g id="count">%1$d</xliff:g> إعداد</item>
+        <item quantity="two"><xliff:g id="count">%1$d</xliff:g> إعدادان</item>
+        <item quantity="few"><xliff:g id="count">%1$d</xliff:g> إعدادات</item>
+        <item quantity="many"><xliff:g id="count">%1$d</xliff:g> إعدادًا</item>
+        <item quantity="other"><xliff:g id="count">%1$d</xliff:g> إعداد</item>
+    </plurals>
+    <plurals name="settings_pinned_count">
+        <item quantity="zero"><xliff:g id="count">%1$d</xliff:g> عنصر مثبت</item>
+        <item quantity="one"><xliff:g id="count">%1$d</xliff:g> عنصر مثبت</item>
+        <item quantity="two"><xliff:g id="count">%1$d</xliff:g> عنصران مثبتان</item>
+        <item quantity="few"><xliff:g id="count">%1$d</xliff:g> عناصر مثبتة</item>
+        <item quantity="many"><xliff:g id="count">%1$d</xliff:g> عنصرًا مثبتًا</item>
+        <item quantity="other"><xliff:g id="count">%1$d</xliff:g> عنصر مثبت</item>
+    </plurals>
+    <plurals name="settings_match_count">
+        <item quantity="zero"><xliff:g id="count">%1$d</xliff:g> تطابق</item>
+        <item quantity="one"><xliff:g id="count">%1$d</xliff:g> تطابق</item>
+        <item quantity="two"><xliff:g id="count">%1$d</xliff:g> تطابقان</item>
+        <item quantity="few"><xliff:g id="count">%1$d</xliff:g> تطابقات</item>
+        <item quantity="many"><xliff:g id="count">%1$d</xliff:g> تطابقًا</item>
+        <item quantity="other"><xliff:g id="count">%1$d</xliff:g> تطابق</item>
+    </plurals>
+    <string name="settings_guide_width">عرض أعمدة الدليل</string>
+    <string name="settings_guide_width_description">غيّر عرض قائمة القنوات والخط الزمني لـ EPG في دليل التلفزيون.</string>
+    <string name="settings_search_keywords_guide_width">دليل epg قناة قائمة خط زمني عمود لوحة عرض حجم تغيير تخطيط</string>
+    <string name="settings_guide_width_summary">قائمة القنوات %1$d%% · الخط الزمني لـ EPG %2$d%%</string>
+    <string name="settings_guide_width_help">• تتشارك قائمة القنوات والخط الزمني لـ EPG صفًا واحدًا، لذلك يجب أن يكون المجموع 100%%.\n• يعرض توسيع قائمة القنوات جزءًا أقل من الخط الزمني؛ وتبقى مدد البرامج ومقياس الوقت بلا تغيير.\n• يبقى عرض كل عمود 10%% على الأقل.\n• تعيد إعادة الضبط قائمة القنوات إلى 10%% والخط الزمني إلى 90%%.\n• يؤدي إيقاف التخصيص إلى استعادة التخطيط القياسي دون فقدان قيمك.</string>
+    <string name="settings_guide_width_channels">قائمة القنوات</string>
+    <string name="settings_guide_width_epg">الخط الزمني لـ EPG</string>
 </resources>
