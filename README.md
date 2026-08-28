@@ -9,7 +9,7 @@
 
 <p align="center">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Android%20TV-3DDC84?logo=android&logoColor=white">
-  <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-2.3.21-7F52FF?logo=kotlin&logoColor=white">
+  <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-2.4.10-7F52FF?logo=kotlin&logoColor=white">
   <img alt="Compose for TV" src="https://img.shields.io/badge/Jetpack%20Compose-for%20TV-4285F4?logo=jetpackcompose&logoColor=white">
   <img alt="Player" src="https://img.shields.io/badge/engines-libmpv%20%2B%20ExoPlayer-FB8C00">
   <img alt="License" src="https://img.shields.io/badge/license-GPLv3-blue">
@@ -65,11 +65,11 @@ Scan to join from your phone:
 
 ### 🎬 Playback
 - **Dual engine** — libmpv (FFmpeg) for max compatibility + ExoPlayer for instant Live TV; per-channel toggle and automatic VOD fallback between them
-- Zero-copy **4K HDR** direct rendering · opt-in **auto frame rate** (off by default; 24/25/50/60 fps display matching, with the rate measured when a live stream doesn't declare one, and Android TV's own *Match content frame rate* preference respected) · **live buffering you control** (Live latency drives the real buffer, and it, the Pre-buffer gate and the choice of player can each be set per playlist) · context-aware channel zapping (dedicated CH± always works in the Live TV/catch-up player and stays in Favorites, History, All or the opened category) · **self-correcting surround sound** (Auto/Stereo only/Surround, with an audio-output watchdog that falls back to stereo if your TV or soundbar can't actually play it, including a clean ExoPlayer video restart) + 150% volume boost
+- Zero-copy **4K HDR** direct rendering · opt-in **auto frame rate** (off by default; 24/25/50/60 fps display matching, with the rate measured when a live stream doesn't declare one, and Android TV's own *Match content frame rate* preference respected) · **live buffering you control** (Live latency drives the real buffer, and it, the Pre-buffer gate and the choice of player can each be set per playlist) · context-aware channel zapping (dedicated CH± always works in the Live TV/catch-up player and stays in Favorites, History, All or the opened category) · **self-correcting surround sound** (Auto/Stereo only/Surround, with an audio-output watchdog that falls back to stereo if your TV or soundbar can't actually play it, a clean ExoPlayer video restart, and direct saved-position starts that keep working surround intact when Home resumes a film) + 150% volume boost
 - **Subtitles** — text (SRT/ASS), image (PGS/VOBSUB/DVB), closed captions, preferred-language auto-selection and independent font/style controls, plus OpenSubtitles search and local files; dedicated OpenSubtitles settings sign in on one panel — username, password and optional API key/Worker together — filled in on the TV or handed over from another device by QR + PIN
 - Resume prompts, next-episode auto-play, mini-player/PiP, **audio-only mode**, confirmed radio/audio-only item labelling, and a live codec/resolution/HDR stream-info overlay
 - **Behaves like a TV app** — remote/headset/assistant transport keys via a system media session, and audio focus that ducks for a notification instead of pausing your film
-- **Diagnostics you can send** — a playback log of failures *and* events, "Report this stream" from the info overlay, optional detailed trace, and a one-press export to `Download/owntv-playback-report.txt`
+- **Diagnostics you can send** — an Error log (Settings → App) holding the last crash *and* recent playback failures and events, "Report this stream" from the info overlay, optional detailed trace, and a one-press export to `Download/owntv-playback-report.txt`
 
 ### 🧭 Browse
 - **Continue Watching** home with TMDB-enriched previews; Live / Movies / Series / Downloads / Guide sections
@@ -159,22 +159,23 @@ More in **[extras/screenshots/](extras/screenshots/)** — playlist management, 
 
 | Area | Choice |
 |------|--------|
-| Language | Kotlin 2.3.21 (no `kotlin-android` plugin) |
-| Build | AGP 9.3.1 / Gradle 9.7.0, KSP2 2.3.11 |
-| UI | Jetpack Compose for TV (`androidx.tv:tv-material` 1.1.0), Compose BOM 2026.06.01 |
+| Language | Kotlin 2.4.10 (no `kotlin-android` plugin) |
+| Build | AGP 9.3.2 / Gradle 9.7.1, KSP2 2.3.11 |
+| UI | Jetpack Compose for TV (`androidx.tv:tv-material` 1.1.0), Compose BOM 2026.08.00 |
 | Media | **libmpv** (FFmpeg) — `dev.jdtech.mpv:libmpv` · **ExoPlayer/Media3** 1.11.0 (Live TV + image subs) |
-| Database | Room 2.8.4 + Paging 3.5.0 + FTS4 (WAL) |
-| DI | Koin 4.1.1 |
+| Database | Room 2.8.4 + Paging 3.5.1 + FTS4 (WAL) |
+| DI | Koin 4.2.2 |
 | Networking | OkHttp 5 (`okhttp-android`) |
-| Images | Coil 3.3.0 |
+| Images | Coil 3.6.0 |
 | Preferences | DataStore |
 
-`minSdk 26`, `targetSdk 36`, `applicationId tv.own.owntv`.
+`minSdk 26`, `targetSdk 36`, `compileSdk 37`, `applicationId tv.own.owntv`.
 
 > **Build note:** there is no `kotlin-android` plugin. AGP 9 ships its own Kotlin, but the Compose
 > compiler plugin pulls the Kotlin Gradle plugin up to the `kotlin` version pinned in
 > `gradle/libs.versions.toml` — that is what actually compiles the app, so keep the Compose compiler
-> plugin on exactly that version. KSP must track the same Kotlin line for Room codegen to work.
+> plugin on exactly that version. KSP versions its own way and does **not** have to match that number
+> — KSP2 2.3.11 is the current release and drives Room's codegen against Kotlin 2.4.10 without issue.
 
 ## ⚙️ How it works (backend)
 

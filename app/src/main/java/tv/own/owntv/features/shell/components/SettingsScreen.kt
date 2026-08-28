@@ -712,12 +712,6 @@ fun SettingsScreen(
             focus = rowFocus.getValue(SettingsTab.VIDEO),
             onClick = { open(SettingsTab.VIDEO) },
         ),
-        RootRow(
-            "error_log", TileTone.SECONDARY, OwnTVIcon.WARNING,
-            title = stringResource(R.string.settings_playback_error_log), desc = stringResource(R.string.settings_playback_error_description),
-            focus = errorLogRowFocus,
-            onClick = { saveScroll(); dialogReturn = errorLogRowFocus; showErrorLog = true },
-        ),
         RootGroup("group_network", stringResource(R.string.settings_network_group), OwnTVIcon.NETWORK, stringResource(R.string.settings_group_summary_network)),
         RootRow(
             tabRowKey(SettingsTab.NETWORK), TileTone.SECONDARY, OwnTVIcon.NETWORK,
@@ -792,6 +786,14 @@ fun SettingsScreen(
             title = stringResource(R.string.settings_about), desc = stringResource(R.string.settings_about_description),
             focus = aboutRowFocus,
             onClick = { saveScroll(); dialogReturn = aboutRowFocus; showAbout = true },
+        ),
+        // Last row in the app, deliberately: the log now carries the last crash as well as playback
+        // failures, so it belongs with About rather than under Playback.
+        RootRow(
+            "error_log", TileTone.SECONDARY, OwnTVIcon.WARNING,
+            title = stringResource(R.string.settings_playback_error_log), desc = stringResource(R.string.settings_playback_error_description),
+            focus = errorLogRowFocus,
+            onClick = { saveScroll(); dialogReturn = errorLogRowFocus; showErrorLog = true },
         ),
     )
 
@@ -1047,7 +1049,7 @@ fun SettingsScreen(
             SettingsSearchEntry(videoPlayerGroup, stringResource(R.string.settings_subtitle_appearance), stringResource(R.string.settings_search_keywords_subtitle_appearance), OwnTVIcon.SUBTITLE, TileTone.TERTIARY) { open(SettingsTab.VIDEO) },
             SettingsSearchEntry(videoPlayerGroup, stringResource(R.string.settings_live_latency), stringResource(R.string.settings_search_keywords_latency), OwnTVIcon.LIVE_TV, TileTone.TERTIARY) { open(SettingsTab.VIDEO) },
             SettingsSearchEntry(videoPlayerGroup, stringResource(R.string.settings_live_preroll), stringResource(R.string.settings_search_keywords_live_preroll), OwnTVIcon.LIVE_TV, TileTone.TERTIARY) { open(SettingsTab.VIDEO) },
-            SettingsSearchEntry(stringResource(R.string.settings_group_playback), stringResource(R.string.settings_playback_error_log), stringResource(R.string.settings_search_keywords_errors), OwnTVIcon.WARNING, TileTone.SECONDARY) { saveScroll(); dialogReturn = searchFieldFocus; showErrorLog = true },
+            SettingsSearchEntry(stringResource(R.string.settings_app_group), stringResource(R.string.settings_playback_error_log), stringResource(R.string.settings_search_keywords_errors), OwnTVIcon.WARNING, TileTone.SECONDARY) { saveScroll(); dialogReturn = searchFieldFocus; showErrorLog = true },
             SettingsSearchEntry(videoPlayerGroup, stringResource(R.string.settings_detailed_playback_logging), stringResource(R.string.settings_search_keywords_detailed_logging), OwnTVIcon.INFO, TileTone.SECONDARY) { open(SettingsTab.VIDEO) },
             SettingsSearchEntry(stringResource(R.string.settings_group_network), stringResource(R.string.common_proxy), stringResource(R.string.settings_search_keywords_proxy), OwnTVIcon.NETWORK, TileTone.SECONDARY) { open(SettingsTab.NETWORK) },
             SettingsSearchEntry(stringResource(R.string.settings_group_network), stringResource(R.string.settings_dns), stringResource(R.string.settings_search_keywords_dns), OwnTVIcon.DNS, TileTone.SECONDARY) { open(SettingsTab.DNS) },

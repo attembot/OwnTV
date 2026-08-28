@@ -66,7 +66,11 @@ class LiveTimeshift(
 
     /** How deep [ch]'s archive is, in seconds — the bound every jump and scrub is clamped to. */
     fun windowSec(ch: ChannelEntity): Int =
-        (ch.catchupDays.takeIf { it > 0 } ?: DEFAULT_CATCHUP_DAYS) * 24 * 3600
+        // Capped: `catchup-days` comes from the playlist, and a silly value there overflowed the
+        // seconds to a NEGATIVE window, which made beginAt's coerceIn(1, window) an empty range —
+        // an IllegalArgumentException in the middle of tuning. A month of archive is already more
+        // than any provider keeps.
+        (ch.catchupDays.takeIf { it > 0 } ?: DEFAULT_CATCHUP_DAYS).coerceAtMost(MAX_CATCHUP_DAYS) * 24 * 3600
 
     /** Offsets worth offering for [ch], nearest first. Empty when the channel has no archive. */
     fun jumpOptions(ch: ChannelEntity): List<Int> =

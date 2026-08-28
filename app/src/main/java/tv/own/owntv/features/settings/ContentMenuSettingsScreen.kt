@@ -1,7 +1,6 @@
 package tv.own.owntv.features.settings
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -25,11 +23,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -41,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import kotlinx.coroutines.flow.first
 import org.koin.androidx.compose.koinViewModel
 import tv.own.owntv.R
 import tv.own.owntv.ui.components.ContentMenu
@@ -48,10 +45,14 @@ import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.OwnTVButton
 import tv.own.owntv.ui.components.OwnTVButtonStyle
 import tv.own.owntv.ui.components.OwnTVIcon
+import tv.own.owntv.ui.components.OwnTVPopup
 import tv.own.owntv.ui.components.applyMenuOrder
+import tv.own.owntv.ui.components.dialogPanel
+import tv.own.owntv.ui.components.modalScrim
 import tv.own.owntv.ui.components.roundedPanel
 import tv.own.owntv.ui.components.trapAllFocusExit
 import tv.own.owntv.ui.theme.OwnTVTheme
+import tv.own.owntv.ui.theme.PopupFontTheme
 
 /**
  * One arrangeable action, for the settings screen only. The long-press menus build their own
@@ -226,12 +227,12 @@ private fun ArrangeMenuOverlay(
     val vm: SettingsViewModel = koinViewModel()
     val colors = OwnTVTheme.colors
     val refs = catalogue(menu)
-    val saved by remember(menu) { vm.menuOrder(menu) }.collectAsStateWithLifecycle(emptyList())
-    // Seeded once from the stored order: after that the list belongs to the overlay, so a save
-    // arriving mid-edit cannot fight the user's own moves.
+    // Wait for DataStore's first real value before seeding. An eager empty placeholder would make
+    // every reopened editor show the shipped order even when a custom order is already saved.
     var keys by remember(menu) { mutableStateOf(emptyList<String>()) }
-    LaunchedEffect(menu, saved) {
-        if (keys.isEmpty()) keys = applyMenuOrder(refs.map { it.key }, saved) { it }
+    LaunchedEffect(menu) {
+        val saved = vm.menuOrder(menu).first()
+        keys = applyMenuOrder(refs.map { it.key }, saved) { it }
     }
     // -1 = nothing picked up; otherwise the index Up/Down carries.
     var picked by remember(menu) { mutableIntStateOf(-1) }
@@ -249,59 +250,62 @@ private fun ArrangeMenuOverlay(
         picked = to
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.88f))
-            .trapAllFocusExit()
-            .focusGroup()
-            // Only while an action is picked up: Up/Down carry it instead of moving focus.
-            .onPreviewKeyEvent { event ->
-                if (picked < 0 || event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                when (event.key) {
-                    Key.DirectionUp -> { move(-1); true }
-                    Key.DirectionDown -> { move(1); true }
-                    else -> false
+    // The shared popup shape, not a hand-rolled panel: the Movies menu alone has thirteen actions, and
+    // a fixed-height Column that tall is centred on a 540dp-high television with its title and its
+    // Save/Cancel row hanging off both ends. dialogPanel() scrolls, and it honours the Glass setting.
+    OwnTVPopup(onDismissRequest = onCancel) {
+        PopupFontTheme(fontScale = 0.75f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .modalScrim()
+                    .trapAllFocusExit()
+                    .focusGroup()
+                    // Only while an action is picked up: Up/Down carry it instead of moving focus.
+                    .onPreviewKeyEvent { event ->
+                        if (picked < 0 || event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        when (event.key) {
+                            Key.DirectionUp -> { move(-1); true }
+                            Key.DirectionDown -> { move(1); true }
+                            else -> false
+                        }
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(
+                    modifier = Modifier.dialogPanel(width = 480.dp, padding = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(menuTitle(menu), style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
+                    Text(
+                        stringResource(R.string.settings_content_menus_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    keys.forEachIndexed { index, key ->
+                        val ref = refs.first { it.key == key }
+                        ArrangeMenuRow(
+                            label = stringResource(ref.labelRes),
+                            picked = picked == index,
+                            onPick = { picked = if (picked == index) -1 else index },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .then(
+                                    when {
+                                        picked == index -> Modifier.focusRequester(pickedFocus)
+                                        picked < 0 && index == 0 -> Modifier.focusRequester(firstFocus)
+                                        else -> Modifier
+                                    },
+                                ),
+                        )
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                        OwnTVButton(stringResource(R.string.common_save), onClick = { onSave(keys) }, modifier = Modifier.weight(1f))
+                        OwnTVButton(stringResource(R.string.common_cancel), onClick = onCancel, style = OwnTVButtonStyle.SECONDARY, modifier = Modifier.weight(1f))
+                    }
                 }
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            modifier = Modifier
-                .width(480.dp)
-                .clip(RoundedCornerShape(20.dp))
-                .background(colors.surfaceContainerHigh)
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(menuTitle(menu), style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
-            Text(
-                stringResource(R.string.settings_content_menus_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(4.dp))
-            keys.forEachIndexed { index, key ->
-                val ref = refs.first { it.key == key }
-                ArrangeMenuRow(
-                    label = stringResource(ref.labelRes),
-                    picked = picked == index,
-                    onPick = { picked = if (picked == index) -1 else index },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .then(
-                            when {
-                                picked == index -> Modifier.focusRequester(pickedFocus)
-                                picked < 0 && index == 0 -> Modifier.focusRequester(firstFocus)
-                                else -> Modifier
-                            },
-                        ),
-                )
-            }
-            Spacer(Modifier.height(4.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                OwnTVButton(stringResource(R.string.common_save), onClick = { onSave(keys) }, modifier = Modifier.weight(1f))
-                OwnTVButton(stringResource(R.string.common_cancel), onClick = onCancel, style = OwnTVButtonStyle.SECONDARY, modifier = Modifier.weight(1f))
             }
         }
     }

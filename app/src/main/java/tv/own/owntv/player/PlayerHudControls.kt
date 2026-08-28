@@ -16,6 +16,7 @@ import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -61,6 +62,7 @@ import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.OwnTVIcon
 import androidx.compose.ui.focus.onFocusChanged
 import tv.own.owntv.ui.theme.OwnTVTheme
+import tv.own.owntv.ui.theme.animationsOn
 import tv.own.owntv.ui.theme.ownTvTween
 import tv.own.owntv.ui.format.localizedDecimal
 import tv.own.owntv.ui.format.rememberSystemTimeFormatter
@@ -167,14 +169,23 @@ internal fun TimeCap(text: String, alignment: Alignment.Horizontal) {
 internal fun LiveStateBadge(offsetSec: Int?) {
     val behind = offsetSec != null && offsetSec > 1
     val tint = if (behind) Color(0xFFE8A33D) else Color(0xFFDC3232)
-    // Only the live edge pulses; "behind" is a static statement of fact. ownTvTween governs the fade,
-    // so Reduce animations already settles it to a steady dot.
-    val transition = rememberInfiniteTransition(label = "liveDot")
-    val pulse by transition.animateFloat(
-        initialValue = 1f, targetValue = 0.25f,
-        animationSpec = infiniteRepeatable(ownTvTween(900), RepeatMode.Reverse),
-        label = "liveDotAlpha",
-    )
+    // Only the live edge pulses; "behind" is a static statement of fact.
+    //
+    // NEVER hand ownTvTween() to infiniteRepeatable. With Animations = Off it is a 0 ms tween, and
+    // Compose's VectorizedInfiniteRepeatableSpec divides the play time by the iteration duration to
+    // find the current repeat — 0 ms means a divide-by-zero on the main thread on the very next frame.
+    // That shipped in 4.2.3 and crashed full-screen Live TV for every user with animations turned off.
+    // Reduce animations is honoured by skipping the transition entirely instead.
+    val pulse = if (behind || !animationsOn) {
+        1f
+    } else {
+        val transition = rememberInfiniteTransition(label = "liveDot")
+        transition.animateFloat(
+            initialValue = 1f, targetValue = 0.25f,
+            animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
+            label = "liveDotAlpha",
+        ).value
+    }
     Row(
         Modifier.clip(RoundedCornerShape(7.dp)).background(tint.copy(alpha = 0.85f)).padding(horizontal = 9.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,

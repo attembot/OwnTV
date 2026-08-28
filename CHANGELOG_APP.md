@@ -9,6 +9,24 @@
 > (e.g. `(community PR #40 by @codeVerine)`). Issue numbers that are part of a title (e.g. `(#57)`) are
 > fine; explanatory parentheticals are not. Descriptions belong in CHANGELOG.md, never here.
 
+## v4.2.4 — 2026-08-27
+
+### ✨ New features
+
+- **🩺 A crash now leaves a report you can send**
+- **⚡ Playlists import and refresh faster**
+- **🚀 OwnTV opens faster**
+
+### 🐛 Fixes
+
+- **Live TV no longer crashes in full screen with Animations turned off**
+- **The long-press menu editor can be scrolled**
+- **An absurd catch-up length no longer breaks tuning**
+- **Stopping a stream during a retry no longer crashes the player**
+- **A refusing media session no longer takes playback with it**
+- **Long-press menu Settings shows the saved order**
+- **Home resume no longer trips working Auto surround into stereo or mpv**
+
 ## v4.2.3 — 2026-08-26
 
 ### ✨ New features

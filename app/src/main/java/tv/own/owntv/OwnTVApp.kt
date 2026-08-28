@@ -12,6 +12,7 @@ import coil3.request.allowRgb565
 import coil3.request.crossfade
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okio.Path.Companion.toOkioPath
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
@@ -74,6 +75,9 @@ class OwnTVApp : Application(), SingletonImageLoader.Factory, androidx.work.Conf
     override fun onCreate() {
         Perf.begin() // zero-point for the OwnTVPerf startup timeline (adb logcat -s OwnTVPerf)
         super.onCreate()
+        // First thing after the context exists: a crash from here on leaves a trace on disk that the
+        // user can export from Settings, instead of being lost with the process.
+        tv.own.owntv.core.util.CrashRecorder.install(this)
         startKoin {
             androidLogger(if (BuildConfig.DEBUG) Level.ERROR else Level.NONE)
             androidContext(this@OwnTVApp)
@@ -127,9 +131,15 @@ class OwnTVApp : Application(), SingletonImageLoader.Factory, androidx.work.Conf
         // unusable. OkHttp then needs retryOnConnectionFailure to try the next resolved address (the TV's
         // browser already does this fallback). Derive one long-lived client so Coil keeps the app-wide
         // proxy, DNS, UA, TLS and connection-pool configuration while regaining alternate-route fallback.
+        // The shared client is also pinned to HTTP/1.1, because IPTV panels answer an HTTP/2 handshake
+        // with RST_STREAM(PROTOCOL_ERROR). Image CDNs are the opposite case: image.tmdb.org negotiates
+        // h2, and a poster grid opens dozens of requests to that one host at once. Over HTTP/1.1 those
+        // queue behind OkHttp's per-host connection limit; over h2 they multiplex on a single connection.
+        // Restore protocol negotiation for images only — the panel-facing client keeps its 1.1 pin.
         val imageHttpClient = GlobalContext.get().get<OkHttpClient>()
             .newBuilder()
             .retryOnConnectionFailure(true)
+            .protocols(listOf(Protocol.HTTP_2, Protocol.HTTP_1_1))
             .build()
         return ImageLoader.Builder(context)
             .components { add(OkHttpNetworkFetcherFactory(callFactory = { imageHttpClient })) }

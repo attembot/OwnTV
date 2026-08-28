@@ -29,9 +29,7 @@ plugins {
 android {
     namespace = "tv.own.owntv"
     compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
+        version = release(37)
     }
 
     // Signing credentials AND local-only build switches, kept in a standalone properties file OUTSIDE

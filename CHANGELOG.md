@@ -1,5 +1,78 @@
 # Changelog
 
+## v4.2.4 — 2026-08-27
+
+### 🩺 A crash now leaves a report you can send
+
+- **The Playback error log is now simply Error log, and it lives under Settings → App, after About.**
+  It is no longer a playback-only page: alongside the most recent playback failures it now carries the
+  last crash, so one place answers "what went wrong" whatever went wrong. The row keeps its place in
+  settings search — searching for *error* or *crash* still finds it.
+- **A crash is written to disk the moment it happens** and survives the app being killed, so it is still
+  there the next time OwnTV opens. **Export** puts it at the top of the report file it saves to Downloads,
+  ahead of the playback history, which is the file to attach when reporting a problem.
+
+### ⚡ Playlists import and refresh faster
+
+- **Downloading a playlist and saving it into the library now happen at the same time.** Previously the two
+  took strict turns: reading the provider's list stopped completely while a batch was written, then the
+  database sat idle while the next batch was read. Both now run together, on every playlist type — M3U,
+  Xtream and Stalker portals alike, on a first import and on a refresh. Nothing about the resulting library
+  changes; there is simply less waiting.
+
+### 🚀 OwnTV opens faster
+
+- **The app is usable in roughly 0.7 seconds instead of 1.5, and Home fills in about 0.6 seconds instead
+  of 1.6.** Measured on a TCL Google TV over five cold starts before and after, with a full catalogue.
+  Nothing was removed or simplified to get there — the same rows, artwork and quality arrive, sooner.
+- **The largest single cause was the list of code OwnTV asks Android to prepare ahead of time.** That
+  list is recorded by walking the app, and it had been recorded on a fresh install, so it described the
+  first-run setup wizard rather than Home, Live TV, Movies, Series and Search. It is now recorded against
+  a real catalogue and covers every browse screen, so the first screen no longer has to be worked out
+  from scratch while you wait.
+- **Home no longer loads itself twice on startup.** Two separate triggers each asked for the same load a
+  fraction of a second apart, and the second one restarted work the first had nearly finished.
+- **Home's rows are now fetched all at once rather than one after another**, and the Continue watching row
+  no longer re-reads the same show from the database once per episode. On a library with a long history
+  this was the slowest part of opening the app.
+- **Posters load over a faster connection to the artwork service**, so a grid of covers no longer queues
+  up behind a handful of connections.
+- **Playlists and artwork are read with settings better suited to a television's storage.**
+
+### 🧰 Toolchain
+
+- **Updated to the current release of every build tool and library OwnTV depends on**, including Kotlin,
+  the Compose UI toolkit, the image loader and the networking stack. Building the project now requires
+  Android SDK 37; the app still runs on Android 8.0 and newer, exactly as before.
+
+### 🐛 Bug fixes
+
+- **Live TV no longer crashes when a channel goes full screen with Animations turned off.** The LIVE badge
+  introduced in 4.2.3 pulsed using a duration that the Animations = Off setting reduced to zero, which
+  brought the app down a frame later. Because the Animations setting is included in Backup & Restore, users
+  who reinstalled and restored hit it again immediately. The badge now simply stays steady when animations
+  are off.
+- **The long-press menu editor can be scrolled.** With thirteen actions, the Movies list was taller than a
+  television screen, so its title and its Save and Cancel buttons hung off the top and bottom with no way to
+  reach them. Every menu editor now scrolls within the panel.
+- **A playlist that claims an absurd catch-up length no longer breaks tuning.** A nonsense `catchup-days`
+  value overflowed the rewind window into a negative number and threw while the channel was being opened;
+  the value is now capped at 31 days.
+- **Stopping a stream during a retry no longer crashes the player.** Several retry paths re-read the current
+  stream address after their backoff delay, which could have been cleared by a stop in the meantime.
+- **A television whose media session refuses to start no longer takes playback with it.** The media session
+  exists so other apps and the TV's own controls can see what is playing; if it fails, the video now
+  continues regardless.
+- **Long-press menu Settings now reopens in the order you saved.** The editor briefly treated its empty
+  loading value as the real setting, filled itself with the shipped order and then ignored the saved
+  order when it arrived. Live TV, movie, series and episode editors now wait for their stored value, so
+  the arrangement shown in Settings matches the popup you actually use.
+- **Resuming from Home no longer makes working Auto surround fall back to stereo or mpv.** ExoPlayer
+  prepared a movie or episode at the beginning and immediately sought to Home's saved position, forcing
+  some TCL/Realtek TVs to rebuild a just-created E-AC3 output that then stayed silent. The saved position
+  is now part of the initial preparation, so Home resumes directly there with the same working audio path
+  as playback started from Movies or Series.
+
 ## v4.2.3 — 2026-08-26
 
 ### 🏷️ Every merged library says which provider an item came from

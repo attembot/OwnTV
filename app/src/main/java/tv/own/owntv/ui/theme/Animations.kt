@@ -34,7 +34,14 @@ val LocalAnimationLevel = staticCompositionLocalOf { AnimationLevel.FULL }
 val animationsOn: Boolean
     @Composable @ReadOnlyComposable get() = LocalAnimationLevel.current != AnimationLevel.OFF
 
-/** A tween whose duration follows the user's Animations setting (Off → an instant 0 ms snap). */
+/**
+ * A tween whose duration follows the user's Animations setting (Off → an instant 0 ms snap).
+ *
+ * **Never pass this to `infiniteRepeatable`.** Compose divides the play time by the iteration
+ * duration to work out which repeat it is in, so a 0 ms iteration is a divide-by-zero on the main
+ * thread one frame after the animation starts. Gate the whole transition on [animationsOn] instead
+ * and hand `infiniteRepeatable` a plain fixed-duration `tween`.
+ */
 @Composable
 @ReadOnlyComposable
 fun <T> ownTvTween(durationMs: Int = 200, easing: Easing = FastOutSlowInEasing): TweenSpec<T> =

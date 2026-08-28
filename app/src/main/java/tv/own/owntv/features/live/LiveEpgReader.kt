@@ -24,6 +24,9 @@ import tv.own.owntv.core.stalker.StreamUrlResolver
  *  offered a day of programmes in the list and a week of rewinding on the timeline. */
 internal const val DEFAULT_CATCHUP_DAYS = 7
 
+/** Upper bound on a playlist's `catchup-days`. Guards the arithmetic that turns it into seconds. */
+internal const val MAX_CATCHUP_DAYS = 31
+
 private const val CATCHUP_LOOKBACK_CAP_MS = 48L * 60 * 60 * 1000 // bounded by the EPG we retain (~2 days)
 
 // How far past a finished catch-up programme to look for the next one. Beyond this the guide has a

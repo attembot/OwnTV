@@ -798,7 +798,7 @@ included in **Backup & Restore**.
   **OK** to drop it, then **Save** — nothing is written until you do, and Back or Cancel discards. **Reset**
   restores the shipped order, per menu or for all four at once. **Close** always stays last.
   An order you set keeps working after an update: a new action is added at the end and a removed one is
-  simply skipped.
+  simply skipped. Reopening the editor shows the same saved order as the long-press popup itself.
 
 - **Settings → Customize Categories & Items**: **hide, rename and reorder** categories, plus **unhide**
   individual channels, movies and series from one place. Pick a section at the top (Live TV / Movies /
@@ -970,8 +970,12 @@ included in **Backup & Restore**.
 - 🎬 **Every playback setting is on one page.** **Settings → Video player** is the complete list —
   HDR, Auto frame rate, Surround sound, Auto-play next, Live preview, Preview sound and Mini player
   sit there alongside the decoder, zoom, volume, subtitle and Live TV settings, so you never have to
-  remember which of two screens a setting was on. The main Settings page keeps **Video player** and
-  the **Playback error log**; the quick-toggle chips above it still cover the most-used switches.
+  remember which of two screens a setting was on. The main Settings page keeps **Video player**; the
+  quick-toggle chips above it still cover the most-used switches.
+- 🩺 **Error log** (App, the last row, after About) — the last crash plus the most recent playback
+  failures, newest first. **Export** writes them to `OwnTV-playback-report.txt` in **Downloads**, crash
+  first; attach that file when reporting a problem. A crash is saved as it happens, so it is still there
+  after the app has closed itself. Searching Settings for *error* or *crash* opens this page directly.
 - 🌐 **Custom DNS** (Network → DNS) — use the TV’s normal DNS, choose Google, Cloudflare or Quad9,
   or enter your own DNS server / DNS‑over‑HTTPS address. Your enabled state and selected server are
   saved immediately and restored after restarting OwnTV. **Test DNS** checks the current entry before
@@ -1144,6 +1148,8 @@ included in **Backup & Restore**.
   sound again) — restart the app, or change this setting, to give your equipment another try. When a movie
   or episode is using **ExoPlayer**, this recovery briefly rebuilds the picture on a clean video surface
   and resumes at the same position; it does not treat the audio change as a reason to switch to mpv.
+  Resuming a film or episode from Home also opens directly at its saved position, so Auto surround is not
+  torn down and rebuilt during startup.
 
   Applies to **Live TV, Movies and Series on both players**. Changing it re-opens whatever is playing.
   If sound and picture still drift, nudge it live with the player's **Audio → A/V sync**, and turn on

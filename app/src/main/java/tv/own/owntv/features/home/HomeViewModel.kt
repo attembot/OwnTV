@@ -5,13 +5,18 @@ import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -202,6 +207,12 @@ data class ContinueTarget(
     val positionMs: Long = 0L,
 )
 
+/**
+ * How long reload requests are gathered before one load actually runs. Long enough to swallow the
+ * cold-start burst (the triggers land within single-digit milliseconds of each other), short enough
+ * to be invisible when the user's own action asks for a refresh.
+ */
+
 private const val SLICE_WINDOW_MS = 360 * 60_000L
 private const val RECENT_LIVE_ROW_LIMIT = 20
 
@@ -226,12 +237,41 @@ class HomeViewModel(
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
+    /**
+     * Single entry point for "rebuild the Home rails". Every trigger goes through here rather than
+     * calling loadHomeData directly, because there is more than one of them and on a cold start they
+     * all fire at once: the trending-table observer below gets Room's immediate first emission, and the
+     * shell runs its own refresh as soon as Home is the selected section. Measured on a TCL, that put
+     * two full loads — ~15 dependent queries each — on the database concurrently at the single most
+     * contended moment of launch, and the two completion stamps landed 6ms apart, so the second one was
+     * pure duplicated work. Conflating buffer + debounce collapses that burst into one load, and
+     * collectLatest keeps a genuine post-sync invalidation from queueing behind a stale in-flight pass.
+     */
+    private val reloadRequests = MutableSharedFlow<Long?>(
+        replay = 1, // the first request is emitted before the collector below is running — don't lose it
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+
     init {
+        viewModelScope.launch {
+            reloadRequests.collectLatest { known ->
+                (known ?: currentProfileId())?.let { profileId ->
+                    loadHomeData(profileId)
+                }
+            }
+        }
         // Room invalidates this after the worker atomically replaces a snapshot, so Home updates even
         // when the user stays on the screen throughout a background post-sync refresh.
+        //
+        // drop(1) discards Room's *initial* emission, which carries no news: it fires the moment this
+        // flow is collected, and loadHomeData reads the trending table itself anyway, so acting on it
+        // only duplicated the load the shell already asks for when Home becomes the selected section.
+        // On a cold start that duplicate was the single largest delay on the screen — the two triggers
+        // arrived hundreds of milliseconds apart, so no amount of coalescing could merge them without
+        // holding the first one back. Only genuine post-first invalidations reach here now.
         viewModelScope.launch {
-            trendingDao.observeAllItems().collect {
-                currentProfileId()?.let { profileId -> loadHomeData(profileId) }
+            trendingDao.observeAllItems().drop(1).collect {
+                reloadRequests.emit(null)
             }
         }
     }
@@ -363,27 +403,46 @@ class HomeViewModel(
         heroPreviewEngine.play(hero.streamUrl, hero.seekToMs, ua, hero.httpHeaders)
     }
 
-    fun refresh() {
-        viewModelScope.launch {
-            val pid = currentProfileId() ?: return@launch
-            loadHomeData(pid)
-        }
+    /**
+     * [profileId] lets a caller that already holds a *validated* active profile skip the lookup this
+     * would otherwise do — a settings read plus a database round-trip that measured ~99ms on a TCL,
+     * spent while the rails are still blank. The shell qualifies: it only composes once the launch
+     * gate has confirmed the active id against Room's profile list. Everyone else passes nothing and
+     * gets the lookup.
+     */
+    fun refresh(profileId: Long? = null) {
+        reloadRequests.tryEmit(profileId?.takeIf { it >= 0 })
     }
 
     private suspend fun loadHomeData(profileId: Long) {
         val previous = _uiState.value
         val state = withContext(Dispatchers.IO) {
-            val config = settings.homeConfig(profileId).first()
-            val metadataConfig = settings.metadataConfig()
-            val preferredLanguage = metadataConfig.resolvedLanguage.substringBefore('-').ifBlank { "en" }.uppercase()
+            // These reads only depend on the profile id, so they are started together instead of one
+            // after another. That matters most for buildContinuationItems, which is by far the longest
+            // of them (150-400ms on a TCL) — run in sequence it used to add its whole duration to the
+            // wait; started here it finishes while the source-id, config and favourites reads happen.
+            // WAL lets SQLite serve concurrent readers, so this is real overlap, not just interleaving.
+            val configAsync = async { settings.homeConfig(profileId).first() }
+            val metadataAsync = async { settings.metadataConfig() }
             // Active-playlist filter + per-section enabledScope: Home rails never show Off sections.
-            val liveIds = activeSourceIds(settings, sourceDao, profileId, MediaType.LIVE).toSet()
-            val movieIds = activeSourceIds(settings, sourceDao, profileId, MediaType.MOVIE).toSet()
-            val seriesIds = activeSourceIds(settings, sourceDao, profileId, MediaType.SERIES).toSet()
-            val allIds = sourceDao.sourceIdsForProfile(profileId).toSet()
+            val liveIdsAsync = async { activeSourceIds(settings, sourceDao, profileId, MediaType.LIVE).toSet() }
+            val movieIdsAsync = async { activeSourceIds(settings, sourceDao, profileId, MediaType.MOVIE).toSet() }
+            val seriesIdsAsync = async { activeSourceIds(settings, sourceDao, profileId, MediaType.SERIES).toSet() }
+            val allIdsAsync = async { sourceDao.sourceIdsForProfile(profileId).toSet() }
+            val continuationAsync = async { planner.buildContinuationItems(profileId) }
+            val favouritesAsync = async { channelDao.favoritesListAlpha(profileId).first() }
+
+            val config = configAsync.await()
+            val metadataConfig = metadataAsync.await()
+            val preferredLanguage = metadataConfig.resolvedLanguage.substringBefore('-').ifBlank { "en" }.uppercase()
+            val liveIds = liveIdsAsync.await()
+            val movieIds = movieIdsAsync.await()
+            val seriesIds = seriesIdsAsync.await()
 
             // Hidden items / hidden categories (per profile) never surface on Home either.
-            val hidden = hiddenState(profileId, allIds.toList())
+            val hidden = hiddenState(profileId, allIdsAsync.await().toList())
+            // Trending and the recent-live query are independent of each other too.
+            val recentLiveAsync = async { recentlyWatchedLive(profileId, liveIds, filtering = true, RECENT_LIVE_ROW_LIMIT) }
             val trending = buildTrendingItems(
                 movieSourceIds = movieIds,
                 seriesSourceIds = seriesIds,
@@ -397,7 +456,7 @@ class HomeViewModel(
                 seriesDao.storedSeasonCounts(trendingSeriesIds).associate { it.seriesId to it.seasonCount }
             }
 
-            val allItems = planner.buildContinuationItems(profileId)
+            val allItems = continuationAsync.await()
             val items = allItems
                 .filter { item ->
                     val sid = continuationSourceId(item) ?: return@filter false
@@ -410,23 +469,30 @@ class HomeViewModel(
                 .filterNot { isContinuationHidden(it, hidden) }
             val movies = items.filter { it.kind == LauncherContinuationKind.MOVIE }
             val series = items.filter { it.kind == LauncherContinuationKind.EPISODE }
-            val liveWithTs = recentlyWatchedLive(profileId, liveIds, filtering = true, RECENT_LIVE_ROW_LIMIT)
+            val liveWithTs = recentLiveAsync.await()
                 .filterNot { isChannelHidden(it.channel, hidden) }
             val live = liveWithTs.map { it.channel }
-            val favLive = channelDao.favoritesListAlpha(profileId).first()
+            val favLive = favouritesAsync.await()
                 .filter { c -> c.sourceId in liveIds }
                 .filterNot { isChannelHidden(it, hidden) }
             val heroItems = buildHeroItems(items, liveWithTs, config)
-            val recentGuide = if (HomeRow.RECENT_CHANNELS in config.visibleOrder && config.recentLiveMode == HomeLiveRowMode.ON_NOW) {
-                buildLiveGuide(profileId, liveIds, live)
-            } else {
-                GuideSliceState()
+            // The two guide slices read different channel sets and never depend on each other.
+            val recentGuideAsync = async {
+                if (HomeRow.RECENT_CHANNELS in config.visibleOrder && config.recentLiveMode == HomeLiveRowMode.ON_NOW) {
+                    buildLiveGuide(profileId, liveIds, live)
+                } else {
+                    GuideSliceState()
+                }
             }
-            val favoriteGuide = if (HomeRow.FAVORITE_CHANNELS in config.visibleOrder && config.favoriteLiveMode == HomeLiveRowMode.ON_NOW) {
-                buildLiveGuide(profileId, liveIds, favLive)
-            } else {
-                GuideSliceState()
+            val favoriteGuideAsync = async {
+                if (HomeRow.FAVORITE_CHANNELS in config.visibleOrder && config.favoriteLiveMode == HomeLiveRowMode.ON_NOW) {
+                    buildLiveGuide(profileId, liveIds, favLive)
+                } else {
+                    GuideSliceState()
+                }
             }
+            val recentGuide = recentGuideAsync.await()
+            val favoriteGuide = favoriteGuideAsync.await()
 
             HomeUiState(
                 trendingItems = trending,
