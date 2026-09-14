@@ -8,7 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import tv.own.owntv.core.database.entity.ChannelEntity
 import tv.own.owntv.core.database.entity.SourceEntity
-import tv.own.owntv.core.database.entity.SourceType
+import tv.own.owntv.core.model.SourceType
 import tv.own.owntv.core.live.OpenStreamRegistry
 import tv.own.owntv.core.live.StreamPurpose
 import tv.own.owntv.core.live.StreamRefusal
