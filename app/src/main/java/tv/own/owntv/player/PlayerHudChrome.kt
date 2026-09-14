@@ -314,11 +314,49 @@ internal fun BottomBar(
     favorite: Boolean = false, onToggleFavorite: (() -> Unit)? = null,
     onOpenDialog: (HudDialog) -> Unit, onPip: (() -> Unit)?, onAudioMode: (() -> Unit)?,
     onMultiview: (() -> Unit)? = null, onRecordThis: (() -> Unit)? = null, recordingThis: Boolean = false,
-    onBack: () -> Unit, modifier: Modifier = Modifier,
+    onBack: () -> Unit,
+    // Fork: PiP corner controls (see PlayerHud).
+    onCornerSwap: (() -> Unit)? = null, onCornerAudio: (() -> Unit)? = null, onCornerMove: (() -> Unit)? = null, onCornerGrow: (() -> Unit)? = null, onCornerShrink: (() -> Unit)? = null, onCornerClose: (() -> Unit)? = null,
+    onChangeMain: (() -> Unit)? = null, onChangeCorner: (() -> Unit)? = null,
+    cornerAudioOn: Boolean = false,
+    modifier: Modifier = Modifier,
 ) {
     val seekStep by player.seekStepMs.collectAsStateWithLifecycle() // Settings -> Seek step
     val buffered by player.bufferedMs.collectAsStateWithLifecycle()
-    Dock(modifier = modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 20.dp)) {
+    Column(modifier = modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 20.dp)) {
+        // Fork: dedicated PiP row (only while a corner stream is up), its own labeled strip so it is obvious
+        // which window each action touches: "Change main" retunes the full-screen stream, "Change PiP"
+        // retunes the inset. Kept separate from the media controls so neither row overflows.
+        if (onCornerClose != null) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color.Black.copy(alpha = 0.45f))
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                    .focusGroup(),
+            ) {
+                OwnTVIcon(OwnTVIcon.PIP, tint = OwnTVTheme.colors.accentOnVideo, filled = true, modifier = Modifier.size(16.dp))
+                Text(
+                    stringResource(R.string.fork_pip_label),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = OwnTVTheme.colors.accentOnVideo,
+                    modifier = Modifier.padding(start = 2.dp, end = 8.dp),
+                )
+                if (onChangeMain != null) CtrlButton(OwnTVIcon.LIVE_TV, label = stringResource(R.string.fork_pip_change_main)) { onChangeMain() }
+                if (onChangeCorner != null) CtrlButton(OwnTVIcon.PLAYLIST, label = stringResource(R.string.fork_pip_change_corner)) { onChangeCorner() }
+                if (onCornerSwap != null) CtrlButton(OwnTVIcon.FULLSCREEN, label = stringResource(R.string.fork_pip_swap_windows)) { onCornerSwap() }
+                // Swap-arrows icon on Sound (not a mute glyph): it MOVES the audio between the two windows.
+                if (onCornerAudio != null) CtrlButton(OwnTVIcon.SWAP, active = cornerAudioOn, label = stringResource(R.string.fork_pip_sound)) { onCornerAudio() }
+                if (onCornerMove != null) CtrlButton(OwnTVIcon.MOVE, label = stringResource(R.string.fork_pip_move)) { onCornerMove() }
+                if (onCornerGrow != null) CtrlButton(OwnTVIcon.ADD, label = stringResource(R.string.fork_pip_size_increase)) { onCornerGrow() }
+                if (onCornerShrink != null) CtrlButton(OwnTVIcon.MINUS, label = stringResource(R.string.fork_pip_size_decrease)) { onCornerShrink() }
+                CtrlButton(OwnTVIcon.CLOSE, label = stringResource(R.string.fork_pip_close)) { onCornerClose() }
+            }
+            Spacer(Modifier.height(10.dp))
+        }
+        Dock(modifier = Modifier.fillMaxWidth()) {
         // Band A — the instrument. The times are the bar's own end caps now; the separate time row is
         // gone, and on live the right cap is the state badge instead of a clock.
         when {
@@ -432,8 +470,10 @@ internal fun BottomBar(
                         // itself (see MpvVideoSurface), GL mode scales internally.
                         PlayerControl.ASPECT ->
                             CtrlButton(OwnTVIcon.ASPECT, active = zoomMode != ZoomMode.FIT, label = stringResource(R.string.player_tool_aspect)) { onOpenDialog(HudDialog.ZOOM) }
+                        // Fork: the button keeps the fork's label. On a live channel it opens a SECOND stream in
+                        // the corner (true PiP); on VOD it docks to the mini player (upstream's behavior).
                         PlayerControl.MINI_PLAYER -> if (onPip != null) {
-                            CtrlButton(OwnTVIcon.PIP, label = stringResource(R.string.player_tool_mini)) { onPip() }
+                            CtrlButton(OwnTVIcon.PIP, label = stringResource(R.string.fork_pip_label)) { onPip() }
                         }
                         PlayerControl.AUDIO_ONLY -> if (onAudioMode != null) {
                             CtrlButton(OwnTVIcon.HEADPHONES, label = stringResource(R.string.player_tool_audio_only)) { onAudioMode() }
@@ -483,6 +523,7 @@ internal fun BottomBar(
                     }
                 }
             }
+        }
         }
     }
 }

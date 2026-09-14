@@ -132,6 +132,17 @@ fun PlayerHud(
     player: PlaybackEngine,
     onBack: () -> Unit,
     onPip: (() -> Unit)? = null,
+    // Fork: true picture-in-picture corner controls, shown only while a second (corner) stream is running.
+    // onCornerClose non-null = a corner is active; cornerAudioOn = the corner currently has the sound.
+    onCornerSwap: (() -> Unit)? = null,   // swap the corner stream into the main window (and vice versa)
+    onCornerAudio: (() -> Unit)? = null,  // move the audio between the main and corner windows
+    onCornerMove: (() -> Unit)? = null,   // cycle the corner window through the four screen corners
+    onCornerGrow: (() -> Unit)? = null,   // grow the corner window +10% (capped)
+    onCornerShrink: (() -> Unit)? = null, // shrink the corner window -10% (never below the base size)
+    onCornerClose: (() -> Unit)? = null,  // close the corner window
+    onChangeMain: (() -> Unit)? = null,   // pick a new channel for the FULL-SCREEN window (corner untouched)
+    onChangeCorner: (() -> Unit)? = null, // pick a new channel for the PiP corner (main untouched)
+    cornerAudioOn: Boolean = false,
     // Switch to audio-only mode (stops video decode, surfaces the top-bar now-playing bar). Null hides it.
     onAudioMode: (() -> Unit)? = null,
     // Live only, and only when Multiview is switched on in Settings: turn this channel into tile 1 of
@@ -660,6 +671,10 @@ fun PlayerHud(
                     favorite = favorite, onToggleFavorite = onToggleFavorite,
                     onOpenDialog = { dialog = it }, onPip = onPip, onAudioMode = onAudioMode,
                     onMultiview = onMultiview, onRecordThis = onRecordThis, recordingThis = recordingThis, onBack = onBack,
+                    // Fork: PiP corner controls.
+                    onCornerSwap = onCornerSwap, onCornerAudio = onCornerAudio, onCornerMove = onCornerMove, onCornerGrow = onCornerGrow, onCornerShrink = onCornerShrink, onCornerClose = onCornerClose,
+                    onChangeMain = onChangeMain, onChangeCorner = onChangeCorner,
+                    cornerAudioOn = cornerAudioOn,
                     modifier = Modifier.align(Alignment.BottomStart),
                 )
             }

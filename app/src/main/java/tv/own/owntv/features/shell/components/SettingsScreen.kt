@@ -1973,7 +1973,9 @@ private fun FocusHighlightDialog(
 
 
 /** Widened for More's About pane, which shows the same repository line the dialog does. */
-internal const val GITHUB_REPO = "github.com/ahXN00/OwnTV"
+// Fork: this build's own source and releases (it carries upstream's history in full), matching where
+// the in-app updater looks (CoreBuildInfo.releaseRepo in OwnTVApp).
+internal const val GITHUB_REPO = "github.com/attembot/OwnTV"
 private const val TELEGRAM_LINK = "t.me/owntvplayer"
 
 /** About OwnTV: version, license, author and project link — all readable on screen (no TV browser). */

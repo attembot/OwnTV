@@ -140,6 +140,8 @@ fun LiveScreen(
             onDispose { vm.unlock() }
         }
     }
+    // Fork: the picture-in-picture corner (a second stream), opened from the channel context menu.
+    val pip = org.koin.compose.koinInject<tv.own.owntv.features.multiview.PipController>()
     val railItems by vm.railItems.collectAsStateWithLifecycle()
     val providerNames by vm.providerNames.collectAsStateWithLifecycle()
     val railFocus = remember { FocusRequester() }
@@ -786,6 +788,7 @@ fun LiveScreen(
                 contextChannel = null
             },
             onRemoveFromHistory = { vm.removeFromHistory(ch.id); contextChannel = null },
+            onWatchInCorner = { pip.openCorner(ch); contextChannel = null },
             onDismiss = { contextChannel = null },
         )
     }
@@ -955,6 +958,7 @@ private fun ChannelContextMenu(
     // "Move to category…" (issue #87): send this channel into a user's combined category.
     onMoveToCategory: () -> Unit,
     onRemoveFromHistory: () -> Unit,
+    onWatchInCorner: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val colors = OwnTVTheme.colors
@@ -990,6 +994,9 @@ private fun ChannelContextMenu(
                 if (onAddToMultiview != null) {
                     add(MenuAction("add_to_multiview", stringResource(R.string.multiview_add_to), OwnTVIcon.LIST_GRID, group = 1, onClick = onAddToMultiview))
                 }
+                // Fork: true PiP keeps this channel playing in a corner window alongside whatever else is on.
+                // Group 5 is fork-only, so it keeps its own divider wherever the user arranges the menu.
+                add(MenuAction("fork_pip", stringResource(R.string.fork_action_picture_in_picture), OwnTVIcon.PIP, group = 5, onClick = onWatchInCorner))
                 if (canMove) {
                     add(MenuAction("move", stringResource(R.string.content_move), group = 2, onClick = onMove))
                     add(MenuAction("move_to_category", stringResource(R.string.content_move_to_category), group = 2, onClick = onMoveToCategory))

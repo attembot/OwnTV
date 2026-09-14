@@ -23,6 +23,8 @@ enum class OwnTVIcon {
     PERSON, ADD, SETTINGS, PALETTE, THEME, ZOOM, PLAYLIST, EPG, VIDEO, SHARE, CHEVRON, CHEVRON_UP, CHEVRON_DOWN, FAVORITE,
     PAUSE, REWIND, FORWARD, AUDIO, SUBTITLE, SKIP_NEXT, SKIP_PREVIOUS,
     BACK, VOLUME_HIGH, VOLUME_LOW, VOLUME_MUTE, ASPECT, PIP, CLOSE,
+    // Fork: FULLSCREEN (PiP swap-windows), MOVE and MINUS (corner move/resize) are still drawn here.
+    FULLSCREEN, MOVE, MINUS,
     SORT, SWAP, HEADPHONES, EXPAND,
     IMAGE, INFO, LANGUAGE, GEAR, SPARKLE,
     CATCHUP,
@@ -175,7 +177,10 @@ fun OwnTVIcon(
                 drawLineStroke(p(12f, 5f), p(12f, 19f), tint, stroke)
                 drawLineStroke(p(5f, 12f), p(19f, 12f), tint, stroke)
             }
-        OwnTVIcon.SETTINGS -> {
+            OwnTVIcon.MINUS -> {
+                drawLineStroke(p(5f, 12f), p(19f, 12f), tint, stroke)
+            }
+            OwnTVIcon.SETTINGS -> {
                 // "tune" sliders — clearer than a gear at small sizes
                 drawLineStroke(p(4f, 8f), p(20f, 8f), tint, stroke)
                 drawLineStroke(p(4f, 16f), p(20f, 16f), tint, stroke)
@@ -306,6 +311,20 @@ fun OwnTVIcon(
                 drawPath(triangle(p(4f, 6f), p(11f, 12f), p(4f, 18f)), tint, style = Fill)
                 drawPath(triangle(p(13f, 6f), p(20f, 12f), p(13f, 18f)), tint, style = Fill)
             }
+            // (SWAP is drawn below — upstream added its own ⇄ glyph in v4.0.2; we keep theirs.)
+            OwnTVIcon.MOVE -> {
+                // Four-way arrows — "reposition the window".
+                drawLineStroke(p(12f, 4f), p(12f, 20f), tint, stroke)
+                drawLineStroke(p(4f, 12f), p(20f, 12f), tint, stroke)
+                drawLineStroke(p(9f, 7f), p(12f, 4f), tint, stroke)
+                drawLineStroke(p(15f, 7f), p(12f, 4f), tint, stroke)
+                drawLineStroke(p(9f, 17f), p(12f, 20f), tint, stroke)
+                drawLineStroke(p(15f, 17f), p(12f, 20f), tint, stroke)
+                drawLineStroke(p(7f, 9f), p(4f, 12f), tint, stroke)
+                drawLineStroke(p(7f, 15f), p(4f, 12f), tint, stroke)
+                drawLineStroke(p(17f, 9f), p(20f, 12f), tint, stroke)
+                drawLineStroke(p(17f, 15f), p(20f, 12f), tint, stroke)
+            }
             OwnTVIcon.SKIP_NEXT -> {
                 // play-to-bar: ▶|
                 drawPath(triangle(p(5f, 6f), p(14f, 12f), p(5f, 18f)), tint, style = Fill)
@@ -400,6 +419,12 @@ fun OwnTVIcon(
                 drawLineStroke(p(7f, 9f), p(9f, 9f), tint, stroke)
                 drawLineStroke(p(17f, 13f), p(17f, 15f), tint, stroke)
                 drawLineStroke(p(17f, 15f), p(15f, 15f), tint, stroke)
+            }
+            OwnTVIcon.FULLSCREEN -> {
+                drawLineStroke(p(4f, 9f), p(4f, 4f), tint, stroke); drawLineStroke(p(4f, 4f), p(9f, 4f), tint, stroke)
+                drawLineStroke(p(20f, 9f), p(20f, 4f), tint, stroke); drawLineStroke(p(20f, 4f), p(15f, 4f), tint, stroke)
+                drawLineStroke(p(4f, 15f), p(4f, 20f), tint, stroke); drawLineStroke(p(4f, 20f), p(9f, 20f), tint, stroke)
+                drawLineStroke(p(20f, 15f), p(20f, 20f), tint, stroke); drawLineStroke(p(20f, 20f), p(15f, 20f), tint, stroke)
             }
             OwnTVIcon.EXPAND -> { // ⤢ open-in-full: diagonal with arrowheads at both ends
                 drawLineStroke(p(6f, 18f), p(18f, 6f), tint, stroke)

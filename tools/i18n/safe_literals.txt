@@ -38,6 +38,7 @@
 1	performance	app/src/main/java/tv/own/owntv/MainActivity.kt	profile-id-loaded
 1	performance	app/src/main/java/tv/own/owntv/MainActivity.kt	profiles-loaded
 1	compiler	app/src/main/java/tv/own/owntv/OwnTVApp.kt	DEPRECATION
+1	technical	app/src/main/java/tv/own/owntv/OwnTVApp.kt	attembot/OwnTV
 1	file-path	app/src/main/java/tv/own/owntv/OwnTVApp.kt	image_cache
 1	performance	app/src/main/java/tv/own/owntv/OwnTVApp.kt	koin-started
 3	empty	app/src/main/java/tv/own/owntv/core/i18n/LocalizedContent.kt	\0
@@ -96,6 +97,7 @@
 1	technical	app/src/main/java/tv/own/owntv/features/live/LiveScreen.kt	channel
 1	preference-key	app/src/main/java/tv/own/owntv/features/live/LiveScreen.kt	epg_offset
 1	preference-key	app/src/main/java/tv/own/owntv/features/live/LiveScreen.kt	favourite
+1	preference-key	app/src/main/java/tv/own/owntv/features/live/LiveScreen.kt	fork_pip
 1	preference-key	app/src/main/java/tv/own/owntv/features/live/LiveScreen.kt	hide
 1	preference-key	app/src/main/java/tv/own/owntv/features/live/LiveScreen.kt	match_epg
 1	preference-key	app/src/main/java/tv/own/owntv/features/live/LiveScreen.kt	move
@@ -105,7 +107,7 @@
 1	preference-key	app/src/main/java/tv/own/owntv/features/live/LiveScreen.kt	remove_history
 1	preference-key	app/src/main/java/tv/own/owntv/features/live/LiveScreen.kt	rename
 2	technical	app/src/main/java/tv/own/owntv/features/live/LiveScreen.kt	−
-3	empty	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	\0
+4	empty	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	\0
 1	technical	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	#$it
 1	technical	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	$label — $reason
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	$reason — gave up after ${ladderBudgetMs.value / 1000}s
@@ -515,7 +517,7 @@
 1	protocol	app/src/main/java/tv/own/owntv/features/shell/components/SettingsScreen.kt	exoplayer
 1	technical	app/src/main/java/tv/own/owntv/features/shell/components/SettingsScreen.kt	focus_highlight
 1	technical	app/src/main/java/tv/own/owntv/features/shell/components/SettingsScreen.kt	fonts
-1	technical	app/src/main/java/tv/own/owntv/features/shell/components/SettingsScreen.kt	github.com/ahXN00/OwnTV
+1	technical	app/src/main/java/tv/own/owntv/features/shell/components/SettingsScreen.kt	github.com/attembot/OwnTV
 1	technical	app/src/main/java/tv/own/owntv/features/shell/components/SettingsScreen.kt	group_app
 1	technical	app/src/main/java/tv/own/owntv/features/shell/components/SettingsScreen.kt	group_appearance
 1	technical	app/src/main/java/tv/own/owntv/features/shell/components/SettingsScreen.kt	group_content_metadata
@@ -603,6 +605,7 @@
 1	empty	app/src/main/java/tv/own/owntv/player/MiniPlayer.kt	\0
 1	technical	app/src/main/java/tv/own/owntv/player/MiniPlayer.kt	miniControls
 1	compiler	app/src/main/java/tv/own/owntv/player/MpvVideoSurface.kt	DEPRECATION
+1	empty	app/src/main/java/tv/own/owntv/player/PipCorner.kt	\0
 1	technical	app/src/main/java/tv/own/owntv/player/PlayerClock.kt	EEEdMMM
 9	empty	app/src/main/java/tv/own/owntv/player/PlayerHud.kt	\0
 1	technical	app/src/main/java/tv/own/owntv/player/PlayerHud.kt	$k: $v
@@ -620,8 +623,15 @@
 1	technical	app/src/main/java/tv/own/owntv/player/PlayerHudControls.kt	toolPadding
 1	technical	app/src/main/java/tv/own/owntv/player/RecordingBadge.kt	rec
 1	technical	app/src/main/java/tv/own/owntv/player/RecordingBadge.kt	recPulse
+1	log	app/src/main/java/tv/own/owntv/player/SecondaryLivePlayer.kt	SecondaryLivePlayer
+1	log	app/src/main/java/tv/own/owntv/player/SecondaryLivePlayer.kt	buffering stalled
+1	log	app/src/main/java/tv/own/owntv/player/SecondaryLivePlayer.kt	corner ExoPlayer error: ${error.errorCodeName}
+1	log	app/src/main/java/tv/own/owntv/player/SecondaryLivePlayer.kt	corner play() failed for $url
+1	log	app/src/main/java/tv/own/owntv/player/SecondaryLivePlayer.kt	corner reconnect ($reason) — attempt $retryCount/$MAX_RECONNECTS
+1	log	app/src/main/java/tv/own/owntv/player/SecondaryLivePlayer.kt	error ${error.errorCodeName}
 1	file-path	app/src/main/java/tv/own/owntv/ui/components/BackgroundImageChooserDialog.kt	background_${System.currentTimeMillis()}.$ext
 1	file-path	app/src/main/java/tv/own/owntv/ui/components/BackgroundImageChooserDialog.kt	png
+1	empty	app/src/main/java/tv/own/owntv/ui/components/ChannelSwitcher.kt	\0
 1	performance	app/src/main/java/tv/own/owntv/ui/components/FocusableSurface.kt	focusContainer
 1	performance	app/src/main/java/tv/own/owntv/ui/components/FocusableSurface.kt	focusScale
 1	protocol	app/src/main/java/tv/own/owntv/ui/components/GenreColor.kt	+18
@@ -1070,4 +1080,3 @@
 1	technical	app/src/main/java/tv/own/owntv/ui/theme/Glass.kt	glassPosition
 2	empty	app/src/main/java/tv/own/owntv/ui/theme/OwnTVColors.kt	\0
 2	empty	app/src/main/java/tv/own/owntv/ui/theme/Theme.kt	\0
-1	technical	app/src/main/java/tv/own/owntv/OwnTVApp.kt	ahXN00/OwnTV

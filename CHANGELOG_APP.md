@@ -9,6 +9,19 @@
 > (e.g. `(community PR #40 by @codeVerine)`). Issue numbers that are part of a title (e.g. `(#57)`) are
 > fine; explanatory parentheticals are not. Descriptions belong in CHANGELOG.md, never here.
 
+## v2026.09.14 (fork) — 2026-09-14
+
+Everything in upstream v5.0.0 below, plus the fork's picture-in-picture.
+
+### ✨ New features
+
+- **🔲 Multiview is now upstream's — the fork's own grid is retired**
+- **🖼️ A PiP corner that is up joins Multiview as its second tile**
+
+### 🐛 Fixes
+
+- **The PiP channel picker's Favourites and Folders follow your saved manual order**
+
 ## v5.0.0 — 2026-09-14
 
 ### ✨ New features
@@ -163,6 +176,35 @@
 - **One less timer running while you watch a recording**
 - **Less background work during playback, and less of it on weaker TVs**
 
+## v2026.08.19 — 2026-08-19
+
+### ✨ New features
+
+- **🖼️ Episode grid — see a picture for every episode**
+- **⚡ A whole show's episode details now arrive in one request**
+- **🎯 Choose the colour and thickness of the focus highlight**
+- **👶 Kids profiles hide adult content across OwnTV**
+- **🚀 Start OwnTV on a channel you choose**
+- **⏪ Catch-up without a TV guide — a Catch-up category and "Go back to…"**
+- **🕐 A clock in the player — and, on catch-up, the time the programme actually aired**
+- **🎛️ Choose the playback engine — four options, for Live TV and for Movies & Series**
+- **🔒 Protected (DRM) channels now play — Widevine and ClearKey**
+- **🔑 Sign in to OpenSubtitles from another device, on one screen**
+- **🔤 Subtitle font selection and Monospace**
+- **📁 Send a playlist file from your computer with Remote**
+- **🗃️ Backup & Restore now really does back up everything**
+
+### 🐛 Fixes
+
+- **Downloaded subtitles are now told apart, and subtitle timing changes the one you selected**
+- **Preferred subtitle language now turns matching subtitles on automatically**
+- **"Watch from start" needed two presses**
+- **DNS choice now survives an app restart**
+- **"Audio only" no longer flashes on ordinary TV channels**
+- **Restoring a backup gave every Stalker playlist the same MAC address**
+- **Back from a show returns focus to that show, not the category sidebar**
+- **Many smaller metadata, backup and profile fixes**
+
 ## v4.2.2 — 2026-08-19
 
 ### ✨ New features
@@ -207,6 +249,30 @@
 - **The default playlist could be repointed at an unrelated playlist**
 - **Startup screen and the Customize PIN lock were filed under "Sources"**
 - **Turning "Advanced options" off now actually stops using your own key**
+
+## v2026.08.17 — 2026-08-17
+
+### ✨ New features
+
+- **📅 Version numbers are now the build date**
+- **⬇️ In-app updates work on this build — no more sideloading**
+- **🎭 Cast photos in TMDB details**
+- **🎧 "Audio only" — sound with no picture is now labelled, not mistaken for a fault**
+- **🔊 Zoom and volume are now remembered per item**
+- **Seek step, live rewind step and deinterlacing**
+
+### 🐛 Fixes
+
+- **Picture-in-picture keeps the sound to itself when you press CH+ or CH−**
+- **The channel picker's D-pad navigation no longer reaches the controls behind it**
+- **Your resume position is saved reliably again**
+- **A dying live channel now ends with a message instead of reconnecting forever**
+- **Channels that need a custom User-Agent or Referer survive Retry and the screensaver**
+- **Holding CH+ or CH− changes channel once**
+- **Subtitles stay on the picture when you zoom**
+- **Custom DNS resolves IPv6-only hosts**
+- **Audio focus is released while you are paused**
+- **Many smaller player, subtitle and catch-up fixes**
 
 ## v4.2.1 — 2026-08-15
 
