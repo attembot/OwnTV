@@ -65,6 +65,7 @@ import tv.own.owntv.features.home.HomeScreen
 import tv.own.owntv.features.home.HomeViewModel
 import tv.own.owntv.features.live.LiveScreen
 import tv.own.owntv.features.live.LiveViewModel
+import tv.own.owntv.core.live.displayText
 import tv.own.owntv.features.live.displayLabel
 import tv.own.owntv.features.movies.MoviesScreen
 import tv.own.owntv.features.movies.MovieViewModel
@@ -254,8 +255,12 @@ fun OwnTVShell(
     // level so it persists across the browse UI <-> full-screen. Audio belongs to one window at a time —
     // by default the main stream, until the user hands sound to the corner (audioOnCorner).
     val pip = koinInject<tv.own.owntv.features.multiview.PipController>()
+    // The corner's own engine (an upstream LivePreviewEngine): the shell draws it and mutes it directly.
+    val pipPlayback = koinInject<tv.own.owntv.player.LiveCornerPlayback>(qualifier = org.koin.core.qualifier.named("pip"))
+    val pipEngine = pipPlayback.engine
     val cornerActive by pip.active.collectAsStateWithLifecycle()
     val cornerChannel by pip.channel.collectAsStateWithLifecycle()
+    val cornerRefusal by pip.refusal.collectAsStateWithLifecycle()
     var audioOnCorner by remember { mutableStateOf(false) }
     // True while the channel switcher for the PiP corner is open (retune the corner without closing it).
     var cornerBrowsing by remember { mutableStateOf(false) }
@@ -804,13 +809,15 @@ fun OwnTVShell(
             audioOnCorner = audioOnCorner,
         ) ?: return@LaunchedEffect
         plan.muteMain?.let { setMainMuted(it) }
-        pip.engine.setMuted(plan.muteCorner)
+        pipEngine.setMuted(plan.muteCorner)
     }
 
-    // Per-source user-agent for the corner engine (providers with a custom UA otherwise 403 in PiP while
-    // playing fine full-screen).
+    // The corner tunes through the live VM, exactly like a Multiview tile: Stalker `cmd` resolution, the
+    // playlist's User-Agent, per-channel headers and DRM, pre-buffer and latency overrides. The VM also
+    // says which playlist a channel belongs to, for the corner's connection-budget check.
     LaunchedEffect(Unit) {
-        pip.uaResolver = { sourceId -> liveVm.uaFor(sourceId) }
+        pipPlayback.tuner = { engine, channel, muted -> liveVm.tuneTile(engine, channel, muted) }
+        pip.sourceOf = { liveVm.sourceOf(it) }
     }
 
     // If the corner closes by any path (close, swap-to-fullscreen, entering Multiview), drop its switcher too.
@@ -1724,8 +1731,11 @@ fun OwnTVShell(
             modifier = Modifier.align(cornerAlign).padding(24.dp)
                 .size(width = (CORNER_BASE_W * cornerScalePct / 100).dp, height = (CORNER_BASE_H * cornerScalePct / 100).dp),
         ) {
+            val res = androidx.compose.ui.platform.LocalContext.current.resources
             tv.own.owntv.player.PipCornerWindow(
-                engine = pip.engine,
+                engine = pipEngine,
+                title = cornerChannel?.name,
+                refusal = cornerRefusal?.displayText(res),
                 showControls = playerMode != PlayerMode.FULLSCREEN,
                 audioOnCorner = audioOnCorner,
                 onToggleAudio = toggleCornerAudio,

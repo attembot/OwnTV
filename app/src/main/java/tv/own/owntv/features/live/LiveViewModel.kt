@@ -1020,9 +1020,6 @@ class LiveViewModel(
         if (!_liveOnExo.value && previewEngine.currentUrl != null) previewEngine.setMuted(!previewAudioOn())
     }
 
-    /** Per-source custom user-agent — the corner/tile engines need the same UA the main engine uses. */
-    fun uaFor(sourceId: Long): String? = sourceUaMap[sourceId]
-
     /** Stalker preview: same "already-previewing → just re-mute" shortcut keyed by the cmd, else
      *  resolve the cmd to a real URL (create_link) and load it. Async because resolution is a network call.
      *  (Fork: mute goes through previewAudioOn() so the PiP-corner suppression covers Stalker too.) */

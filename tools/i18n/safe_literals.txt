@@ -42,6 +42,7 @@
 1	file-path	app/src/main/java/tv/own/owntv/OwnTVApp.kt	image_cache
 1	performance	app/src/main/java/tv/own/owntv/OwnTVApp.kt	koin-started
 3	empty	app/src/main/java/tv/own/owntv/core/i18n/LocalizedContent.kt	\0
+2	technical	app/src/main/java/tv/own/owntv/di/PlayerModule.kt	pip
 1	assertion	app/src/main/java/tv/own/owntv/features/customize/CustomizeItemsViewModel.kt	EPISODE not applicable
 2	assertion	app/src/main/java/tv/own/owntv/features/customize/CustomizeItemsViewModel.kt	EPISODE not applicable to category items
 3	empty	app/src/main/java/tv/own/owntv/features/customize/CustomizeScreen.kt	\0
@@ -467,6 +468,7 @@
 1	performance	app/src/main/java/tv/own/owntv/features/shell/OwnTVShell.kt	epg-preload
 1	technical	app/src/main/java/tv/own/owntv/features/shell/OwnTVShell.kt	jpeg
 1	technical	app/src/main/java/tv/own/owntv/features/shell/OwnTVShell.kt	jpg
+1	technical	app/src/main/java/tv/own/owntv/features/shell/OwnTVShell.kt	pip
 1	technical	app/src/main/java/tv/own/owntv/features/shell/OwnTVShell.kt	png
 1	performance	app/src/main/java/tv/own/owntv/features/shell/OwnTVShell.kt	shell-composed
 1	protocol	app/src/main/java/tv/own/owntv/features/shell/OwnTVShell.kt	srt
@@ -605,7 +607,6 @@
 1	empty	app/src/main/java/tv/own/owntv/player/MiniPlayer.kt	\0
 1	technical	app/src/main/java/tv/own/owntv/player/MiniPlayer.kt	miniControls
 1	compiler	app/src/main/java/tv/own/owntv/player/MpvVideoSurface.kt	DEPRECATION
-1	empty	app/src/main/java/tv/own/owntv/player/PipCorner.kt	\0
 1	technical	app/src/main/java/tv/own/owntv/player/PlayerClock.kt	EEEdMMM
 9	empty	app/src/main/java/tv/own/owntv/player/PlayerHud.kt	\0
 1	technical	app/src/main/java/tv/own/owntv/player/PlayerHud.kt	$k: $v
@@ -623,12 +624,6 @@
 1	technical	app/src/main/java/tv/own/owntv/player/PlayerHudControls.kt	toolPadding
 1	technical	app/src/main/java/tv/own/owntv/player/RecordingBadge.kt	rec
 1	technical	app/src/main/java/tv/own/owntv/player/RecordingBadge.kt	recPulse
-1	log	app/src/main/java/tv/own/owntv/player/SecondaryLivePlayer.kt	SecondaryLivePlayer
-1	log	app/src/main/java/tv/own/owntv/player/SecondaryLivePlayer.kt	buffering stalled
-1	log	app/src/main/java/tv/own/owntv/player/SecondaryLivePlayer.kt	corner ExoPlayer error: ${error.errorCodeName}
-1	log	app/src/main/java/tv/own/owntv/player/SecondaryLivePlayer.kt	corner play() failed for $url
-1	log	app/src/main/java/tv/own/owntv/player/SecondaryLivePlayer.kt	corner reconnect ($reason) — attempt $retryCount/$MAX_RECONNECTS
-1	log	app/src/main/java/tv/own/owntv/player/SecondaryLivePlayer.kt	error ${error.errorCodeName}
 1	file-path	app/src/main/java/tv/own/owntv/ui/components/BackgroundImageChooserDialog.kt	background_${System.currentTimeMillis()}.$ext
 1	file-path	app/src/main/java/tv/own/owntv/ui/components/BackgroundImageChooserDialog.kt	png
 1	empty	app/src/main/java/tv/own/owntv/ui/components/ChannelSwitcher.kt	\0

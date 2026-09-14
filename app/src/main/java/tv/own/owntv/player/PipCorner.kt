@@ -2,8 +2,6 @@
 
 package tv.own.owntv.player
 
-import android.view.SurfaceHolder
-import android.view.SurfaceView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -32,48 +30,36 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import kotlinx.coroutines.delay
 import tv.own.owntv.R
+import tv.own.owntv.core.database.entity.ChannelEntity
+import tv.own.owntv.features.multiview.CornerPlayback
 import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.OwnTVIcon
 
 /**
- * Hosts the [CornerEngine]'s video on its own [SurfaceView], **z-ordered above** the main player's
- * surface (`setZOrderMediaOverlay(true)`) so the corner draws on top of the full-screen stream behind it.
- *
- * Two overlapping SurfaceViews are the right tool here: both are hardware-overlay candidates, so on a TV
- * with ≥2 overlay planes (most) neither stream falls back to GPU composition. (Both engines document that a
- * *regular* view over a video surface knocks 4K off the direct scan-out path — a second SurfaceView avoids
- * that on capable hardware; on a single-plane device the compositor blends them, which still works, warmer.)
+ * The corner's engine is one of upstream's [LivePreviewEngine]s — the same class behind the Live
+ * preview pane and every Multiview tile — capped like a background tile. [tuner] is wired by the shell
+ * to `LiveViewModel.tuneTile`, so a Stalker channel, a channel with its own headers or DRM, and a
+ * playlist with a custom User-Agent all play in the corner exactly as they do full screen.
  */
-@Composable
-fun SecondaryVideoSurface(engine: CornerEngine, modifier: Modifier = Modifier, keepAwake: Boolean = true) {
-    // key(engine): the factory captures `engine` in the holder callback ONCE. If Compose reused this
-    // AndroidView node for a different engine (e.g. MultiView's dominant pane recomposing to another tile),
-    // the surface would stay bound to the old engine and the new one would decode invisibly. Keying by
-    // engine identity discards the node instead, so a fresh SurfaceView binds the right engine.
-    androidx.compose.runtime.key(engine) {
-        AndroidView(
-            modifier = modifier,
-            factory = { ctx ->
-                SurfaceView(ctx).apply {
-                    // Must be set before the surface is created — lifts this surface above the main one behind it.
-                    setZOrderMediaOverlay(true)
-                    holder.addCallback(object : SurfaceHolder.Callback {
-                        override fun surfaceCreated(holder: SurfaceHolder) = engine.setSurface(holder.surface)
-                        override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
-                        override fun surfaceDestroyed(holder: SurfaceHolder) = engine.setSurface(null)
-                    })
-                }
-            },
-            update = { it.keepScreenOn = keepAwake },
-        )
+class LiveCornerPlayback(val engine: LivePreviewEngine) : CornerPlayback {
+    var tuner: (LivePreviewEngine, ChannelEntity, Boolean) -> Unit = { _, _, _ -> }
+
+    init {
+        engine.setMuted(true)
+        engine.setMaxVideoHeight(LiveEnginePool.BACKGROUND_TILE_HEIGHT)
     }
+
+    override val isErrored: Boolean get() = engine.state.value == LivePreviewEngine.State.ERROR
+    override fun tune(channel: ChannelEntity, muted: Boolean) = tuner(engine, channel, muted)
+    override fun setMuted(muted: Boolean) = engine.setMuted(muted)
+    override fun stop() = engine.stop()
 }
 
 /**
@@ -82,10 +68,18 @@ fun SecondaryVideoSurface(engine: CornerEngine, modifier: Modifier = Modifier, k
  * close). During the browse UI the corner carries its own controls (navigate to it with the remote, like
  * the docked mini-player); while the main player is full-screen the player HUD drives these instead, so the
  * corner is rendered video-only ([showControls] = false).
+ *
+ * The video is drawn through a TextureView (see [ExoPreviewSurface]): a second SurfaceView would ask the
+ * television for a second hardware video plane, which many boxes do not have — sound with no picture is
+ * exactly the Multiview symptom upstream fixed the same way.
  */
 @Composable
 fun PipCornerWindow(
-    engine: CornerEngine,
+    engine: LivePreviewEngine,
+    /** The corner channel's name; shown briefly whenever it changes. */
+    title: String?,
+    /** The connection-budget sentence when the playlist had no stream to spare; null while playing. */
+    refusal: String?,
     showControls: Boolean,
     audioOnCorner: Boolean,
     onToggleAudio: () -> Unit,
@@ -98,12 +92,11 @@ fun PipCornerWindow(
     modifier: Modifier = Modifier,
 ) {
     val state by engine.state.collectAsStateWithLifecycle()
-    val meta by engine.meta.collectAsStateWithLifecycle()
-    val loading = state == CornerState.LOADING
+    val loading = refusal == null && state == LivePreviewEngine.State.LOADING
 
     // The channel name shows briefly when the corner opens or changes channel, then fades to just video.
     var titleVisible by remember { mutableStateOf(true) }
-    LaunchedEffect(meta.title) { titleVisible = true; delay(4000); titleVisible = false }
+    LaunchedEffect(title) { titleVisible = true; delay(4000); titleVisible = false }
 
     Box(
         modifier = modifier
@@ -115,12 +108,14 @@ fun PipCornerWindow(
                 shape = RoundedCornerShape(12.dp),
             ),
     ) {
-        if (state == CornerState.ERROR) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        when {
+            refusal != null -> Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = Alignment.Center) {
+                Text(refusal, style = MaterialTheme.typography.labelMedium, color = Color.White, textAlign = TextAlign.Center)
+            }
+            state == LivePreviewEngine.State.ERROR -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(stringResource(R.string.fork_corner_playback_failed), style = MaterialTheme.typography.labelMedium, color = Color.White)
             }
-        } else {
-            SecondaryVideoSurface(engine = engine, modifier = Modifier.fillMaxSize())
+            else -> ExoPreviewSurface(engine = engine, modifier = Modifier.fillMaxSize(), keepAwake = true, useTextureView = true)
         }
         if (loading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -149,7 +144,7 @@ fun PipCornerWindow(
                     OwnTVIcon(OwnTVIcon.VOLUME_HIGH, tint = tv.own.owntv.ui.theme.OwnTVTheme.colors.primary, filled = true, modifier = Modifier.size(14.dp))
                 }
                 Text(
-                    meta.title ?: "",
+                    title.orEmpty(),
                     style = MaterialTheme.typography.labelLarge,
                     color = Color.White,
                     maxLines = 1,

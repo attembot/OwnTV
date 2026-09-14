@@ -46,9 +46,17 @@ val playerModule = module {
     // Bridges the playing item to the OpenSubtitles search. Bound here rather than with the rest of
     // the subtitle stack because it takes the player; it follows the engine to :player-core.
     single { tv.own.owntv.core.subtitles.SubtitleController(get(), get(), get(), get()) }
-    // Fork: a second, independent ExoPlayer for the picture-in-picture corner (true PiP: a different
-    // stream alongside the main one). Separate decoder/surface/audio from the preview engine above so
-    // both play. (The fork's own MultiView is gone since v5.0: upstream's Multiview uses LiveEnginePool.)
-    single { tv.own.owntv.player.SecondaryLivePlayer(androidContext(), get(), get()) }
-    single { tv.own.owntv.features.multiview.PipController(get<tv.own.owntv.player.SecondaryLivePlayer>()) }
+    // Fork: the picture-in-picture corner (true PiP: a second stream alongside the main one). One more
+    // LivePreviewEngine, built exactly like a Multiview tile's, wrapped so the corner tunes through
+    // LiveViewModel.tuneTile (Stalker resolve, headers, DRM, UA) and claims a slot in the connection
+    // budget. `named("pip")` keeps it apart from the single long-lived preview engine above.
+    single(org.koin.core.qualifier.named("pip")) {
+        tv.own.owntv.player.LiveCornerPlayback(LivePreviewEngine(androidContext(), get(), get(), get(), get(), get()))
+    }
+    single {
+        tv.own.owntv.features.multiview.PipController(
+            playback = get<tv.own.owntv.player.LiveCornerPlayback>(org.koin.core.qualifier.named("pip")),
+            registry = get(),
+        )
+    }
 }

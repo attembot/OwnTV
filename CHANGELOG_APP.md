@@ -9,6 +9,19 @@
 > (e.g. `(community PR #40 by @codeVerine)`). Issue numbers that are part of a title (e.g. `(#57)`) are
 > fine; explanatory parentheticals are not. Descriptions belong in CHANGELOG.md, never here.
 
+## v2026.09.14.1 (fork) — 2026-09-14
+
+### ✨ New features
+
+- **🖼️ Picture-in-picture plays through the same engine as Multiview**
+- **🗓️ Stalker portals play in the corner**
+- **🔌 The corner counts against your provider's stream limit, and says so when there is none to spare**
+
+### 🐛 Fixes
+
+- **Channels that need their own headers or User-Agent play in the corner**
+- **The corner draws on boxes with a single hardware video plane**
+
 ## v2026.09.14 (fork) — 2026-09-14
 
 Everything in upstream v5.0.0 below, plus the fork's picture-in-picture.
