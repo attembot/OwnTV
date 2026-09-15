@@ -337,6 +337,17 @@ fun OwnTVShell(
     var showHistoryList by remember { mutableStateOf(false) }
     // Multiview: the grid, while it is up, and which tile is waiting for a channel to be picked.
     val multiviewEnabled by settingsRepo.multiviewEnabled.collectAsStateWithLifecycle(false)
+    // Fork: Multiview defaults ON in this build (upstream's default is off, and the setting lives in
+    // core where the fork cannot change it). Applied exactly once, remembered in the fork's own prefs,
+    // so Settings > Video player > Multiview keeps working: switching it off later stays off.
+    val forkPrefsContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    LaunchedEffect(Unit) {
+        val prefs = forkPrefsContext.getSharedPreferences("fork_defaults", android.content.Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("multiview_default_applied", false)) {
+            settingsRepo.setMultiviewEnabled(true)
+            prefs.edit().putBoolean("multiview_default_applied", true).apply()
+        }
+    }
     val recordWatchingEnabled by settingsRepo.recordWhatImWatching.collectAsStateWithLifecycle(false)
     val multiviewTileCount by settingsRepo.multiviewTiles.collectAsStateWithLifecycle(
         tv.own.owntv.core.live.DEFAULT_MULTIVIEW_TILES,
