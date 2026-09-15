@@ -9,6 +9,12 @@
 > (e.g. `(community PR #40 by @codeVerine)`). Issue numbers that are part of a title (e.g. `(#57)`) are
 > fine; explanatory parentheticals are not. Descriptions belong in CHANGELOG.md, never here.
 
+## v2026.09.15 (fork) — 2026-09-15
+
+### 🐛 Fixes
+
+- **The Multiview button is back in the player, next to PiP, without a Settings toggle**
+
 ## v2026.09.14.1 (fork) — 2026-09-14
 
 ### ✨ New features

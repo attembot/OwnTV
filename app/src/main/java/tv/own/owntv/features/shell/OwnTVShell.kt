@@ -1523,10 +1523,12 @@ fun OwnTVShell(
                     onChannelUp = zap?.let { z -> { z(-1) } },
                     onChannelDown = zap?.let { z -> { z(1) } },
                     onOpenChannelList = if (isTunedLive && liveCanZap) { { showChannelList = true } } else null,
-                    // Live channels only, and only once Multiview is switched on: the channel on screen
-                    // becomes tile 1 and the grid takes over. Everything it needs is already tuned.
-                    // Fork: a PiP corner that is up comes along as tile 2 (openMultiview closes the corner).
-                    onMultiview = if (multiviewEnabled && isTunedLive && previewChannel != null) {
+                    // Live channels only: the channel on screen becomes tile 1 and the grid takes over.
+                    // Fork: NOT gated on the Multiview setting (upstream hides the button until it is switched
+                    // on in Settings > Video player); this build always offers it next to PiP. The setting
+                    // still governs the rest (Add to Multiview in the channel menu, the tile ceiling).
+                    // A PiP corner that is up comes along as tile 2 (openMultiview closes the corner).
+                    onMultiview = if (isTunedLive && previewChannel != null) {
                         { multiview = openMultiview(previewChannel, listOfNotNull(cornerChannel)) }
                     } else {
                         null
