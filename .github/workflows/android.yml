@@ -116,10 +116,9 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          # Fork: the action's default is `tools platform-tools`, and Google's repository stopped listing
-          # the long-obsolete `tools` package (2026-09-14) — sdkmanager then exits 1 and every job dies
-          # before Gradle runs. Nothing here ever used it; the build needs platform-tools only.
-          packages: platform-tools
+          # 'tools' is obsolete and Google removed it from the SDK repository; the
+          # action still asks for it by default, which fails the whole setup step.
+          packages: 'platform-tools'
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -175,10 +174,9 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          # Fork: the action's default is `tools platform-tools`, and Google's repository stopped listing
-          # the long-obsolete `tools` package (2026-09-14) — sdkmanager then exits 1 and every job dies
-          # before Gradle runs. Nothing here ever used it; the build needs platform-tools only.
-          packages: platform-tools
+          # 'tools' is obsolete and Google removed it from the SDK repository; the
+          # action still asks for it by default, which fails the whole setup step.
+          packages: 'platform-tools'
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4

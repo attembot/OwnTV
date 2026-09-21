@@ -9,6 +9,10 @@
 > (e.g. `(community PR #40 by @codeVerine)`). Issue numbers that are part of a title (e.g. `(#57)`) are
 > fine; explanatory parentheticals are not. Descriptions belong in CHANGELOG.md, never here.
 
+## v2026.09.21 (fork) — 2026-09-21
+
+Everything in upstream v5.0.1 and v5.0.2 below, plus the fork's picture-in-picture and always-on Multiview button.
+
 ## v2026.09.15.1 (fork) — 2026-09-15
 
 ### 🐛 Fixes
@@ -41,6 +45,52 @@ Everything in upstream v5.0.0 below, plus the fork's picture-in-picture.
 ### 🐛 Fixes
 
 - **The PiP channel picker's Favourites and Folders follow your saved manual order**
+
+## v5.0.2 — 2026-09-21
+
+### 🩹 Fixes
+
+- **💥 The app would not open after updating from v5.0.0**
+
+## v5.0.1 — 2026-09-21
+
+### ✨ New features
+
+- **🎬 A cinematic layout for Movies & Series**
+- **✨ Set a new television up from the one you already have** (#189)
+- **🚀 Refreshing a playlist gets out of your way**
+- **📅 A week of guide, and you choose how much**
+- **🔄 Local sync, tidied up on the television**
+- **📺 Protected and MPEG-DASH channels play**
+
+### 🩹 Fixes
+
+- **📺 Stream info said MPEG-TS on a DASH channel**
+- **📺 A channel that will not open can now fall back to the provider's own address**
+- **⏺️ Recording a copy-protected channel is refused straight away, and says why**
+- **🪟 Every popup now behaves like every other popup**
+- **🗂️ Restoring a backup during setup asks what to bring back**
+- **🔗 Sync mode could hand the other device a key that did not fit**
+- **📡 A long guide download is no longer stopped by the system**
+- **🎞️ A live channel's frame rate is no longer shown a notch too low**
+- **🗂️ Categories your provider lists no longer arrive empty**
+- **⏪ Catch-up plays on Stalker portal playlists**
+- **⏪ Catch-up loads faster**
+- **💬 Catch-up says when a provider has no recording, instead of doing nothing**
+- **🔲 Holding OK on the Multiview settings no longer closes the app**
+- **🔎 Settings search finds every setting, including Multiview and the player engines**
+- **📖 The user guide explains how to turn Multiview on**
+- **💥 The app no longer crashes on opening with many manually matched EPG channels**
+- **📖 The user guide describes first-run setup and remote playlist entry accurately**
+- **🔠 Popup font size now resizes everything inside a popup**
+- **🖼️ Channel logos no longer sit on a black square**
+- **💥 The app no longer runs out of memory when the guide is refreshed**
+- **🔗 "Match EPG" lists guide channels again**
+- **🔎 The guide picker's search understands names and non-Latin scripts**
+- **🔗 Manual EPG matches survive deleting and re-adding a playlist**
+- **🤖 Auto-match no longer reports success it cannot deliver**
+- **🧹 Duplicate programmes are removed when the guide is downloaded**
+- **⚡ The Live TV list stops re-asking what is on**
 
 ## v5.0.0 — 2026-09-14
 

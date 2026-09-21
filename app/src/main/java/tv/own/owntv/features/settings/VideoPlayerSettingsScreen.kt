@@ -114,6 +114,8 @@ internal val VIDEO_QUICK_ROWS: List<VideoQuickRef> = listOf(
     VideoQuickRef("vp_deinterlace", SECTION_ENGINE, OwnTVIcon.VIDEO, R.string.settings_deinterlace, R.string.settings_deinterlace_description),
     VideoQuickRef("vp_hdr", SECTION_ENGINE, OwnTVIcon.VIDEO, R.string.settings_quick_hdr, R.string.settings_hdr_description),
     VideoQuickRef("vp_afr", SECTION_ENGINE, OwnTVIcon.VIDEO, R.string.settings_auto_frame_rate, R.string.settings_auto_frame_rate_description),
+    VideoQuickRef("vp_multiview", SECTION_ENGINE, OwnTVIcon.LIST_GRID, R.string.settings_multiview, R.string.settings_multiview_description),
+    VideoQuickRef("vp_multiview_tiles", SECTION_ENGINE, OwnTVIcon.LIST_GRID, R.string.settings_multiview_tiles_max, R.string.settings_multiview_description),
     VideoQuickRef("vp_live_engine", SECTION_ENGINE, OwnTVIcon.PLAY, R.string.settings_live_tv_player, R.string.settings_live_player_description),
     VideoQuickRef("vp_live_engine_sources", SECTION_ENGINE, OwnTVIcon.PLAY, R.string.settings_live_engine_per_playlist, R.string.settings_live_engine_per_playlist_description),
     VideoQuickRef("vp_vod_engine", SECTION_ENGINE, OwnTVIcon.PLAY, R.string.settings_movies_series_player, R.string.settings_movies_player_description),
@@ -191,6 +193,19 @@ internal fun videoQuickBinding(key: String, vm: SettingsViewModel): VideoQuickBi
         "vp_hdr" -> {
             val on by vm.hdrEnabled.collectAsStateWithLifecycle()
             toggle(onOff(on), on) { vm.setHdrEnabled(!on) }
+        }
+        "vp_multiview" -> {
+            val on by vm.multiviewEnabled.collectAsStateWithLifecycle()
+            toggle(onOff(on), on) { vm.setMultiviewEnabled(!on) }
+        }
+        "vp_multiview_tiles" -> {
+            // The ceiling is picked in a dialog, so this one links back to the row rather than
+            // cycling the number in place — [dialogForQuickKey] already routes it there.
+            val tiles by vm.multiviewTiles.collectAsStateWithLifecycle()
+            link(
+                stringResource(R.string.settings_multiview_tiles_max_value, tiles),
+                tiles > tv.own.owntv.core.live.DEFAULT_MULTIVIEW_TILES,
+            )
         }
         "vp_afr" -> {
             val on by vm.autoFrameRate.collectAsStateWithLifecycle()
@@ -1513,6 +1528,7 @@ private fun LiveLatencyWarningDialog(onConfirm: () -> Unit, onCancel: () -> Unit
     val firstFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
     BackHandler { onCancel() }
+    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onCancel) {
     Box(
         modifier = Modifier.fillMaxSize().modalScrim().trapAllFocusExit().focusGroup(),
         contentAlignment = Alignment.Center,
@@ -1532,6 +1548,7 @@ private fun LiveLatencyWarningDialog(onConfirm: () -> Unit, onCancel: () -> Unit
             }
         }
     }
+    }
 }
 
 /** Confirmation before forgetting a whole set of remembered per-item choices (engine pins, zoom and
@@ -1543,6 +1560,7 @@ private fun ConfirmResetDialog(title: String, description: String, onConfirm: ()
     val firstFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
     BackHandler { onCancel() }
+    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onCancel) {
     Box(
         modifier = Modifier.fillMaxSize().modalScrim().trapAllFocusExit().focusGroup(),
         contentAlignment = Alignment.Center,
@@ -1561,6 +1579,7 @@ private fun ConfirmResetDialog(title: String, description: String, onConfirm: ()
                 OwnTVButton(stringResource(R.string.common_reset), onClick = onConfirm)
             }
         }
+    }
     }
 }
 
@@ -1656,7 +1675,7 @@ private fun externalPlayerChip(live: Boolean, movies: Boolean, series: Boolean):
 // --- Shared building blocks (kept local to the settings sub-screens) ---
 
 @Composable
-internal fun Header(title: String, onBack: () -> Unit) {
+internal fun Header(title: String, onBack: () -> Unit, subtitle: String? = null) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         FocusableSurface(
             onClick = onBack,
@@ -1665,7 +1684,16 @@ internal fun Header(title: String, onBack: () -> Unit) {
             surface = GlassSurface.CARDS,
             contentAlignment = Alignment.Center,
         ) { _ -> OwnTVIcon(OwnTVIcon.BACK, tint = OwnTVTheme.colors.onSurface, modifier = Modifier.size(20.dp)) }
-        Text(title, style = MaterialTheme.typography.headlineLarge, color = OwnTVTheme.colors.onSurface)
+        Column {
+            Text(title, style = MaterialTheme.typography.headlineLarge, color = OwnTVTheme.colors.onSurface)
+            if (subtitle != null) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = OwnTVTheme.colors.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 
@@ -1701,6 +1729,9 @@ internal fun Row2(
     primaryChip: Boolean = true,
     chevron: Boolean = false,
     iconTint: Color? = null,
+    /** Tile fill override. With [iconTint] and [titleTint], marks a row as destructive. */
+    iconBackground: Color? = null,
+    titleTint: Color? = null,
     iconBadge: String? = null,
     accentIconBadge: Boolean = false,
     keycapColor: Color? = null,
@@ -1735,7 +1766,7 @@ internal fun Row2(
             val (tileBg, tileOn) = LocalSettingsRowTone.current.colors()
             Box {
                 Box(
-                    modifier = Modifier.size(Dimens.IconTileSize).clip(RoundedCornerShape(Dimens.IconTileCorner)).background(tileBg),
+                    modifier = Modifier.size(Dimens.IconTileSize).clip(RoundedCornerShape(Dimens.IconTileCorner)).background(iconBackground ?: tileBg),
                     contentAlignment = Alignment.Center,
                 ) {
                     if (keycapColor != null) {
@@ -1790,7 +1821,7 @@ internal fun Row2(
                     Text(
                         title,
                         style = MaterialTheme.typography.titleMedium,
-                        color = colors.onSurface,
+                        color = titleTint ?: colors.onSurface,
                         modifier = Modifier.weight(1f, fill = false),
                     )
                     // The same dot the root rows carry: this one is also sitting in Quick.
@@ -1824,6 +1855,10 @@ internal fun PickerDialog(
     searchable: Boolean = false,
     trailingLabels: Map<String, String> = emptyMap(),
     leadingIcons: Map<String, OwnTVIcon> = emptyMap(),
+    subtitle: String? = null,
+    descriptions: Map<String, String> = emptyMap(),
+    /** Drawn under an option's description — the layout chooser's little bar preview. */
+    optionPreview: (@Composable (String) -> Unit)? = null,
 ) {
     val colors = OwnTVTheme.colors
     val fr = remember { FocusRequester() }
@@ -1847,9 +1882,14 @@ internal fun PickerDialog(
         tv.own.owntv.ui.theme.PopupFontTheme {
             Box(Modifier.fillMaxSize().modalScrim().trapAllFocusExit().focusGroup(), contentAlignment = Alignment.Center) {
                 Column(
-                    modifier = Modifier.dialogPanel(width = 280.dp, corner = 16.dp, padding = 14.dp, scroll = false),
+                    // Descriptions need room to breathe; a 280dp column would wrap them to five lines.
+                    modifier = Modifier.dialogPanel(width = if (descriptions.isEmpty()) 280.dp else 420.dp, corner = 16.dp, padding = 14.dp, scroll = false),
                 ) {
             Text(title, style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
+            if (subtitle != null) {
+                Spacer(Modifier.height(4.dp))
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+            }
             Spacer(Modifier.height(10.dp))
             if (searchable) {
                 tv.own.owntv.ui.components.SearchBar(
@@ -1875,6 +1915,7 @@ internal fun PickerDialog(
                         contentAlignment = Alignment.CenterStart,
                         surface = GlassSurface.DIALOGS,
                     ) { _ ->
+                        Column(Modifier.fillMaxWidth()) {
                         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         leadingIcons[value]?.let { icon ->
                             OwnTVIcon(
@@ -1893,6 +1934,18 @@ internal fun PickerDialog(
                             )
                         }
                         if (isSel) OwnTVIcon(OwnTVIcon.STAR, tint = colors.onPrimaryContainer, filled = true, modifier = Modifier.size(14.dp))
+                        }
+                        descriptions[value]?.let { desc ->
+                            Text(
+                                desc,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (isSel) colors.onPrimaryContainer else colors.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 10.dp, end = 10.dp, bottom = 8.dp),
+                            )
+                        }
+                        optionPreview?.let { preview ->
+                            Box(Modifier.padding(start = 10.dp, end = 10.dp, bottom = 10.dp)) { preview(value) }
+                        }
                         }
                     }
                 }
@@ -1930,7 +1983,7 @@ private fun ExternalPlayerDialog(
         Triple(tv.own.owntv.core.settings.SettingsRepository.ExternalPlayerSection.MOVIES, stringResource(R.string.common_nav_movies), movies),
         Triple(tv.own.owntv.core.settings.SettingsRepository.ExternalPlayerSection.SERIES, stringResource(R.string.common_nav_series), series),
     )
-    tv.own.owntv.ui.theme.PopupFontTheme {
+    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
         Box(Modifier.fillMaxSize().modalScrim().trapAllFocusExit().focusGroup(), contentAlignment = Alignment.Center) {
             Column(modifier = Modifier.dialogPanel(width = 300.dp, corner = 16.dp, padding = 14.dp, scroll = false)) {
                 Text(stringResource(R.string.settings_external_player), style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
@@ -1986,7 +2039,7 @@ internal fun StepperDialog(
     val minusEnabled = value > min
     val steppers = tv.own.owntv.ui.components.rememberStepperFocus(plusEnabled, minusEnabled)
     BackHandler { onDismiss() }
-    tv.own.owntv.ui.theme.PopupFontTheme {
+    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
     Box(Modifier.fillMaxSize().modalScrim().trapAllFocusExit().focusGroup(), contentAlignment = Alignment.Center) {
         Column(
             modifier = Modifier.dialogPanel(width = 360.dp, corner = 16.dp, padding = 16.dp),
@@ -2140,7 +2193,7 @@ private fun SubtitleAppearanceDialog(
     }
 
     BackHandler { onDismiss() }
-    tv.own.owntv.ui.theme.PopupFontTheme {
+    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
         Box(
             modifier = Modifier.fillMaxSize().modalScrim()
                 .trapAllFocusExit().focusGroup(),
@@ -2283,7 +2336,7 @@ private fun SubtitleColorDialog(color: String, onColor: (String) -> Unit, onDism
         onColor(hex)
     }
 
-    tv.own.owntv.ui.theme.PopupFontTheme {
+    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
         Box(
             modifier = Modifier.fillMaxSize().modalScrim()
                 .imePadding().trapAllFocusExit().focusGroup(),
@@ -2380,7 +2433,7 @@ private fun SubtitlePositionDialog(
     val selectedFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { selectedFocus.requestFocus() } }
     BackHandler { onDismiss() }
-    tv.own.owntv.ui.theme.PopupFontTheme {
+    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
         Box(
             modifier = Modifier.fillMaxSize().modalScrim()
                 .trapAllFocusExit().focusGroup(),
@@ -2496,7 +2549,7 @@ private fun SubtitleSizeDialog(
     val firstRow = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { firstRow.requestFocus() } }
     BackHandler { onDismiss() }
-    tv.own.owntv.ui.theme.PopupFontTheme {
+    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
         Box(
             modifier = Modifier.fillMaxSize().modalScrim()
                 .trapAllFocusExit().focusGroup(),
@@ -2598,7 +2651,7 @@ private fun SubtitleTransparencyDialog(
     val plusEnabled = isDefault || effective < SubtitleStyle.OPACITY_MAX
     val steppers = tv.own.owntv.ui.components.rememberStepperFocus(plusEnabled, minusEnabled)
     BackHandler { onDismiss() }
-    tv.own.owntv.ui.theme.PopupFontTheme {
+    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
         Box(
             modifier = Modifier.fillMaxSize().modalScrim()
                 .trapAllFocusExit().focusGroup(),

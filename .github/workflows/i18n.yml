@@ -113,6 +113,10 @@ jobs:
           java-version: '21'
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # 'tools' is obsolete and Google removed it from the SDK repository; the
+          # action still asks for it by default, which fails the whole setup step.
+          packages: 'platform-tools'
       - name: Resolve core
         uses: ./.github/actions/resolve-core
         with:
