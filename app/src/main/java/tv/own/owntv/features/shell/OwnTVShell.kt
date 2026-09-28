@@ -1667,7 +1667,6 @@ fun OwnTVShell(
                     // threw the user out of the rewind with the HUD still counting "behind live".
                     // Also hidden for a protected channel (#115): only ExoPlayer can license it, so the
                     // toggle's other position is not a compatibility choice but a guaranteed failure.
-                    onToggleCompatMode = if (isTunedLive && !timeshifted && previewChannel?.drmConfig == null) liveVm::toggleForceMpv else null,
                     // True PiP corner controls — present only while a second stream is in the corner.
                     // Swap is offered only when the main stream is a promoted live channel (both ExoPlayer),
                     // so the exchange is clean; audio/close are always available with a corner up.
