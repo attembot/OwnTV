@@ -1,6 +1,8 @@
 package tv.own.owntv.player
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -36,6 +39,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import kotlinx.coroutines.delay
+import org.koin.compose.koinInject
 import tv.own.owntv.R
 import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.OwnTVButton
@@ -235,6 +239,96 @@ internal fun SpeedDialog(current: Double, onSelect: (Double) -> Unit, onDismiss:
     }
 }
 
+/**
+ * The sleep timer's choices (N17), the phone's sheet in the television's dialog: Off while one is
+ * running, the shared minute choices, "End of programme" only when the guide says when that is, and
+ * "End of movie / episode" only while one plays.
+ * The title turns into the countdown while a timer runs, so re-opening it says what is set.
+ */
+@Composable
+internal fun SleepTimerDialog(
+    timer: SleepTimer,
+    /** When the programme on air ends; null offers no such row. */
+    programmeEndMs: Long?,
+    onDismiss: () -> Unit,
+) {
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { requestFocusRetrying(focus) }
+    BackHandler { onDismiss() }
+    val remaining by timer.remainingMs.collectAsStateWithLifecycle()
+    val title = remaining?.let {
+        stringResource(R.string.player_sleep_timer_remaining, stringResource(R.string.player_duration_minutes, SleepTimer.minutesLeft(it)))
+    } ?: stringResource(R.string.player_sleep_timer)
+    // Read once, as the dialog opens: the rows must not change under the D-pad while it is up.
+    val running = remember { remaining != null }
+    val endKind = remember { timer.itemEndKind() }
+    DialogScaffold(title = title, onDismiss = onDismiss) {
+        if (running) {
+            item {
+                OptionRow(
+                    label = stringResource(R.string.common_off),
+                    selected = false,
+                    modifier = Modifier.focusRequester(focus),
+                    onClick = { timer.cancel(); onDismiss() },
+                )
+            }
+        }
+        items(SleepTimer.CHOICES_MINUTES.size) { index ->
+            val minutes = SleepTimer.CHOICES_MINUTES[index]
+            OptionRow(
+                label = stringResource(R.string.player_duration_minutes, minutes),
+                selected = false,
+                modifier = if (!running && index == 0) Modifier.focusRequester(focus) else Modifier,
+                onClick = { timer.start(minutes * 60_000L); onDismiss() },
+            )
+        }
+        programmeEndMs?.takeIf { it > System.currentTimeMillis() }?.let { endMs ->
+            item {
+                OptionRow(
+                    label = stringResource(R.string.player_sleep_timer_end_of_programme),
+                    selected = false,
+                    onClick = { timer.start(endMs - System.currentTimeMillis()); onDismiss() },
+                )
+            }
+        }
+        endKind?.let { kind ->
+            item {
+                OptionRow(
+                    label = stringResource(if (kind == SleepTimer.EndKind.EPISODE) R.string.player_sleep_timer_end_of_episode else R.string.player_sleep_timer_end_of_movie),
+                    selected = false,
+                    onClick = { timer.startUntilItemEnd(); onDismiss() },
+                )
+            }
+        }
+        item { ScreenOffRow() }
+    }
+}
+
+/**
+ * "Also turn off the screen": ticked is the system grant itself ([ScreenOff]), so it is re-read after
+ * the system screen answers rather than stored. A set with no such screen says so instead.
+ */
+@Composable
+private fun ScreenOffRow(screenOff: ScreenOff = koinInject()) {
+    val context = LocalContext.current
+    var allowed by remember { mutableStateOf(screenOff.isAllowed()) }
+    val ask = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { allowed = screenOff.isAllowed() }
+    OptionRow(
+        label = stringResource(R.string.player_sleep_timer_screen_off),
+        selected = allowed,
+        onClick = {
+            if (allowed) {
+                screenOff.revoke()
+                allowed = false
+            } else {
+                runCatching { ask.launch(screenOff.requestIntent()) }.onFailure {
+                    android.widget.Toast.makeText(context, R.string.player_sleep_timer_screen_off_unavailable, android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
+        },
+    )
+}
+
 @Composable
 internal fun ZoomDialog(current: ZoomMode, onSelect: (ZoomMode) -> Unit, onDismiss: () -> Unit) {
     val focus = remember { FocusRequester() }
@@ -246,6 +340,27 @@ internal fun ZoomDialog(current: ZoomMode, onSelect: (ZoomMode) -> Unit, onDismi
         items(ZoomMode.entries.size) { index ->
             val mode = ZoomMode.entries[index]
             OptionRow(label = stringResource(mode.labelRes), selected = mode == current, modifier = if (index == selectedIndex) Modifier.focusRequester(focus) else Modifier, onClick = { onSelect(mode) })
+        }
+    }
+}
+
+/** N11 — Auto (Settings → Maximum video quality), then every height this stream offers, highest first. */
+@Composable
+internal fun QualityDialog(heights: List<Int>, current: Int?, onSelect: (Int?) -> Unit, onDismiss: () -> Unit) {
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { requestFocusRetrying(focus) }
+    BackHandler { onDismiss() }
+    val options: List<Int?> = listOf<Int?>(null) + heights
+    val selectedIndex = options.indexOf(current).coerceAtLeast(0)
+    DialogScaffold(title = stringResource(R.string.player_tool_quality), onDismiss = onDismiss) {
+        items(options.size) { index ->
+            val height = options[index]
+            OptionRow(
+                label = if (height == null) stringResource(R.string.settings_auto) else stringResource(R.string.settings_video_quality_lines, height),
+                selected = height == current,
+                modifier = if (index == selectedIndex) Modifier.focusRequester(focus) else Modifier,
+                onClick = { onSelect(height) },
+            )
         }
     }
 }

@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -28,7 +29,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
@@ -60,6 +60,7 @@ import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.OwnTVSpinner
 import tv.own.owntv.ui.components.displayText // PlayerFailureReason.displayText, for the error overlay
 import tv.own.owntv.ui.theme.LocalActionSurface
+import tv.own.owntv.ui.theme.gradientWash
 
 /**
  * The full-screen player HUD. This file owns the HUD's STATE — visibility, direct tune, the dialog the
@@ -117,7 +118,7 @@ private const val PLAYER_SHORTCUT_LONG_PRESS_MS = 600L
 private const val TRACK_POLL_MS = 300L
 private const val TRACK_POLL_TRIES = 20
 
-internal enum class HudDialog { NONE, AUDIO, SUBS, SPEED, ZOOM, VOLUME, SUB_TIMING, JUMP_BACK }
+internal enum class HudDialog { NONE, AUDIO, SUBS, SPEED, ZOOM, QUALITY, VOLUME, SUB_TIMING, JUMP_BACK, SLEEP_TIMER }
 
 /** What the top-left channel OSD shows for direct tune: the digits being typed, the channel a number
  *  resolved to, or a failure message. All three render as the same card as the channel OSD. */
@@ -174,11 +175,15 @@ fun PlayerHud(
     onScrubLive: ((Int) -> Unit)? = null, // timeline scrub: +sec = back, −sec = toward live
     // The playing channel's guide, for the timeline's programme ticks and the scrub bubble's name.
     liveProgrammes: List<LiveProgramme> = emptyList(),
+    /** N4 — the saved copy's holes, for the rewind bar. */
+    liveGaps: () -> List<LongRange> = { emptyList() },
     // "Go back to…": aim at a point in the archive instead of nudging toward it with rewind. Null =
     // not a catch-up channel. [jumpBackOptions] is read when the list opens so its clock times are
     // computed against the moment the user asked, not the moment the HUD was composed.
     jumpBackOptions: (() -> List<Int>)? = null,
     onJumpBack: ((Int) -> Unit)? = null,
+    // N2 — back to the channel watched before this one. Null hides the button (no previous channel yet).
+    onPreviousChannel: (() -> Unit)? = null,
     // Archive depth of the current channel, for the exact-time picker's day/HH:MM bounds.
     jumpBackWindowSec: (() -> Int)? = null,
     // Read as a lambda, not a value: the offset ticks once a second, and taking it as a plain Int?
@@ -211,17 +216,26 @@ fun PlayerHud(
     // (the EPG data lives in LiveViewModel, not the player). Rendered on the right edge whenever the
     // controls are visible, like the top-bar channel card; informational only, never focusable.
     liveEpgCard: (@Composable () -> Unit)? = null,
+    // N3 — now/next lines for the channel-change banner (the playing channel's guide). Null = name only.
+    zapGuide: (@Composable () -> Unit)? = null,
     // The archive's own wall-clock instant while catch-up/rewind is playing; null means the picture is
     // the present, and only the real clock shows. Drives the second, framed clock at top centre.
     // Lambda for the same reason as [timeshiftOffsetSec]: this instant advances every second too.
     watchingWallMs: (() -> Long?)? = null,
+    // N17 — when the programme on air ends, read as the sleep timer opens. Null = no "End of programme".
+    sleepProgrammeEndMs: (() -> Long?)? = null,
+    // N6 — Settings → "Left and right rewind live TV": with the controls hidden, Left/Right on a
+    // catch-up channel scrub instead of opening the lists. Films always seek.
+    liveLeftRightRewinds: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    val timeshiftOffset = timeshiftOffsetSec?.invoke()
-    val watchingWall = watchingWallMs?.invoke()
+    // T14 — nothing that ticks is read in this root scope: with the controls hidden it used to recompose
+    // the whole HUD once a second for a position nobody could see. The offset, the archive clock and the
+    // position are handed down as lambdas and read by the piece that draws them.
+    val timeshiftOffset: () -> Int? = { timeshiftOffsetSec?.invoke() }
     val layoutDirection = LocalLayoutDirection.current
     val isPlaying by player.isPlaying.collectAsStateWithLifecycle()
-    val position by player.position.collectAsStateWithLifecycle()
+    val position = player.position.collectAsStateWithLifecycle()
     val duration by player.duration.collectAsStateWithLifecycle()
     val buffering by player.buffering.collectAsStateWithLifecycle()
     val error by player.error.collectAsStateWithLifecycle()
@@ -246,22 +260,28 @@ fun PlayerHud(
     val tuneFailed = stringResource(R.string.player_tune_failed)
 
     val nextUpTitle by player.nextUpTitle.collectAsStateWithLifecycle()
+    // The sleep timer's "End of episode" stops there, so there is no next to count down to.
+    val stopsAtItemEnd by player.stopsAtItemEnd.collectAsStateWithLifecycle()
 
     var dialog by remember { mutableStateOf(HudDialog.NONE) }
     val playFocus = remember { FocusRequester() }
     val retryFocus = remember { FocusRequester() }
     val catchFocus = remember { FocusRequester() }
     val nextFocus = remember { FocusRequester() }
+    // The timeline, and whether the next reveal of the controls lands on it rather than Play (N6).
+    val seekFocus = remember { FocusRequester() }
+    var focusSeekOnShow by remember { mutableStateOf(false) }
 
     // Next-episode countdown card (VOD queues only): appears in the last ~30s before the automatic
     // advance (which fires at duration − 8s), counts down to it, and offers Play now / Cancel.
     var autoNextDismissed by remember { mutableStateOf(false) }
     // Re-arm when the queued next episode changes (i.e. after an advance to a new item).
     LaunchedEffect(nextUpTitle, nav.hasNext) { autoNextDismissed = false }
-    val msToAdvance = if (!isLive && duration > 0L) (duration - 8_000L) - position else Long.MAX_VALUE
-    val showNextCard = !isLive && error == null && nav.hasNext && nextUpTitle != null &&
-        msToAdvance in 0L..30_000L && !autoNextDismissed
-    val nextCountdown = ((msToAdvance + 999L) / 1000L).toInt().coerceIn(0, 30)
+    // Derived, so the root recomposes when the card appears or goes, not on every position tick.
+    val msToAdvance: () -> Long = { if (!isLive && duration > 0L) (duration - 8_000L) - position.value else Long.MAX_VALUE }
+    val nextCardDue by remember(isLive, duration) { derivedStateOf { msToAdvance() in 0L..30_000L } }
+    val showNextCard = !isLive && error == null && nav.hasNext && nextUpTitle != null && !stopsAtItemEnd &&
+        nextCardDue && !autoNextDismissed
 
     var controlsVisible by remember { mutableStateOf(true) }
     var showInfo by remember { mutableStateOf(false) } // stream technical-info overlay
@@ -413,7 +433,14 @@ fun PlayerHud(
         // The next-episode countdown card owns focus while it's up so Play now / Cancel are reachable.
         if (showNextCard) { runCatching { nextFocus.requestFocus() }; return@LaunchedEffect }
         if (controlsVisible) {
-            if (error != null) runCatching { retryFocus.requestFocus() } else runCatching { playFocus.requestFocus() }
+            val toSeek = focusSeekOnShow
+            focusSeekOnShow = false
+            when {
+                error != null -> runCatching { retryFocus.requestFocus() }
+                // Falls back to Play when no timeline is drawn after all (no duration yet, say).
+                toSeek -> runCatching { seekFocus.requestFocus() }.onFailure { runCatching { playFocus.requestFocus() } }
+                else -> runCatching { playFocus.requestFocus() }
+            }
         } else runCatching { catchFocus.requestFocus() }
     }
 
@@ -535,6 +562,26 @@ fun PlayerHud(
                 canZap && e.key == Key.MediaPrevious -> { zap(-1); true }
                 canZap && isLive && !controlsVisible && e.key == Key.DirectionUp -> { zap(1); true }
                 canZap && isLive && !controlsVisible && e.key == Key.DirectionDown -> { zap(-1); true }
+                // N6 — Left/Right with the controls hidden: reveal them on the timeline and take the first
+                // step, so the jump is seen and holding the key goes on scrubbing the bar itself. Physical
+                // keys, like the bars: left is back in time in every locale. A film always does this; a
+                // live channel only with its archive and the setting on — otherwise the lists below.
+                // Decided in the bottom bar's own order: a channel with an archive draws the live timeline
+                // even while rewound (when the engine is playing a file and calls it not live), so that
+                // is what the keys scrub; only without one does a film's seek bar apply.
+                !controlsVisible && error == null && (e.key == Key.DirectionLeft || e.key == Key.DirectionRight) &&
+                    (if (onScrubLive != null) liveLeftRightRewinds else !isLive && duration > 0L) -> {
+                    val back = e.key == Key.DirectionLeft
+                    if (onScrubLive != null) {
+                        onScrubLive(if (back) LIVE_SCRUB_STEP_SEC else -LIVE_SCRUB_STEP_SEC)
+                    } else {
+                        val step = player.seekStepMs.value
+                        player.seekBy(if (back) -step else step)
+                    }
+                    focusSeekOnShow = true
+                    controlsVisible = true
+                    true
+                }
                 // The category list lives at logical Start; history lives at logical End.
                 onOpenChannelList != null && !controlsVisible &&
                     e.key.horizontalDirection(layoutDirection) == HorizontalDirection.START -> { onOpenChannelList(); true }
@@ -574,9 +621,9 @@ fun PlayerHud(
                 // A fresh tune drives the card from the lookup result, not player metadata: the Stalker and
                 // mpv paths publish their metadata after an async resolve, which would show the old channel.
                 if (tuned != null) {
-                    ChannelOsdCard(title = tuned.name, subtitle = tuned.number?.let { stringResource(R.string.player_channel_number, it) }, logoUrl = tuned.logoUrl)
+                    ChannelOsdCard(title = tuned.name, subtitle = tuned.number?.let { stringResource(R.string.player_channel_number, it) }, logoUrl = tuned.logoUrl, guide = zapGuide)
                 } else {
-                    ChannelCard(player)
+                    ChannelCard(player, guide = zapGuide)
                 }
             }
             when (val osd = tuneOsd) {
@@ -601,17 +648,19 @@ fun PlayerHud(
             // so those washed out on bright scenes; a hard-edged band would instead draw a visible seam
             // across the picture. The colour stops give the panel first, then the feather.
             Box(Modifier.align(Alignment.TopStart).fillMaxWidth().height(210.dp)
-                .background(Brush.verticalGradient(
+                .gradientWash(
+                    vertical = true,
                     0.0f to Color.Black.copy(alpha = 0.72f),
                     0.5f to Color.Black.copy(alpha = 0.68f),
                     1.0f to Color.Transparent,
-                )))
+                ))
             Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(260.dp)
-                .background(Brush.verticalGradient(
+                .gradientWash(
+                    vertical = true,
                     0.0f to Color.Transparent,
                     0.45f to Color.Black.copy(alpha = 0.68f),
                     1.0f to Color.Black.copy(alpha = 0.78f),
-                )))
+                ))
 
             // The active engine (MPV/EXO) leads the mini chips so users can always tell which player is on.
             // One unified strip: back · logo · chips-over-channel-name · Now/Next guide. The channel name
@@ -624,7 +673,7 @@ fun PlayerHud(
                 // Hidden behind an error overlay along with the rest of the chrome: a clock ticking
                 // over a failure message just draws the eye to the wrong thing.
                 centre = if (error == null) {
-                    { PlayerClock(watchingMs = watchingWall) }
+                    { PlayerClock(watchingMs = watchingWallMs?.invoke()) }
                 } else null,
             )
 
@@ -633,17 +682,19 @@ fun PlayerHud(
             if (error == null) {
                 CenterControls(player, nav, isPlaying, isLive, onRewindLive, onForwardLive, timeshiftOffset, playFocus, modifier = Modifier.align(Alignment.Center))
 
-                val reportPosition = formatTime(position)
                 val reportDuration = duration.takeIf { it > 0 }?.let { formatTime(it) }
                 val reportSavedMessage = stringResource(R.string.player_report_saved)
 
                 BottomBar(
-                    player = player, isLive = isLive, position = position, duration = duration,
+                    seekFocus = seekFocus,
+                    player = player, isLive = isLive, position = { position.value }, duration = duration,
                     volume = volume, audioCount = audioCount, subCount = subCount, zoomMode = zoomMode,
                     speedLabel = formatSpeed(speed),
-                    onScrubLive = onScrubLive, timeshiftOffsetSec = timeshiftOffset, onGoToLive = onGoToLive,
+                    onScrubLive = onScrubLive, timeshiftOffset = timeshiftOffset, onGoToLive = onGoToLive,
                     liveProgrammes = liveProgrammes,
+                    liveGaps = liveGaps,
                     onOpenJumpBack = if (onJumpBack != null) { { dialog = HudDialog.JUMP_BACK } } else null,
+                    onPreviousChannel = onPreviousChannel,
                     compatMode = compatMode, onToggleCompatMode = toggleCompat,
                     vodOnExo = vodOnExo, onToggleVodEngine = toggleVod,
                     onInfo = { showInfo = !showInfo }, infoOn = showInfo,
@@ -652,6 +703,8 @@ fun PlayerHud(
                         // The readout is gathered on the player's own thread now (A-F2), so the report is
                         // written from a coroutine. The confirmation still flashes immediately — the user
                         // pressed a button and must see it acknowledged.
+                        // Read at the press, not per tick.
+                        val reportPosition = tv.own.owntv.ui.components.formatTimestamp(reportContext.resources, position.value)
                         hudScope.launch {
                             val snapshot = buildString {
                                 appendLine(player.streamInfo().joinToString("\n") { (k, v) -> "  $k: $v" })
@@ -684,7 +737,7 @@ fun PlayerHud(
         // Cancel. Shown independently of the main controls so it appears even after they auto-hide.
         if (showNextCard) {
             NextEpisodeCard(
-                seconds = nextCountdown,
+                seconds = { ((msToAdvance() + 999L) / 1000L).toInt().coerceIn(0, 30) },
                 title = nextUpTitle ?: "",
                 playFocus = nextFocus,
                 onPlayNow = { autoNextDismissed = true; player.next() },
@@ -820,7 +873,7 @@ fun PlayerHud(
                 onSelect = { player.selectAudio(it.mpvId); dialog = HudDialog.NONE }, onOff = null,
                 onDismiss = { dialog = HudDialog.NONE },
                 // A/V-sync nudge wherever the engine can actually shift audio: mpv, VOD *and* live (a live
-                // stream can arrive with the provider's own drift baked in). Hidden on ExoPlayer (F19e).
+                // stream can arrive with the provider's own drift baked in), on mpv and ExoPlayer alike.
                 audioDelayMs = if (player.audioDelayAvailable()) audioDelayMs else null,
                 onAdjustAudioDelay = if (player.audioDelayAvailable()) ({ d -> player.adjustAudioDelay(d) }) else null,
                 audioDelayRemembered = audioDelayRemembered,
@@ -851,7 +904,18 @@ fun PlayerHud(
         HudDialog.SUB_TIMING -> SubtitleTimingDialog(player, onDismiss = { dialog = HudDialog.NONE })
         HudDialog.SPEED -> SpeedDialog(current = speed, onSelect = { player.setSpeed(it); dialog = HudDialog.NONE }, onDismiss = { dialog = HudDialog.NONE })
         HudDialog.ZOOM -> ZoomDialog(current = zoomMode, onSelect = { player.setZoomModeByUser(it); dialog = HudDialog.NONE }, onDismiss = { dialog = HudDialog.NONE })
+        HudDialog.QUALITY -> {
+            // Snapshot as it opens, like the track lists above: a live list would rebuild the rows.
+            val heights = remember { player.videoQualities.value }
+            val pick by player.videoQualityPick.collectAsStateWithLifecycle()
+            QualityDialog(heights, pick, onSelect = { player.selectVideoQuality(it); dialog = HudDialog.NONE }, onDismiss = { dialog = HudDialog.NONE })
+        }
         HudDialog.VOLUME -> VolumeDialog(player, onDismiss = { dialog = HudDialog.NONE })
+        HudDialog.SLEEP_TIMER -> SleepTimerDialog(
+            timer = org.koin.compose.koinInject(),
+            programmeEndMs = remember { sleepProgrammeEndMs?.invoke() },
+            onDismiss = { dialog = HudDialog.NONE },
+        )
         // "Go back to…". The options are read here, as the list opens, so the clock times shown are
         // relative to the moment the user asked rather than to when the HUD was first composed.
         HudDialog.JUMP_BACK -> {

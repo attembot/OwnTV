@@ -51,6 +51,7 @@ import tv.own.owntv.core.player.ControlCluster
 import tv.own.owntv.ui.components.OwnTVButton
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.theme.OwnTVTheme
+import tv.own.owntv.ui.theme.animationsOn
 
 /**
  * The HUD's chrome: the top strip, the channel/direct-tune OSD cards, the centre transport and the
@@ -175,9 +176,11 @@ internal fun ChannelOsdCard(
     subtitle: String?,
     logoUrl: String?,
     modifier: Modifier = Modifier,
+    /** N3 — now/next under the name on a zap; null (or a channel with no guide) keeps it name-only. */
+    guide: (@Composable () -> Unit)? = null,
 ) {
     Row(
-        modifier = modifier.widthIn(max = 340.dp).clip(RoundedCornerShape(14.dp)).background(Color.Black.copy(alpha = 0.55f)).padding(14.dp),
+        modifier = modifier.widthIn(max = if (guide != null) 420.dp else 340.dp).clip(RoundedCornerShape(14.dp)).background(Color.Black.copy(alpha = 0.55f)).padding(14.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Box(Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFF004F46)), contentAlignment = Alignment.Center) {
@@ -189,18 +192,19 @@ internal fun ChannelOsdCard(
             subtitle?.takeIf { it.isNotBlank() }?.let {
                 Text(it, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
+            guide?.invoke()
         }
     }
 }
 
 @Composable
-internal fun ChannelCard(player: PlaybackEngine, modifier: Modifier = Modifier) {
+internal fun ChannelCard(player: PlaybackEngine, modifier: Modifier = Modifier, guide: (@Composable () -> Unit)? = null) {
     // Collect the reactive meta so the card refreshes the instant a zap changes the channel.
     val meta by player.currentMeta.collectAsStateWithLifecycle()
     val displayTitle = meta.title?.takeIf { it.isNotBlank() }
         ?: meta.episodeNumber?.let { stringResource(R.string.player_episode_number, it) }
         ?: ""
-    ChannelOsdCard(title = displayTitle, subtitle = meta.localizedSubtitle(), logoUrl = meta.logoUrl, modifier = modifier)
+    ChannelOsdCard(title = displayTitle, subtitle = meta.localizedSubtitle(), logoUrl = meta.logoUrl, modifier = modifier, guide = guide)
 }
 
 /** Direct-tune entry OSD: the number as it's typed, on the same surface (position, radius, scrim) the
@@ -209,12 +213,16 @@ internal fun ChannelCard(player: PlaybackEngine, modifier: Modifier = Modifier) 
  *  visible instead of mysterious. [error] turns it into the failure readout for the same number. */
 @Composable
 internal fun ChannelNumberCard(digits: String, error: String? = null, modifier: Modifier = Modifier) {
-    val caret = rememberInfiniteTransition(label = "tuneCaret")
-    val caretAlpha by caret.animateFloat(
-        initialValue = 1f, targetValue = 0f,
-        animationSpec = infiniteRepeatable(tween(600, easing = LinearEasing), RepeatMode.Reverse),
-        label = "tuneCaretAlpha",
-    )
+    // Animations Off: a steady caret, with no infinite transition started (never a 0 ms one).
+    val caretAlpha = if (!animationsOn) 1f else {
+        val caret = rememberInfiniteTransition(label = "tuneCaret")
+        val blink by caret.animateFloat(
+            initialValue = 1f, targetValue = 0f,
+            animationSpec = infiniteRepeatable(tween(600, easing = LinearEasing), RepeatMode.Reverse),
+            label = "tuneCaretAlpha",
+        )
+        blink
+    }
     val countdown = remember { Animatable(0f) }
     // Captured before the draw lambda: a DrawScope is not a composable, so it can't read the theme.
     val accent = OwnTVTheme.colors.accentOnVideo
@@ -266,11 +274,13 @@ internal fun ChannelNumberCard(digits: String, error: String? = null, modifier: 
 @Composable
 internal fun CenterControls(
     player: PlaybackEngine, nav: NavState, isPlaying: Boolean, isLive: Boolean,
-    onRewindLive: (() -> Unit)?, onForwardLive: (() -> Unit)?, timeshiftOffsetSec: Int?,
+    onRewindLive: (() -> Unit)?, onForwardLive: (() -> Unit)?, timeshiftOffset: () -> Int?,
     playFocus: FocusRequester, modifier: Modifier = Modifier,
 ) {
     val seekStep by player.seekStepMs.collectAsStateWithLifecycle() // Settings -> Seek step
     val rewindMode = onRewindLive != null // this is a catch-up-capable Live channel
+    // Read here, not in the HUD root: it ticks every second while rewound (T14).
+    val timeshiftOffsetSec = timeshiftOffset()
     val timeshifting = timeshiftOffsetSec != null
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         if (timeshifting) {
@@ -304,16 +314,20 @@ internal fun CenterControls(
 
 @Composable
 internal fun BottomBar(
-    player: PlaybackEngine, isLive: Boolean, position: Long, duration: Long,
+    player: PlaybackEngine, isLive: Boolean, position: () -> Long, duration: Long,
     volume: Int, audioCount: Int, subCount: Int, zoomMode: ZoomMode, speedLabel: String,
-    onScrubLive: ((Int) -> Unit)?, timeshiftOffsetSec: Int?, onGoToLive: (() -> Unit)?, onOpenJumpBack: (() -> Unit)?,
+    onScrubLive: ((Int) -> Unit)?, timeshiftOffset: () -> Int?, onGoToLive: (() -> Unit)?, onOpenJumpBack: (() -> Unit)?,
     liveProgrammes: List<LiveProgramme> = emptyList(),
+    liveGaps: () -> List<LongRange> = { emptyList() },
     compatMode: Boolean?, onToggleCompatMode: (() -> Unit)?,
     vodOnExo: Boolean?, onToggleVodEngine: (() -> Unit)?,
     onInfo: (() -> Unit)? = null, infoOn: Boolean = false, onReport: (() -> Unit)? = null,
     favorite: Boolean = false, onToggleFavorite: (() -> Unit)? = null,
+    onPreviousChannel: (() -> Unit)? = null,
     onOpenDialog: (HudDialog) -> Unit, onPip: (() -> Unit)?, onAudioMode: (() -> Unit)?,
     onMultiview: (() -> Unit)? = null, onRecordThis: (() -> Unit)? = null, recordingThis: Boolean = false,
+    /** Given to whichever timeline is drawn, so Left/Right with the controls hidden can land on it (N6). */
+    seekFocus: FocusRequester? = null,
     onBack: () -> Unit,
     // Fork: PiP corner controls (see PlayerHud).
     onCornerSwap: (() -> Unit)? = null, onCornerAudio: (() -> Unit)? = null, onCornerMove: (() -> Unit)? = null, onCornerGrow: (() -> Unit)? = null, onCornerShrink: (() -> Unit)? = null, onCornerClose: (() -> Unit)? = null,
@@ -321,8 +335,12 @@ internal fun BottomBar(
     cornerAudioOn: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    val seekStep by player.seekStepMs.collectAsStateWithLifecycle() // Settings -> Seek step
-    val buffered by player.bufferedMs.collectAsStateWithLifecycle()
+    // Changes only while rewound into the archive. The film position is read lower still, by
+    // [VodTimeline], so the tool buttons do not redraw every second (T14).
+    val timeshiftOffsetSec = timeshiftOffset()
+    // Only whether one runs: the countdown itself ticks every second, and this bar must not (T14).
+    val sleepLeft = org.koin.compose.koinInject<SleepTimer>().remainingMs.collectAsStateWithLifecycle()
+    val sleepRunning by androidx.compose.runtime.remember { androidx.compose.runtime.derivedStateOf { sleepLeft.value != null } }
     Column(modifier = modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 20.dp)) {
         // Fork: dedicated PiP row (only while a corner stream is up), its own labeled strip so it is obvious
         // which window each action touches: "Change main" retunes the full-screen stream, "Change PiP"
@@ -370,6 +388,8 @@ internal fun BottomBar(
                             programmes = liveProgrammes,
                             liveEdgeMs = System.currentTimeMillis(),
                             onScrub = onScrubLive,
+                            focusRequester = seekFocus,
+                            gaps = liveGaps,
                         )
                     }
                     Spacer(Modifier.width(12.dp))
@@ -378,15 +398,7 @@ internal fun BottomBar(
                 Spacer(Modifier.height(10.dp))
             }
             !isLive && duration > 0 -> {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    TimeCap(formatTime(position), Alignment.Start)
-                    Spacer(Modifier.width(12.dp))
-                    Box(Modifier.weight(1f)) {
-                        SeekBar(positionMs = position, durationMs = duration, bufferedMs = buffered, stepMs = seekStep, onSeek = { player.seekBy(it) })
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    TimeCap(stringResource(R.string.player_time_remaining, formatTime((duration - position).coerceAtLeast(0))), Alignment.End)
-                }
+                VodTimeline(player, position, duration, seekFocus)
                 Spacer(Modifier.height(10.dp))
             }
             // A live channel with no archive has no timeline to scrub, but it still has a state to
@@ -437,11 +449,15 @@ internal fun BottomBar(
                         PlayerControl.CATCH_UP -> if (onOpenJumpBack != null) {
                             CtrlButton(OwnTVIcon.CATCHUP, label = stringResource(R.string.player_tool_catchup)) { onOpenJumpBack() }
                         }
+                        // N2 — back to the channel watched before; present only once there is one.
+                        PlayerControl.PREVIOUS_CHANNEL -> if (onPreviousChannel != null) {
+                            CtrlButton(OwnTVIcon.HISTORY, label = stringResource(R.string.player_previous_channel)) { onPreviousChannel() }
+                        }
                         // Belongs to the tools cluster; `clusterFor` never hands them to this loop.
                         PlayerControl.BRIGHTNESS, PlayerControl.CHANNEL_LIST, PlayerControl.ENGINE,
-                        PlayerControl.ASPECT, PlayerControl.MINI_PLAYER, PlayerControl.AUDIO_ONLY,
-                        PlayerControl.MULTIVIEW, PlayerControl.RECORD, PlayerControl.INFO,
-                        PlayerControl.REPORT,
+                        PlayerControl.ASPECT, PlayerControl.QUALITY, PlayerControl.MINI_PLAYER, PlayerControl.AUDIO_ONLY,
+                        PlayerControl.MULTIVIEW, PlayerControl.RECORD, PlayerControl.SLEEP_TIMER,
+                        PlayerControl.INFO, PlayerControl.REPORT,
                         -> Unit
                     }
                 }
@@ -470,6 +486,14 @@ internal fun BottomBar(
                         // itself (see MpvVideoSurface), GL mode scales internally.
                         PlayerControl.ASPECT ->
                             CtrlButton(OwnTVIcon.ASPECT, active = zoomMode != ZoomMode.FIT, label = stringResource(R.string.player_tool_aspect)) { onOpenDialog(HudDialog.ZOOM) }
+                        // N11 — only when this stream offers several; tinted while a pick overrides Auto.
+                        PlayerControl.QUALITY -> {
+                            val qualities by player.videoQualities.collectAsStateWithLifecycle()
+                            val pick by player.videoQualityPick.collectAsStateWithLifecycle()
+                            if (qualities.isNotEmpty()) {
+                                CtrlButton(OwnTVIcon.VIDEO, active = pick != null, label = stringResource(R.string.player_tool_quality)) { onOpenDialog(HudDialog.QUALITY) }
+                            }
+                        }
                         // Fork: the button keeps the fork's label. On a live channel it opens a SECOND stream in
                         // the corner (true PiP); on VOD it docks to the mini player (upstream's behavior).
                         PlayerControl.MINI_PLAYER -> if (onPip != null) {
@@ -499,6 +523,9 @@ internal fun BottomBar(
                                 ),
                             ) { onRecordThis() }
                         }
+                        // N17 — stop after a while; tinted while a countdown is running.
+                        PlayerControl.SLEEP_TIMER ->
+                            CtrlButton(OwnTVIcon.BEDTIME, active = sleepRunning, label = stringResource(R.string.player_sleep_timer)) { onOpenDialog(HudDialog.SLEEP_TIMER) }
                         // Stream technical info (codec/res/HDR/bitrate/decoder/audio/buffer) —
                         // toggles the overlay. Parked at the far right, where the redundant
                         // exit-fullscreen button used to sit (Back already leaves the player, so
@@ -518,7 +545,8 @@ internal fun BottomBar(
                         // Belongs to the media cluster; `clusterFor` never hands them to this loop.
                         PlayerControl.GO_LIVE, PlayerControl.VOLUME, PlayerControl.BRIGHTNESS,
                         PlayerControl.SPEED, PlayerControl.SUBTITLES, PlayerControl.AUDIO,
-                        PlayerControl.FAVOURITE, PlayerControl.CATCH_UP, PlayerControl.CHANNEL_LIST,
+                        PlayerControl.FAVOURITE, PlayerControl.CATCH_UP, PlayerControl.PREVIOUS_CHANNEL,
+                        PlayerControl.CHANNEL_LIST,
                         -> Unit
                     }
                 }
@@ -534,11 +562,30 @@ private fun volumeIcon(volume: Int): OwnTVIcon = when {
     else -> OwnTVIcon.VOLUME_HIGH
 }
 
+/** A film's seek bar and its two time caps — the only part of the dock that needs the position, so the
+ *  only part that recomposes as it ticks (T14). */
+@Composable
+private fun VodTimeline(player: PlaybackEngine, position: () -> Long, duration: Long, seekFocus: FocusRequester?) {
+    val seekStep by player.seekStepMs.collectAsStateWithLifecycle() // Settings -> Seek step
+    val buffered by player.bufferedMs.collectAsStateWithLifecycle()
+    val pos = position()
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        TimeCap(formatTime(pos), Alignment.Start)
+        Spacer(Modifier.width(12.dp))
+        Box(Modifier.weight(1f)) {
+            SeekBar(positionMs = pos, durationMs = duration, bufferedMs = buffered, stepMs = seekStep, onSeek = { player.seekBy(it) }, focusRequester = seekFocus)
+        }
+        Spacer(Modifier.width(12.dp))
+        TimeCap(stringResource(R.string.player_time_remaining, formatTime((duration - pos).coerceAtLeast(0))), Alignment.End)
+    }
+}
+
 /** Next-episode countdown card: "Next episode in Ns" + title, with Play now / Cancel. Play now advances
- *  immediately; Cancel suppresses the automatic advance for the current item. */
+ *  immediately; Cancel suppresses the automatic advance for the current item. [seconds] is read inside,
+ *  so the countdown redraws this card rather than the whole HUD. */
 @Composable
 internal fun NextEpisodeCard(
-    seconds: Int,
+    seconds: () -> Int,
     title: String,
     playFocus: FocusRequester,
     onPlayNow: () -> Unit,
@@ -554,7 +601,7 @@ internal fun NextEpisodeCard(
             .padding(horizontal = 18.dp, vertical = 14.dp),
     ) {
         Text(
-            stringResource(R.string.player_next_episode, seconds),
+            stringResource(R.string.player_next_episode, seconds()),
             style = MaterialTheme.typography.labelLarge,
             color = colors.accentOnVideo,
             fontWeight = FontWeight.Bold,

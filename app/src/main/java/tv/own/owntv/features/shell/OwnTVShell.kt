@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
@@ -283,6 +284,11 @@ fun OwnTVShell(
     // up/down (CH+/CH-). Guide tunes start through LiveViewModel too (they set zapSource = LIVE_TV), so
     // there is exactly ONE zap path: liveVm's. The Guide keeps its own EpgViewModel only for the grid.
     val liveVm = org.koin.androidx.compose.koinViewModel<LiveViewModel>()
+    // N2 — "previous" from the system media controls on a live channel goes back a channel.
+    DisposableEffect(playbackSession, liveVm) {
+        playbackSession.livePrevious = { liveVm.previousChannel() }
+        onDispose { playbackSession.livePrevious = null }
+    }
     val epgVm = org.koin.androidx.compose.koinViewModel<tv.own.owntv.features.epg.EpgViewModel>()
     val liveCanZap by liveVm.canZap.collectAsStateWithLifecycle()
     // Full-screen is running on the ExoPlayer engine (a promoted Live preview) rather than mpv.
@@ -292,20 +298,16 @@ fun OwnTVShell(
     // startOnExo() unmutes the main engine, undoing the corner's audio claim. Key the arbitration on
     // the live engine actually (re)opening a stream, which is the event that resets the mute.
     val liveEngineState by liveVm.previewEngine.state.collectAsStateWithLifecycle()
+    val previousLiveChannel by liveVm.previousChannelTarget.collectAsStateWithLifecycle()
     // A catch-up archive programme is playing (Guide "Watch from start" or the Live TV catch-up picker)
     // rather than the live stream — the HUD swaps live-only controls for the VOD ones.
     val catchupActive by liveVm.catchupActive.collectAsStateWithLifecycle()
     val vodExoActive by player.exoActiveState.collectAsStateWithLifecycle()
-    // Publish the active engine to the system (audio focus + MediaSession), and detach when the player
-    // is closed — an inactive session must not keep answering the TV's transport keys or the Assistant.
-    LaunchedEffect(liveOnExo, playerMode) {
-        playbackSession.attach(
-            if (playerMode == PlayerMode.NONE) null else if (liveOnExo) liveVm.previewEngine else mpvEngine,
-        )
-    }
     // Auto frame rate: only ever applied to the FULL-SCREEN surface (never the mini-player or the
     // in-pane Live preview) — see FrameRateController.
     val autoFrameRate by settingsRepo.autoFrameRate.collectAsStateWithLifecycle(initialValue = false)
+    val afrMatchResolution by settingsRepo.afrMatchResolution.collectAsStateWithLifecycle(initialValue = false)
+    val afrPauseSecs by settingsRepo.afrPauseSecs.collectAsStateWithLifecycle(initialValue = 0)
     // ...and the one-time suggestion to turn it on, for the 25-fps-on-60-Hz judder the direct render path
     // cannot fix by itself (F13). `true` until the flag is read, so it can never flash on first frame.
     val afrPrompted by settingsRepo.autoFrameRatePrompted.collectAsStateWithLifecycle(initialValue = true)
@@ -314,9 +316,10 @@ fun OwnTVShell(
     // "Prefer EPG logos": start following the setting once, here rather than in Application.onCreate —
     // the store queries nothing at all while the toggle is off, so cold start stays free of EPG reads.
     val epgDaoForLogos = koinInject<tv.own.owntv.core.database.dao.EpgDao>()
+    val customizeForLogos = koinInject<tv.own.owntv.core.customize.CustomizationStore>()
     val logoScope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
-        tv.own.owntv.core.epg.EpgLogoStore.start(logoScope, settingsRepo, epgDaoForLogos)
+        tv.own.owntv.core.epg.EpgLogoStore.start(logoScope, settingsRepo, epgDaoForLogos, customizeForLogos)
     }
     // Live rewind / timeshift: whether the live channel supports catch-up, and how far behind live we are.
     val canRewindLive by liveVm.canRewindLive.collectAsStateWithLifecycle()
@@ -326,12 +329,18 @@ fun OwnTVShell(
     // just the on/off fact, which changes when the user enters or leaves the rewind and no oftener.
     val timeshiftOffsetState = liveVm.timeshiftOffsetSec.collectAsStateWithLifecycle()
     val watchingWallState = liveVm.watchingWallMs.collectAsStateWithLifecycle()
-    val timelineProgrammes by liveVm.timelineProgrammes.collectAsStateWithLifecycle()
+    val onLocalCopy by liveVm.onLocalCopy.collectAsStateWithLifecycle()
     val timeshifted by remember(liveVm) {
         liveVm.timeshiftOffsetSec.map { it != null }.distinctUntilChanged()
     }.collectAsStateWithLifecycle(false)
     // Which section armed the current fullscreen stream — picks whose channel list CH+/CH- step through.
     var zapSource by remember { mutableStateOf<MainSection?>(null) }
+    // The multi-day guide for the rewind timeline is read only while it can be shown (the same test
+    // the HUD applies below); otherwise its query would re-run on every channel-list focus step.
+    val wantTimeline = playerMode == PlayerMode.FULLSCREEN && zapSource == MainSection.LIVE_TV && !catchupActive && canRewindLive
+    val timelineProgrammes by remember(liveVm, wantTimeline) {
+        if (wantTimeline) liveVm.timelineProgrammes else flowOf(emptyList())
+    }.collectAsStateWithLifecycle(emptyList())
     // In-player channel-list overlay (Left while controls hidden, live only).
     var showChannelList by remember { mutableStateOf(false) }
     // In-player watch-history list (Right while controls hidden, live only).
@@ -350,6 +359,7 @@ fun OwnTVShell(
         }
     }
     val recordWatchingEnabled by settingsRepo.recordWhatImWatching.collectAsStateWithLifecycle(false)
+    val liveLeftRightRewinds by settingsRepo.liveLeftRightRewinds.collectAsStateWithLifecycle(false)
     val multiviewTileCount by settingsRepo.multiviewTiles.collectAsStateWithLifecycle(
         tv.own.owntv.core.live.DEFAULT_MULTIVIEW_TILES,
     )
@@ -357,6 +367,27 @@ fun OwnTVShell(
     val streamRegistry = koinInject<tv.own.owntv.core.live.OpenStreamRegistry>()
     var multiview by remember { mutableStateOf<tv.own.owntv.features.multiview.MultiviewState?>(null) }
     var multiviewPickFor by remember { mutableStateOf<Int?>(null) }
+    // Publish the active engine to the system (audio focus + MediaSession), and detach when the player
+    // is closed — an inactive session must not keep answering the TV's transport keys or the Assistant.
+    // During Multiview that is the tile with the sound; the preview engine it used to stay on is stopped.
+    val multiviewAudibleEngine = multiview?.let { it.pool.peek(it.audible) }
+    LaunchedEffect(liveOnExo, playerMode, multiviewAudibleEngine) {
+        playbackSession.attach(
+            when {
+                multiview != null -> multiviewAudibleEngine
+                playerMode == PlayerMode.NONE -> null
+                liveOnExo -> liveVm.previewEngine
+                else -> mpvEngine
+            },
+        )
+    }
+    // The pool outlives this composable (it is app-wide), the grid state does not. If the shell is torn
+    // down with the grid up, release its engines and stream claims, or they play on as ghosts that
+    // refuse later tiles and recordings.
+    val currentMultiview by rememberUpdatedState(multiview)
+    DisposableEffect(Unit) {
+        onDispose { currentMultiview?.releaseAll() }
+    }
     // Channels kept from the Live list (B5's second entry point). Pressing play on any channel is
     // what says "now": the grid opens with them already in it, and the selection is spent.
     val multiviewSelection by liveVm.multiviewSelection.collectAsStateWithLifecycle()
@@ -611,6 +642,23 @@ fun OwnTVShell(
         liveVm.clearMultiviewSelection()
         state
     }
+    // N17 — the sleep timer's "stop" on a television. Closing the player alone is not a stop here: a
+    // live channel carries on in the preview pane, and a Multiview grid is not the player at all. So
+    // all three go, in the order Multiview's own Back uses, and the preview last.
+    val sleepTimer = koinInject<tv.own.owntv.player.SleepTimer>()
+    val stopForSleep by rememberUpdatedState {
+        multiview?.let { grid ->
+            grid.releaseAll()
+            multiview = null
+            multiviewPickFor = null
+        }
+        if (playerMode != PlayerMode.NONE) exitPlayer()
+        liveVm.stopPreview()
+    }
+    DisposableEffect(sleepTimer) {
+        sleepTimer.stopPlayback = { stopForSleep() }
+        onDispose { sleepTimer.stopPlayback = null }
+    }
     // The kept selection is spent the moment a channel actually starts playing full screen: that
     // press is the "and now open it" the plan describes, and nothing else in the app claims it.
     LaunchedEffect(playerMode, previewChannel?.id, multiviewSelection.size) {
@@ -728,6 +776,7 @@ fun OwnTVShell(
             RemoteShortcutAction.ENTER_AUDIO_MODE -> if (playerMode == PlayerMode.FULLSCREEN || playerMode == PlayerMode.MINI) toAudioMode()
             RemoteShortcutAction.PLAY_PAUSE -> if (playerMode != PlayerMode.NONE) dockedEngine.togglePlayPause()
             RemoteShortcutAction.RETURN_TO_LIVE -> if (playerMode != PlayerMode.NONE && zapSource == MainSection.LIVE_TV && timeshifted) liveVm.goToLive()
+            RemoteShortcutAction.PREVIOUS_CHANNEL -> if (playerMode != PlayerMode.NONE && zapSource == MainSection.LIVE_TV) liveVm.previousChannel()
             RemoteShortcutAction.PAGE_TOWARD_FIRST,
             RemoteShortcutAction.PAGE_TOWARD_LAST,
             RemoteShortcutAction.JUMP_TO_FIRST,
@@ -867,8 +916,10 @@ fun OwnTVShell(
     LaunchedEffect(Unit) { runCatching { sidebarFocus.requestFocus() } }
 
     // Stop a leftover live preview when you leave the Live section (but never while fullscreen/mini plays).
+    // The preview runs on the ExoPlayer live engine, not mpv: stopping only mpv here (as when the preview
+    // was mpv) left it decoding and holding a provider connection after a shortcut or deep link out.
     LaunchedEffect(selectedSection, playerMode) {
-        if (selectedSection != MainSection.LIVE_TV && playerMode == PlayerMode.NONE) player.stop()
+        if (selectedSection != MainSection.LIVE_TV && playerMode == PlayerMode.NONE) liveVm.stopPreview()
         if (selectedSection != MainSection.HOME || playerMode != PlayerMode.NONE) homeVm.stopPreview()
     }
 
@@ -1090,8 +1141,9 @@ fun OwnTVShell(
                     // The Search pill only exists while focus sits on the nav panel — inside a
                     // section it fades out and turns unfocusable, so focus can never jump to it.
                     searchVisible = focusedLayer == ShellLayer.SIDEBAR,
-                    // The playlist chip becomes a quick-switcher only when there's more than one to pick.
-                    playlistInteractive = playlists.size > 1,
+                    // The playlist chip becomes a quick-switcher only when there's more than one to pick
+                    // and focus is on the sidebar or the Home screen, preventing focus escapes from content lists.
+                    playlistInteractive = playlists.size > 1 && (focusedLayer == ShellLayer.SIDEBAR || selectedSection == MainSection.HOME),
                     onPlaylistClick = { showPlaylistPicker = true },
                     playlistDownFocusRequester = homeFirstRowFocus.takeIf {
                         selectedSection == MainSection.HOME
@@ -1158,6 +1210,7 @@ fun OwnTVShell(
                             onOpenSettings = { onSelectSection(MainSection.SETTINGS) },
                             onFullscreen = { openFullscreen() },
                             onChildFocused = { focusedLayer = ShellLayer.CONTENT },
+                            previewEnabled = playerMode == PlayerMode.NONE,
                             modifier = Modifier
                                 .fillMaxSize()
                                 .onFocusChanged { if (it.hasFocus) focusedLayer = ShellLayer.CONTENT }
@@ -1469,7 +1522,10 @@ fun OwnTVShell(
                     keepAwake = true, autoFrameRate = isFull && autoFrameRate,
                 )
             } else {
-                MpvVideoSurface(player = player, modifier = Modifier.fillMaxSize(), autoFrameRate = isFull && autoFrameRate)
+                MpvVideoSurface(
+                    player = player, modifier = Modifier.fillMaxSize(), autoFrameRate = isFull && autoFrameRate,
+                    afrMatchResolution = afrMatchResolution, afrHoldSecs = afrPauseSecs,
+                )
             }
             // The item has no video track of its own (a radio channel, a music-only "movie"). Playing it is
             // correct — but a black screen with sound reads as a broken player, so name what is happening.
@@ -1583,12 +1639,19 @@ fun OwnTVShell(
                     onScrubLive = if (isTunedLive && canRewindLive) liveVm::scrubLive else null,
                     // Only collected where there is a timeline to draw them on.
                     liveProgrammes = if (isTunedLive && canRewindLive) timelineProgrammes else emptyList(),
-                    jumpBackOptions = if (isTunedLive && canRewindLive) liveVm::currentJumpOptions else null,
-                    onJumpBack = if (isTunedLive && canRewindLive) liveVm::jumpBackTo else null,
-                    jumpBackWindowSec = if (isTunedLive && canRewindLive) liveVm::currentCatchupWindowSec else null,
+                    liveGaps = liveVm::timeshiftGaps,
+                    // "Go back to…" is the provider archive's: a copy saved on this device (N4) rewinds with the
+                    // bar and the buttons, and must not show a catch-up control on a channel without catch-up.
+                    jumpBackOptions = if (isTunedLive && previewChannel?.catchup == true) liveVm::currentJumpOptions else null,
+                    onJumpBack = if (isTunedLive && previewChannel?.catchup == true) liveVm::jumpBackTo else null,
+                    onPreviousChannel = if (isTunedLive && previousLiveChannel != null) liveVm::previousChannel else null,
+                    jumpBackWindowSec = if (isTunedLive && previewChannel?.catchup == true) liveVm::currentCatchupWindowSec else null,
                     // Non-null only while an archive is on screen, so movies, episodes and live TV get
                     // the single real clock and catch-up gets the pair.
                     watchingWallMs = { watchingWallState.value },
+                    // "End of programme" only at the live edge: rewound, the programme on air is not the one being watched.
+                    sleepProgrammeEndMs = if (isTunedLive && !timeshifted) { { liveVm.nowNext.value?.now?.stopMs } } else null,
+                    liveLeftRightRewinds = liveLeftRightRewinds,
                     timeshiftOffsetSec = if (isTunedLive) { { timeshiftOffsetState.value } } else null,
                     // Fork: bump audioTick after the tune resolves — a number-tune retunes the main engine
                     // out-of-band, and the corner may own the sound (same rule as zap / Change main / swap).
@@ -1620,6 +1683,9 @@ fun OwnTVShell(
                     onChangeMain = if (cornerActive && isLiveChannel) ({ mainPicking = true }) else null,
                     onChangeCorner = if (cornerActive) ({ cornerBrowsing = true }) else null,
                     cornerAudioOn = audioOnCorner,
+                    // A copy saved on this device (N4) is the exception: the other engine re-opens the same copy
+                    // at the same moment, so the rewind survives the switch.
+                    onToggleCompatMode = if (isTunedLive && (!timeshifted || onLocalCopy) && previewChannel?.drmConfig == null) liveVm::toggleForceMpv else null,
                     // VOD engine toggle (movies/series only — live and catch-up channels keep their own
                     // engine handling above): flip the current item between mpv and ExoPlayer.
                     vodOnExo = if (!isLiveStream && !isTunedLive) vodExoActive else null,
@@ -1636,6 +1702,13 @@ fun OwnTVShell(
                     // In-stream favorite toggle for the current channel/movie/series.
                     favorite = favActive,
                     onToggleFavorite = favToggle,
+                    // N3 — the zap banner's now/next. Collected inside the slot, so only the banner redraws.
+                    zapGuide = if (isLiveChannel) {
+                        {
+                            val guide by liveVm.zapGuide.collectAsStateWithLifecycle()
+                            tv.own.owntv.features.shell.components.ZapGuideLines(guide)
+                        }
+                    } else null,
                     // Guide card for the playing channel (nowNext follows previewChannel = what's playing).
                     liveEpgCard = if (isLiveChannel) {
                         {
@@ -1700,6 +1773,14 @@ fun OwnTVShell(
                 val catchupUnavailable = stringResource(R.string.content_epg_catchup_unavailable)
                 LaunchedEffect(liveVm) {
                     liveVm.catchupUnavailable.collect { localSubToast.show(catchupUnavailable) }
+                }
+                // N4 — back on a channel whose saved copy was kept: continue from there, or stay live.
+                val timeshiftResumeAt by liveVm.timeshiftResumeAt.collectAsStateWithLifecycle()
+                if (isFull && timeshiftResumeAt != null) {
+                    tv.own.owntv.ui.components.TimeshiftResumeDialog(
+                        onResume = liveVm::resumeTimeshift,
+                        onGoLive = liveVm::dismissTimeshiftResume,
+                    )
                 }
                 // Left — the playing channel's own provider category.
                 if (showChannelList && isLiveChannel) {

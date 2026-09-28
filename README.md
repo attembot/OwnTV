@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="extras/logo.png" alt="OwnTV" width="360">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset="extras/brand/app-logos/logo_eggshell_light.png">
+    <img src="extras/brand/app-logos/logo_eggshell.png" alt="OwnTV" width="360">
+  </picture>
 </p>
 
 <p align="center">
@@ -48,7 +51,7 @@ Questions, ideas, bug reports — **join the OwnTV Telegram group:**
 
 ### 👉 [t.me/owntvplayer](https://t.me/owntvplayer)
 
-<a href="https://t.me/owntvplayer"><img src="extras/telegram_qr_code.jpg" alt="Scan to join the OwnTV Telegram group" width="150"></a>
+<a href="https://t.me/owntvplayer"><img src="extras/qr-codes/telegram_qr_code.jpg" alt="Scan to join the OwnTV Telegram group" width="150"></a>
 
 ---
 
@@ -92,7 +95,7 @@ Questions, ideas, bug reports — **join the OwnTV Telegram group:**
 ### 🎨 Look & robustness
 - Material 3 theming, your own accent and focus highlight, and an interaction-aware **Glass Effect**
 - Font sizing for the interface and for popups, independently
-- **Remote Shortcuts** — map spare colour, number, channel and media keys to 25 actions
+- **Remote Shortcuts** — map spare colour, number, channel and media keys to 26 actions
 - **26 interface languages**, RTL-aware, chosen before anything else on a fresh install
 - **Backup & Restore** to a single `.own` file, optionally encrypted, locally or over Wi-Fi
 - **Set up from another device** — a new box copies everything from the OwnTV device you already
@@ -205,22 +208,14 @@ https://github.com/ahXN00/OwnTV/releases/latest/download/OwnTV.apk
 > Only if you want to build from source — otherwise just
 > **[install the APK](#-installing-fire-tv--android-tv)**.
 
-**One extra step first: a GitHub token.** Half the app lives in the separate
-[OwnTV_Core](https://github.com/ahXN00/OwnTV_Core) repository and is pulled from GitHub Packages,
-which always asks who you are. Without it, Gradle sync fails with a `401`.
+Half the app lives in the separate [OwnTV_Core](https://github.com/ahXN00/OwnTV_Core) repository;
+Gradle downloads it from OwnTV's public Maven repository by itself — **no account or token needed**.
 
 1. **Get the code** — `git clone https://github.com/ahXN00/OwnTV.git` (or download the ZIP).
-2. **Add a token** — create a [personal access token (classic)](https://github.com/settings/tokens)
-   with the single scope **`read:packages`**, then put it in `~/.gradle/gradle.properties`
-   (`C:\Users\<you>\.gradle\gradle.properties`) — never inside the project:
-   ```properties
-   gpr.user=your-github-username
-   gpr.token=ghp_yourtokenhere
-   ```
-3. **Open it** in [Android Studio](https://developer.android.com/studio) and let Gradle sync.
-4. **Pick the build variant** — `standard` for real devices and arm emulators, `x86_64` for x86_64
+2. **Open it** in [Android Studio](https://developer.android.com/studio) and let Gradle sync.
+3. **Pick the build variant** — `standard` for real devices and arm emulators, `x86_64` for x86_64
    emulators. This matters: the native player only loads on a matching ABI.
-5. **Run** ▶. Minimum **Android 8.0 / API 26**.
+4. **Run** ▶. Minimum **Android 8.0 / API 26**.
 
 Command line: `./gradlew assembleDebug` (`gradlew.bat` on Windows). The APK lands in
 `app/build/outputs/apk/`.
@@ -240,18 +235,18 @@ If your language is already available, contribute interface translations across 
 
 ## 🙏 Credits
 
-<img src="extras/Weblate_logo.svg" alt="Weblate" width="200">
+<img src="extras/partner-logos/Weblate_logo.svg" alt="Weblate" width="200">
 
 OwnTV speaks 26 languages because people translate it on
 [**Weblate**](https://weblate.org/), which hosts the project free of charge for libre software.
 Thank you to Weblate and to every translator who has given the app their language.
 
-<img src="extras/tmdb_logo.svg" alt="TMDB" width="200">
+<img src="extras/partner-logos/tmdb_logo.svg" alt="TMDB" width="200">
 
 Movie & series metadata and trailers are provided by [TMDB](https://www.themoviedb.org/).
 **This product uses the TMDB API but is not endorsed or certified by TMDB.**
 
-<img src="extras/opensubtitles_logo.svg" alt="OpenSubtitles" width="200">
+<img src="extras/partner-logos/opensubtitles_logo.svg" alt="OpenSubtitles" width="200">
 
 Subtitle search & download is powered by [OpenSubtitles.com](https://www.opensubtitles.com/).
 **This product uses the OpenSubtitles API but is not endorsed or certified by OpenSubtitles.** You sign

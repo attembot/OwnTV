@@ -67,6 +67,7 @@ import tv.own.owntv.core.theme.UiZoom
 import tv.own.owntv.features.profiles.ProfileEditorDialog
 import tv.own.owntv.features.settings.SectionPickerDialog
 import tv.own.owntv.features.settings.FirstRunLanguageSelector
+import tv.own.owntv.ui.components.AppIconPicker
 import tv.own.owntv.ui.components.BrandLockup
 import tv.own.owntv.ui.components.BrowseMode
 import tv.own.owntv.ui.components.FocusableSurface
@@ -118,6 +119,8 @@ fun Onboarding(firstRun: Boolean, onDone: (Long?) -> Unit, onCancel: () -> Unit,
     // whole file, so "playlists but not that device's settings" could not be said here.
     var restoreFile by remember { mutableStateOf<java.io.File?>(null) }
     var restoreSections by remember { mutableStateOf<Set<tv.own.owntv.core.backup.BackupManager.Section>?>(null) }
+    // "Hardware settings from the other device" — asked with the sections, carried like them.
+    val restoreDeviceSettings = remember { mutableStateOf(false) }
 
     // Refresh the "existing playlists" availability whenever we land on the add-content step.
     LaunchedEffect(step) { if (step == Step.ADD_CONTENT) existing = runCatching { vm.availableExistingSources() }.getOrDefault(emptyList()) }
@@ -174,16 +177,16 @@ fun Onboarding(firstRun: Boolean, onDone: (Long?) -> Unit, onCancel: () -> Unit,
                 onBack = { vm.stopRemoteListener(); step = Step.ADD_SOURCE_CHOOSER },
             )
             Step.ADD_SOURCE -> AddSourceScreen(
-                onStartXtream = { name, server, user, pass, ua, epg, refresh, live, movies, series, _, preferHls ->
-                    vm.startXtream(name.ifBlank { defaultIptvName }, server, user, pass, ua, epg, refresh, live, movies, series, preferHls)
+                onStartXtream = { name, server, user, pass, ua, ref, epg, refresh, live, movies, series, _, preferHls ->
+                    vm.startXtream(name.ifBlank { defaultIptvName }, server, user, pass, ua, epg, refresh, live, movies, series, preferHls, httpReferer = ref)
                     importOrigin = Step.ADD_SOURCE
                     step = Step.IMPORTING
                 },
-                onStartM3u = { name, url, ua, epg, refresh, _ -> vm.startM3u(name.ifBlank { defaultPlaylistName }, url, ua, epg, refresh); importOrigin = Step.ADD_SOURCE; step = Step.IMPORTING },
-                onStartStalker = { name, portalUrl, mac, serialNumber, deviceId, deviceId2, signature, ua, refresh, _, live, movies, series ->
+                onStartM3u = { name, url, ua, ref, epg, refresh, _ -> vm.startM3u(name.ifBlank { defaultPlaylistName }, url, ua, epg, refresh, httpReferer = ref); importOrigin = Step.ADD_SOURCE; step = Step.IMPORTING },
+                onStartStalker = { name, portalUrl, mac, serialNumber, deviceId, deviceId2, signature, ua, ref, refresh, _, live, movies, series ->
                     vm.startStalker(
                         name.ifBlank { defaultPortalName }, portalUrl, mac, serialNumber, deviceId,
-                        deviceId2, signature, ua, refresh, live, movies, series,
+                        deviceId2, signature, ua, refresh, live, movies, series, httpReferer = ref,
                     )
                     importOrigin = Step.ADD_SOURCE
                     step = Step.IMPORTING
@@ -232,7 +235,7 @@ fun Onboarding(firstRun: Boolean, onDone: (Long?) -> Unit, onCancel: () -> Unit,
                 // The same choice, carried across the password question: a sealed file is chosen
                 // from before it can be opened, so the answer has to outlive the prompt.
                 onPassword = { file, pass ->
-                    vm.restoreWithPassword(file, pass, onDone, restoreSections ?: allRestoreSections)
+                    vm.restoreWithPassword(file, pass, onDone, restoreSections ?: allRestoreSections, restoreDeviceSettings.value)
                 },
                 onBack = { vm.reset(); restoreFile = null; restoreSections = null; step = backupOrigin },
             )
@@ -251,9 +254,12 @@ fun Onboarding(firstRun: Boolean, onDone: (Long?) -> Unit, onCancel: () -> Unit,
                 confirmLabel = stringResource(R.string.settings_backup_restore_action),
                 onConfirm = { chosen ->
                     restoreSections = chosen
-                    vm.importBackup(file, onDone, chosen) // restore activates a profile itself
+                    vm.importBackup(file, onDone, chosen, restoreDeviceSettings.value) // restore activates a profile itself
                 },
                 onDismiss = { vm.reset(); restoreFile = null; step = backupOrigin },
+                // Offered whatever the file is: this has not opened it yet. Harmless for a backup of
+                // this very device, whose hardware settings core restores regardless.
+                deviceSettings = restoreDeviceSettings,
             )
         }
         // Semi-auto EPG: after the first playlist imports, ask → sync (live count) → done (overlays "All set!").
@@ -278,7 +284,7 @@ private fun WelcomeScreen(onNext: () -> Unit) {
             color = OwnTVTheme.colors.primary.copy(alpha = 0.82f),
         )
         Spacer(Modifier.height(19.dp))
-        BrandLockup(markSize = 82, textSize = 62)
+        BrandLockup(markSize = 82, textSize = 62, stacked = true)
         Spacer(Modifier.height(24.dp))
         Text(stringResource(R.string.setup_welcome_tagline), style = MaterialTheme.typography.titleMedium, color = OwnTVTheme.colors.onSurfaceVariant)
         Spacer(Modifier.height(30.dp))
@@ -311,6 +317,7 @@ private fun DisplaySizeScreen(onNext: () -> Unit, onBack: () -> Unit) {
     val vm: DisplaySizeViewModel = koinViewModel()
     val zoom by vm.uiZoomPercent.collectAsStateWithLifecycle()
     val fontSize by vm.fontSizePercent.collectAsStateWithLifecycle()
+    val appIcon by vm.appIcon.collectAsStateWithLifecycle()
     val colors = OwnTVTheme.colors
     val fr = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
@@ -364,6 +371,16 @@ private fun DisplaySizeScreen(onNext: () -> Unit, onBack: () -> Unit) {
             onDecrease = { vm.setFontSize(fontSize - UiFontScale.STEP) },
             onIncrease = { vm.setFontSize(fontSize + UiFontScale.STEP) },
         )
+        Spacer(Modifier.height(18.dp))
+        // No restart prompt here: nothing is on the home screen yet, and the pick applies as soon as
+        // the app is next in the background.
+        Text(
+            stringResource(R.string.settings_app_icon),
+            style = MaterialTheme.typography.titleMedium,
+            color = colors.onSurface,
+        )
+        Spacer(Modifier.height(8.dp))
+        AppIconPicker(selected = appIcon, onPick = vm::setAppIcon)
         Spacer(Modifier.height(22.dp))
         SetupAccentRule()
         Spacer(Modifier.height(18.dp))

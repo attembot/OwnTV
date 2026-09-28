@@ -130,6 +130,9 @@ class EpgViewModel(
     private val externalPlayerLauncher: tv.own.owntv.core.player.ExternalPlayerLauncher,
     private val customCategoryDao: tv.own.owntv.core.database.dao.CustomCategoryDao,
     private val recordings: tv.own.owntv.core.recording.RecordingManager,
+    /** The provider-guide half of a row, for channels whose stored guide stops short — the app-wide
+     *  reader Live TV uses too (T18), so both screens share one cache. */
+    private val liveEpgReader: tv.own.owntv.core.live.LiveEpgReader,
 ) : ViewModel() {
 
     /** The one candidate set the picker and both auto-match paths read — see [GuideCandidates]. */
@@ -178,7 +181,7 @@ class EpgViewModel(
                     channel = channel,
                     programme = programme,
                     source = source,
-                    timeZone = settings.resolveCatchupTimeZone(),
+                    timeZone = settings.resolveCatchupTimeZone(source),
                     xtream = xtream,
                 )
                 return@launch
@@ -258,11 +261,6 @@ class EpgViewModel(
 
     /** Every windowed guide read this screen makes. The caches around it stay here — what to keep
      *  depends on how the grid scrolls, which is the screen's business, not core's. */
-    /** The provider-guide half of a row, for channels whose stored guide stops short. Built here for
-     *  the same reason LiveViewModel builds its own: it is a plain core reader, not a shared service. */
-    private val liveEpgReader =
-        tv.own.owntv.core.live.LiveEpgReader(epgDao, epgSourceStore, sourceDao, xtream, streamUrlResolver)
-
     private val guideReader =
         tv.own.owntv.core.live.GuideReader(epgDao, epgSourceStore, sourceDao, liveEpgReader)
 
@@ -556,13 +554,13 @@ class EpgViewModel(
                 _matchSummary.value = EpgMatchSummary.CatchupUnavailable
                 return@launch
             }
-            val sourceUa = withContext(kotlinx.coroutines.Dispatchers.IO) { sourceDao.getById(channel.sourceId)?.userAgent }
+            val source = withContext(kotlinx.coroutines.Dispatchers.IO) { sourceDao.getById(channel.sourceId) }
             externalPlayerLauncher.launch(
                 url = url,
                 title = channel.name,
                 subtitle = programme.title,
-                userAgent = sourceUa,
-                httpHeaders = channel.httpHeaders,
+                userAgent = source?.userAgent,
+                httpHeaders = tv.own.owntv.core.settings.SourceOverrides.headersWithReferer(channel.httpHeaders, source),
             )
         }
     }
@@ -579,7 +577,7 @@ class EpgViewModel(
                     .getOrNull()
             }
         }
-        return CatchupUrl.forSource(channel, programme, source, settings.resolveCatchupTimeZone(), xtream)
+        return CatchupUrl.forSource(channel, programme, source, settings.resolveCatchupTimeZone(source), xtream)
     }
 
     /** True when a programme can be played from the archive: a catch-up channel, already started, and
@@ -693,6 +691,30 @@ class EpgViewModel(
     private val _review = MutableStateFlow<List<EpgMatchSuggestion>>(emptyList())
     val review: StateFlow<List<EpgMatchSuggestion>> = _review.asStateFlow()
 
+    /**
+     * The review window's "Include guide logos" tick. Starts ticked when some EPG source already has
+     * "Use this guide's logos" on; while ticked, every match this run makes also turns that option on for
+     * the EPG sources that carry a logo for it.
+     */
+    private val _includeGuideLogos = MutableStateFlow(false)
+    val includeGuideLogos: StateFlow<Boolean> = _includeGuideLogos.asStateFlow()
+
+    fun setIncludeGuideLogos(include: Boolean) {
+        _includeGuideLogos.value = include
+    }
+
+    /** Guide ids the current run applied on its own, before the review window opened. */
+    private var runApplied: List<String> = emptyList()
+
+    private suspend fun includeLogosIfTicked(epgIds: List<String>) {
+        if (_includeGuideLogos.value) tv.own.owntv.core.epg.EpgLogoStore.includeLogosFor(settings, epgDao, runApplied + epgIds)
+    }
+
+    private suspend fun openReview(suggestions: List<EpgMatchSuggestion>) {
+        if (suggestions.isNotEmpty()) _includeGuideLogos.value = settings.epgUseLogos.first().isNotEmpty()
+        _review.value = suggestions
+    }
+
     /** One-line outcome of the last auto-match run, shown as a transient banner. */
     private val _matchSummary = MutableStateFlow<EpgMatchSummary?>(null)
     val matchSummary: StateFlow<EpgMatchSummary?> = _matchSummary.asStateFlow()
@@ -717,9 +739,10 @@ class EpgViewModel(
                 // Persist the confident hits (DataStore writes are cheap, but do them off the scan).
                 for ((key, epgId) in outcome.applied) customize.setEpgMatch(pid, MediaType.LIVE, key, epgId)
 
-                _review.value = outcome.review.map {
+                runApplied = outcome.applied.map { it.second }
+                openReview(outcome.review.map {
                     EpgMatchSuggestion(it.channel, it.epgChannelId, it.displayName, it.score)
-                }
+                })
                 val applied = outcome.applied.size
                 _matchSummary.value = when {
                     applied == 0 && outcome.review.isEmpty() -> EpgMatchSummary.AllMatched
@@ -752,7 +775,8 @@ class EpgViewModel(
                 } else {
                     // Show it in the review dialog (accept/skip) instead of applying silently. acceptSuggestion
                     // persists the match + fills the guide; dismissSuggestion just drops it.
-                    _review.value = listOf(EpgMatchSuggestion(channel, best.epgChannelId, best.displayName, best.score))
+                    runApplied = emptyList()
+                    openReview(listOf(EpgMatchSuggestion(channel, best.epgChannelId, best.displayName, best.score)))
                     // Say so up front when the winner's guide channel is empty, instead of letting the
                     // user accept it and find a blank row.
                     if (!best.hasProgrammes) _matchSummary.value = EpgMatchSummary.MatchedNoProgrammes
@@ -769,6 +793,7 @@ class EpgViewModel(
             val pid = settings.activeProfileId.first()
             customize.setEpgMatch(pid, MediaType.LIVE, CustomizeKeys.channel(s.channel), s.epgChannelId)
             _review.value = _review.value.filterNot { it.channel.id == s.channel.id }
+            includeLogosIfTicked(listOf(s.epgChannelId))
             fillMatchedInBackground(listOf(s.epgChannelId))
         }
     }
@@ -786,12 +811,15 @@ class EpgViewModel(
             val pid = settings.activeProfileId.first()
             for (s in all) customize.setEpgMatch(pid, MediaType.LIVE, CustomizeKeys.channel(s.channel), s.epgChannelId)
             _review.value = emptyList()
+            includeLogosIfTicked(all.map { it.epgChannelId })
             fillMatchedInBackground(all.map { it.epgChannelId })
         }
     }
 
     /** Close the review list / clear the summary banner. */
     fun clearReview() {
+        // Closing the window still honours the tick for the matches the run applied on its own.
+        if (_review.value.isNotEmpty() && runApplied.isNotEmpty()) viewModelScope.launch { includeLogosIfTicked(emptyList()) }
         _review.value = emptyList()
         _matchSummary.value = null
     }

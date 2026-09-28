@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="logo.png" alt="OwnTV" width="300">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset="brand/app-logos/logo_eggshell_light.png">
+    <img src="brand/app-logos/logo_eggshell.png" alt="OwnTV" width="300">
+  </picture>
 </p>
 
 <h1 align="center">OwnTV — Master Product Brief</h1>
@@ -54,6 +57,10 @@ Each engine is chosen automatically by content type, with fallback between them.
   VOD on mpv. Overridable **per playlist**.
 - **Per-item toggle** — the **⇄ MPV/EXO** pill pins a channel or a film to the other engine and
   remembers it, in both directions. A pin always outranks the setting.
+- **Track memory** — the audio and subtitle language picked in the player is remembered per
+  channel, film and series (per profile), on both engines.
+- **Per-playlist provider quirks** — catch-up time zone, "give up after" time and an HTTP Referer
+  can be set for one playlist without touching the others.
 - **The fallback ladder** — a failing live channel walks up to four rungs, each tried once:
   `ExoPlayer+HLS → ExoPlayer+TS → mpv+HLS → mpv+TS`, or the same list led by mpv. **Give up on a
   channel after** (15/30/60 s or Never, default 30 s) bounds the whole tune; provider-requested
@@ -82,6 +89,8 @@ Each engine is chosen automatically by content type, with fallback between them.
 - **Frame-rate matching** (opt-in) — asks the display for the video's native rate to remove judder.
   When a live stream declares no rate it is measured, and used only when two samples agree. Android
   TV's own *Match content frame rate* preference is honoured above the app's toggle.
+  For films it can also hold playback through a non-seamless switch and match the film's resolution
+  (never above the TV's own) — both opt-in.
 - **Live buffering under user control** — the **Live latency** choice sizes the real buffer on both
   engines, and a separate **Pre-buffer** gate (off / 2 / 5 / 10 s) holds playback until enough video
   is collected. Both overridable per playlist.
@@ -94,7 +103,12 @@ Each engine is chosen automatically by content type, with fallback between them.
   stereo when the sink accepts a format it cannot actually play. On ExoPlayer that recovery recreates
   the surface and resumes at the same position rather than mistaking an audio problem for a video one.
 - **Volume boost to 150%** with a soft limiter.
-- **A/V sync nudge** in 25 ms steps, optionally remembered per item.
+- **A/V sync nudge** in 25 ms steps on both engines, optionally remembered per item.
+- **Previous channel** — a player-bar button, the remote's Last-channel key and the media controls' "previous".
+- **Night mode and Volume leveling** on both engines, and a
+  **Dolby/DTS passthrough** switch; either of the first two makes ExoPlayer decode in the app.
+- **Maximum video quality** plus a per-item **Quality** button; experimental **tunneled playback** for
+  live ExoPlayer, offered only where a decoder supports it and switched off after the first failure.
 - **Audio-only items are labelled, not failed** — a radio channel shows an *Audio only* plate, so
   sound with no picture is never mistaken for a fault. Distinct from **Audio Mode**, which is the
   user switching the picture off.
@@ -108,8 +122,9 @@ Each engine is chosen automatically by content type, with fallback between them.
 | Closed captions (CEA-608/708) | Decoded from the video stream into a selectable track |
 
 Independent **font, scale, colour, position and background** across mpv, ExoPlayer and the app-drawn
-overlay; *Default* preserves authored styling. **Preferred audio/subtitle language** selects the
-matching track on both engines. Subtitle size is stored per engine, because the two render the same
+overlay; *Default* preserves authored styling. **Preferred audio/subtitle language** (per profile, 50
+languages, plus **Original language** for audio — TMDB's original language of the film or series,
+else the stream's main track) selects the matching track on both engines. Subtitle size is stored per engine, because the two render the same
 multiplier at visibly different sizes.
 
 External subtitles come from **OpenSubtitles** (own account, remote sign-in by QR + PIN) or a
@@ -120,7 +135,7 @@ External subtitles come from **OpenSubtitles** (own account, remote sign-in by Q
 Scrubbable seek bar · previous/next through the episode queue · play/pause · audio, subtitle and
 speed pickers · zoom and aspect (Fit · Fill · Stretch · Original · Force 16:9 · Force 4:3) · volume
 with mute · favourite the current item · **stream info overlay** (codec, resolution, fps, bit depth,
-HDR type, bitrate, decoder, audio, buffer, dropped frames, masked source URL) · a **clock** in every
+HDR type, interlacing on mpv, bitrate, decoder, audio, buffer, dropped frames, masked source URL) · a **clock** in every
 mode, becoming *Programme time* + *Current time* during a replay · auto-hiding controls, with **Back**
 hiding them first and then exiting.
 
@@ -236,6 +251,11 @@ profile: Home, last channel, Live Favorites, or one chosen channel.
   scrubs the live stream on archive-capable channels. **Go back to…** jumps straight to a time, with
   an exact day/hour/minute picker clamped to the archive window — and works with **no guide at all**.
   A **Catch-up category** in Live TV lists every channel that advertises an archive.
+- **Pause and rewind live TV** (local timeshift, opt-in) — a channel without catch-up is saved on the
+  device while it is watched full screen (15–60 min, always ≥ 1 GB free) and played from that copy, so it
+  can be paused and rewound like an archive channel. The copy is the only provider connection; it is kept
+  5 minutes after leaving (Resume / Go live on return), deleted after 2 minutes on another channel, and
+  wiped at every start. Built in core (`TimeshiftManager`, `LiveTuneController`), shared with the phone.
 - **Auto-match EPG** links channels to guide data when `tvg-id` is missing or wrong; confident matches
   apply automatically and the rest go to a review list. Matches are per profile and survive re-syncs.
   A **guide time offset** corrects a feed published in another time zone, globally or per channel.
@@ -309,6 +329,8 @@ path in each result.
 - **Appearance** — theme, any accent colour (preset, palette or hex, generating the whole theme), a
   separate **focus highlight** colour and thickness, UI zoom, and **font customization** (main text
   60–140%, popup text 50–120%, popup geometry 50–120%, six bundled families).
+- **App icon** (in the App group) — the flip-card icon and logo in eight colours (Eggshell by
+  default), changing the app row banner, the launch screen and every in-app logo after a restart.
 - **Glass Effect** — an opt-in, interaction-aware material on its own page with a live preview: six
   clarity presets, 20–100% tint, ten real frost levels, adaptive readability, optional depth and
   parallax, a local or remote wallpaper, and per-surface control. Real frost needs Android 12+ and a
@@ -377,7 +399,7 @@ manual check, and installation on the TV itself.
 | Language | Kotlin 2.4.20 (no `kotlin-android` plugin; the Compose compiler plugin pulls the Kotlin Gradle plugin to this version) |
 | Build | AGP 9.4.0 / Gradle 9.7.1, KSP2 2.3.11 |
 | UI | Jetpack Compose for TV (`androidx.tv:tv-material` 1.1.0), Compose BOM 2026.08.00 |
-| Media | libmpv (FFmpeg) — `dev.jdtech.mpv:libmpv` · ExoPlayer/Media3 1.11.1 |
+| Media | libmpv (FFmpeg) — `tv.own.owntv:libmpv`, OwnTV's own build (newest mpv + FFmpeg 9, monthly) · ExoPlayer/Media3 1.11.1 |
 | Database | Room 2.8.5 + Paging 3.5.1 + FTS4 (WAL) |
 | DI | Koin 4.2.2 |
 | Networking | OkHttp 5 — the panel-facing client is pinned to HTTP/1.1 for flaky IPTV panels, while the image client keeps h2 so poster grids multiplex on one connection |

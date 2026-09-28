@@ -52,6 +52,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import tv.own.owntv.ui.components.BrandMark
+import tv.own.owntv.ui.components.rememberAppliedIcon
 import tv.own.owntv.core.nav.MainSection
 import tv.own.owntv.R
 import tv.own.owntv.ui.components.FocusableSurface
@@ -309,24 +311,13 @@ private fun NowPlayingItem(
 }
 
 /**
- * Brand mark at the top of the rail — the cyan play-triangle inside a rounded-square outline, the same
- * geometry as [ic_launcher_foreground] (kept consistent with the planned branded splash). Drawn from
- * [OwnTVIcon.PLAY] (filled) inside an outlined [Box] so it matches the visual weight of the 56dp avatar
- * below. Decorative only: a plain Box is not focusable, so it neither captures D-pad focus nor traps an
- * "up" press. Tints with [OwnTVTheme.colors].primary so it follows the user's accent like the nav icons.
+ * Brand mark at the top of the rail: the flat flip-card mark in the icon colour the launcher shows,
+ * sized like the 56 dp avatar below. Decorative only: an Image is not focusable, so it neither
+ * captures D-pad focus nor traps an "up" press.
  */
 @Composable
 private fun AppLogo(modifier: Modifier = Modifier) {
-    val colors = OwnTVTheme.colors
-    Box(
-        modifier = modifier
-            .size(56.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .border(width = 2.dp, color = colors.primary, shape = RoundedCornerShape(20.dp)),
-        contentAlignment = Alignment.Center,
-    ) {
-        OwnTVIcon(icon = OwnTVIcon.PLAY, tint = colors.primary, modifier = Modifier.size(26.dp), filled = true)
-    }
+    BrandMark(rememberAppliedIcon(), 56.dp, modifier)
 }
 
 @Composable
@@ -486,7 +477,7 @@ private fun NavItem(
                     .width(48.dp)
                     .height(39.dp)
                     .then(
-                        if (active) Modifier.shadow(
+                        if (active && focused) Modifier.shadow(
                             elevation = 6.dp,
                             shape = shape,
                             ambientColor = colors.primary.copy(alpha = 0.30f),
@@ -498,7 +489,7 @@ private fun NavItem(
                     // Material follows the active mode; compact geometry stays identical in both.
                     .glass(surface = GlassSurface.SIDEBAR, baseFill = ladder.container, shape = shape)
                     .then(
-                        if (active) Modifier.background(
+                        if (active && focused) Modifier.background(
                             Brush.linearGradient(
                                 listOf(
                                     colors.primary.copy(alpha = 0.64f),
@@ -510,12 +501,16 @@ private fun NavItem(
                     )
                     .then(
                         when {
-                            active -> Modifier.border(
-                                1.dp,
-                                colors.primary.copy(alpha = if (focused) 0.95f else 0.72f),
+                            focused -> Modifier.border(
+                                tv.own.owntv.ui.theme.LocalFocusBorderWidth.current,
+                                OwnTVTheme.colors.focusBorder,
                                 shape,
                             )
-                            ladder.focusBorder != null -> Modifier.border(tv.own.owntv.ui.theme.LocalFocusBorderWidth.current, ladder.focusBorder, shape)
+                            active -> Modifier.border(
+                                1.dp,
+                                OwnTVTheme.colors.focusBorder.copy(alpha = 0.28f),
+                                shape,
+                            )
                             else -> Modifier
                         }
                     ),
@@ -525,7 +520,7 @@ private fun NavItem(
                 // accent when active). No per-frame animation on the always-visible nav.
                 NavDuotoneIcon(
                     section = section,
-                    color = if (active) colors.onPrimaryContainer else ladder.icon,
+                    color = ladder.icon,
                     modifier = Modifier.size(24.dp),
                 )
             }
