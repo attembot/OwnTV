@@ -1,5 +1,6 @@
 package tv.own.owntv.features.shell.components
 
+import tv.own.owntv.ui.theme.mpx
 import androidx.compose.runtime.Immutable
 
 import androidx.compose.animation.animateColorAsState
@@ -476,119 +477,31 @@ fun CategoryContextMenu(
     onMove: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    OwnTVPopup(onDismissRequest = onDismiss) {
-        val colors = OwnTVTheme.colors
-        val focus = remember { FocusRequester() }
-        LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-        androidx.activity.compose.BackHandler { onDismiss() }
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .modalScrim()
-                .trapAllFocusExit()
-                .focusGroup()
-                .longPressMenuGuard(),
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    androidx.activity.compose.BackHandler { onDismiss() }
+    // The long-press menu look (P4-05), as the channel and settings-row menus draw it.
+    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
+        androidx.compose.foundation.layout.Box(
+            Modifier.fillMaxSize().longPressMenuGuard().modalScrim().trapAllFocusExit().focusGroup(),
             contentAlignment = Alignment.Center,
         ) {
-            Column(
-                modifier = Modifier
-                    .dialogPanel(width = 280.dp, scroll = false),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Text(
-                    categoryName,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = colors.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(8.dp))
-
+            tv.own.owntv.ui.stage.StageMenu(Modifier.width(520.mpx)) {
+                tv.own.owntv.ui.stage.StageMenuHeader(title = categoryName, subtitle = null)
                 if (canMove) {
-                    RailMenuAction(
-                        label = stringResource(tv.own.owntv.R.string.content_move),
-                        onClick = onMove,
-                        modifier = Modifier.fillMaxWidth().focusRequester(focus),
+                    tv.own.owntv.ui.stage.StageMenuItem(
+                        stringResource(tv.own.owntv.R.string.content_move), onClick = onMove,
+                        icon = OwnTVIcon.MOVE, modifier = Modifier.focusRequester(focus),
                     )
                 }
-
                 if (canHide) {
-                    RailMenuDivider()
-                    RailMenuAction(
-                        label = stringResource(tv.own.owntv.R.string.common_hide),
-                        onClick = onHide,
-                        modifier = if (!canMove) Modifier.fillMaxWidth().focusRequester(focus) else Modifier.fillMaxWidth(),
-                        destructive = true,
+                    tv.own.owntv.ui.stage.StageMenuItem(
+                        stringResource(tv.own.owntv.R.string.common_hide), onClick = onHide,
+                        icon = OwnTVIcon.EYE_OFF, modifier = if (!canMove) Modifier.focusRequester(focus) else Modifier,
                     )
                 }
-
-                RailMenuDivider()
-                RailMenuAction(
-                    label = stringResource(tv.own.owntv.R.string.common_cancel),
-                    onClick = onDismiss,
-                    icon = OwnTVIcon.CLOSE,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                tv.own.owntv.ui.stage.StageMenuItem(stringResource(tv.own.owntv.R.string.common_cancel), onClick = onDismiss, icon = OwnTVIcon.CLOSE)
             }
         }
     }
-}
-
-@Composable
-private fun RailMenuAction(
-    label: String,
-    onClick: () -> Unit,
-    icon: OwnTVIcon? = null,
-    modifier: Modifier = Modifier,
-    iconModifier: Modifier = Modifier,
-    destructive: Boolean = false,
-) {
-    val colors = OwnTVTheme.colors
-    val errorColor = MaterialTheme.colorScheme.error
-    val errorContainerColor = MaterialTheme.colorScheme.errorContainer
-    val onErrorContainerColor = MaterialTheme.colorScheme.onErrorContainer
-    tv.own.owntv.ui.components.FocusableSurface(
-        onClick = onClick,
-        modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
-        focusedScale = 1.012f,
-        unfocusedContainerColor = Color.Transparent,
-        focusedContainerColor = if (destructive) errorContainerColor else colors.primaryContainer,
-        selectedContainerColor = Color.Transparent,
-        surface = GlassSurface.DIALOGS,
-        glassFrostScale = 0.86f,
-        glassIdleRimAlpha = 0f,
-    ) { focused ->
-        val foreground = when {
-            destructive && !focused -> errorColor
-            destructive && focused -> onErrorContainerColor
-            focused -> colors.onPrimaryContainer
-            else -> colors.onSurface
-        }
-        Row(
-            Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            if (icon != null) OwnTVIcon(icon, foreground, Modifier.size(19.dp).then(iconModifier), filled = true)
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelLarge,
-                color = foreground,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-@Composable
-private fun RailMenuDivider() {
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .height(1.dp)
-            .background(OwnTVTheme.colors.outlineVariant.copy(alpha = 0.45f)),
-    )
 }

@@ -1,23 +1,22 @@
 package tv.own.owntv.features.settings
 
+import androidx.compose.foundation.layout.widthIn
+import tv.own.owntv.ui.stage.stageGlass
+import tv.own.owntv.ui.theme.stageAccent
+import tv.own.owntv.ui.theme.stageText
+import tv.own.owntv.ui.theme.StageColors
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.foundation.focusGroup
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,20 +25,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.koin.androidx.compose.koinViewModel
-import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import tv.own.owntv.R
+import androidx.compose.ui.focus.focusProperties
+import tv.own.owntv.ui.components.OwnTVIcon
+import tv.own.owntv.ui.theme.mpx
+import androidx.compose.ui.focus.onFocusChanged
 import tv.own.owntv.core.database.entity.SourceEntity
 import tv.own.owntv.core.model.SourceType
 import tv.own.owntv.core.sync.SyncCounts
@@ -64,12 +61,8 @@ import tv.own.owntv.features.setup.AddSourceChooserScreen
 import tv.own.owntv.features.setup.AddSourceScreen
 import tv.own.owntv.features.setup.RemoteSetupScreen
 import tv.own.owntv.ui.components.OwnTVButton
-import tv.own.owntv.ui.components.dialogPanel
-import tv.own.owntv.ui.components.modalScrim
 import tv.own.owntv.ui.components.OwnTVButtonStyle
 import tv.own.owntv.ui.components.OwnTVSpinner
-import tv.own.owntv.ui.components.roundedPanel
-import tv.own.owntv.ui.components.trapAllFocusExit
 import tv.own.owntv.ui.theme.OwnTVTheme
 
 /** Phase 13 — list / add / re-sync / delete the active profile's IPTV sources. */
@@ -236,17 +229,17 @@ fun ManageSourcesScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 SettingsViewModel.ImportState.Running -> CenterStatus {
                     val display = progress?.importProgressDisplay()
                     OwnTVSpinner(sizeDp = 56)
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(24.mpx))
                     Text(
                         stringResource(R.string.settings_sources_importing),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = colors.onSurface,
+                        style = stageText(38, 800),
+                        color = StageColors.Text,
                     )
-                    Spacer(Modifier.height(6.dp))
-                    Text(display?.primaryText() ?: stringResource(R.string.settings_sources_preparing), style = MaterialTheme.typography.headlineSmall, color = colors.primary)
-                    Spacer(Modifier.height(4.dp))
-                    Text(display?.detailText() ?: stringResource(R.string.settings_sources_preparing), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
-                    Spacer(Modifier.height(20.dp))
+                    Spacer(Modifier.height(9.mpx))
+                    Text(display?.primaryText() ?: stringResource(R.string.settings_sources_preparing), style = stageText(30, 800), color = stageAccent.accent)
+                    Spacer(Modifier.height(6.mpx))
+                    Text(display?.detailText() ?: stringResource(R.string.settings_sources_preparing), style = stageText(18, 400), color = StageColors.Muted)
+                    Spacer(Modifier.height(30.mpx))
                     OwnTVButton(stringResource(R.string.common_cancel), onClick = { showAdd = false; vm.cancelImport() }, style = OwnTVButtonStyle.SECONDARY)
                 }
                 is SettingsViewModel.ImportState.Success -> {
@@ -255,18 +248,18 @@ fun ManageSourcesScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                         EpgSyncDialog(state = epgSync, onSync = vm::syncPendingEpg, onDismiss = vm::dismissPendingEpg)
                     } else if (s.warnings.isNotEmpty() || s.remainder.hasAny) {
                         CenterStatus {
-                            Text(stringResource(R.string.settings_sources_import_title), style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
-                            Spacer(Modifier.height(8.dp))
-                            Text(s.counts.summaryText(), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+                            Text(stringResource(R.string.settings_sources_import_title), style = stageText(38, 800), color = StageColors.Text)
+                            Spacer(Modifier.height(12.mpx))
+                            Text(s.counts.summaryText(), style = stageText(18, 400), color = StageColors.Muted)
                             s.warnings.warningText()?.let { warning ->
-                                Spacer(Modifier.height(4.dp))
-                                Text(warning, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+                                Spacer(Modifier.height(6.mpx))
+                                Text(warning, style = stageText(18, 400), color = StageColors.Muted)
                             }
                             s.remainder.remainderText()?.let { remainder ->
-                                Spacer(Modifier.height(4.dp))
-                                Text(remainder, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+                                Spacer(Modifier.height(6.mpx))
+                                Text(remainder, style = stageText(18, 400), color = StageColors.Muted)
                             }
-                            Spacer(Modifier.height(20.dp))
+                            Spacer(Modifier.height(30.mpx))
                             OwnTVButton(stringResource(R.string.common_done), onClick = { showAdd = false; vm.resetImport() })
                         }
                     } else {
@@ -274,83 +267,61 @@ fun ManageSourcesScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                     }
                 }
                 is SettingsViewModel.ImportState.Failed -> CenterStatus {
-                    Text(stringResource(R.string.settings_sources_import_failed), style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
-                    Spacer(Modifier.height(8.dp))
-                    Text(s.failure.displayText(), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
-                    Spacer(Modifier.height(20.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(stringResource(R.string.settings_sources_import_failed), style = stageText(38, 800), color = StageColors.Text)
+                    Spacer(Modifier.height(12.mpx))
+                    Text(s.failure.displayText(), style = stageText(18, 400), color = StageColors.Muted)
+                    Spacer(Modifier.height(30.mpx))
+                    Row(horizontalArrangement = Arrangement.spacedBy(14.mpx)) {
                         OwnTVButton(stringResource(R.string.common_back), onClick = { showAdd = false; vm.resetImport() }, style = OwnTVButtonStyle.SECONDARY)
                         OwnTVButton(stringResource(R.string.settings_sources_try_again), onClick = { vm.resetImport() }, modifier = Modifier.focusRequester(errorFocus))
                     }
                 }
             }
         } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .roundedPanel()
-                    // D-pad entry from outside (sidebar / back from a sub-screen) should fall INSIDE the
-                    // menu — on the last-acted row if there is one, else the first row, else "Add Source"
-                    // (only when the list is empty). Previously this always went to "Add Source", which is
-                    // why focus never landed in the list.
-                    .focusProperties {
-                        onEnter = {
-                            val tid = contextId
-                            when {
-                                tid != null && sources.any { it.id == tid } -> runCatching { contextFocus.requestFocus() }
-                                sources.isNotEmpty() -> runCatching { firstRowFocus.requestFocus() }
-                                else -> runCatching { addFocus.requestFocus() }
-                            }
-                        }
-                    }
-                    .focusGroup()
-                    .padding(horizontal = 40.dp, vertical = 28.dp),
+            // P10B-07: the playlists as rows; the focused one's Edit / Info / Re-sync / Delete in the panel.
+            val actionsFocus = remember { FocusRequester() }
+            StageFullPage(
+                parents = listOf(stringResource(R.string.settings_group_sources)),
+                title = stringResource(R.string.settings_playlists),
+                count = "",
+                onBack = onBack,
+                handleBack = false,
+                toolbar = {
+                    tv.own.owntv.ui.stage.StageTool(
+                        stringResource(R.string.settings_sources_add), onClick = { showAdd = true },
+                        icon = tv.own.owntv.ui.components.OwnTVIcon.ADD, boxed = true,
+                        modifier = Modifier.focusRequester(addFocus),
+                    )
+                },
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.settings_sources_title), style = MaterialTheme.typography.headlineLarge, color = colors.onSurface)
-                    Spacer(Modifier.weight(1f))
-                    OwnTVButton(stringResource(R.string.settings_sources_add), onClick = { showAdd = true }, icon = tv.own.owntv.ui.components.OwnTVIcon.ADD, modifier = Modifier.focusRequester(addFocus))
-                }
-                Spacer(Modifier.height(8.dp))
-                Text(stringResource(R.string.settings_sources_description), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
-                Spacer(Modifier.height(20.dp))
-
-                if (sources.isEmpty()) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(stringResource(R.string.settings_sources_empty), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge)
+                if (sources.isEmpty()) StageSettingsNote(stringResource(R.string.settings_sources_empty), null)
+                sources.forEachIndexed { index, source ->
+                    val isDefault = source.id == defaultId
+                    val counts by remember(source.id) { vm.contentCounts(source.id) }.collectAsStateWithLifecycle(null)
+                    val syncState by remember(source.id) { vm.syncState(source.id) }.collectAsStateWithLifecycle(CatalogSyncState.Idle)
+                    val rowFocus = when {
+                        source.id == contextId -> contextFocus
+                        index == 0 -> firstRowFocus
+                        else -> null
                     }
-                } else {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        itemsIndexed(sources, key = { _, it -> it.id }) { index, source ->
-                            // Default is only the explicitly-chosen source; when none is set every playlist shows
-                            // (no badge). Chosen via the add/edit form's "Default playlist" toggle, not a row action.
-                            val isDefault = source.id == defaultId
-                            val counts by remember(source.id) { vm.contentCounts(source.id) }.collectAsStateWithLifecycle(null)
-                            val syncState by remember(source.id) { vm.syncState(source.id) }.collectAsStateWithLifecycle(CatalogSyncState.Idle)
-
-                            SourceRow(
-                                source = source,
-                                autoRefresh = playlistAutoRefresh[source.id] ?: PlaylistRefresh.OFF,
-                                isDefault = isDefault,
-                                expiry = sourceExpiry[source.id],
-                                counts = counts,
-                                syncState = syncState,
-                                isDeleting = source.id in deletingIds,
-                                // Bind contextFocus to the row the user is acting on (so we can restore it),
-                                // and firstRowFocus to row 0 (entry / empty-context fallback).
-                                rowModifier = when {
-                                    source.id == contextId -> Modifier.focusRequester(contextFocus)
-                                    index == 0 -> Modifier.focusRequester(firstRowFocus)
-                                    else -> Modifier
-                                },
-                                onEdit = { contextId = source.id; contextIndex = index; editingSource = source },
-                                onTest = { contextId = source.id; contextIndex = index; vm.testSource(source) },
-                                onResync = { contextId = source.id; contextIndex = index; resyncChoice = source },
-                                onCancelSync = { contextId = source.id; contextIndex = index; vm.cancelResync(source) },
-                                onDelete = { contextId = source.id; contextIndex = index; confirmDelete = source },
-                            )
-                        }
-                    }
+                    SourceRow(
+                        source = source,
+                        autoRefresh = playlistAutoRefresh[source.id] ?: PlaylistRefresh.OFF,
+                        isDefault = isDefault,
+                        expiry = sourceExpiry[source.id],
+                        counts = counts,
+                        syncState = syncState,
+                        isDeleting = source.id in deletingIds,
+                        rowFocus = rowFocus,
+                        actionsFocus = actionsFocus,
+                        keepPanel = source.id == contextId,
+                        onFocused = { contextId = source.id; contextIndex = index },
+                        onEdit = { contextId = source.id; contextIndex = index; editingSource = source },
+                        onTest = { contextId = source.id; contextIndex = index; vm.testSource(source) },
+                        onResync = { contextId = source.id; contextIndex = index; resyncChoice = source },
+                        onCancelSync = { contextId = source.id; contextIndex = index; vm.cancelResync(source) },
+                        onDelete = { contextId = source.id; contextIndex = index; confirmDelete = source },
+                    )
                 }
             }
         }
@@ -408,102 +379,87 @@ private fun SourceRow(
     counts: SyncCounts?,
     syncState: CatalogSyncState,
     isDeleting: Boolean,
-    rowModifier: Modifier,
+    rowFocus: FocusRequester?,
+    actionsFocus: FocusRequester,
+    keepPanel: Boolean,
+    onFocused: () -> Unit,
     onEdit: () -> Unit,
     onTest: () -> Unit,
     onResync: () -> Unit,
     onCancelSync: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val colors = OwnTVTheme.colors
     val activeSync = syncState as? CatalogSyncState.Syncing
     val activeCounts = activeSync?.countsLabel(source.type, counts)
-    Row(
-        modifier = rowModifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(colors.surfaceContainerHigh).padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(source.name, style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
-                if (isDefault) {
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        stringResource(R.string.settings_sources_default),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = colors.onPrimaryContainer,
-                        modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(colors.primaryContainer).padding(horizontal = 8.dp, vertical = 2.dp),
-                    )
-                }
-                if (isDeleting) {
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        stringResource(R.string.settings_sources_deleting),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = colors.onPrimaryContainer,
-                        modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(colors.primaryContainer).padding(horizontal = 8.dp, vertical = 2.dp),
-                    )
-                }
-                activeSync?.let {
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        resyncProgressPercent(it.baseItemCount, it.totalProcessed)?.let { percent -> stringResource(R.string.sync_progress_percent, percent) }
-                            ?: stringResource(R.string.sync_progress_syncing),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = colors.onPrimaryContainer,
-                        modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(colors.primaryContainer).padding(horizontal = 8.dp, vertical = 2.dp),
-                    )
-                }
-            }
-            val sourceTypeText = stringResource(
-                when (source.type) {
-                    SourceType.XTREAM -> R.string.settings_sources_type_xtream
-                    SourceType.M3U -> R.string.settings_sources_type_m3u
-                    SourceType.STALKER -> R.string.settings_sources_type_stalker
-                    SourceType.LOCAL_BACKUP -> R.string.settings_sources_backup
-                },
-                source.url,
-            )
-            val visibleCounts = if (activeSync == null) counts?.breakdownText() else activeCounts?.displayText()
-            val details = buildList {
-                add(sourceTypeText)
-                if (autoRefresh.mode != PlaylistAutoRefresh.OFF) add(stringResource(R.string.settings_sources_auto_refresh, playlistAutoRefreshLabel(autoRefresh)))
-                if (!expiry.isNullOrBlank()) add(stringResource(R.string.settings_sources_expiry, expiry))
-                if (!visibleCounts.isNullOrBlank()) add(visibleCounts)
-                else if (activeSync != null) add(stringResource(R.string.settings_sources_preparing_detail))
-            }
-            Text(
-                details.joinToString(stringResource(R.string.settings_sources_details_separator)),
-                style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            )
-        }
-        Spacer(Modifier.width(12.dp))
-        if (isDeleting) {
-            // Removing a huge source cascades through hundreds of thousands of rows — show that the
-            // removal is running and take the row's actions away so it can't be edited/re-synced/
-            // deleted again mid-delete.
-            OwnTVSpinner(sizeDp = 22)
-            Spacer(Modifier.width(10.dp))
-            Text(stringResource(R.string.settings_sources_removing_detail), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
-        } else {
-            OwnTVButton(stringResource(R.string.settings_sources_edit), onClick = onEdit, style = OwnTVButtonStyle.SECONDARY)
-            Spacer(Modifier.width(10.dp))
-            // "Info", not "Test": the expensive measurement now lives behind Re-test inside the
-            // popup, and this button answers the question it always really answered — is it alive?
-            OwnTVButton(stringResource(R.string.settings_sources_info), onClick = onTest, style = OwnTVButtonStyle.SECONDARY)
-            Spacer(Modifier.width(10.dp))
-            // One stable button whose label/action flips with syncState. Keeping the SAME composable
-            // in the tree (instead of an if/else that disposes "Re-sync" and composes "Cancel") means
-            // the focusable node is never removed, so D-pad focus survives the swap instead of escaping
-            // the row — that swap was the re-sync focus loss.
-            OwnTVButton(
-                label = stringResource(if (syncState.isActive) R.string.settings_sources_cancel else R.string.settings_sources_resync),
-                onClick = if (syncState.isActive) onCancelSync else onResync,
-                style = OwnTVButtonStyle.SECONDARY,
-            )
-            Spacer(Modifier.width(10.dp))
-            OwnTVButton(stringResource(R.string.settings_sources_delete), onClick = onDelete, style = OwnTVButtonStyle.SECONDARY)
-        }
+    val typeName = stringResource(
+        when (source.type) {
+            SourceType.XTREAM -> R.string.settings_sources_type_xtream
+            SourceType.M3U -> R.string.settings_sources_type_m3u
+            SourceType.STALKER -> R.string.settings_sources_type_stalker
+            SourceType.LOCAL_BACKUP -> R.string.settings_sources_backup
+        },
+        source.url,
+    )
+    val visibleCounts = if (activeSync == null) counts?.breakdownText() else activeCounts?.displayText()
+    val sep = stringResource(R.string.settings_sources_details_separator)
+    // The row's line: counts, refresh and expiry; the URL itself goes to the panel.
+    val line = buildList {
+        if (!visibleCounts.isNullOrBlank()) add(visibleCounts)
+        else if (activeSync != null) add(stringResource(R.string.settings_sources_preparing_detail))
+        if (autoRefresh.mode != PlaylistAutoRefresh.OFF) add(stringResource(R.string.settings_sources_auto_refresh, playlistAutoRefreshLabel(autoRefresh)))
+        if (!expiry.isNullOrBlank()) add(stringResource(R.string.settings_sources_expiry, expiry))
+    }.joinToString(sep)
+    val status = when {
+        isDeleting -> stringResource(R.string.settings_sources_deleting)
+        activeSync != null -> resyncProgressPercent(activeSync.baseItemCount, activeSync.totalProcessed)
+            ?.let { stringResource(R.string.sync_progress_percent, it) } ?: stringResource(R.string.sync_progress_syncing)
+        isDefault -> stringResource(R.string.settings_sources_default)
+        else -> null
     }
+    val back = rowFocus ?: remember { FocusRequester() }
+    val actions = if (isDeleting) emptyList() else listOf(
+        StageAction(OwnTVIcon.PENCIL, stringResource(R.string.settings_sources_edit), onEdit),
+        // "Info", not "Test": the expensive measurement lives behind Re-test inside the popup.
+        StageAction(OwnTVIcon.INFO, stringResource(R.string.settings_sources_info), onTest),
+        StageAction(
+            OwnTVIcon.REFRESH,
+            stringResource(if (syncState.isActive) R.string.settings_sources_cancel else R.string.settings_sources_resync),
+            if (syncState.isActive) onCancelSync else onResync,
+        ),
+        StageAction(OwnTVIcon.TRASH, stringResource(R.string.settings_sources_delete), onDelete, danger = true),
+    )
+    StageSettingRow(
+        icon = OwnTVIcon.PLAYLIST,
+        title = source.name,
+        desc = line.ifBlank { typeName },
+        value = status?.let { SettingValue.Action(it) },
+        onClick = { runCatching { actionsFocus.requestFocus() } },
+        keepPanel = keepPanel,
+        help = SettingHelp(
+            title = source.name,
+            // The address on one line, the counts on the next (owner).
+            text = listOfNotNull(typeName, visibleCounts).joinToString("\n"),
+            hints = listOf(
+                "▶" to stringResource(R.string.settings_key_actions),
+                stringResource(R.string.common_back) to stringResource(R.string.common_nav_settings),
+            ),
+            extra = {
+                if (isDeleting) {
+                    Text(
+                        stringResource(R.string.settings_sources_removing_detail),
+                        style = tv.own.owntv.ui.theme.stageText(16, 500), color = tv.own.owntv.ui.theme.StageColors.Muted,
+                        modifier = Modifier.padding(top = 14.mpx),
+                    )
+                } else {
+                    StageActionColumn(actions, back, actionsFocus)
+                }
+            },
+        ),
+        modifier = Modifier
+            .focusRequester(back)
+            .focusProperties { right = actionsFocus }
+            .onFocusChanged { if (it.isFocused) onFocused() },
+    )
 }
 
 private fun CatalogSyncState.Syncing.countsLabel(sourceType: SourceType, stored: SyncCounts?): tv.own.owntv.core.sync.SyncProgressCounts? {
@@ -553,8 +509,12 @@ private fun CatalogSyncState.Syncing.countsLabel(sourceType: SourceType, stored:
 
 @Composable
 private fun CenterStatus(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
-    Box(Modifier.fillMaxSize().roundedPanel(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, content = content)
+    Box(Modifier.padding(top = tv.own.owntv.features.shell.components.StageContentTop).fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            Modifier.widthIn(max = 1000.mpx).stageGlass(30.mpx).padding(horizontal = 60.mpx, vertical = 48.mpx),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            content = content,
+        )
     }
 }
 
@@ -571,25 +531,11 @@ internal fun ConfirmDialog(
      */
     @StringRes confirmLabel: Int = R.string.common_delete,
 ) {
-    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
-    val colors = OwnTVTheme.colors
-    val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-    BackHandler { onDismiss() }
-    Box(Modifier.fillMaxSize().modalScrim().trapAllFocusExit().focusGroup(), contentAlignment = Alignment.Center) {
-        Column(Modifier.dialogPanel(width = 460.dp, padding = 28.dp)) {
-            Text(title, style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
-            Spacer(Modifier.height(10.dp))
-            Text(message, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
-            Spacer(Modifier.height(22.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OwnTVButton(stringResource(R.string.common_cancel), onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY, modifier = Modifier.focusRequester(focus))
-                Spacer(Modifier.weight(1f))
-                OwnTVButton(stringResource(confirmLabel), onClick = onConfirm)
-            }
-        }
-    }
-    }
+    // Focus starts on Cancel: a mis-press must not delete anything.
+    tv.own.owntv.ui.stage.StageConfirm(
+        title = title, body = message, confirm = stringResource(confirmLabel),
+        onConfirm = onConfirm, onCancel = onDismiss, focusCancel = true,
+    )
 }
 
 /**
@@ -611,33 +557,22 @@ private fun ResyncChoiceDialog(
     onClean: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
-    val colors = OwnTVTheme.colors
     val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-    BackHandler { onDismiss() }
-    Box(Modifier.fillMaxSize().modalScrim().trapAllFocusExit().focusGroup(), contentAlignment = Alignment.Center) {
-        Column(Modifier.dialogPanel(width = 520.dp, padding = 28.dp)) {
-            Text(stringResource(R.string.settings_sources_resync_title_full, sourceName), style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
-            Spacer(Modifier.height(10.dp))
-            Text(
-                stringResource(R.string.settings_sources_resync_description),
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(22.dp))
-            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OwnTVButton(stringResource(R.string.settings_sources_resync_now_full), onClick = onNormal, modifier = Modifier.fillMaxWidth().focusRequester(focus))
-                OwnTVButton(
-                    stringResource(R.string.settings_sources_resync_remove_full),
-                    onClick = onClean,
-                    style = OwnTVButtonStyle.SECONDARY,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OwnTVButton(stringResource(R.string.common_cancel), onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY, modifier = Modifier.fillMaxWidth())
-            }
-        }
-    }
+    LaunchedEffect(Unit) { kotlinx.coroutines.delay(60); runCatching { focus.requestFocus() } }
+    tv.own.owntv.ui.stage.StagePopup(
+        onDismiss = onDismiss,
+        title = stringResource(R.string.settings_sources_resync_title_full, sourceName),
+        body = stringResource(R.string.settings_sources_resync_description),
+        buttons = { tv.own.owntv.ui.stage.StageButton(stringResource(R.string.common_cancel), onClick = onDismiss, height = 56.mpx, textSize = 19) },
+    ) {
+        tv.own.owntv.ui.stage.StagePopupOption(
+            title = stringResource(R.string.settings_sources_resync_now_full), onClick = onNormal, modifier = Modifier.focusRequester(focus),
+            leading = { tv.own.owntv.ui.stage.StagePopupIcon(OwnTVIcon.REFRESH) },
+        )
+        tv.own.owntv.ui.stage.StagePopupOption(
+            title = stringResource(R.string.settings_sources_resync_remove_full), onClick = onClean, danger = true,
+            leading = { tv.own.owntv.ui.stage.StagePopupIcon(OwnTVIcon.TRASH, tv.own.owntv.ui.theme.StageColors.Danger) },
+        )
     }
 }
 
@@ -660,92 +595,62 @@ internal fun SourceTestDialog(
     /** Abandon a measurement in progress. Falls back to simply closing when not supplied. */
     onSkip: (() -> Unit)? = null,
 ) {
-    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
-    val colors = OwnTVTheme.colors
     val focus = remember { FocusRequester() }
-    // Keyed on *which* button carries the requester, not on first composition.
-    //
-    // While measuring that button is Skip; when the measurement finishes it becomes OK, and the node
-    // holding the requester is therefore removed and replaced. A one-shot request left focus on a
-    // node that no longer existed, so the finished dialog could not be dismissed with the remote at
-    // all — the press went nowhere. A frame is waited for because the replacement must exist before
-    // it can be asked to take focus.
+    // Keyed on *which* button carries the requester, not on first composition: while measuring it is
+    // Skip, then OK replaces it — a one-shot request left focus on a node that no longer existed, so
+    // the finished dialog could not be dismissed. A frame is waited for so the replacement exists.
     val measuring = state is SourceTestUi.Measuring
     LaunchedEffect(measuring) {
         withFrameNanos { }
+        kotlinx.coroutines.delay(60)
         runCatching { focus.requestFocus() }
     }
-    BackHandler { onDismiss() }
-    Box(Modifier.fillMaxSize().modalScrim().trapAllFocusExit().focusGroup(), contentAlignment = Alignment.Center) {
-        Column(Modifier.dialogPanel(width = 520.dp, padding = 28.dp)) {
-            Text(stringResource(R.string.settings_sources_test_title), style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
-            Spacer(Modifier.height(4.dp))
-            Text(state.sourceName, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
-            Spacer(Modifier.height(18.dp))
-            when (state) {
-                is SourceTestUi.Running -> Row(verticalAlignment = Alignment.CenterVertically) {
-                    OwnTVSpinner(sizeDp = 22)
-                    Spacer(Modifier.width(12.dp))
-                    Text(stringResource(R.string.setup_testing), style = MaterialTheme.typography.bodyLarge, color = colors.onSurfaceVariant)
-                }
-                // The measurement is slow by nature, so it says which stream it is on rather than
-                // spinning silently for two minutes and looking like a hang.
-                is SourceTestUi.Measuring -> Row(verticalAlignment = Alignment.CenterVertically) {
-                    OwnTVSpinner(sizeDp = 22)
-                    Spacer(Modifier.width(12.dp))
-                    Text(
-                        stringResource(
-                            R.string.settings_sources_probe_running,
-                            state.progress.stream,
-                            state.progress.maxStreams,
-                        ),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = colors.onSurfaceVariant,
-                    )
-                }
-                is SourceTestUi.Done -> SourceTestReport(state.result, state.limit)
+    tv.own.owntv.ui.stage.StagePopup(
+        onDismiss = onDismiss,
+        title = stringResource(R.string.settings_sources_test_title),
+        body = state.sourceName,
+        buttons = {
+            // Only once the quick check has finished: a measurement on top of a running request would
+            // race it for the same connection.
+            if (onRetest != null && state is SourceTestUi.Done) {
+                tv.own.owntv.ui.stage.StageButton(stringResource(R.string.settings_sources_retest), onClick = onRetest, height = 56.mpx, textSize = 19)
             }
-            Spacer(Modifier.height(22.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                // While measuring, the only honest button is one that abandons it: OK would suggest
-                // the answer is already in. Nobody should be trapped for two minutes by a provider
-                // that is simply slow.
-                if (state is SourceTestUi.Measuring) {
-                    OwnTVButton(
-                        stringResource(R.string.settings_sources_probe_skip),
-                        onClick = onSkip ?: onDismiss,
-                        modifier = Modifier.focusRequester(focus),
-                    )
-                } else {
-                    OwnTVButton(stringResource(R.string.common_ok), onClick = onDismiss, modifier = Modifier.focusRequester(focus))
-                }
-                // Only once the quick check has finished: starting a two-minute measurement on top of
-                // a request that is still running would race it for the same connection.
-                if (onRetest != null && state is SourceTestUi.Done) {
-                    OwnTVButton(
-                        stringResource(R.string.settings_sources_retest),
-                        onClick = onRetest,
-                        style = OwnTVButtonStyle.SECONDARY,
-                    )
-                }
+            // While measuring, the only honest button abandons it: OK would suggest the answer is in.
+            if (state is SourceTestUi.Measuring) {
+                tv.own.owntv.ui.stage.StageButton(stringResource(R.string.settings_sources_probe_skip), onClick = onSkip ?: onDismiss, height = 56.mpx, textSize = 19, tinted = true, modifier = Modifier.focusRequester(focus))
+            } else {
+                tv.own.owntv.ui.stage.StageButton(stringResource(R.string.common_ok), onClick = onDismiss, height = 56.mpx, textSize = 19, tinted = true, modifier = Modifier.focusRequester(focus))
             }
+        },
+    ) {
+        val line = tv.own.owntv.ui.theme.stageText(18, 500)
+        when (state) {
+            is SourceTestUi.Running -> Row(verticalAlignment = Alignment.CenterVertically) {
+                OwnTVSpinner(sizeDp = 22)
+                Spacer(Modifier.width(16.mpx))
+                Text(stringResource(R.string.setup_testing), style = line, color = tv.own.owntv.ui.theme.StageColors.Muted)
+            }
+            // Slow by nature, so it says which stream it is on rather than looking like a hang.
+            is SourceTestUi.Measuring -> Row(verticalAlignment = Alignment.CenterVertically) {
+                OwnTVSpinner(sizeDp = 22)
+                Spacer(Modifier.width(16.mpx))
+                Text(stringResource(R.string.settings_sources_probe_running, state.progress.stream, state.progress.maxStreams), style = line, color = tv.own.owntv.ui.theme.StageColors.Muted)
+            }
+            is SourceTestUi.Done -> SourceTestReport(state.result, state.limit)
         }
-    }
     }
 }
 
 @Composable
 private fun SourceTestReport(result: SourceTestResult, limit: tv.own.owntv.core.live.ConnectionLimit?) {
-    val colors = OwnTVTheme.colors
     val res = LocalContext.current.resources
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.mpx)) {
         Text(
-            result.headline(res),
-            style = MaterialTheme.typography.bodyLarge,
-            color = if (result is SourceTestResult.Ok) colors.onSurface else colors.favorite,
+            result.headline(res), style = tv.own.owntv.ui.theme.stageText(20, 700),
+            color = if (result is SourceTestResult.Ok) tv.own.owntv.ui.theme.StageColors.Ok else tv.own.owntv.ui.theme.StageColors.Danger,
         )
         result.detailLines(res, limit).forEach {
-            Text(it, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+            Text(it, style = tv.own.owntv.ui.theme.stageText(17, 500), color = tv.own.owntv.ui.theme.StageColors.Muted)
         }
     }
 }

@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.launch
 import tv.own.owntv.core.customize.CustomizationStore
 import tv.own.owntv.core.customize.SectionCustomizations
@@ -105,6 +106,11 @@ class SeriesViewModel(
     private val subtitleController: tv.own.owntv.core.subtitles.SubtitleController,
 ) : ViewModel() {
 
+    /** The categories' search text, held here so it survives the player (see LiveViewModel). */
+    private val _categoryQuery = kotlinx.coroutines.flow.MutableStateFlow("")
+    val categoryQuery: kotlinx.coroutines.flow.StateFlow<String> = _categoryQuery
+    fun setCategoryQuery(query: String) { _categoryQuery.value = query }
+
     data class SeriesMoveState(val items: List<SeriesEntity>, val activeIndex: Int, val contextKey: String)
     private val _moveState = MutableStateFlow<SeriesMoveState?>(null)
     val moveState: StateFlow<SeriesMoveState?> = _moveState.asStateFlow()
@@ -129,10 +135,6 @@ class SeriesViewModel(
         }
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.Eagerly, Ctx(-1L, emptyList(), emptyMap()))
-
-    val providerNames: StateFlow<Map<Long, String>> = ctx
-        .map { c -> c.sourceNames.takeIf { it.size > 1 } ?: emptyMap() }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
     private val folderContextKeys: StateFlow<Map<Long, String>> = ctx
         .flatMapLatest { c ->
@@ -243,18 +245,8 @@ class SeriesViewModel(
     val sortMode: StateFlow<SettingsRepository.SortMode> = settings.sortSeries
         .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.SortMode.ALPHA)
 
-    fun toggleSort() {
-        viewModelScope.launch {
-            // Cycle Provider → A–Z → Rating → Provider.
-            settings.setSortSeries(
-                when (sortMode.value) {
-                    SettingsRepository.SortMode.PLAYLIST -> SettingsRepository.SortMode.ALPHA
-                    SettingsRepository.SortMode.ALPHA -> SettingsRepository.SortMode.RATING
-                    SettingsRepository.SortMode.RATING -> SettingsRepository.SortMode.DATE_ADDED
-                    SettingsRepository.SortMode.DATE_ADDED -> SettingsRepository.SortMode.PLAYLIST
-                },
-            )
-        }
+    fun setSort(mode: SettingsRepository.SortMode) {
+        viewModelScope.launch { settings.setSortSeries(mode) }
     }
 
     val viewMode: StateFlow<SettingsRepository.VodViewMode> = settings.vodViewMode
@@ -290,13 +282,24 @@ class SeriesViewModel(
     private val _seriesMetaTick = MutableStateFlow(0L)
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    /** TMDB details already resolved this session, by title id: shown without the focus debounce. */
+    private val resolvedMeta = java.util.concurrent.ConcurrentHashMap<Long, tv.own.owntv.core.database.entity.MetadataCacheEntity>()
+
     val selectedSeriesMeta: StateFlow<SeriesMeta?> = combine(_selectedSeries, _seriesMetaTick) { s, tick -> s to tick }
         .distinctUntilChanged { a, b -> a.first?.id == b.first?.id && a.second == b.second }
         // See MetadataRepository.FOCUS_DEBOUNCE_MS — 700 ms so scrolling past cards costs nothing.
-        .debounce(tv.own.owntv.core.metadata.MetadataRepository.FOCUS_DEBOUNCE_MS)
-        .mapLatest { (s, _) ->
-            if (s == null) null
-            else SeriesMeta(s.id, runCatching { metadata.resolveSeries(s) }.getOrNull())
+        // A title resolved once this session shows at once; only an unseen one waits the focus debounce
+        // (FOCUS_DEBOUNCE_MS: scrolling past cards must cost nothing), then reads the DB cache or TMDB.
+        .transformLatest { (s, _) ->
+            if (s == null) { emit(null); return@transformLatest }
+            resolvedMeta[s.id]?.let { emit(SeriesMeta(s.id, it)); return@transformLatest }
+            delay(tv.own.owntv.core.metadata.MetadataRepository.FOCUS_DEBOUNCE_MS)
+            val cache = runCatching { metadata.resolveSeries(s) }.getOrNull()
+            if (cache != null) {
+                if (resolvedMeta.size > 500) resolvedMeta.clear()
+                resolvedMeta[s.id] = cache
+            }
+            emit(SeriesMeta(s.id, cache))
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
@@ -323,24 +326,6 @@ class SeriesViewModel(
     // (distinct from _openedSeries, which tracks the browse/detail selection).
     private val _playingSeries = MutableStateFlow<SeriesEntity?>(null)
     val playingSeries: StateFlow<SeriesEntity?> = _playingSeries.asStateFlow()
-
-    // --- Download status for poster-panel strips (display-only) ---
-
-    /** Active episode-download rows keyed by episode id — for the focused-episode strip. */
-    val episodeDownloadStates: StateFlow<Map<Long, DownloadEntity>> = ctx
-        .flatMapLatest { c -> if (c.profileId < 0) flowOf(emptyList()) else downloadManager.observe(c.profileId) }
-        .map { list -> list.filter { it.mediaType == MediaType.EPISODE }.associateBy { it.itemId } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
-
-    /** All episode downloads for the grid-selected series (entire-series aggregate strip). */
-    val selectedSeriesDownloads: StateFlow<List<DownloadEntity>> = _selectedSeries
-        .flatMapLatest { s -> if (s == null) flowOf(emptyList()) else downloadManager.observeForSeries(s.id) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    /** All episode downloads for the opened series (aggregate strip inside the episode view). */
-    val openedSeriesDownloads: StateFlow<List<DownloadEntity>> = _openedSeries
-        .flatMapLatest { s -> if (s == null) flowOf(emptyList()) else downloadManager.observeForSeries(s.id) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _selectedSeason = MutableStateFlow(1)
     val selectedSeason: StateFlow<Int> = _selectedSeason.asStateFlow()
@@ -509,6 +494,7 @@ class SeriesViewModel(
                             ?.let(categoriesById::get)
                             ?.sourceId
                             ?.let(multiSourceNames::get),
+                        sourceId = e.categoryId?.let(categoriesById::get)?.sourceId,
                     )
                 }
             }
@@ -551,6 +537,30 @@ class SeriesViewModel(
     val count: StateFlow<Int> = combine(_selected, ctx, hiddenCategoryIds) { key, c, hidden -> Triple(key, c, hidden) }
         .flatMapLatest { (key, c, hidden) -> countFlow(key, c, hidden).throttleLatest() } // C2: cap live COUNT re-runs during bulk sync
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    /** The count beside every category (Stage sheet / column): one grouped query for the folders. */
+    val railCounts: StateFlow<Map<LiveKey, Int>> = combine(ctx, hiddenCategoryIds, railItems) { c, hidden, items -> Triple(c, hidden, items) }
+        .flatMapLatest { (c, hidden, items) ->
+            val single = items.filter { it.key !is LiveKey.Folder }.map { item -> countFlow(item.key, c, hidden).map { mapOf(item.key to it) } }
+            val folders = seriesDao.observeCountsByCategory(c.sourceIds.ifEmpty { listOf(-1L) })
+                .map { rows -> rows.associate { LiveKey.Folder(it.categoryId) as LiveKey to it.itemCount } }
+            combine(single + folders) { parts -> parts.fold(emptyMap<LiveKey, Int>()) { acc, m -> acc + m } }.throttleLatest()
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    /** Which playlist a show or category comes from (GOLD / JR), only while more than one is shown. */
+    val playlistMarks: StateFlow<Map<Long, tv.own.owntv.ui.stage.PlaylistMark>> = activeProfileSources(settings, sourceDao)
+        .map { aps ->
+            if (aps.seriesSourceIds.size < 2) emptyMap()
+            else aps.sources.withIndex().associate { (i, s) -> s.id to tv.own.owntv.ui.stage.PlaylistMark.of(s.name, i) }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    /** Whether "Remove from history" has anything to remove for [series]. */
+    suspend fun isInHistory(series: SeriesEntity): Boolean {
+        val pid = currentProfileId() ?: return false
+        return historyDao.exists(pid, MediaType.SERIES, series.id)
+    }
 
     val favoriteIds: StateFlow<Set<Long>> = ctx
         .flatMapLatest { favoriteDao.observeFavoriteIds(it.profileId, MediaType.SERIES) }
@@ -682,6 +692,7 @@ class SeriesViewModel(
     fun refetchSeriesMeta(series: SeriesEntity) {
         viewModelScope.launch {
             runCatching { metadata.clearSeries(series) }
+            resolvedMeta.remove(series.id)
             _cachedPosters.value = _cachedPosters.value - series.id
             _seriesMetaTick.value++
         }
@@ -704,6 +715,7 @@ class SeriesViewModel(
     fun setSeriesTmdbName(series: SeriesEntity, title: String, year: Int?) {
         viewModelScope.launch {
             runCatching { metadata.setSeriesOverride(series, title, year) }
+            resolvedMeta.remove(series.id)
             _seriesMetaTick.value++
         }
     }
@@ -712,6 +724,7 @@ class SeriesViewModel(
     fun clearSeriesTmdbName(series: SeriesEntity) {
         viewModelScope.launch {
             runCatching { metadata.clearSeriesOverride(series) }
+            resolvedMeta.remove(series.id)
             _seriesMetaTick.value++
         }
     }
@@ -792,18 +805,19 @@ class SeriesViewModel(
     }
 
     /**
-     * TMDB rows for EVERY episode of the active season, keyed by local episode id — the grid needs all
-     * of them at once, unlike the list which only ever shows the focused episode's still.
+     * TMDB rows for EVERY episode of the active season, keyed by local episode id — the grid and the
+     * list both show every episode's still at once.
      *
-     * Only collected in grid mode, and only after [GRID_DWELL_MS]: opening a show and immediately
+     * Only fetched after [GRID_DWELL_MS]: opening a show and immediately
      * pressing Back should cost nothing, and leaving cancels the fetch outright because `mapLatest`
      * tears down the previous coroutine. One request covers the whole season (see
      * `MetadataRepository.resolveSeasonEpisodes`).
      */
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val seasonEpisodeMeta: StateFlow<Map<Long, tv.own.owntv.core.database.entity.MetadataCacheEntity>> =
-        combine(_openedSeries, _selectedSeason, episodes, episodeViewMode, _episodeMetaTick) { show, season, eps, mode, _ ->
-            if (show == null || mode != SettingsRepository.VodViewMode.GRID) {
+        // Both layouts show each episode's still, date and plot (P6-01 / P6-02), so both need the season's details.
+        combine(_openedSeries, _selectedSeason, episodes, _episodeMetaTick) { show, season, eps, _ ->
+            if (show == null) {
                 null
             } else {
                 // Mirror the screen's own fallback: a show whose seasons start at 0 or 2 displays its
@@ -1097,12 +1111,17 @@ class SeriesViewModel(
         }
     }
 
-    fun downloadSeries(series: SeriesEntity) {
+    fun downloadSeries(series: SeriesEntity) = downloadEpisodes(series, null)
+
+    /** "Download season" on the series page (G11): only [season]'s episodes. */
+    fun downloadSeason(series: SeriesEntity, season: Int) = downloadEpisodes(series, season)
+
+    private fun downloadEpisodes(series: SeriesEntity, season: Int?) {
         val showDir = StorageAccess.sanitize(series.name)
         viewModelScope.launch {
             val pid = currentProfileId() ?: return@launch
             if (!tv.own.owntv.core.content.AdultCategoryClassifier.allows(pid, series.categoryId, profileDao, categoryDao)) return@launch
-            seriesDao.episodesBySeries(series.id).first().forEach { ep ->
+            seriesDao.episodesBySeries(series.id).first().filter { season == null || it.seasonNumber == season }.forEach { ep ->
                 val ext = ep.containerExt ?: StorageAccess.extOf(ep.streamUrl)
                 downloadManager.enqueue(
                     profileId = pid,

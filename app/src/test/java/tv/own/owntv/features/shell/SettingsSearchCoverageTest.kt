@@ -28,7 +28,7 @@ class SettingsSearchCoverageTest {
     /** Just the search-results block, so a tab opened from a normal row does not count as covered. */
     private val searchBlock: String by lazy {
         val from = source.indexOf("val searchResults")
-        val to = source.indexOf("val tokens = searchQuery", from)
+        val to = source.indexOf("val needle = searchQuery", from)
         assertTrue("could not find the search block — has it been renamed?", from in 0 until to)
         source.substring(from, to)
     }
@@ -113,7 +113,10 @@ class SettingsSearchCoverageTest {
                 val body = m.groupValues[1]
                 // Quick's own rows are copies of rows that live in a group; the group row is the one to find.
                 if (Regex("""^\s*"quick_""").containsMatchIn(body)) return@mapNotNull null
-                Regex("""title = stringResource\((R\.string\.[a-z_0-9]+)""").find(body)?.groupValues?.get(1)
+                // The row's own title: a derived row says `ref.titleRes` (covered by the Video player
+                // derivation), so a title further down — another call's — must not stand in for it.
+                Regex("""title = stringResource\(([^)]*)\)""").find(body)?.groupValues?.get(1)
+                    ?.takeIf { it.startsWith("R.string.") }
             }
             .toSet()
         assertTrue("could not read the root rows", rootRows.size > 20)
@@ -144,6 +147,14 @@ class SettingsSearchCoverageTest {
         "player_subtitles_connected_user", "player_subtitles_delete_action", "player_subtitles_sign_in",
         "player_subtitles_sign_out", "settings_open_subtitles_advanced", "settings_open_subtitles_setup_local",
         "settings_open_subtitles_setup_remote",
+        // Stage (P10–P12): a full page's own heading — the screen, which has its own entry — and the
+        // titles and options of its popups and confirmations.
+        "settings_epg_sources_title", "settings_home_screen", "settings_title_date_time_weather",
+        "settings_delete_subtitles", "settings_remote_shortcuts_capture_title", "settings_epg_sources_fill_playlist",
+        "settings_sources_resync_title_full", "settings_sources_resync_now_full", "settings_sources_resync_remove_full",
+        "settings_sources_test_title", "player_subtitles_sign_in_title", "settings_open_subtitles_setup_title",
+        "settings_panel_width_dialog_title", "settings_panel_width_disable_preview_title",
+        "settings_record_watching_warning_title",
     )
 
     @Test
@@ -156,7 +167,10 @@ class SettingsSearchCoverageTest {
                 Regex("""internal val [A-Z_]+_SEARCH_ROWS: List<Int> =\s*listOf\(([^)]*)\)""")
                     .findAll(f.readText()).joinToString(" ") { it.groupValues[1] }
             }
-        val index = searchBlock + source.substring(helperFrom, source.indexOf("\n)\n", helperFrom)) + screenRows
+        // The file may be checked out with CRLF endings, so the closing `)` line is matched either way.
+        val helperTo = Regex("""\n\)\r?\n""").find(source, helperFrom)?.range?.first ?: -1
+        assertTrue("could not find the end of subScreenSearchEntries", helperTo > helperFrom)
+        val index = searchBlock + source.substring(helperFrom, helperTo) + screenRows
         fun normalize(res: String) = res.removePrefix("settings_").removePrefix("quick_")
         val present = Regex("""R\.string\.([a-z_0-9]+)""").findAll(index).map { normalize(it.groupValues[1]) }.toSet()
         // Backup and Local sync are More pages, not Settings (see notSearchable).

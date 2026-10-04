@@ -7,11 +7,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import tv.own.owntv.core.database.entity.RecordingEntity
@@ -19,7 +17,6 @@ import tv.own.owntv.core.model.MediaType
 import tv.own.owntv.core.model.RecordingStatus
 import tv.own.owntv.core.player.ExternalPlayerLauncher
 import tv.own.owntv.core.recording.RecordingManager
-import tv.own.owntv.core.recording.RecordingStorageInfo
 import tv.own.owntv.core.settings.SettingsRepository
 import tv.own.owntv.player.OwnTVPlayer
 
@@ -42,18 +39,6 @@ class RecordingsViewModel(
     val rows: StateFlow<List<RecordingEntity>> = settings.activeProfileId
         .flatMapLatest { pid -> if (pid < 0) flowOf(emptyList()) else recordings.observe(pid) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    /**
-     * Free and total space on the volume recordings are written to, plus the floor they stop at.
-     *
-     * Keyed on the download **root** as well as on the list — the same defect the Downloads screen
-     * had: keyed on the list alone, pointing the folder at another volume left the bar showing the
-     * old one until the app was restarted, and with nothing recorded yet the list never changes.
-     */
-    val storage: StateFlow<RecordingStorageInfo?> =
-        combine(rows, settings.downloadRoot) { _, _ -> Unit }
-            .mapLatest { recordings.storageInfo() }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /**
      * False when Android will not let the app set exact alarms, so the screen can say that a

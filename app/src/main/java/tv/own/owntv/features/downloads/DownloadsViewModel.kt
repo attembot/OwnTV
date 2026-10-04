@@ -42,7 +42,11 @@ class DownloadsViewModel(
     private val externalPlayerLauncher: tv.own.owntv.core.player.ExternalPlayerLauncher,
     private val subtitleController: tv.own.owntv.core.subtitles.SubtitleController,
     private val metadata: tv.own.owntv.core.metadata.MetadataRepository,
+    tracker: tv.own.owntv.core.download.DownloadActivityTracker,
 ) : ViewModel() {
+
+    /** The one transfer running now, with its speed (G3), for the focused row's "12.4 MB/s · 3 min left". */
+    val active: StateFlow<tv.own.owntv.core.download.DownloadActivityTracker.ActiveDownload?> = tracker.active
 
     /**
      * The profile's downloads, minus rows whose movie/series the user has hidden — a hidden title
@@ -87,7 +91,38 @@ class DownloadsViewModel(
         else -> false
     }
 
-    /** Free/total space on the download volume — recomputed whenever the download list changes. */
+    /**
+     * What a row shows besides the stored title: the show's name for an episode, 16:9 art, and the
+     * parts of "2026 · 1 h 38 min · 1080p" / "Season 1 · Episode 3". Looked up once per download —
+     * the list re-emits on every progress tick — and absent for a title its playlist no longer has.
+     */
+    val details: StateFlow<Map<Long, DownloadDetails>> = run {
+        val cache = HashMap<Long, DownloadDetails?>()
+        downloads.mapLatest { list ->
+            list.mapNotNull { d ->
+                val found = if (cache.containsKey(d.id)) cache[d.id] else lookUp(d).also { cache[d.id] = it }
+                found?.let { d.id to it }
+            }.toMap()
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+    }
+
+    private suspend fun lookUp(d: DownloadEntity): DownloadDetails? = when (d.mediaType) {
+        MediaType.MOVIE -> movieDao.getById(d.itemId)?.let { m ->
+            DownloadDetails(
+                title = m.name, artUrl = m.backdropUrl ?: m.posterUrl, year = m.year ?: m.parsedYear, runtimeSecs = m.durationSecs,
+                quality = tv.own.owntv.features.shell.components.cinematicQualityBadges(m.qualityRank, null).firstOrNull(),
+            )
+        }
+        MediaType.EPISODE -> seriesDao.getEpisodeById(d.itemId)?.let { ep ->
+            val show = seriesDao.getSeriesById(ep.seriesId)
+            DownloadDetails(
+                title = show?.name ?: d.title, artUrl = show?.backdropUrl ?: show?.posterUrl ?: d.posterUrl,
+                runtimeSecs = ep.durationSecs, season = ep.seasonNumber, episode = ep.episodeNumber,
+            )
+        }
+        else -> null
+    }
+
     /**
      * Free and total space on the volume the downloads are written to.
      *
@@ -196,3 +231,14 @@ class DownloadsViewModel(
     fun resume(download: DownloadEntity) = downloadManager.resume(download)
     fun delete(download: DownloadEntity) = downloadManager.delete(download)
 }
+
+/** See [DownloadsViewModel.details]. */
+data class DownloadDetails(
+    val title: String,
+    val artUrl: String?,
+    val year: Int? = null,
+    val runtimeSecs: Int? = null,
+    val quality: String? = null,
+    val season: Int? = null,
+    val episode: Int? = null,
+)

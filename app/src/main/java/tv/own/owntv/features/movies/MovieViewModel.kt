@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import tv.own.owntv.core.customize.CustomizationStore
@@ -71,6 +72,7 @@ import tv.own.owntv.core.settings.SettingsRepository
 import tv.own.owntv.player.OwnTVPlayer
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.core.live.LiveKey
+import tv.own.owntv.features.search.positionOf
 import tv.own.owntv.core.live.parseLiveKey
 import tv.own.owntv.core.live.serialize
 import tv.own.owntv.core.settings.SourceOverrides
@@ -99,6 +101,11 @@ class MovieViewModel(
     private val subtitleController: tv.own.owntv.core.subtitles.SubtitleController,
 ) : ViewModel() {
 
+    /** The categories' search text, held here so it survives the player (see LiveViewModel). */
+    private val _categoryQuery = kotlinx.coroutines.flow.MutableStateFlow("")
+    val categoryQuery: kotlinx.coroutines.flow.StateFlow<String> = _categoryQuery
+    fun setCategoryQuery(query: String) { _categoryQuery.value = query }
+
     data class MovieMoveState(val items: List<MovieEntity>, val activeIndex: Int, val contextKey: String)
     private val _moveState = MutableStateFlow<MovieMoveState?>(null)
     val moveState: StateFlow<MovieMoveState?> = _moveState.asStateFlow()
@@ -123,10 +130,6 @@ class MovieViewModel(
         }
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.Eagerly, Ctx(-1L, emptyList(), emptyMap()))
-
-    val providerNames: StateFlow<Map<Long, String>> = ctx
-        .map { c -> c.sourceNames.takeIf { it.size > 1 } ?: emptyMap() }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
     private val folderContextKeys: StateFlow<Map<Long, String>> = ctx
         .flatMapLatest { c ->
@@ -237,18 +240,8 @@ class MovieViewModel(
     val sortMode: StateFlow<SettingsRepository.SortMode> = settings.sortMovies
         .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.SortMode.ALPHA)
 
-    fun toggleSort() {
-        viewModelScope.launch {
-            // Cycle Provider → A–Z → Rating → Provider.
-            settings.setSortMovies(
-                when (sortMode.value) {
-                    SettingsRepository.SortMode.PLAYLIST -> SettingsRepository.SortMode.ALPHA
-                    SettingsRepository.SortMode.ALPHA -> SettingsRepository.SortMode.RATING
-                    SettingsRepository.SortMode.RATING -> SettingsRepository.SortMode.DATE_ADDED
-                    SettingsRepository.SortMode.DATE_ADDED -> SettingsRepository.SortMode.PLAYLIST
-                },
-            )
-        }
+    fun setSort(mode: SettingsRepository.SortMode) {
+        viewModelScope.launch { settings.setSortMovies(mode) }
     }
 
     val viewMode: StateFlow<SettingsRepository.VodViewMode> = settings.vodViewMode
@@ -288,15 +281,26 @@ class MovieViewModel(
     private val _metaRefreshTick = MutableStateFlow(0L)
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    /** TMDB details already resolved this session, by title id: shown without the focus debounce. */
+    private val resolvedMeta = java.util.concurrent.ConcurrentHashMap<Long, tv.own.owntv.core.database.entity.MetadataCacheEntity>()
+
     val selectedMovieMeta: StateFlow<MovieMeta?> = combine(_selectedMovie, _metaRefreshTick) { m, tick -> m to tick }
         .distinctUntilChanged { a, b -> a.first?.id == b.first?.id && a.second == b.second }
         // 700 ms, not 350: sustained D-pad scrolling was firing a lookup per card it passed over, which
         // made browsing the single biggest source of metadata traffic. At 700 ms a scroll produces one
         // lookup when the user actually settles on something.
-        .debounce(tv.own.owntv.core.metadata.MetadataRepository.FOCUS_DEBOUNCE_MS)
-        .mapLatest { (m, _) ->
-            if (m == null) null
-            else MovieMeta(m.id, runCatching { metadata.resolveMovie(m) }.getOrNull())
+        // A title resolved once this session shows at once; only an unseen one waits the focus debounce
+        // (FOCUS_DEBOUNCE_MS: scrolling past cards must cost nothing), then reads the DB cache or TMDB.
+        .transformLatest { (m, _) ->
+            if (m == null) { emit(null); return@transformLatest }
+            resolvedMeta[m.id]?.let { emit(MovieMeta(m.id, it)); return@transformLatest }
+            delay(tv.own.owntv.core.metadata.MetadataRepository.FOCUS_DEBOUNCE_MS)
+            val cache = runCatching { metadata.resolveMovie(m) }.getOrNull()
+            if (cache != null) {
+                if (resolvedMeta.size > 500) resolvedMeta.clear()
+                resolvedMeta[m.id] = cache
+            }
+            emit(MovieMeta(m.id, cache))
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
@@ -402,6 +406,7 @@ class MovieViewModel(
                             ?.let(categoriesById::get)
                             ?.sourceId
                             ?.let(multiSourceNames::get),
+                        sourceId = e.categoryId?.let(categoriesById::get)?.sourceId,
                     )
                 }
             }
@@ -444,6 +449,30 @@ class MovieViewModel(
     val count: StateFlow<Int> = combine(_selected, ctx, hiddenCategoryIds) { key, c, hidden -> Triple(key, c, hidden) }
         .flatMapLatest { (key, c, hidden) -> countFlow(key, c, hidden).throttleLatest() } // C2: cap live COUNT re-runs during bulk sync
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    /** The count beside every category (Stage sheet / column): one grouped query for the folders. */
+    val railCounts: StateFlow<Map<LiveKey, Int>> = combine(ctx, hiddenCategoryIds, railItems) { c, hidden, items -> Triple(c, hidden, items) }
+        .flatMapLatest { (c, hidden, items) ->
+            val single = items.filter { it.key !is LiveKey.Folder }.map { item -> countFlow(item.key, c, hidden).map { mapOf(item.key to it) } }
+            val folders = movieDao.observeCountsByCategory(c.sourceIds.ifEmpty { listOf(-1L) })
+                .map { rows -> rows.associate { LiveKey.Folder(it.categoryId) as LiveKey to it.itemCount } }
+            combine(single + folders) { parts -> parts.fold(emptyMap<LiveKey, Int>()) { acc, m -> acc + m } }.throttleLatest()
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    /** Which playlist a title or category comes from (GOLD / JR), only while more than one is shown. */
+    val playlistMarks: StateFlow<Map<Long, tv.own.owntv.ui.stage.PlaylistMark>> = activeProfileSources(settings, sourceDao)
+        .map { aps ->
+            if (aps.movieSourceIds.size < 2) emptyMap()
+            else aps.sources.withIndex().associate { (i, s) -> s.id to tv.own.owntv.ui.stage.PlaylistMark.of(s.name, i) }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    /** Whether "Remove from history" has anything to remove for [movie]. */
+    suspend fun isInHistory(movie: MovieEntity): Boolean {
+        val pid = currentProfileId() ?: return false
+        return historyDao.exists(pid, MediaType.MOVIE, movie.id)
+    }
 
     val favoriteIds: StateFlow<Set<Long>> = ctx
         .flatMapLatest { favoriteDao.observeFavoriteIds(it.profileId, MediaType.MOVIE) }
@@ -509,6 +538,32 @@ class MovieViewModel(
     fun setSearchQuery(query: String) { _search.value = query }
     fun onMovieFocused(movie: MovieEntity) { _selectedMovie.value = movie }
 
+    /** Search's "Go to movie": the titles scroll to [reveal] and focus it, then call [revealDone]. */
+    private val _reveal = MutableStateFlow<tv.own.owntv.features.search.Reveal?>(null)
+    val reveal: StateFlow<tv.own.owntv.features.search.Reveal?> = _reveal.asStateFlow()
+
+    /** Open [movie] where it lives: its own category, or All movies when that category is not in the
+     *  rail or the movie is not in it. It becomes the selected title (Cinematic's top shows it). */
+    fun revealMovie(movie: MovieEntity) {
+        _search.value = ""
+        _selectedMovie.value = movie
+        viewModelScope.launch {
+            val c = ctx.first { it.profileId >= 0 }
+            val sort = settings.sortMovies.first()
+            val folder = movie.categoryId?.let { LiveKey.Folder(it) }
+            val inRail = folder != null &&
+                kotlinx.coroutines.withTimeoutOrNull(2_000) { railItems.first { list -> list.any { it.key == folder } } } != null
+            for (key in listOfNotNull(folder.takeIf { inRail }, LiveKey.All)) {
+                val position = pagingSource(key, c, "", sort).positionOf(movie.id, { it.id }) ?: continue
+                if (lockedKey == null) select(key)
+                _reveal.value = tv.own.owntv.features.search.Reveal(key, movie.id, position)
+                return@launch
+            }
+        }
+    }
+
+    fun revealDone() { _reveal.value = null }
+
     /**
      * Manual "Refetch TMDB details" (plan §11.2 U5a): clear this movie's cached match/details (incl. a 7-day
      * negative cache) and re-trigger [resolveMovie] for the focused movie via the meta-refresh tick.
@@ -516,6 +571,7 @@ class MovieViewModel(
     fun refetchMovieMeta(movie: MovieEntity) {
         viewModelScope.launch {
             runCatching { metadata.clearMovie(movie) }
+            resolvedMeta.remove(movie.id)
             _cachedPosters.value = _cachedPosters.value - movie.id
             _metaRefreshTick.value++
         }
@@ -537,6 +593,7 @@ class MovieViewModel(
     fun setMovieTmdbName(movie: MovieEntity, title: String, year: Int?) {
         viewModelScope.launch {
             runCatching { metadata.setMovieOverride(movie, title, year) }
+            resolvedMeta.remove(movie.id)
             _metaRefreshTick.value++
         }
     }
@@ -545,6 +602,7 @@ class MovieViewModel(
     fun clearMovieTmdbName(movie: MovieEntity) {
         viewModelScope.launch {
             runCatching { metadata.clearMovieOverride(movie) }
+            resolvedMeta.remove(movie.id)
             _metaRefreshTick.value++
         }
     }

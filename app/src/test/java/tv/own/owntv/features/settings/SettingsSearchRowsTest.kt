@@ -27,8 +27,10 @@ class SettingsSearchRowsTest {
         return Regex("""R\.string\.([a-z_0-9]+)""").findAll(body!!).map { it.groupValues[1] }.toSet()
     }
 
+    // `title = …` on a row, or a Stage row's `val useTitle = …`; for
+    // `if (testing) R.string.settings_testing else R.string.x` the row is the `else` string.
     private fun titles(source: String, notRows: Set<String>): Set<String> =
-        Regex("""title = stringResource\(R\.string\.([a-z_0-9]+)""").findAll(source)
+        Regex("""(?:title|Title) = stringResource\((?:if \(.*?\) R\.string\.[a-z_0-9]+ else )?R\.string\.([a-z_0-9]+)""").findAll(source)
             .map { it.groupValues[1] }.filterNot { it in notRows }.toSet()
 
     private fun check(file: String, list: String, notRows: Set<String> = emptySet()) {
@@ -40,21 +42,25 @@ class SettingsSearchRowsTest {
 
     @Test
     fun `recording rows are searchable`() =
-        check("RecordingSettingsScreen.kt", "RECORDING_SEARCH_ROWS", notRows = setOf("recording_settings_group"))
+        check(
+            "RecordingSettingsScreen.kt", "RECORDING_SEARCH_ROWS",
+            // The group's heading and the "record while watching" warning dialog are not rows.
+            notRows = setOf("recording_settings_group", "settings_record_watching_warning_title"),
+        )
+
+    // A Stage full page's own title is the screen itself, which has a search entry of its own.
+    @Test
+    fun `proxy rows are searchable`() = check("NetworkSettingsScreen.kt", "PROXY_SEARCH_ROWS", notRows = setOf("common_proxy"))
 
     @Test
-    fun `proxy rows are searchable`() = check("NetworkSettingsScreen.kt", "PROXY_SEARCH_ROWS")
-
-    @Test
-    fun `dns rows are searchable`() = check("DnsSettingsScreen.kt", "DNS_SEARCH_ROWS")
+    fun `dns rows are searchable`() = check("DnsSettingsScreen.kt", "DNS_SEARCH_ROWS", notRows = setOf("settings_dns", "common_save"))
 
     @Test
     fun `subtitle appearance rows are searchable`() {
         val source = read("VideoPlayerSettingsScreen.kt")
-        // The popup's five style rows, as drawn by `Row2(... title = ...)` after the Size row.
-        val popup = source.substringAfter("title = stringResource(R.string.settings_subtitle_size),")
-            .substringBefore("SubDialog.TRANSPARENCY)")
-        val drawn = titles(popup, emptySet()) + "settings_subtitle_size"
+        // The Stage page's five style rows, each drawn as `SubStyleRow(stringResource(R.string.…), …)`.
+        val drawn = Regex("""SubStyleRow\(stringResource\(R\.string\.([a-z_0-9]+)\)""").findAll(source)
+            .map { it.groupValues[1] }.toSet()
         assertEquals(5, drawn.size)
         assertEquals(emptySet<String>(), drawn - listed(source, "SUBTITLE_APPEARANCE_SEARCH_ROWS"))
     }

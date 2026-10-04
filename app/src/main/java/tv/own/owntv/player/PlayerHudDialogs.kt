@@ -3,22 +3,12 @@ package tv.own.owntv.player
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -29,28 +19,29 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import kotlinx.coroutines.delay
 import org.koin.compose.koinInject
 import tv.own.owntv.R
-import tv.own.owntv.ui.components.FocusableSurface
-import tv.own.owntv.ui.components.OwnTVButton
+import tv.own.owntv.ui.theme.mpx
+import tv.own.owntv.ui.theme.stageText
+import tv.own.owntv.ui.theme.stageAccent
+import tv.own.owntv.ui.theme.StageColors
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.dialogPanel
 import tv.own.owntv.ui.components.displayLabel
 import tv.own.owntv.ui.components.modalScrim
-import tv.own.owntv.ui.components.trapAllFocusExit
 import tv.own.owntv.ui.format.localizedDecimal
-import tv.own.owntv.core.theme.GlassSurface
-import tv.own.owntv.ui.theme.OwnTVTheme
 
 /**
  * Every dialog the HUD opens — tracks, speed, zoom, volume and subtitle timing — plus the scaffold and
@@ -62,6 +53,10 @@ private val SPEEDS = listOf(0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0)
 /** A/V-sync nudge step, kept identical to the Settings stepper so a value found in the player can be
  *  reproduced there exactly. */
 private const val AV_SYNC_STEP_MS = 25
+
+/** Subtitle timing: 0.1 s per ◀ ▶, up to a minute either way. */
+private const val SUB_DELAY_STEP_MS = 100
+private const val SUB_DELAY_MAX_MS = 60_000
 
 @Composable
 internal fun TrackDialog(
@@ -82,10 +77,11 @@ internal fun TrackDialog(
     // Non-null on the Subtitles dialog for a movie/episode → "Select local subtitle file" (plan §7).
     onSelectLocalSubtitle: (() -> Unit)? = null,
     // Non-null on the Subtitles dialog when timing adjustment applies to the active track (plan §8) →
-    // an "ADJUST" section with a "Subtitle timing" row.
-    onSubtitleTiming: (() -> Unit)? = null,
+    // an "ADJUST" section with a "Subtitle timing" row: ◀ ▶ nudge it, OK sets it back to zero.
+    subDelayMs: Int = 0,
+    onAdjustSubDelay: ((Int) -> Unit)? = null,
+    onResetSubDelay: () -> Unit = {},
 ) {
-    val colors = OwnTVTheme.colors
     val focus = remember { FocusRequester() }
     BackHandler { onDismiss() }
     // Open with focus on the CURRENTLY-selected track (so re-opening to change it lands on the right row),
@@ -113,7 +109,7 @@ internal fun TrackDialog(
     }
     DialogScaffold(title = title, onDismiss = onDismiss, state = listState) {
         if (tracks.isEmpty() && onOff == null) {
-            item { Text(stringResource(R.string.player_no_tracks), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, modifier = Modifier.padding(16.dp)) }
+            item { Text(stringResource(R.string.player_no_tracks), style = stageText(18, 400), color = StageColors.Muted, modifier = Modifier.padding(vertical = 10.mpx)) }
         }
         if (onOff != null) {
             item {
@@ -136,64 +132,51 @@ internal fun TrackDialog(
         }
         // ADD SUBTITLES (subtitles dialog, movie/episode only) — OpenSubtitles search + local file (§4/§7).
         if (onSearchSubtitles != null || onSelectLocalSubtitle != null) {
-            item {
-                Text(
-                    stringResource(R.string.player_add_subtitles),
-                    style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(start = 16.dp, top = 10.dp, bottom = 2.dp),
-                )
-            }
+            item { tv.own.owntv.ui.stage.StagePopupLabel(stringResource(R.string.player_add_subtitles), Modifier.padding(top = 12.mpx)) }
             if (onSearchSubtitles != null) {
-                item { OptionRow(label = stringResource(R.string.player_search_subtitles), selected = false, onClick = onSearchSubtitles) }
+                item { ActionRow(stringResource(R.string.player_search_subtitles), OwnTVIcon.SEARCH, onSearchSubtitles) }
             }
             if (onSelectLocalSubtitle != null) {
-                item { OptionRow(label = stringResource(R.string.player_select_local_subtitle), selected = false, onClick = onSelectLocalSubtitle) }
+                item { ActionRow(stringResource(R.string.player_select_local_subtitle), OwnTVIcon.FOLDER, onSelectLocalSubtitle) }
             }
         }
         // ADJUST (subtitles dialog): timing panel for the active subtitle (plan §8).
-        if (onSubtitleTiming != null) {
+        if (onAdjustSubDelay != null) {
+            item { tv.own.owntv.ui.stage.StagePopupLabel(stringResource(R.string.player_adjust), Modifier.padding(top = 12.mpx)) }
             item {
-                Text(
-                    stringResource(R.string.player_adjust),
-                    style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(start = 16.dp, top = 10.dp, bottom = 2.dp),
+                StepperRow(
+                    title = stringResource(R.string.player_subtitle_timing),
+                    value = formatSubDelay(subDelayMs),
+                    step = SUB_DELAY_STEP_MS,
+                    canStep = { it in -SUB_DELAY_MAX_MS..SUB_DELAY_MAX_MS },
+                    current = subDelayMs,
+                    onStep = onAdjustSubDelay,
+                    onClick = onResetSubDelay,
                 )
             }
-            item { OptionRow(label = stringResource(R.string.player_subtitle_timing), selected = false, onClick = onSubtitleTiming) }
         }
         // A/V-sync nudge (audio dialog, VOD only) — fixes a badly-muxed file where audio leads/lags the video.
         if (onAdjustAudioDelay != null) {
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Text(stringResource(R.string.player_av_sync), style = MaterialTheme.typography.titleSmall, color = colors.onSurface, modifier = Modifier.weight(1f))
-                    // 25 ms steps, matching Settings: what this corrects is the display's own picture-processing
-                    // delay, which lands in the tens of milliseconds — 50 ms could bracket it but not hit it.
-                    StepButton(stringResource(R.string.common_minus), enabled = (audioDelayMs ?: 0) > -5_000) { onAdjustAudioDelay(-AV_SYNC_STEP_MS) }
-                    Text(
-                        formatDelay(audioDelayMs ?: 0),
-                        style = MaterialTheme.typography.bodyMedium, color = colors.primary,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        modifier = Modifier.widthIn(min = 78.dp, max = 140.dp),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    StepButton(stringResource(R.string.common_plus), enabled = (audioDelayMs ?: 0) < 5_000) { onAdjustAudioDelay(AV_SYNC_STEP_MS) }
-                }
+                // 25 ms steps, matching Settings: what this corrects is the display's own picture-processing
+                // delay, which lands in the tens of milliseconds — 50 ms could bracket it but not hit it.
+                StepperRow(
+                    title = stringResource(R.string.player_av_sync),
+                    value = formatDelay(audioDelayMs ?: 0),
+                    step = AV_SYNC_STEP_MS,
+                    canStep = { it in -5_000..5_000 },
+                    current = audioDelayMs ?: 0,
+                    onStep = onAdjustAudioDelay,
+                )
             }
             // Lip-sync error belongs to the stream, not to the user: this keeps the offset for THIS
             // film or channel, so it comes back next time without following you onto anything else.
             if (onToggleRememberAudioDelay != null) {
                 item {
-                    OptionRow(
-                        label = stringResource(R.string.player_av_sync_remember),
-                        selected = audioDelayRemembered,
+                    tv.own.owntv.ui.stage.StagePopupOption(
+                        title = stringResource(R.string.player_av_sync_remember),
                         onClick = onToggleRememberAudioDelay,
+                        leading = { f -> tv.own.owntv.ui.stage.StagePopupCheck(audioDelayRemembered, f) },
                     )
                 }
             }
@@ -313,9 +296,9 @@ private fun ScreenOffRow(screenOff: ScreenOff = koinInject()) {
     val context = LocalContext.current
     var allowed by remember { mutableStateOf(screenOff.isAllowed()) }
     val ask = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { allowed = screenOff.isAllowed() }
-    OptionRow(
-        label = stringResource(R.string.player_sleep_timer_screen_off),
-        selected = allowed,
+    tv.own.owntv.ui.stage.StagePopupOption(
+        title = stringResource(R.string.player_sleep_timer_screen_off),
+        leading = { f -> tv.own.owntv.ui.stage.StagePopupCheck(allowed, f) },
         onClick = {
             if (allowed) {
                 screenOff.revoke()
@@ -367,7 +350,6 @@ internal fun QualityDialog(heights: List<Int>, current: Int?, onSelect: (Int?) -
 
 @Composable
 internal fun VolumeDialog(player: PlaybackEngine, onDismiss: () -> Unit) {
-    val colors = OwnTVTheme.colors
     val volume by player.volume.collectAsStateWithLifecycle()
     // Mute the channel and "–" disables; without the shared guard focus died there (see
     // [tv.own.owntv.ui.components.rememberStepperFocus]).
@@ -376,73 +358,17 @@ internal fun VolumeDialog(player: PlaybackEngine, onDismiss: () -> Unit) {
         minusEnabled = volume > 0,
     )
     // Real dialog window for the same focus isolation as DialogScaffold (see there).
-    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
-        // Slightly stronger than the default wash: this one sits over moving video.
-        Box(
-            Modifier.fillMaxSize().modalScrim(strength = 1.2f).trapAllFocusExit().focusGroup(),
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(Modifier.dialogPanel(padding = 28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(stringResource(R.string.player_volume), style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
-                Spacer(Modifier.height(20.dp))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                    StepButton(stringResource(R.string.common_minus), enabled = volume > 0, modifier = Modifier.focusRequester(steppers.minus)) { player.adjustVolumeByUser(-5) }
-                    Text(stringResource(R.string.player_percent, volume), style = MaterialTheme.typography.headlineLarge, color = colors.accent, modifier = Modifier.width(120.dp), textAlign = TextAlign.Center)
-                    StepButton(stringResource(R.string.common_plus), enabled = volume < 150, modifier = Modifier.focusRequester(steppers.plus)) { player.adjustVolumeByUser(5) }
-                }
-                Spacer(Modifier.height(22.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OwnTVButton(stringResource(if (volume == 0) R.string.player_unmute else R.string.player_mute), onClick = { player.toggleMute() }, style = tv.own.owntv.ui.components.OwnTVButtonStyle.SECONDARY)
-                    Spacer(Modifier.weight(1f))
-                    OwnTVButton(stringResource(R.string.common_done), onClick = onDismiss)
-                }
-            }
-        }
-    }
-}
-
-/**
- * Subtitle-timing panel (subtitle plan §8.2/§8.3): 100 ms and 500 ms steps + Reset, applied live while
- * the video keeps playing behind (the backdrop is NOT dimmed so speech and text can be compared).
- * Positive = subtitles shown later; the direction is always spelled out. Back keeps the value.
- */
-@Composable
-internal fun SubtitleTimingDialog(player: PlaybackEngine, onDismiss: () -> Unit) {
-    val colors = OwnTVTheme.colors
-    val delay by player.subDelayMs.collectAsStateWithLifecycle()
-    val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { requestFocusRetrying(focus) }
-    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
-        tv.own.owntv.ui.theme.PopupFontTheme {
-            // No scrim by design — the video stays undimmed behind so speech and subtitles can be
-            // compared while the offset is nudged. Only the focus trap is added.
-            Box(
-                Modifier.fillMaxSize().padding(bottom = 56.dp).trapAllFocusExit().focusGroup(),
-                contentAlignment = Alignment.BottomCenter,
-            ) {
-                Column(Modifier.dialogPanel(width = 560.dp, padding = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(stringResource(R.string.player_subtitle_timing), style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
-                    Spacer(Modifier.height(10.dp))
-                    Text(formatSubDelay(delay), style = MaterialTheme.typography.headlineLarge, color = colors.accent)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        when {
-                            delay > 0 -> stringResource(R.string.player_subtitles_later)
-                            delay < 0 -> stringResource(R.string.player_subtitles_earlier)
-                            else -> stringResource(R.string.player_no_offset)
-                        },
-                        style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(18.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        OwnTVButton(stringResource(R.string.player_subtitle_delay_negative, 0.5), onClick = { player.adjustSubtitleDelay(-500) }, style = tv.own.owntv.ui.components.OwnTVButtonStyle.SECONDARY)
-                        OwnTVButton(stringResource(R.string.player_subtitle_delay_negative, 0.1), onClick = { player.adjustSubtitleDelay(-100) }, style = tv.own.owntv.ui.components.OwnTVButtonStyle.SECONDARY)
-                        OwnTVButton(stringResource(R.string.common_reset), onClick = { player.resetSubtitleDelay() }, modifier = Modifier.focusRequester(focus))
-                        OwnTVButton(stringResource(R.string.player_subtitle_delay_positive, 0.1), onClick = { player.adjustSubtitleDelay(100) }, style = tv.own.owntv.ui.components.OwnTVButtonStyle.SECONDARY)
-                        OwnTVButton(stringResource(R.string.player_subtitle_delay_positive, 0.5), onClick = { player.adjustSubtitleDelay(500) }, style = tv.own.owntv.ui.components.OwnTVButtonStyle.SECONDARY)
-                    }
-                }
-            }
+    tv.own.owntv.ui.stage.StagePopup(
+        onDismiss = onDismiss, title = stringResource(R.string.player_volume), eyebrow = null, width = 640.mpx,
+        buttons = {
+            tv.own.owntv.ui.stage.StageButton(stringResource(if (volume == 0) R.string.player_unmute else R.string.player_mute), onClick = { player.toggleMute() }, height = 56.mpx, textSize = 19)
+            tv.own.owntv.ui.stage.StageButton(stringResource(R.string.common_done), onClick = onDismiss, height = 56.mpx, textSize = 19, tinted = true)
+        },
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.mpx, Alignment.CenterHorizontally)) {
+            StepButton(stringResource(R.string.common_minus), enabled = volume > 0, modifier = Modifier.focusRequester(steppers.minus)) { player.adjustVolumeByUser(-5) }
+            Text(stringResource(R.string.player_percent, volume), style = stageText(44, 800), color = stageAccent.accent, modifier = Modifier.width(160.mpx), textAlign = TextAlign.Center)
+            StepButton(stringResource(R.string.common_plus), enabled = volume < 150, modifier = Modifier.focusRequester(steppers.plus)) { player.adjustVolumeByUser(5) }
         }
     }
 }
@@ -454,13 +380,41 @@ private fun formatSubDelay(ms: Int): String = when {
     else -> stringResource(R.string.player_subtitle_delay_negative, -ms / 1000.0)
 }
 
+/**
+ * The settings-row stepper in a popup: the row holds focus, ◀ ▶ move [current] by [step] while
+ * [canStep] allows the result, and the value sits on the right as "− 0 ms +".
+ */
 @Composable
-private fun StepButton(label: String, enabled: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    FocusableSurface(onClick = onClick, enabled = enabled, modifier = modifier.size(64.dp), shape = RoundedCornerShape(18.dp), contentAlignment = Alignment.Center, surface = GlassSurface.DIALOGS) { _ ->
-        Text(label, style = MaterialTheme.typography.headlineMedium, color = if (enabled) OwnTVTheme.colors.onSurface else OwnTVTheme.colors.outline)
-    }
+private fun StepperRow(title: String, value: String, step: Int, canStep: (Int) -> Boolean, current: Int, onStep: (Int) -> Unit, onClick: () -> Unit = {}) {
+    tv.own.owntv.ui.stage.StagePopupOption(
+        title = title,
+        onClick = onClick,
+        modifier = Modifier.onPreviewKeyEvent { e ->
+            val delta = when (e.key) {
+                Key.DirectionLeft -> -step
+                Key.DirectionRight -> step
+                else -> return@onPreviewKeyEvent false
+            }
+            if (e.type == KeyEventType.KeyDown && canStep(current + delta)) onStep(delta)
+            true
+        },
+        trailing = { tv.own.owntv.ui.stage.StageStepper(value) },
+    )
 }
 
+/** A round − / + on the volume popup: a Stage button, dimmed while it can go no further. */
+@Composable
+private fun StepButton(label: String, enabled: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    tv.own.owntv.ui.stage.StageButton(label, onClick = { if (enabled) onClick() }, round = true, height = 72.mpx, textSize = 30, modifier = modifier.alpha(if (enabled) 1f else 0.45f))
+}
+
+/**
+ * The player's pick-one popups (tracks, speed, zoom, quality, sleep timer) as Stage popups: the title,
+ * then `.opt` rows. A REAL dialog window, not an in-place overlay: it owns the D-pad focus scope, so
+ * nothing in the HUD behind it (play button, catch-all focusable, stream-info chips) can compete for or
+ * steal focus — which is what intermittently locked the subtitle/audio pickers out of focus on
+ * codec-heavy (HDR/DTS) streams. Back is handled by the window itself via onDismissRequest.
+ */
 @Composable
 private fun DialogScaffold(
     title: String,
@@ -468,46 +422,22 @@ private fun DialogScaffold(
     state: androidx.compose.foundation.lazy.LazyListState = androidx.compose.foundation.lazy.rememberLazyListState(),
     content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
 ) {
-    val colors = OwnTVTheme.colors
-    // A REAL dialog window, not an in-place overlay: it owns the D-pad focus scope, so nothing in the
-    // HUD behind it (play button, catch-all focusable, stream-info chips) can compete for or steal
-    // focus — which is what intermittently locked the subtitle/audio pickers out of focus on
-    // codec-heavy (HDR/DTS) streams. Back is handled by the window itself via onDismissRequest.
-    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
-        // Compact glass popup matching the storage picker: smaller font + narrow box.
-        tv.own.owntv.ui.theme.PopupFontTheme(fontScale = 0.72f) {
-            Box(
-                modifier = Modifier.fillMaxSize().modalScrim(strength = 1.2f).trapAllFocusExit().focusGroup(),
-                contentAlignment = Alignment.Center,
-            ) {
-                // Glass effect panel (same translucent chrome as the volume/timing dialogs) — the
-                // inner LazyColumn manages its own scroll, so scroll = false.
-                Column(modifier = Modifier.dialogPanel(width = 260.dp, corner = 16.dp, padding = 14.dp, scroll = false)) {
-                    Text(title, style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
-                    Spacer(Modifier.height(8.dp))
-                    // Cap to the screen (minus dialog chrome) so all rows stay reachable on small screens.
-                    val listMax = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp - 160.dp).coerceIn(140.dp, 240.dp)
-                    LazyColumn(state = state, modifier = Modifier.heightIn(max = listMax), verticalArrangement = Arrangement.spacedBy(4.dp), content = content)
-                }
-            }
-        }
+    tv.own.owntv.ui.stage.StagePopup(onDismiss = onDismiss, title = title, eyebrow = null, width = 640.mpx, scroll = false) {
+        LazyColumn(state = state, modifier = Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(4.mpx), content = content)
     }
 }
 
+/** `.opt` with a radio: one of a list, the current one ringed. */
 @Composable
 private fun OptionRow(label: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    val colors = OwnTVTheme.colors
-    FocusableSurface(
-        onClick = onClick, modifier = modifier.fillMaxWidth(), selected = selected, shape = RoundedCornerShape(12.dp),
-        selectedContainerColor = colors.primaryContainer, contentAlignment = Alignment.CenterStart,
-        surface = GlassSurface.DIALOGS,
-    ) { focused ->
-        Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(label, style = MaterialTheme.typography.bodyMedium, color = if (selected) colors.onPrimaryContainer else if (focused) colors.primary else colors.onSurface)
-            if (selected) {
-                Spacer(Modifier.weight(1f))
-                OwnTVIcon(OwnTVIcon.STAR, tint = colors.onPrimaryContainer, filled = true, modifier = Modifier.size(14.dp))
-            }
-        }
-    }
+    tv.own.owntv.ui.stage.StagePopupOption(
+        title = label, onClick = onClick, modifier = modifier, chosen = selected,
+        leading = { f -> tv.own.owntv.ui.stage.StagePopupRadio(selected, f) },
+    )
+}
+
+/** `.opt` that opens something (search, a file, the timing panel): its icon instead of a radio. */
+@Composable
+private fun ActionRow(label: String, icon: OwnTVIcon, onClick: () -> Unit) {
+    tv.own.owntv.ui.stage.StagePopupOption(title = label, onClick = onClick, leading = { tv.own.owntv.ui.stage.StagePopupIcon(icon) })
 }

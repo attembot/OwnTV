@@ -330,6 +330,33 @@ data class FrostSelection(
 /** Ambient blurred backdrop, or null when blur isn't active. See [BlurredBackdrop]. */
 val LocalBlurredBackdrop = compositionLocalOf<BlurredBackdrop?> { null }
 
+/** The resolved Glass & background setting (what sits behind every screen), provided by MainActivity. */
+val LocalBackground = compositionLocalOf { tv.own.owntv.core.theme.BackgroundConfig() }
+
+/**
+ * Draw the part of the blurred picture that lies behind [bounds] (root px), into this node's own
+ * coordinates, so a panel shows a frosted copy of exactly what is behind it. The node must already be
+ * clipped to its shape. Float translate/scale on purpose: see the Tier-2 note in [glass].
+ */
+fun DrawScope.drawBackdropSlice(blurred: BlurredBackdrop, selection: FrostSelection, bounds: Rect) {
+    val rootW = blurred.rootSizePx.width
+    val rootH = blurred.rootSizePx.height
+    val lower = selection.lower
+    if (rootW <= 0f || rootH <= 0f || bounds.width <= 0f || bounds.height <= 0f || lower.width <= 0) return
+    val sx = size.width / bounds.width
+    val sy = size.height / bounds.height
+    translate(-bounds.left * sx, -bounds.top * sy) {
+        scale(rootW / lower.width * sx, rootH / lower.height * sy, pivot = Offset.Zero) {
+            drawImage(lower, topLeft = Offset.Zero, alpha = 1f - selection.upperWeight)
+        }
+        selection.upper?.let { upper ->
+            scale(rootW / upper.width * sx, rootH / upper.height * sy, pivot = Offset.Zero) {
+                drawImage(upper, topLeft = Offset.Zero, alpha = selection.upperWeight)
+            }
+        }
+    }
+}
+
 /**
  * Render this surface as glass: (Tier 2) a frosted slice of the blurred backdrop aligned to this
  * panel's on-screen position, then a translucent fill + a specular top-edge highlight, clipped to
@@ -609,9 +636,9 @@ fun Modifier.glass(
  * Position holder deliberately outside Compose snapshot state. A scrolling frost surface only needs
  * a redraw when its root-space position changes; recomposition and cache rebuilding would be wasted.
  */
-private class GlassPositionState(var bounds: Rect = Rect.Zero)
+class GlassPositionState(var bounds: Rect = Rect.Zero)
 
-private data class GlassPositionElement(
+data class GlassPositionElement(
     val position: GlassPositionState,
 ) : ModifierNodeElement<GlassPositionNode>() {
     override fun create(): GlassPositionNode = GlassPositionNode(position)
@@ -625,7 +652,7 @@ private data class GlassPositionElement(
     }
 }
 
-private class GlassPositionNode(
+class GlassPositionNode(
     var position: GlassPositionState,
 ) : Modifier.Node(), GlobalPositionAwareModifierNode, DrawModifierNode {
     override fun onGloballyPositioned(coordinates: LayoutCoordinates) {

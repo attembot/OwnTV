@@ -47,4 +47,7 @@
     <style name="Theme.OwnTV.Starting.OliveCream">
         <item name="windowSplashScreenAnimatedIcon">@drawable/owntv_splash_static_olive_cream</item>
     </style>
+    <style name="Theme.OwnTV.Starting.Pixel">
+        <item name="windowSplashScreenAnimatedIcon">@drawable/owntv_splash_static_pixel</item>
+    </style>
 </resources>

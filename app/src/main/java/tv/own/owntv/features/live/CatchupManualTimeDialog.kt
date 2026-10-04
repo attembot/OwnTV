@@ -2,14 +2,10 @@ package tv.own.owntv.features.live
 
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -30,21 +26,13 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import tv.own.owntv.core.live.CatchupJumps
 import tv.own.owntv.R
-import tv.own.owntv.ui.components.FocusableSurface
-import tv.own.owntv.ui.components.OwnTVButton
-import tv.own.owntv.ui.components.OwnTVButtonStyle
-import tv.own.owntv.ui.components.dialogPanel
-import tv.own.owntv.ui.components.modalScrim
-import tv.own.owntv.ui.components.trapAllFocusExit
+import tv.own.owntv.ui.theme.mpx
+import androidx.compose.foundation.background
 import tv.own.owntv.ui.format.rememberBestDateFormatter
-import tv.own.owntv.core.theme.GlassSurface
 import tv.own.owntv.ui.theme.OwnTVTheme
 
 /**
@@ -101,66 +89,31 @@ internal fun CatchupManualTimeDialog(
 
     val dayFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { kotlinx.coroutines.delay(60); runCatching { dayFocus.requestFocus() } }
-    androidx.activity.compose.BackHandler { onDismiss() }
-
-    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
-        tv.own.owntv.ui.theme.PopupFontTheme(fontScale = 0.75f) {
-            Box(
-                Modifier.fillMaxSize().modalScrim().trapAllFocusExit().focusGroup(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(Modifier.dialogPanel(width = 440.dp, corner = 16.dp, padding = 18.dp, scroll = false)) {
-                    Text(
-                        stringResource(R.string.content_catchup_jump_exact),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = colors.onSurface,
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        stringResource(R.string.content_catchup_jump_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = colors.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(14.dp))
-                    Row(
-                        Modifier.fillMaxWidth().focusGroup(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Wheel(
-                            value = formatDay(CatchupJumps.instantOf(point, nowMs, zone)),
-                            onUp = { nudge(deltaDays = -1) },   // toward today
-                            onDown = { nudge(deltaDays = +1) }, // further back
-                            modifier = Modifier.weight(1.6f).focusRequester(dayFocus),
-                        )
-                        Wheel(
-                            value = two(point.hour),
-                            onUp = { nudge(deltaHours = +1) },
-                            onDown = { nudge(deltaHours = -1) },
-                            modifier = Modifier.weight(1f),
-                        )
-                        Text(":", style = MaterialTheme.typography.titleLarge, color = colors.onSurfaceVariant)
-                        Wheel(
-                            value = two(point.minute),
-                            onUp = { nudge(deltaMinutes = +1) },
-                            onDown = { nudge(deltaMinutes = -1) },
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                    Spacer(Modifier.height(16.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OwnTVButton(
-                            stringResource(R.string.content_play),
-                            onClick = { onPick(CatchupJumps.offsetSecOf(point, nowMs, zone)) },
-                        )
-                        OwnTVButton(
-                            stringResource(R.string.common_cancel),
-                            onClick = onDismiss,
-                            style = OwnTVButtonStyle.SECONDARY,
-                        )
-                    }
-                }
-            }
+    tv.own.owntv.ui.stage.StagePopup(
+        onDismiss = onDismiss,
+        title = stringResource(R.string.content_catchup_jump_exact),
+        body = stringResource(R.string.content_catchup_jump_hint),
+        eyebrow = null,
+        width = 760.mpx,
+        buttons = {
+            tv.own.owntv.ui.stage.StageButton(stringResource(R.string.common_cancel), onClick = onDismiss, height = 56.mpx, textSize = 19)
+            tv.own.owntv.ui.stage.StageButton(stringResource(R.string.content_play), onClick = { onPick(CatchupJumps.offsetSecOf(point, nowMs, zone)) }, icon = tv.own.owntv.ui.components.OwnTVIcon.PLAY, height = 56.mpx, textSize = 19, tinted = true)
+        },
+    ) {
+        Row(
+            Modifier.fillMaxWidth().focusGroup(),
+            horizontalArrangement = Arrangement.spacedBy(12.mpx),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Wheel(
+                value = formatDay(CatchupJumps.instantOf(point, nowMs, zone)),
+                onUp = { nudge(deltaDays = -1) },   // toward today
+                onDown = { nudge(deltaDays = +1) }, // further back
+                modifier = Modifier.weight(1.6f).focusRequester(dayFocus),
+            )
+            Wheel(value = two(point.hour), onUp = { nudge(deltaHours = +1) }, onDown = { nudge(deltaHours = -1) }, modifier = Modifier.weight(1f))
+            Text(":", style = tv.own.owntv.ui.theme.stageText(30, 800), color = tv.own.owntv.ui.theme.StageColors.Muted)
+            Wheel(value = two(point.minute), onUp = { nudge(deltaMinutes = +1) }, onDown = { nudge(deltaMinutes = -1) }, modifier = Modifier.weight(1f))
         }
     }
 }
@@ -186,53 +139,35 @@ private fun Wheel(
     onDown: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors = OwnTVTheme.colors
     var editing by remember { mutableStateOf(false) }
-    // Losing focus (Left/Right to a neighbour) must not leave this wheel armed behind the user's back.
-    FocusableSurface(
+    val a = tv.own.owntv.ui.theme.stageAccent
+    // OK arms the wheel (accent, arrows shown), ▲ ▼ turn it, OK or Back puts it down. Losing focus
+    // (◀ ▶ to a neighbour) must not leave it armed behind the user's back.
+    tv.own.owntv.ui.stage.StageSurface(
         onClick = { editing = !editing },
-        selected = editing,
+        radius = 16.mpx,
+        focusStyle = tv.own.owntv.ui.stage.StageFocus.FX,
+        idle = if (editing) Modifier.background(a.accent.copy(alpha = 0.18f), RoundedCornerShape(16.mpx)) else Modifier.background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(16.mpx)),
         modifier = modifier
+            .height(120.mpx)
             .onFocusChanged { if (!it.isFocused) editing = false }
-            // Preview, so Back is taken before the dialog's own BackHandler can dismiss everything.
+            // Preview, so Back is taken before the dialog's own Back can dismiss everything.
             .onPreviewKeyEvent { e ->
                 if (!editing || e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 when (e.key) {
                     Key.DirectionUp -> { onUp(); true }
                     Key.DirectionDown -> { onDown(); true }
                     Key.Back -> { editing = false; true }
-                    else -> false // Left/Right still move to the neighbouring wheel
+                    else -> false
                 }
             },
-        shape = RoundedCornerShape(12.dp),
         contentAlignment = Alignment.Center,
-        surface = GlassSurface.DIALOGS,
     ) { _ ->
-        Column(
-            Modifier.fillMaxWidth().padding(vertical = 6.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            // Arrows appear only while editing — they are a statement that Up/Down now do something
-            // here, which is exactly the thing the user cannot otherwise tell.
-            Text(
-                "▲",
-                style = MaterialTheme.typography.labelSmall,
-                // Transparent rather than absent, so showing/hiding the arrows never reflows the row.
-                color = if (editing) colors.primary else Color.Transparent,
-            )
-            Text(
-                value,
-                style = MaterialTheme.typography.titleLarge,
-                color = if (editing) colors.primary else colors.onSurface,
-                fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Text(
-                "▼",
-                style = MaterialTheme.typography.labelSmall,
-                color = if (editing) colors.primary else Color.Transparent,
-            )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            // Transparent rather than absent, so showing the arrows never reflows the row.
+            Text("▲", style = tv.own.owntv.ui.theme.stageText(14, 700), color = if (editing) a.accent else Color.Transparent)
+            Text(value, style = tv.own.owntv.ui.theme.stageText(28, 800), color = if (editing) a.accent else tv.own.owntv.ui.theme.StageColors.Text, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+            Text("▼", style = tv.own.owntv.ui.theme.stageText(14, 700), color = if (editing) a.accent else Color.Transparent)
         }
     }
 }

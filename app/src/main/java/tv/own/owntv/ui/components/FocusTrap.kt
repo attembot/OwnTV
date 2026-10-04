@@ -1,7 +1,6 @@
 package tv.own.owntv.ui.components
 
 import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
@@ -40,10 +39,9 @@ fun Modifier.trapVerticalFocusExit(): Modifier = focusProperties {
  * leaving the group).
  */
 fun Modifier.trapAllFocusExit(): Modifier =
-    // Modal scrims are the common host for popups. Consuming the IME inset here makes centred
-    // content lay out above an on-screen keyboard; dialogPanel's verticalScroll keeps tall forms
-    // reachable in the reduced height.
-    imePadding().focusProperties { onExit = { cancelFocusChange() } }
+    // No imePadding here: OwnTVPopup already lays a popup out in the room above the keyboard, and
+    // padding by the keyboard again left a 74 px strip — only the popup's heading — on the TCL.
+    focusProperties { onExit = { cancelFocusChange() } }
 
 /**
  * Put focus back on the control that opened a dialog, and hold the list still while it lands.
@@ -148,7 +146,7 @@ fun rememberDialogFocusRestore(
             savedScroll.intValue = scrollState?.value ?: 0
             return@LaunchedEffect
         }
-        restoreAfterDialogClose(target.value, scrollState, savedScroll.intValue)
+        if (target.value != null) restoreAfterDialogClose(target.value, scrollState, savedScroll.intValue)
         target.value = null
     }
     return target

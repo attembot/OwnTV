@@ -51,7 +51,6 @@ import tv.own.owntv.core.epg.CatchupUrl
 import tv.own.owntv.core.live.StreamGrant
 import tv.own.owntv.core.recording.RecordingSchedule
 import tv.own.owntv.core.customize.SectionCustomizations
-import tv.own.owntv.core.customize.applyCustomizations
 import tv.own.owntv.core.customize.CategoryMove
 import tv.own.owntv.core.customize.CategoryRailEditor
 import tv.own.owntv.core.customize.MoveKind
@@ -66,7 +65,6 @@ import tv.own.owntv.core.database.dao.ProfileDao
 import tv.own.owntv.core.database.dao.SourceDao
 import tv.own.owntv.core.database.dao.resolveExistingProfileId
 import tv.own.owntv.core.database.entity.ChannelEntity
-import tv.own.owntv.core.database.entity.CategoryEntity
 import tv.own.owntv.core.database.entity.ContentOrderEntity
 import tv.own.owntv.core.database.entity.FavoriteEntity
 import tv.own.owntv.core.database.entity.SourceEntity
@@ -86,6 +84,7 @@ import tv.own.owntv.player.OwnTVPlayer
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.core.live.LiveTimeshift
 import tv.own.owntv.core.live.LiveKey
+import tv.own.owntv.features.search.positionOf
 import tv.own.owntv.core.live.isChannelVisible
 import tv.own.owntv.core.live.liveCountFlow
 import tv.own.owntv.core.live.livePagingSource
@@ -103,6 +102,8 @@ data class LiveRailItem(
     val title: String? = null,
     val icon: OwnTVIcon? = null,
     val providerName: String? = null,
+    /** The playlist a folder belongs to: its mark in the Movies / Series category list. */
+    val sourceId: Long? = null,
 )
 
 class LiveViewModel(
@@ -295,6 +296,17 @@ class LiveViewModel(
     val providerNames: StateFlow<Map<Long, String>> = ctx
         .map { c -> c.sourceNames.takeIf { it.size > 1 } ?: emptyMap() }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+    /**
+     * The Stage playlist mark per source (decision D4), coloured by the playlist's position in the
+     * profile's list — the order the playlist switcher uses. Empty with one playlist, like [providerNames].
+     */
+    val playlistMarks: StateFlow<Map<Long, tv.own.owntv.ui.stage.PlaylistMark>> = activeProfileSources(settings, sourceDao)
+        .map { aps ->
+            if (aps.liveSourceIds.size < 2) emptyMap()
+            else aps.sources.withIndex().associate { (i, s) -> s.id to tv.own.owntv.ui.stage.PlaylistMark.of(s.name, i) }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     private val folderContextKeys: StateFlow<Map<Long, String>> = ctx
         .flatMapLatest { c ->
@@ -592,8 +604,7 @@ class LiveViewModel(
                 if (cust.hiddenItems.isEmpty() && cust.itemNames.isEmpty() && hiddenCats.isEmpty() && movedFrom.isEmpty()) paging
                 else paging
                     .filter { ch ->
-                        CustomizeKeys.channel(ch) !in cust.hiddenItems &&
-                        (ch.categoryId == null || ch.categoryId !in hiddenCats) &&
+                        isChannelVisible(ch, cust, hiddenCats, key) &&
                             // Moved-out items leave ONLY their origin folder (they stay in All/search).
                             (movedFrom[CustomizeKeys.channel(ch)]?.let { origin ->
                                 key !is LiveKey.Folder || origin != folderContextKeys.value[key.id]
@@ -703,6 +714,9 @@ class LiveViewModel(
     /** The global guide shift, shown as the per-channel dialog's "follow global" default. */
     fun globalEpgShift(): Int = epgOffset.value
 
+    /** The playlist's name, for the channel menu's "category · playlist" line. */
+    fun sourceNameOf(sourceId: Long): String? = sourceById[sourceId]?.name
+
     /** Distinct EPG channels for the "Match EPG" picker (across the profile's playlists + EPG feeds),
      *  ranked so guide channels resembling [channelName] come first instead of a plain A-Z list. */
     suspend fun availableEpgChannels(channelName: String, query: String): List<tv.own.owntv.core.epg.GuideCandidate> {
@@ -748,6 +762,33 @@ class LiveViewModel(
         val result = source.load(PagingSource.LoadParams.Refresh(key = null, loadSize = limit, placeholdersEnabled = false))
         return (result as? PagingSource.LoadResult.Page)?.data ?: emptyList()
     }
+    /** List view or Guide view (G14): what Live TV shows, and so what it opens in next time. */
+    val liveView: StateFlow<SettingsRepository.LiveView> = settings.liveView
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.LiveView.LIST)
+
+    fun setLiveView(view: SettingsRepository.LiveView) {
+        viewModelScope.launch { settings.setLiveView(view) }
+    }
+
+    /** Live TV layout: the categories as a sheet on Left (Stage), or a column always on screen. */
+    val liveLayout: StateFlow<SettingsRepository.LiveLayout> = settings.liveLayout
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.LiveLayout.STAGE)
+
+    /**
+     * The channel count beside every category in the sheet or column: each fixed entry and custom
+     * category by the same query as the header's count, and every provider folder from one grouped
+     * query. Only collected while the categories are on screen.
+     */
+    val railCounts: StateFlow<Map<LiveKey, Int>> = combine(ctx, hiddenCategoryIds, railItems) { c, hidden, items -> Triple(c, hidden, items) }
+        .flatMapLatest { (c, hidden, items) ->
+            val single = items.filter { it.key !is LiveKey.Folder }.map { item ->
+                liveCountFlow(item.key, c.profileId, c.sourceIds, hidden, channelDao, customCategoryDao).map { mapOf(item.key to it) }
+            }
+            val folders = channelDao.observeCountsByCategory(c.sourceIds.ifEmpty { listOf(-1L) })
+                .map { rows -> rows.associate { LiveKey.Folder(it.categoryId) as LiveKey to it.itemCount } }
+            combine(single + folders) { parts -> parts.fold(emptyMap<LiveKey, Int>()) { acc, m -> acc + m } }.throttleLatest()
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     val count: StateFlow<Int> = combine(_selected, ctx, hiddenCategoryIds) { key, c, hidden -> Triple(key, c, hidden) }
         .flatMapLatest { (key, c, hidden) -> countFlow(key, c, hidden).throttleLatest() } // C2: cap live COUNT re-runs during bulk sync
@@ -856,6 +897,33 @@ class LiveViewModel(
         _previewArmed.value = true // a real user focus — the in-pane preview may now play
         _previewChannel.value = channel
     }
+
+    /** Search's "Go to channel": the list scrolls to [reveal] and focuses it, then calls [revealDone]. */
+    private val _reveal = MutableStateFlow<tv.own.owntv.features.search.Reveal?>(null)
+    val reveal: StateFlow<tv.own.owntv.features.search.Reveal?> = _reveal.asStateFlow()
+
+    /** Open [channel] where it lives: its own category, or All channels when that category is not in
+     *  the rail or the channel is not in it. It becomes the preview, as if the user had walked there. */
+    fun revealChannel(channel: ChannelEntity) {
+        _search.value = ""
+        _previewArmed.value = true
+        _previewChannel.value = channel
+        viewModelScope.launch {
+            val c = ctx.first { it.profileId >= 0 }
+            val sort = settings.sortLive.first()
+            val folder = channel.categoryId?.let { LiveKey.Folder(it) }
+            val inRail = folder != null &&
+                kotlinx.coroutines.withTimeoutOrNull(2_000) { railItems.first { list -> list.any { it.key == folder } } } != null
+            for (key in listOfNotNull(folder.takeIf { inRail }, LiveKey.All)) {
+                val position = pagingSource(key, c, "", sort).positionOf(channel.id, { it.id }) ?: continue
+                if (lockedKey == null) _selected.value = key
+                _reveal.value = tv.own.owntv.features.search.Reveal(key, channel.id, position)
+                return@launch
+            }
+        }
+    }
+
+    fun revealDone() { _reveal.value = null }
 
     // The in-pane preview only plays once the user has actually focused a channel — so restoring the last
     // focused channel on startup positions focus & the details pane WITHOUT auto-previewing on launch (#6).
@@ -969,25 +1037,49 @@ class LiveViewModel(
     val zapListKey: StateFlow<LiveKey?> = zapList.key
 
     // --- Category browser (second Left press shows all categories) ---
+    /** The categories' search text. Here, not in the list, so it survives the player: the browse UI
+     *  is removed while a channel plays full screen, and a search lost on return meant pressing Up
+     *  through dozens of categories to reach the field again. */
+    private val _categoryQuery = MutableStateFlow("")
+    val categoryQuery: StateFlow<String> = _categoryQuery.asStateFlow()
+    fun setCategoryQuery(query: String) { _categoryQuery.value = query }
+
     private val _showCategoryBrowser = MutableStateFlow(false)
     val showCategoryBrowser: StateFlow<Boolean> = _showCategoryBrowser.asStateFlow()
 
-    /** Categories for the category browser (with customizations applied). */
-    val browserCategories: StateFlow<List<Pair<CategoryEntity, String>>> = ctx
-        .flatMapLatest { c ->
-            if (c.profileId < 0) flowOf(emptyList())
-            else combine(categoryDao.observe(c.sourceIds, MediaType.LIVE), custom) { cats, cust ->
-                cats.applyCustomizations(cust)
-            }
-        }
+    /** Categories for the in-player category browser and the Multiview picker: the Live rail's own
+     *  folders, so custom categories, renames, hides, kids filtering and the order all match it. */
+    val browserCategories: StateFlow<List<Pair<LiveKey, String>>> = railItems
+        .map { items -> items.filter { it.key is LiveKey.Folder || it.key is LiveKey.Custom }.map { it.key to it.title.orEmpty() } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun showCategories() { _showCategoryBrowser.value = true }
     fun hideCategoryBrowser() { _showCategoryBrowser.value = false }
 
-    /** Load channels for an arbitrary category into the zap list. */
-    fun loadChannelsForCategory(categoryId: Long) =
-        zapList.armForCategory(categoryId) { _showCategoryBrowser.value = false }
+    /** Load channels for a category picked in the browser into the zap list. */
+    fun loadChannelsForCategory(key: LiveKey) {
+        val close = { _showCategoryBrowser.value = false }
+        when (key) {
+            is LiveKey.Folder -> zapList.armForCategory(key.id, close)
+            is LiveKey.Custom -> {
+                val title = browserCategories.value.firstOrNull { it.first == key }?.second.orEmpty()
+                zapList.armForCustom(key, title, { channelsInCustom(key) }, close)
+            }
+            else -> Unit
+        }
+    }
+
+    /** One custom category in its rail order, with the hide/rename treatment the Live list gives it. */
+    private suspend fun channelsInCustom(key: LiveKey.Custom): List<ChannelEntity> {
+        val c = ctx.value
+        if (c.profileId < 0) return emptyList()
+        val cs = custResolved.value
+        return withContext(Dispatchers.IO) {
+            customCategoryDao.snapshotChannels(c.profileId, key.id, c.sourceIds.ifEmpty { listOf(-1L) }, ZAP_LIST_LIMIT)
+        }
+            .filter { isChannelVisible(it, cs.cust, cs.hiddenCats, key) }
+            .map { ch -> cs.cust.itemNames[CustomizeKeys.channel(ch)]?.let { ch.copy(name = it) } ?: ch }
+    }
 
     /** One provider category, in its manual order — the in-player category browser's pick. */
     private suspend fun channelsInCategory(categoryId: Long): List<ChannelEntity> {
@@ -1092,7 +1184,10 @@ class LiveViewModel(
         val customizations = customize.observe(current.profileId, MediaType.LIVE).first()
         if (CustomizeKeys.channel(channel) in customizations.hiddenItems) return false
         val category = channel.categoryId?.let { categoryDao.getById(it) }
-        return category == null || CustomizeKeys.category(category) !in customizations.hiddenCategories
+        if (category == null || CustomizeKeys.category(category) !in customizations.hiddenCategories) return true
+        // Its folder is hidden, but a custom category the user kept it in still shows it (as the lists do).
+        return customCategoryDao.contextsOf(current.profileId, MediaType.LIVE, channel.id)
+            .any { it !in customizations.hiddenCategories }
     }
 
     /** Open a channel fullscreen, preserving the browse context it was launched from. The channel's
@@ -1119,7 +1214,7 @@ class LiveViewModel(
         ensurePlaying(channel)
     }
 
-    /** Tune a channel picked outside the Live TV list — the Guide, or a Search result (F05). Same as
+    /** Tune a channel picked outside the Live TV list — the Guide (F05). Same as
      *  [ensurePlaying] except history is written straight away: this is a deliberate one-shot pick (you
      *  chose a channel, or "Watch channel" in a programme dialog), not the zap-through-a-category flow
      *  the history debounce exists to filter, and such a channel was not reliably landing in History.
@@ -1747,8 +1842,8 @@ class LiveViewModel(
      * guide simply has no entry here, and the row shows no second line. Returns only channels that
      * actually have something airing right now.
      */
-    suspend fun nowPlayingFor(channels: List<ChannelEntity>): Map<Long, String> =
-        epgReader.nowPlayingFor(channels, custom.value, epgOffset.value)
+    suspend fun nowPlayingFor(channels: List<ChannelEntity>): Map<Long, tv.own.owntv.core.parser.XtEpgEntry> =
+        epgReader.nowProgrammesFor(channels, custom.value, epgOffset.value)
 
     /**
      * Current programme title per channel id, shared by the Live list and the in-player overlays.
@@ -1757,33 +1852,38 @@ class LiveViewModel(
      * behalf. An earlier version had each caller drop everything outside its own list, which made the
      * Live list and the channel-list overlay evict each other's work every time one opened.
      */
-    private val nowPlayingCache = object : LinkedHashMap<Long, String>(256, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, String>?) = size > MAX_NOW_PLAYING
+    private val nowPlayingCache = object : LinkedHashMap<Long, tv.own.owntv.core.parser.XtEpgEntry?>(256, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, tv.own.owntv.core.parser.XtEpgEntry?>?) = size > MAX_NOW_PLAYING
     }
 
-    private val _nowPlaying = MutableStateFlow<Map<Long, String>>(emptyMap())
+    private val _nowPlaying = MutableStateFlow<Map<Long, tv.own.owntv.core.parser.XtEpgEntry?>>(emptyMap())
 
     /**
      * Channel id → the programme airing now.
      *
-     * Channels that were asked about and have no guide are held internally as a blank, so they are
+     * Channels that were asked about and have no guide are held internally as null, so they are
      * not asked again on every append; that sentinel is filtered out here, so such a row simply has
      * no entry and draws no second line.
      */
     val nowPlaying: StateFlow<Map<Long, String>> = _nowPlaying
-        .map { titles -> titles.filterValues { it.isNotBlank() } }
+        .map { found -> buildMap { found.forEach { (id, p) -> if (p != null) put(id, p.title) } } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    /** [nowPlaying] with the programme's start and stop, for the Stage rows' time left and progress. */
+    val nowProgrammes: StateFlow<Map<Long, tv.own.owntv.core.parser.XtEpgEntry>> = _nowPlaying
+        .map { found -> buildMap { found.forEach { (id, p) -> if (p != null) put(id, p) } } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     private var nowPlayingJob: kotlinx.coroutines.Job? = null
 
-    private fun publishNowPlaying(resolved: Map<Long, String>) {
+    private fun publishNowPlaying(resolved: Map<Long, tv.own.owntv.core.parser.XtEpgEntry?>) {
         synchronized(nowPlayingCache) {
             nowPlayingCache.putAll(resolved)
             _nowPlaying.value = HashMap(nowPlayingCache)
         }
     }
 
-    private fun cachedNowPlaying(): Map<Long, String> = synchronized(nowPlayingCache) { HashMap(nowPlayingCache) }
+    private fun cachedNowPlaying(): Map<Long, tv.own.owntv.core.parser.XtEpgEntry?> = synchronized(nowPlayingCache) { HashMap(nowPlayingCache) }
 
     /** Forget every resolved title — the guide data or the offset moved underneath them. */
     private fun clearNowPlaying() {
@@ -1807,9 +1907,9 @@ class LiveViewModel(
         nowPlayingJob?.cancel()
         nowPlayingJob = viewModelScope.launch {
             val found = runCatching { nowPlayingFor(missing) }.getOrDefault(emptyMap())
-            // Remember the ones with no guide too, as a blank — otherwise they are re-queried on
+            // Remember the ones with no guide too, as null — otherwise they are re-queried on
             // every single append, which is most of the cost this removes.
-            publishNowPlaying(found + missing.filter { it.id !in found }.associate { it.id to "" })
+            publishNowPlaying(found + missing.filter { it.id !in found }.associate { it.id to null })
         }
     }
 
@@ -1825,7 +1925,7 @@ class LiveViewModel(
         nowPlayingJob?.cancel()
         nowPlayingJob = viewModelScope.launch {
             val found = runCatching { nowPlayingFor(loaded) }.getOrDefault(emptyMap())
-            publishNowPlaying(found + loaded.filter { it.id !in found }.associate { it.id to "" })
+            publishNowPlaying(found + loaded.filter { it.id !in found }.associate { it.id to null })
         }
     }
 
@@ -1918,6 +2018,19 @@ class LiveViewModel(
         sortBeforeMove = null
         if (previous != SettingsRepository.SortMode.PLAYLIST) {
             viewModelScope.launch { settings.setSortLive(previous) }
+        }
+    }
+
+    /** Take [channel] out of the custom category [key] only. If it had been moved out of its provider
+     *  folder into here, it goes back there — the same as deleting the whole category does. */
+    fun removeFromCustomCategory(channel: ChannelEntity, key: LiveKey.Custom) {
+        viewModelScope.launch {
+            val pid = currentProfileId() ?: return@launch
+            userDataWriter.removeCustomCategoryMember(pid, MediaType.LIVE, key.id, channel.id)
+            val itemKey = CustomizeKeys.channel(channel)
+            custom.value.movedFromOrigin[itemKey]?.let { origin ->
+                customize.setItemMovedFromOrigin(pid, MediaType.LIVE, itemKey, origin, moved = false)
+            }
         }
     }
 

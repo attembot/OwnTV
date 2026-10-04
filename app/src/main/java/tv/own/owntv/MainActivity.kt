@@ -26,17 +26,14 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.AsyncImage
 import org.koin.android.ext.android.get
 import org.koin.android.ext.android.inject
 import org.koin.androidx.compose.koinViewModel
@@ -53,6 +50,7 @@ import tv.own.owntv.ui.theme.BlurredBackdrop
 import tv.own.owntv.ui.theme.BackdropLuminanceMap
 import tv.own.owntv.core.theme.GlassConfig
 import tv.own.owntv.ui.theme.GlassMotionState
+import tv.own.owntv.ui.theme.LocalBackground
 import tv.own.owntv.ui.theme.LocalBlurredBackdrop
 import tv.own.owntv.ui.theme.LocalGlass
 import tv.own.owntv.ui.theme.LocalGlassMotion
@@ -61,7 +59,6 @@ import tv.own.owntv.ui.theme.OwnTVTheme
 import tv.own.owntv.core.theme.UiFontScale
 import tv.own.owntv.core.theme.UiZoom
 import tv.own.owntv.ui.theme.stackBlur
-import tv.own.owntv.ui.theme.supportsBackdropBlur
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -226,8 +223,19 @@ open class MainActivity : ComponentActivity() {
             val uiZoomPercent by viewModel.uiZoomPercent.collectAsStateWithLifecycle()
             val fontCustomization by viewModel.fontCustomization.collectAsStateWithLifecycle()
             val animationLevel by viewModel.animationLevel.collectAsStateWithLifecycle()
+            // Animations Off also stills the launch screen. Android shows it before the app runs, so the
+            // choice can only be handed over for the next launch, and only from Android 13 on (P11).
+            LaunchedEffect(animationLevel) {
+                if (android.os.Build.VERSION.SDK_INT >= 33) {
+                    val still = animationLevel == tv.own.owntv.core.theme.AnimationLevel.OFF
+                    splashScreen.setSplashScreenTheme(
+                        if (still) stillLaunchTheme(tv.own.owntv.core.brand.AppIconSwitcher.applied(this@MainActivity)) else 0,
+                    )
+                }
+            }
             val bgImagePath by viewModel.bgImagePath.collectAsStateWithLifecycle()
             val glassConfig by viewModel.glassConfig.collectAsStateWithLifecycle()
+            val background by viewModel.backgroundConfig.collectAsStateWithLifecycle()
             val avatarId by viewModel.avatarId.collectAsStateWithLifecycle()
             val avatarPath by viewModel.avatarPath.collectAsStateWithLifecycle()
             val profileName by viewModel.profileName.collectAsStateWithLifecycle()
@@ -324,7 +332,7 @@ open class MainActivity : ComponentActivity() {
                 val glassActive = glassConfig.enabled
                 val effectiveGlass = glassConfig.copy(
                     scope = if (glassActive) glassConfig.scope else emptySet(),
-                    hasBackdrop = bgImagePath.isNotBlank(),
+                    hasBackdrop = background.showsPicture,
                 )
                 // Root viewport size in px — the area the background image fills and that the blurred
                 // backdrop stands in for. Captured here (top of the tree) so glass panels can map their
@@ -341,8 +349,11 @@ open class MainActivity : ComponentActivity() {
                 // Phase 4 — real backdrop blur. Load+blur the background once (cached) when glass is on,
                 // a background image is set, blur strength > 0, and the device supports it (API 31+).
                 // Otherwise this stays null and panels fall back to Tier-1 translucency.
-                val needsBackdropAssets = glassActive && bgImagePath.isNotBlank()
-                val supportsFrostPyramid = supportsBackdropBlur()
+                // Glass & background: a picture is drawn blurred (its Blur) and glass frosts it, so the
+                // blurred copy is built whenever a picture is shown, glass on or off. The blur itself is
+                // CPU work done once per picture, so every device gets it.
+                val needsBackdropAssets = background.showsPicture
+                val supportsFrostPyramid = true
                 val blurred by produceState<BlurredBackdrop?>(
                     initialValue = null,
                     bgImagePath,
@@ -367,6 +378,7 @@ open class MainActivity : ComponentActivity() {
                     LocalGlass provides effectiveGlass,
                     LocalGlassMotion provides glassMotion,
                     LocalBlurredBackdrop provides blurred,
+                    LocalBackground provides background,
                 ) {
                     // Wrap the shell in the locale locals (LocalResources/LocalContext/
                     // LocalConfiguration/LocalLayoutDirection) for the currently selected locale, and
@@ -384,7 +396,7 @@ open class MainActivity : ComponentActivity() {
                     ) {
                         // Background image sits behind everything when a path is set; otherwise the solid
                         // base color shows through and glass renders over that instead.
-                        if (bgImagePath.isNotBlank()) BackgroundLayer(bgImagePath)
+                        if (background.showsPicture) BackgroundLayer(background, blurred)
 
                         Box(modifier = Modifier.fillMaxSize()) {
                         val profile = activeProfileId
@@ -471,43 +483,10 @@ open class MainActivity : ComponentActivity() {
     }
 }
 
-/**
- * The full-bleed background layer, drawn behind the entire shell. Renders the user's chosen image
- * (an app-private file path set by the Background image picker) via Coil [AsyncImage], plus a soft
- * dark legibility scrim so foreground text stays readable over bright photos. Callers must check
- * [path] is non-blank before composing this — it draws unconditionally otherwise.
- */
+/** The user's picture behind the entire shell (Glass & background). Callers check [BackgroundConfig.showsPicture]. */
 @androidx.compose.runtime.Composable
-private fun BackgroundLayer(path: String) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val file = java.io.File(path)
-    // Build an explicit ImageRequest with a Uri from the File path. Passing a bare File relies on
-    // whatever fetcher happens to be registered; an explicit file:// Uri guarantees the built-in
-    // FileFetcher decodes it, and lets us cap the decoded size (a 7.8MB JPEG upscaled to 4K would
-    // blow the deliberately tiny memory cache) and log failures for diagnosis.
-    val request = remember(path) {
-        coil3.request.ImageRequest.Builder(context)
-            .data(android.net.Uri.fromFile(file))
-            .build()
-    }
-    Box(modifier = Modifier.fillMaxSize()) {
-        AsyncImage(
-            model = request,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            alignment = Alignment.Center,
-            // Surface decode errors so a silent load failure is obvious in logcat (BgImage tag).
-            onError = { Log.w(BG_TAG, "background image load failed: ${it.result.throwable.message}") },
-            onSuccess = { Log.d(BG_TAG, "background image loaded: ${file.absolutePath} (${file.length()} bytes)") },
-            modifier = Modifier.fillMaxSize(),
-        )
-        // Legibility scrim: a soft dark wash over the photo.
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.16f)),
-        )
-    }
+private fun BackgroundLayer(background: tv.own.owntv.core.theme.BackgroundConfig, blurred: BlurredBackdrop?) {
+    tv.own.owntv.ui.components.BackgroundPicture(background, blurred, Modifier.fillMaxSize())
 }
 
 /**

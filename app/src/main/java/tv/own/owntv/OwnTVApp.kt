@@ -126,6 +126,15 @@ class OwnTVApp : Application(), SingletonImageLoader.Factory, androidx.work.Conf
             settings = GlobalContext.get().get(),
             archiveStore = GlobalContext.get().get(),
         )
+        // The Stage UI's own defaults, once per install (owner, 2026-10-02): Docked · Compact rail, glass
+        // on at 50%, the Stage background; Movies & Series keep an update's layout.
+        appScope.launch {
+            runCatching {
+                GlobalContext.get().get<tv.own.owntv.core.settings.SettingsRepository>().applyStageDefaults(
+                    tv.own.owntv.core.theme.GlassConfig(tv.own.owntv.ui.theme.ALL_GLASS_SURFACES).toBitmask(),
+                )
+            }
+        }
         // NOTE: cold start does ZERO heavy DB work. Index + ANALYZE maintenance is piggy-backed onto the
         // operation that actually changes the data — ImportFinalizer.finalize() for normal re-syncs, the
         // deferred content-index worker after a fresh import, the EpgRepository refresh after every EPG

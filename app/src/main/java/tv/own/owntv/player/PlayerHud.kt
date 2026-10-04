@@ -118,7 +118,7 @@ private const val PLAYER_SHORTCUT_LONG_PRESS_MS = 600L
 private const val TRACK_POLL_MS = 300L
 private const val TRACK_POLL_TRIES = 20
 
-internal enum class HudDialog { NONE, AUDIO, SUBS, SPEED, ZOOM, QUALITY, VOLUME, SUB_TIMING, JUMP_BACK, SLEEP_TIMER }
+internal enum class HudDialog { NONE, AUDIO, SUBS, SPEED, ZOOM, QUALITY, VOLUME, JUMP_BACK, SLEEP_TIMER }
 
 /** What the top-left channel OSD shows for direct tune: the digits being typed, the channel a number
  *  resolved to, or a failure message. All three render as the same card as the channel OSD. */
@@ -889,6 +889,7 @@ fun PlayerHud(
                     subTracks = player.textTracks()
                 }
             }
+            val subDelay by player.subDelayMs.collectAsStateWithLifecycle()
             TrackDialog(
                 stringResource(R.string.player_subtitles), subTracks,
                 onSelect = { player.selectSubtitle(it.mpvId); dialog = HudDialog.NONE },
@@ -898,10 +899,11 @@ fun PlayerHud(
                 onSelectLocalSubtitle = onSelectLocalSubtitle?.let { open -> { dialog = HudDialog.NONE; open() } },
                 // Subtitle timing (plan §8): only when adjustment applies to the ACTIVE subtitle on the
                 // current engine (any mpv text sub; external side-loads on ExoPlayer).
-                onSubtitleTiming = if (player.subtitleTimingAvailable()) ({ dialog = HudDialog.SUB_TIMING }) else null,
+                subDelayMs = subDelay,
+                onAdjustSubDelay = if (player.subtitleTimingAvailable()) player::adjustSubtitleDelay else null,
+                onResetSubDelay = player::resetSubtitleDelay,
             )
         }
-        HudDialog.SUB_TIMING -> SubtitleTimingDialog(player, onDismiss = { dialog = HudDialog.NONE })
         HudDialog.SPEED -> SpeedDialog(current = speed, onSelect = { player.setSpeed(it); dialog = HudDialog.NONE }, onDismiss = { dialog = HudDialog.NONE })
         HudDialog.ZOOM -> ZoomDialog(current = zoomMode, onSelect = { player.setZoomModeByUser(it); dialog = HudDialog.NONE }, onDismiss = { dialog = HudDialog.NONE })
         HudDialog.QUALITY -> {

@@ -302,6 +302,35 @@
             </intent-filter>
         </activity>
 
+
+        <activity
+            android:name=".MainActivityPixel"
+            android:banner="@drawable/owntv_banner_pixel"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/owntv_icon_pixel"
+            android:launchMode="singleTop"
+            android:roundIcon="@mipmap/owntv_icon_pixel"
+            android:theme="@style/Theme.OwnTV.Starting.Pixel"
+            android:windowSoftInputMode="adjustPan">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:host="play"
+                    android:scheme="owntv" />
+                <data
+                    android:host="open"
+                    android:scheme="owntv" />
+            </intent-filter>
+        </activity>
+
     </application>
 
 </manifest>

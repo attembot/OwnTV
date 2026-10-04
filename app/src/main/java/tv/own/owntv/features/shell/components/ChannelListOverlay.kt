@@ -2,7 +2,6 @@ package tv.own.owntv.features.shell.components
 
 import tv.own.owntv.core.epg.displayLogoUrl
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,7 +20,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -35,7 +32,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import coil3.compose.AsyncImage
 import tv.own.owntv.R
 import tv.own.owntv.core.i18n.HorizontalDirection
 import tv.own.owntv.core.i18n.horizontalDirection
@@ -44,7 +40,6 @@ import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.ContentPanelFill
 import tv.own.owntv.ui.components.modalScrim
 import tv.own.owntv.ui.components.roundedPanel
-import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.ProviderChip
 import tv.own.owntv.core.theme.GlassSurface
 import tv.own.owntv.ui.theme.OwnTVTheme
@@ -152,16 +147,8 @@ private fun ChannelRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Box(
-                modifier = Modifier.size(40.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)).background(colors.surfaceContainerLowest),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (!channel.displayLogoUrl.isNullOrBlank()) {
-                    AsyncImage(model = channel.displayLogoUrl, contentDescription = null, modifier = Modifier.fillMaxSize())
-                } else {
-                    OwnTVIcon(OwnTVIcon.LIVE_TV, tint = colors.onSurfaceVariant, modifier = Modifier.size(20.dp))
-                }
-            }
+            // The Live list's own white plate, so a logo looks the same here as it does there.
+            tv.own.owntv.features.live.LivePlate(channel.displayLogoUrl, width = 56.dp, height = 40.dp, radius = 8.dp)
             // Fixed-width number strip, so names stay aligned whatever the digit count (see LiveScreen).
             if (showNumber) {
                 tv.own.owntv.ui.components.ChannelNumberColumn(

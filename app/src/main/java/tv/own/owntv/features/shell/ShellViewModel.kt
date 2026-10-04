@@ -263,6 +263,10 @@ class ShellViewModel(
     val glassConfig: StateFlow<tv.own.owntv.core.theme.GlassConfig> = settings.glassConfig
         .stateIn(viewModelScope, SharingStarted.Eagerly, tv.own.owntv.core.theme.GlassConfig())
 
+    /** Glass & background: what sits behind every screen. */
+    val backgroundConfig: StateFlow<tv.own.owntv.core.theme.BackgroundConfig> = settings.backgroundConfig
+        .stateIn(viewModelScope, SharingStarted.Eagerly, tv.own.owntv.core.theme.BackgroundConfig())
+
     /** The active profile's avatar (so the sidebar reflects profile edits, not a separate setting). */
     val avatarId: StateFlow<Int> = settings.activeProfileId
         .flatMapLatest { pid -> if (pid < 0) flowOf(0) else profileDao.observeById(pid).map { it?.avatarId ?: 0 } }

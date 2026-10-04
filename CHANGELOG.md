@@ -7,6 +7,10 @@
 > Issue numbers that are part of a title are fine; explanatory parentheticals are not. The detail —
 > what, why, files and verification — belongs in the commit message, never here.
 
+## v2026.10.04 (fork) — 2026-10-04
+
+Everything in upstream v5.1.0 below, plus the fork's picture-in-picture and always-on Multiview button.
+
 ## v2026.09.28 (fork) — 2026-09-28
 
 Everything in upstream v5.0.3 and v5.0.4 below, plus the fork's picture-in-picture and always-on Multiview button.
@@ -100,6 +104,25 @@ Everything in upstream v5.0.0 below, plus the fork's picture-in-picture.
 - **Custom DNS resolves IPv6-only hosts**
 - **Audio focus is released while you are paused**
 - **Many smaller player, subtitle and catch-up fixes**
+
+## v5.1.0 — 2026-10-04
+
+### ✨ New features
+- **🎨 A completely new interface**
+- **⚙️ Settings rearranged into twelve groups**
+- **⏪ Resume a saved channel: ask, always or never**
+- **🗂️ Remove a channel from a custom category**
+
+### 🐛 Fixes
+- **Catch-up that shows no picture no longer reports a fast-start error (#229)**
+- **Faster channel switching on providers that mix HLS and TS channels**
+- **Custom categories in the player's channel list and the Multiview picker**
+- **Hiding a provider category no longer empties custom categories**
+- **Category search kept after watching a channel**
+- **Left always returns to the rail**
+- **Channel logos in the player's channel list match Live TV**
+- **Brand accent, Subtitle style and DNS presets found by Settings search**
+- **Play in external player finds VLC and MX Player on Android 11 and newer**
 
 ## v5.0.4 — 2026-09-26
 

@@ -3,13 +3,10 @@ package tv.own.owntv.ui.components
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
-import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,6 +27,9 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import tv.own.owntv.R
+import tv.own.owntv.ui.theme.mpx
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxWidth
 import tv.own.owntv.core.brand.AppIcon
 import tv.own.owntv.core.brand.AppIconSwitcher
 import tv.own.owntv.ui.theme.OwnTVTheme
@@ -47,8 +47,8 @@ fun AppIconPicker(
 ) {
     var focusedIcon by remember { mutableStateOf<AppIcon?>(null) }
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        // Two rows of four: eight tiles in one row are wider than the Settings panel.
-        AppIcon.entries.chunked(4).forEachIndexed { row, icons ->
+        // Two rows of five (the 8 colours, Signal, Pixel): ten tiles in one row are wider than the panel.
+        AppIcon.entries.chunked(5).forEachIndexed { row, icons ->
             if (row > 0) Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 icons.forEach { icon ->
@@ -60,7 +60,7 @@ fun AppIconPicker(
                             .then(if (icon == selected && firstFocus != null) Modifier.focusRequester(firstFocus) else Modifier),
                     ) { focused ->
                         LaunchedEffect(focused) { if (focused) focusedIcon = icon }
-                        BrandMark(icon, 56.dp)
+                        BrandMark(icon, 56.dp, followAccent = false)
                     }
                 }
             }
@@ -85,25 +85,17 @@ fun AppIconSettingsDialog(chosen: AppIcon, onPick: (AppIcon) -> Unit, onDismiss:
     val applied = remember(context) { AppIconSwitcher.applied(context) }
     var picked by remember { mutableStateOf<AppIcon?>(null) }
     val tileFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { tileFocus.requestFocus() } }
+    LaunchedEffect(Unit) { kotlinx.coroutines.delay(60); runCatching { tileFocus.requestFocus() } }
     AppIconPanel(onDismiss, width = 640) {
         val restartFor = picked
         if (restartFor != null) {
             RestartContent(restartFor, onDismiss)
         } else {
+            Text(stringResource(R.string.settings_app_icon), style = tv.own.owntv.ui.theme.stageText(38, 800), color = tv.own.owntv.ui.theme.StageColors.Text)
             Text(
-                stringResource(R.string.settings_app_icon),
-                style = MaterialTheme.typography.headlineSmall,
-                color = OwnTVTheme.colors.onSurface,
+                stringResource(R.string.settings_app_icon_summary), style = tv.own.owntv.ui.theme.stageText(18, 400), color = tv.own.owntv.ui.theme.StageColors.Muted,
+                textAlign = TextAlign.Center, modifier = Modifier.padding(top = 10.mpx, bottom = 24.mpx),
             )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                stringResource(R.string.settings_app_icon_summary),
-                style = MaterialTheme.typography.bodyLarge,
-                color = OwnTVTheme.colors.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(18.dp))
             AppIconPicker(
                 selected = chosen,
                 onPick = { icon ->
@@ -128,15 +120,8 @@ fun AppIconRestartDialog(icon: AppIcon, onDismiss: () -> Unit) {
 
 @Composable
 private fun AppIconPanel(onDismiss: () -> Unit, width: Int, content: @Composable () -> Unit) {
-    OwnTVPopup(onDismissRequest = onDismiss) {
-        Box(
-            Modifier.fillMaxSize().modalScrim().trapAllFocusExit().focusGroup(),
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(Modifier.dialogPanel(width = width.dp, padding = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                content()
-            }
-        }
+    tv.own.owntv.ui.stage.StagePopup(onDismiss = onDismiss, title = null, eyebrow = null, width = (width * 1.8f).mpx) {
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) { content() }
     }
 }
 
@@ -144,34 +129,22 @@ private fun AppIconPanel(onDismiss: () -> Unit, width: Int, content: @Composable
 private fun RestartContent(icon: AppIcon, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val restartFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { restartFocus.requestFocus() } }
-    BrandMark(icon, 72.dp)
-    Spacer(Modifier.height(14.dp))
+    LaunchedEffect(Unit) { kotlinx.coroutines.delay(60); runCatching { restartFocus.requestFocus() } }
+    BrandMark(icon, 72.dp, followAccent = false)
     Text(
-        stringResource(R.string.app_icon_restart_title),
-        style = MaterialTheme.typography.headlineSmall,
-        color = OwnTVTheme.colors.onSurface,
-        textAlign = TextAlign.Center,
+        stringResource(R.string.app_icon_restart_title), style = tv.own.owntv.ui.theme.stageText(34, 800), color = tv.own.owntv.ui.theme.StageColors.Text,
+        textAlign = TextAlign.Center, modifier = Modifier.padding(top = 20.mpx),
     )
-    Spacer(Modifier.height(8.dp))
     Text(
-        stringResource(R.string.app_icon_restart_message),
-        style = MaterialTheme.typography.bodyLarge,
-        color = OwnTVTheme.colors.onSurfaceVariant,
-        textAlign = TextAlign.Center,
+        stringResource(R.string.app_icon_restart_message), style = tv.own.owntv.ui.theme.stageText(18, 400), color = tv.own.owntv.ui.theme.StageColors.Muted,
+        textAlign = TextAlign.Center, modifier = Modifier.padding(top = 10.mpx),
     )
-    Spacer(Modifier.height(20.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        OwnTVButton(
-            stringResource(R.string.update_later),
-            onClick = onDismiss,
-            modifier = Modifier.width(170.dp),
-            style = OwnTVButtonStyle.SECONDARY,
-        )
-        OwnTVButton(
+    Row(Modifier.padding(top = 28.mpx), horizontalArrangement = Arrangement.spacedBy(14.mpx)) {
+        tv.own.owntv.ui.stage.StageButton(stringResource(R.string.update_later), onClick = onDismiss, height = 56.mpx, textSize = 19)
+        tv.own.owntv.ui.stage.StageButton(
             stringResource(R.string.app_icon_restart_now),
             onClick = { context.findActivity()?.let { AppIconSwitcher.restartWith(it, icon) } },
-            modifier = Modifier.width(220.dp).focusRequester(restartFocus),
+            height = 56.mpx, textSize = 19, tinted = true, modifier = Modifier.focusRequester(restartFocus),
         )
     }
 }

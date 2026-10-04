@@ -46,21 +46,30 @@ import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.ui.focus.FocusRequester as RowFocus
+import tv.own.owntv.ui.theme.mpx
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemContentType
 import androidx.paging.compose.itemKey
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
-import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import tv.own.owntv.R
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.Key
 import tv.own.owntv.core.customize.CustomizeKeys
 import tv.own.owntv.core.database.entity.ChannelEntity
 import tv.own.owntv.core.database.entity.ContentOrderEntity
@@ -83,10 +92,7 @@ import tv.own.owntv.ui.components.jumpLazyListTo
 import tv.own.owntv.ui.components.longPressMenuGuard
 import tv.own.owntv.ui.components.trapAllFocusExit
 import tv.own.owntv.ui.components.trapVerticalFocusExit
-import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.ChannelGenre
-import tv.own.owntv.ui.components.OwnTVButton
-import tv.own.owntv.ui.components.OwnTVButtonStyle
 import tv.own.owntv.core.model.ContentMenu
 import tv.own.owntv.ui.components.MenuAction
 import tv.own.owntv.ui.components.arranged
@@ -94,25 +100,21 @@ import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.ProviderChip
 import tv.own.owntv.ui.components.OwnTVSpinner
 import tv.own.owntv.ui.components.SearchBar
-import tv.own.owntv.ui.components.SortChip
 import tv.own.owntv.ui.components.TextInputDialog
 import tv.own.owntv.ui.components.formatCount
 import tv.own.owntv.ui.components.ContentPanelFill
 import tv.own.owntv.ui.components.PreviewPanelFill
 import tv.own.owntv.ui.components.roundedPanel
-import tv.own.owntv.ui.components.dialogPanel
-import tv.own.owntv.ui.components.modalScrim
 import tv.own.owntv.ui.components.gridFocusTarget
 import tv.own.owntv.ui.format.rememberBestDateFormatter
 import tv.own.owntv.ui.format.rememberSystemTimeFormatter
 import tv.own.owntv.ui.theme.Dimens
-import tv.own.owntv.core.theme.GlassSurface
-import tv.own.owntv.ui.theme.OwnTVTheme
 import tv.own.owntv.ui.theme.LocalPopupFontFamily
 import tv.own.owntv.core.live.LiveKey
 import tv.own.owntv.core.live.EpgNowNext
 
-/** Layer 2–4 for Live TV: real category rail, Paging channel list, and a live preview pane. */
+/** Live TV (Stage P4): the channel list, the stage beside it and the categories as a sheet or a column. */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun LiveScreen(
     onFullscreen: () -> Unit,
@@ -127,6 +129,8 @@ fun LiveScreen(
      * More → History show channels without a second copy of this list existing.
      */
     lockedKey: LiveKey? = null,
+    /** Guide view (Live TV tool row): opens the TV Guide until the in-place guide arrives (P5). */
+    onOpenGuide: () -> Unit = {},
 ) {
     val vm: LiveViewModel = koinViewModel()
     // Locking and unlocking are one pair: the pin belongs to this screen's lifetime, not to the view
@@ -229,6 +233,7 @@ fun LiveScreen(
         if (!rememberLive) runCatching { listState.scrollToItem(0) }
     }
     val catListState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val categoryQuery by vm.categoryQuery.collectAsStateWithLifecycle()
     val chromeScrollThresholdPx = with(LocalDensity.current) { 8.dp.roundToPx() }
     val contentScrolled by remember(effectiveListState, catListState, chromeScrollThresholdPx) {
         androidx.compose.runtime.derivedStateOf {
@@ -286,6 +291,43 @@ fun LiveScreen(
     val contextFocus = remember { FocusRequester() }
     var enteringMoveMode by remember { mutableStateOf(false) }
     LaunchedEffect(moveState) { if (moveState != null) enteringMoveMode = false }
+    // Bring row [idx] on screen only when it is not already fully there: returning focus to a row
+    // that is visible must not yank the list so that row jumps to the top.
+    suspend fun revealRow(idx: Int) {
+        val info = effectiveListState.layoutInfo
+        val row = info.visibleItemsInfo.firstOrNull { it.index == idx }
+        val fullyVisible = row != null && row.offset >= info.viewportStartOffset && row.offset + row.size <= info.viewportEndOffset
+        if (!fullyVisible) runCatching { effectiveListState.scrollToItem(idx) }
+    }
+    // One requester per row position, for ▲/▼ stepping. Only composed rows are attached.
+    val rowRequesters = remember { HashMap<Int, RowFocus>() }
+    fun rowFocus(i: Int): RowFocus = rowRequesters.getOrPut(i) { RowFocus() }
+    // Move to row [i]: scroll just enough to show it with one row of room (the edge-scroll rule), wait for
+    // it to be laid out, then focus it. Works for a held key: nothing depends on focus search.
+    // The row a burst of presses is heading for: every press counts from there, not from the row that
+    // still has focus, and the newest press cancels the step still in flight.
+    var stepTarget by remember { mutableStateOf<Int?>(null) }
+    var stepJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    fun stepTo(i: Int) {
+        stepTarget = i
+        stepJob?.cancel()
+        stepJob = scope.launch {
+            val info = effectiveListState.layoutInfo
+            val row = info.visibleItemsInfo.firstOrNull { it.index == i }
+            val step = ((info.visibleItemsInfo.firstOrNull()?.size ?: 0) + info.mainAxisItemSpacing).toFloat()
+            val delta = when {
+                row == null -> if (i > (info.visibleItemsInfo.lastOrNull()?.index ?: 0)) step else -step
+                row.offset - step < info.viewportStartOffset -> row.offset - step - info.viewportStartOffset
+                row.offset + row.size + step > info.viewportEndOffset -> row.offset + row.size + step - info.viewportEndOffset
+                else -> 0f
+            }
+            if (delta != 0f) runCatching { effectiveListState.scrollBy(delta) }
+            if (effectiveListState.layoutInfo.visibleItemsInfo.none { it.index == i }) runCatching { effectiveListState.scrollToItem(i) }
+            withFrameNanos { }
+            runCatching { rowFocus(i).requestFocus() }
+            stepTarget = null
+        }
+    }
     // Land focus back on the long-pressed channel's row (or a sensible fallback if it's gone).
     suspend fun restoreToContextRow() {
         val targetId = contextChannelId
@@ -293,7 +335,7 @@ fun LiveScreen(
 
         val idx = channels.itemSnapshotList.items.indexOfFirst { it.id == targetId }
         if (idx >= 0) {
-            runCatching { effectiveListState.scrollToItem(idx) }
+            revealRow(idx)
             withFrameNanos { } // wait one frame so the row is laid out and contextFocus is attached
             runCatching { contextFocus.requestFocus() }
         } else {
@@ -413,7 +455,7 @@ fun LiveScreen(
         val ch = previewChannel
         val idx = if (ch != null) channels.itemSnapshotList.items.indexOfFirst { it.id == ch.id } else -1
         if (idx >= 0) {
-            runCatching { effectiveListState.scrollToItem(idx) }
+            revealRow(idx)
             delay(60)
             runCatching { selFocus.requestFocus() }
         } else {
@@ -422,126 +464,193 @@ fun LiveScreen(
         }
         onRestored()
     }
+    // Search's "Go to channel": scroll to where the channel sits so that part of the list loads, find
+    // its row by id and focus it. The list can still be the old category's for a moment, so focus is
+    // re-asserted for a short while; nothing found after ~5 s lands on the first row.
+    val reveal by vm.reveal.collectAsStateWithLifecycle()
+    LaunchedEffect(reveal, selectedKey) {
+        val r = reveal ?: return@LaunchedEffect
+        if (selectedKey != r.key) return@LaunchedEffect
+        if (rememberLive) perCategoryChannelIds[selectedKey] = r.id
+        var found = false
+        for (attempt in 0 until 50) {
+            if (channels.itemCount > 0) {
+                val idx = channels.itemSnapshotList.indexOfFirst { it?.id == r.id }
+                if (idx >= 0) {
+                    revealRow(idx)
+                    withFrameNanos { }
+                    if (runCatching { selFocus.requestFocus() }.getOrDefault(false)) found = true
+                    if (found && attempt >= 8) break
+                } else {
+                    runCatching { effectiveListState.scrollToItem(r.position.coerceAtMost(channels.itemCount - 1)) }
+                }
+            }
+            delay(100)
+        }
+        if (!found) runCatching { firstItemFocus.requestFocus() }
+        vm.revealDone()
+    }
 
     val selectedIndex = railItems.indexOfFirst { it.key == selectedKey }.coerceAtLeast(0)
     val selectedItem = railItems.getOrNull(selectedIndex)
     val selectedLabel = selectedItem?.displayLabel() ?: stringResource(R.string.content_category_all_channels)
 
-    // Manual panel widths (Settings → Panel Width Adjustment). The saved percentages now resolve
-    // against the inside of one shared content container; no stored value is rewritten.
+    val liveLayout by vm.liveLayout.collectAsStateWithLifecycle()
+    val nowProgrammes by vm.nowProgrammes.collectAsStateWithLifecycle()
+    val playlistMarks by vm.playlistMarks.collectAsStateWithLifecycle()
+    // Separate panels keeps the categories on screen; the Stage layout opens them as a sheet on Left.
+    val separate = liveLayout == tv.own.owntv.core.settings.SettingsRepository.LiveLayout.SEPARATE && lockedKey == null
+    var categoriesOpen by remember { mutableStateOf(false) }
+    var sheetHadFocus by remember { mutableStateOf(false) }
+    // The current channel's row. After a long-press that row carries contextFocus instead of selFocus
+    // (gridFocusTarget prefers it), so both are tried before falling back to the first row.
+    fun focusCurrentRow(): Boolean =
+        runCatching { selFocus.requestFocus() }.getOrDefault(false) ||
+            runCatching { contextFocus.requestFocus() }.getOrDefault(false) ||
+            runCatching { firstItemFocus.requestFocus() }.getOrDefault(false)
+    val categoriesVisible = lockedKey == null && (separate || categoriesOpen)
+    val railCounts by (if (categoriesVisible) vm.railCounts else remember { kotlinx.coroutines.flow.MutableStateFlow(emptyMap<LiveKey, Int>()) })
+        .collectAsStateWithLifecycle()
+    val scheduleFocus = remember { FocusRequester() }
+    var openProgramme by remember { mutableStateOf<Pair<ChannelEntity, tv.own.owntv.core.parser.XtEpgEntry>?>(null) }
+    // Back closes the sheet: one level out.
+    androidx.activity.compose.BackHandler(enabled = categoriesOpen) { categoriesOpen = false; focusCurrentRow() }
+    LaunchedEffect(categoriesOpen) {
+        if (categoriesOpen) { withFrameNanos { }; runCatching { railFocus.requestFocus() } }
+        // However the sheet closed (Back, a pick, ◀ to the rail), the next one starts fresh.
+        else sheetHadFocus = false
+    }
+
+    // Focus from the categories to the channel list: the remembered channel, else the first row.
+    fun focusChannelList() {
+        val targetId = if (rememberLive) perCategoryChannelIds[selectedKey] ?: previewChannel?.id else previewChannel?.id
+        scope.launch {
+            if (channels.itemCount > 0) {
+                val targetIdx = if (targetId != null) {
+                    channels.itemSnapshotList.items.indexOfFirst { it.id == targetId }.takeIf { it >= 0 } ?: 0
+                } else 0
+                revealRow(targetIdx)
+                withFrameNanos { }
+                repeat(3) {
+                    if (targetId != null && focusCurrentRow()) return@launch
+                    if (runCatching { firstItemFocus.requestFocus() }.getOrDefault(false)) return@launch
+                    withFrameNanos { }
+                }
+            } else {
+                runCatching { listSearchFocus.requestFocus() }
+            }
+        }
+    }
+
+    val (categoryEntries, groupsHeading) = liveCategoryEntries(railItems, railCounts)
+    val headerLabel = if (selectedItem?.key is LiveKey.Folder || selectedItem?.key is LiveKey.Custom) ProviderTags.parse(selectedLabel).name else selectedLabel
+
+    // CH± in the categories moves the highlight only; OK picks (owner, 2026-10-01).
+    var catFocusIndex by remember { mutableStateOf<Int?>(null) }
+    val categoriesModifier = Modifier
+        .onFocusChanged {
+            railPaneFocused = it.hasFocus
+            if (it.hasFocus && previewEnabled) vm.stopPreview()
+            // The sheet closes when focus leaves it (◀ to the rail) — not while its own menus are open,
+            // and not on the "unfocused" report every node gets when it first attaches.
+            if (it.hasFocus) sheetHadFocus = true
+            else if (sheetHadFocus && categoriesOpen && contextCategory == null && categoryMoveState == null) {
+                sheetHadFocus = false
+                categoriesOpen = false
+            }
+        }
+        .chNavPaging(
+            enabled = chNavEnabled,
+            upSkip = chNavUpSkip,
+            downSkip = chNavDownSkip,
+            isFocused = { railPaneFocused },
+            lastIndex = { railItems.size - 1 },
+            currentTargetIndex = { catFocusIndex ?: selectedIndex },
+            onJumpToIndex = { idx -> catFocusIndex = idx; railFocusRow = idx },
+        )
+    val onCategorySelect: (Int) -> Unit = { idx ->
+        railItems.getOrNull(idx)?.let { vm.select(it.key) }
+        if (categoriesOpen) { categoriesOpen = false; focusChannelList() }
+    }
+    val onCategoryLongSelect: (Int) -> Unit = { idx ->
+        railItems.getOrNull(idx)?.let { item ->
+            if (item.key is LiveKey.Folder || item.key is LiveKey.Custom) {
+                contextCategory = item
+                contextCategoryKey = item.key
+            }
+        }
+    }
+
+    // Manual panel widths (Settings → Panel Width Adjustment), mapped onto Stage: Category = the sheet
+    // (Stage) or the column (Separate), List and Preview split the rest; Preview 0% = full-width list.
     val panelShares = rememberPanelShares(PanelSection.LIVE, settingsVm)
+    // The Stage layout has its own set: the sheet on its own scale, list + preview = 100.
+    val panelOn by settingsVm.panelWidthEnabled.getValue(PanelSection.LIVE).collectAsStateWithLifecycle()
+    val stageSaved by settingsVm.liveStageWidths.collectAsStateWithLifecycle()
+    val stageWidths = stageSaved.takeIf { panelOn && !separate }
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
-            // Plan Z — while pinned, the More screen hosting this pane owns the panel and its
-            // padding, so the tab strip above the list is inside the same box rather than floating
-            // over the wallpaper next to a second one.
-            .then(
-                if (lockedKey == null) {
-                    Modifier.roundedPanel(fillColor = ContentPanelFill).padding(
-                        start = 0.dp,
-                        top = BrowseContainerPadding,
-                        end = BrowseContainerPadding,
-                        bottom = BrowseContainerPadding,
-                    )
-                } else {
-                    Modifier
-                },
-            )
             .onFocusChanged { if (it.hasFocus) onChildFocused() },
     ) {
-    val previewVisible = panelShares?.preview != 0
-    val innerGapTotal = browsePanelGapTotal(previewVisible)
-    val contentWidth = if (lockedKey == null) maxWidth - BrowseContainerPadding else maxWidth
-    val panels = panelShares?.let { computePanelWidths(it, contentWidth, innerGapTotal) }
-    Row(
-        modifier = Modifier
-            .fillMaxSize(),
-    ) {
-        // Plan Z — More → Favourites and More → History pin this pane to one folder and put
-        // their own three tabs above it, so there is no category rail to draw.
-        if (lockedKey == null) {
-        CategoryRail(
-            width = (panels?.category ?: Dimens.RailWidthFixed) + BrowseContainerPadding,
-            categories = railItems.map {
-                RailCategory(
-                    it.displayLabel(),
-                    it.icon,
-                    showGenreDot = it.key is LiveKey.Folder,
-                    providerName = it.providerName,
-                )
-            },
-            selectedIndex = selectedIndex,
-            focusRowIndex = railFocusRow,
-            onRowFocused = { railFocusRow = null },
-            onSelect = { idx -> railItems.getOrNull(idx)?.let { vm.select(it.key) } },
-            onLongSelect = { idx -> 
-                railItems.getOrNull(idx)?.let { item ->
-                    if (item.key is LiveKey.Folder || item.key is LiveKey.Custom) {
-                        contextCategory = item
-                        contextCategoryKey = item.key
-                    }
-                }
-            },
-            // Focusing a folder stops the in-pane preview — but only when a preview is actually running.
-            // When the player is docked (live PiP) or fullscreen, previewEnabled is false and stopPreview
-            // would kill that stream (e.g. while navigating left to leave Live), so we skip it.
-            onFocused = { if (previewEnabled) vm.stopPreview() },
-            listState = catListState,
-            focusRequester = railFocus,
-            onNavigateRight = {
-                val targetId = if (rememberLive) {
-                    perCategoryChannelIds[selectedKey] ?: previewChannel?.id
-                } else {
-                    previewChannel?.id
-                }
-                scope.launch {
-                    if (channels.itemCount > 0) {
-                        val targetIdx = if (targetId != null) {
-                            channels.itemSnapshotList.items.indexOfFirst { it.id == targetId }.takeIf { it >= 0 } ?: 0
-                        } else 0
-                        runCatching { effectiveListState.scrollToItem(targetIdx) }
-                        withFrameNanos { }
-                        repeat(3) {
-                            val focused = if (targetId != null) {
-                                runCatching { selFocus.requestFocus() }.getOrDefault(false)
-                            } else false
-                            if (focused) return@launch
-                            if (runCatching { firstItemFocus.requestFocus() }.getOrDefault(false)) return@launch
-                            if (runCatching { selFocus.requestFocus() }.getOrDefault(false)) return@launch
-                            withFrameNanos { }
-                        }
-                    } else {
-                        runCatching { listSearchFocus.requestFocus() }
-                    }
-                }
-            },
-            showPanel = false,
-            modifier = Modifier
-                .onFocusChanged { railPaneFocused = it.hasFocus }
-                .chNavPaging(
-                    enabled = chNavEnabled,
-                    upSkip = chNavUpSkip,
-                    downSkip = chNavDownSkip,
-                    isFocused = { railPaneFocused },
-                    lastIndex = { railItems.size - 1 },
-                    currentTargetIndex = { selectedIndex },
-                    // Selecting a category loads only its first paged page (~50 items), not all channels
-                    // at once, so this is fast. The rail's LaunchedEffect scrolls + focuses the pill.
-                    onJumpToIndex = { idx -> railItems.getOrNull(idx)?.let { vm.select(it.key) } },
-                ),
+        // Horizontal geometry is a fraction of the mockup's 1920 width, so every zoom reflows.
+        val screenW = maxWidth
+        fun fx(px: Int) = screenW * (px / 1920f)
+        val margin = fx(64)
+        val row = screenW - margin * 2
+        val previewShown = if (separate) panelShares?.preview != 0 else stageWidths?.preview != 0
+        val liveHints = listOf(
+            stringResource(R.string.common_ok) to stringResource(R.string.content_key_watch),
+            "◀" to stringResource(R.string.content_category_browser_title),
+            "▶" to stringResource(R.string.content_key_schedule),
+            stringResource(R.string.content_key_hold_ok) to stringResource(R.string.content_key_options),
         )
+        val gapCat = fx(26)
+        val gapStage = if (separate) fx(30) else fx(34)
+        val colW: Dp
+        val listW: Dp
+        val stageW: Dp
+        val sheetW: Dp
+        if (separate && panelShares != null) {
+            val p = computePanelWidths(panelShares, row, gapCat + if (previewShown) gapStage else 0.dp)
+            colW = p.category; listW = p.list; stageW = p.preview; sheetW = 0.dp
+        } else if (!separate && stageWidths != null) {
+            // The sheet is a share of the screen; the row between the margins is list + preview.
+            val rest = (row - if (previewShown) gapStage else 0.dp).coerceAtLeast(1.dp)
+            colW = 0.dp
+            sheetW = screenW * (stageWidths.sheet / 100f)
+            listW = rest * (stageWidths.list / 100f)
+            stageW = rest - listW
+        } else {
+            // The mockup's geometry.
+            colW = fx(350); sheetW = fx(450)
+            listW = if (separate) fx(620) else fx(846)
+            stageW = if (separate) fx(766) else fx(912)
+        }
+        val listX = if (separate) margin + colW + gapCat else margin
+        val listWidth = if (previewShown) listW else row - (listX - margin)
 
-        Spacer(Modifier.width(BrowseColumnGap))
-        Box(
-            Modifier
-                .width(BrowseColumnDividerSpace)
-                .fillMaxHeight()
-                .padding(vertical = 2.dp)
-                .background(OwnTVTheme.colors.outlineVariant.copy(alpha = 0.35f)),
-        )
-
-        Spacer(Modifier.width(BrowseColumnGap))
+        if (separate) {
+            LiveCategories(
+                entries = categoryEntries,
+                selectedIndex = selectedIndex,
+                groupsHeading = groupsHeading,
+                sheet = false,
+                listState = catListState,
+                onSelect = onCategorySelect,
+                onLongSelect = onCategoryLongSelect,
+                onNavigateRight = { focusChannelList() },
+                focusRequester = railFocus,
+                focusRowIndex = railFocusRow,
+                onRowFocused = { railFocusRow = null },
+                onRowFocus = { catFocusIndex = it },
+                searchQuery = categoryQuery,
+                onSearchQueryChange = vm::setCategoryQuery,
+                modifier = categoriesModifier
+                    .padding(start = margin, top = 128.mpx, bottom = 24.mpx)
+                    .width(colW)
+                    .fillMaxHeight(),
+            )
         }
 
         val targetChannelIdState = remember {
@@ -551,226 +660,307 @@ fun LiveScreen(
         }
         val targetChannelId by targetChannelIdState
 
-        // Layer 3 — header + channel list (fixed-width column; the preview pane fills the rest)
-        Column(
-            modifier = Modifier
-                .width(panels?.list ?: Dimens.ChannelListWidth)
-                .fillMaxHeight()
-                // Track whether this pane holds focus so chNavPaging only consumes CH keys when it does.
-                .onFocusChanged { channelPaneFocused = it.hasFocus }
-                // CH+- key paging for this channel list. Long-press jumps to first/last channel;
-                // short press skips N. currentTargetIndex falls back to the visible top when the
-                // previewed channel isn't in the loaded window (paged data).
-                .chNavPaging(
-                    enabled = chNavEnabled,
-                    upSkip = chNavUpSkip,
-                    downSkip = chNavDownSkip,
-                    isFocused = { channelPaneFocused },
-                    // On the "All" list (every channel) a long-press jump to the very last item is
-                    // pointless and janks, so disable long-press there — short-press skipping stays.
-                    longPressEnabled = { selectedKey != LiveKey.All },
-                    lastIndex = { channels.itemCount - 1 },
-                    currentTargetIndex = {
-                        val pc = previewChannel
-                        if (pc != null) {
-                            val idx = channels.itemSnapshotList.items.indexOfFirst { it.id == pc.id }
-                            if (idx >= 0) idx else effectiveListState.firstVisibleItemIndex
-                        } else {
-                            effectiveListState.firstVisibleItemIndex
-                        }
-                    },
-                    onJumpToIndex = { idx ->
-                        // Scroll the target into view, then focus it. selFocus is bound to the
-                        // previewed channel by gridFocusTarget, so we make the target the previewed
-                        // one (which also fires the debounced 700ms preview — desired).
-                        val target = channels.itemSnapshotList.items.getOrNull(idx)?.id
-                        scope.launch {
-                            runCatching { effectiveListState.scrollToItem(idx) }
-                            withFrameNanos { }
-                            if (target != null) {
-                                // Set the previewed channel so selFocus binds to the new row, then focus.
-                                val item = channels.itemSnapshotList.items.firstOrNull { it.id == target }
-                                if (item != null) {
-                                    vm.onChannelFocused(item)
-                                    runCatching { selFocus.requestFocus() }
-                                }
-                            } else {
-                                runCatching { firstItemFocus.requestFocus() }
-                            }
-                        }
-                    },
-                )
-                // Entering this pane (from the rail or the preview) must land on a channel row, never
-                // the search bar: prefer the last-focused channel, else the first row. onEnter fires
-                // only for directional entry from outside (internal moves don't re-trigger it).
-                .focusProperties {
-                    onEnter = {
-                        val focused = if (targetChannelId != null) {
-                            runCatching { selFocus.requestFocus() }.getOrDefault(false)
-                        } else false
-                        if (!focused) {
-                            if (!runCatching { firstItemFocus.requestFocus() }.getOrDefault(false)) {
-                                runCatching { selFocus.requestFocus() }
-                            }
-                        }
-                    }
-                }
-                // Held Up/Down can outrun the lazy list's composition and escape this pane
-                // (landing on the top bar) — trap vertical exits; D-pad Right is also trapped
-                // so remote navigation does not escape to the TopBar or preview pane; Left/Back leave normally.
-                // Plan Z — while pinned there IS somewhere above to go: the More screen's tab
-                // strip. It owns the trap instead, so Up reaches the tabs and still cannot escape
-                // past them to the shell's top bar.
-                .then(
-                    if (lockedKey == null) {
-                        Modifier.focusProperties {
-                            onExit = {
-                                if (requestedFocusDirection == FocusDirection.Up ||
-                                    requestedFocusDirection == FocusDirection.Down ||
-                                    requestedFocusDirection == FocusDirection.Right
-                                ) {
-                                    cancelFocusChange()
-                                }
-                            }
-                        }
-                    } else {
-                        Modifier
-                    },
-                )
-                .focusGroup()
+        // The list side, dimmed to 40% while the sheet is over it (P3-02).
+        Box(
+            Modifier
+                .fillMaxSize()
+                .then(if (categoriesOpen) Modifier.graphicsLayer { alpha = 0.4f } else Modifier),
         ) {
-            Text(
-                stringResource(R.string.common_nav_live_tv),
-                style = MaterialTheme.typography.headlineLarge,
-                color = OwnTVTheme.colors.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+            LiveHeader(
+                category = headerLabel,
+                count = count,
+                showChevron = !separate && lockedKey == null,
+                modifier = Modifier.padding(start = fx(84), top = 52.mpx).width(listX - fx(84) + listWidth),
             )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                pluralStringResource(R.plurals.content_count_channels, count, selectedLabel, count),
-                style = MaterialTheme.typography.titleMedium,
-                color = OwnTVTheme.colors.primary,
-                fontWeight = FontWeight.Bold,
-            )
-            Spacer(Modifier.height(14.dp))
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
+            // Header tools + channel list: one focus group.
+            Column(
                 modifier = Modifier
+                    .padding(start = listX, top = 118.mpx)
+                    .width(listWidth)
+                    .fillMaxHeight()
+                    .onFocusChanged { channelPaneFocused = it.hasFocus }
+                    .chNavPaging(
+                        enabled = chNavEnabled,
+                        upSkip = chNavUpSkip,
+                        downSkip = chNavDownSkip,
+                        isFocused = { channelPaneFocused },
+                        longPressEnabled = { selectedKey != LiveKey.All },
+                        lastIndex = { channels.itemCount - 1 },
+                        currentTargetIndex = {
+                            val pc = previewChannel
+                            if (pc != null) {
+                                val idx = channels.itemSnapshotList.items.indexOfFirst { it.id == pc.id }
+                                if (idx >= 0) idx else effectiveListState.firstVisibleItemIndex
+                            } else {
+                                effectiveListState.firstVisibleItemIndex
+                            }
+                        },
+                        onJumpToIndex = { idx ->
+                            val target = channels.itemSnapshotList.items.getOrNull(idx)?.id
+                            scope.launch {
+                                runCatching { effectiveListState.scrollToItem(idx) }
+                                withFrameNanos { }
+                                if (target != null) {
+                                    val item = channels.itemSnapshotList.items.firstOrNull { it.id == target }
+                                    if (item != null) {
+                                        // The remembered channel is the focus target, so it moves with the jump;
+                                        // focus by row number, which holds whatever the row's other requesters are.
+                                        vm.onChannelFocused(item)
+                                        if (rememberLive) perCategoryChannelIds[selectedKey] = item.id
+                                        withFrameNanos { }
+                                        runCatching { rowFocus(idx).requestFocus() }
+                                    }
+                                } else {
+                                    runCatching { firstItemFocus.requestFocus() }
+                                }
+                            }
+                        },
+                    )
+                    // Entering this pane lands on a channel row, never the search field.
                     .focusProperties {
                         onEnter = {
-                            // Prevent entering search/sort horizontally from the category rail (D-pad Right).
-                            // SearchBar and SortChip remain fully accessible by pressing Up from the channel rows.
-                            if (requestedFocusDirection == FocusDirection.Right ||
-                                requestedFocusDirection == FocusDirection.Left
-                            ) {
-                                cancelFocusChange()
+                            if (targetChannelId == null || !focusCurrentRow()) runCatching { firstItemFocus.requestFocus() }
+                        }
+                    }
+                    // Held Up/Down never escape the list; pinned (More) keeps Up for its tabs.
+                    .focusProperties {
+                        onExit = {
+                            when (requestedFocusDirection) {
+                                // The rows handle ◀ and ▶ themselves; from the tool row neither leaves the pane.
+                                FocusDirection.Left, FocusDirection.Right -> cancelFocusChange()
+                                FocusDirection.Up, FocusDirection.Down -> if (lockedKey == null) cancelFocusChange()
+                                else -> Unit
                             }
                         }
                     }
                     .focusGroup(),
             ) {
-                SearchBar(
-                    query = searchQuery,
-                    onQueryChange = vm::setSearchQuery,
-                    placeholder = stringResource(R.string.content_search_channels),
-                    modifier = Modifier.weight(1f).focusRequester(listSearchFocus).onFocusChanged { if (it.hasFocus && previewEnabled) vm.stopPreview() },
-                )
-                Spacer(Modifier.size(10.dp))
-                SortChip(mode = sortMode, onToggle = vm::toggleSort)
-            }
-            Spacer(Modifier.height(14.dp))
-
-            if (channels.itemCount == 0) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        if (searchQuery.isNotBlank()) stringResource(R.string.content_no_channels_found, searchQuery.trim()) else stringResource(R.string.content_no_channels_here),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = OwnTVTheme.colors.onSurfaceVariant,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.mpx),
+                    modifier = Modifier.padding(start = 4.mpx).focusGroup(),
+                ) {
+                    tv.own.owntv.ui.stage.StageSearchField(
+                        query = searchQuery,
+                        onQueryChange = vm::setSearchQuery,
+                        placeholder = if (separate) stringResource(R.string.common_search) else stringResource(R.string.content_search_in, headerLabel),
+                        // The mockup's share of the list width, but never more than the two tools leave:
+                        // a narrow custom list shrinks the field, not "Guide view".
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .width(if (separate) listWidth * (230f / 620f) else listWidth * (456f / 846f))
+                            .focusRequester(listSearchFocus)
+                            .onFocusChanged { if (it.hasFocus && previewEnabled) vm.stopPreview() }
+                            // ◀ Categories from the search field too, as from the rows (not while typing).
+                            .onPreviewKeyEvent { e ->
+                                if (e.type == androidx.compose.ui.input.key.KeyEventType.KeyDown &&
+                                    e.key == androidx.compose.ui.input.key.Key.DirectionLeft &&
+                                    searchQuery.isEmpty() && lockedKey == null
+                                ) {
+                                    if (separate) runCatching { railFocus.requestFocus() } else categoriesOpen = true
+                                    true
+                                } else false
+                            },
+                    )
+                    tv.own.owntv.ui.stage.StageTool(
+                        text = null,
+                        icon = OwnTVIcon.SORT,
+                        value = if (sortMode == tv.own.owntv.core.settings.SettingsRepository.SortMode.ALPHA) stringResource(R.string.settings_sort_alpha) else stringResource(R.string.content_epg_sort_provider),
+                        onClick = vm::toggleSort,
+                    )
+                    tv.own.owntv.ui.stage.StageTool(
+                        text = stringResource(R.string.content_live_guide_view),
+                        icon = OwnTVIcon.GRID,
+                        onClick = onOpenGuide,
                     )
                 }
-            } else {
-                LazyColumn(state = effectiveListState, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    items(
-                        count = channels.itemCount,
-                        key = channels.itemKey { it.id },
-                        contentType = channels.itemContentType { "channel" },
-                    ) { index ->
-                        val channel = channels[index]
-                        if (channel != null) {
-                            // Only the rows entering or leaving the preview recompose on a focus step,
-                            // instead of every visible row re-reading the previewed channel.
-                            val isPreviewed by remember(channel.id) {
-                                androidx.compose.runtime.derivedStateOf { previewChannel?.id == channel.id }
-                            }
-                            // Same idea for the focus target (the remembered channel, else the preview).
-                            val isTarget by remember(channel.id) {
-                                androidx.compose.runtime.derivedStateOf { targetChannelIdState.value == channel.id }
-                            }
-                            ChannelRow(
-                                channel = channel,
-                                isFavorite = favoriteIds.contains(channel.id),
-                            // The batch answers from the stored guide plus whatever the preview has
-                            // already resolved; the channel under the cursor is answered from the
-                            // preview ITSELF, so the row and the pane beside it can never disagree and
-                            // the line appears at once rather than at the next 60s refresh.
-                            nowTitle = if (isPreviewed) {
-                                nowNext?.now?.title?.takeIf { it.isNotBlank() } ?: nowPlaying[channel.id]
-                            } else {
-                                nowPlaying[channel.id]
-                            },
-                            showNumber = showChannelNumbers,
-                            providerName = providerNames[channel.sourceId],
-                                modifier = Modifier.gridFocusTarget(
-                                    itemId = channel.id, index = index,
-                                    contextId = contextChannelId, contextFocus = contextFocus,
-                                    selectedId = if (isTarget) channel.id else null, selectedFocus = selFocus,
-                                    firstItemFocus = firstItemFocus,
+                Spacer(Modifier.height(20.mpx))
+                if (channels.itemCount == 0) {
+                    Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                        Text(
+                            if (searchQuery.isNotBlank()) stringResource(R.string.content_no_channels_found, searchQuery.trim()) else stringResource(R.string.content_no_channels_here),
+                            style = tv.own.owntv.ui.theme.stageText(20, 500),
+                            color = tv.own.owntv.ui.theme.StageColors.Muted,
+                        )
+                    }
+                } else {
+                    // The list clips whatever is drawn outside it, which cut the focused row's 44 px glow.
+                    // It is laid out [glowRoom] wider at each side and padded back by the same amount,
+                    // so the rows sit exactly where they did and the glow has room to show.
+                    val glowRoom = 24.mpx
+                    // Scroll only as far as the focused row needs to be on screen, as Home does: the TV
+                    // default pins focus a third of the way down, so each ▼ moved the highlight a row
+                    // and then slid the whole list back under it — a double step.
+                    androidx.compose.runtime.CompositionLocalProvider(androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides edgeScrollSpec) {
+                    LazyColumn(
+                        state = effectiveListState,
+                        verticalArrangement = Arrangement.spacedBy(8.mpx),
+                        modifier = Modifier.fillMaxWidth().weight(1f).layout { measurable, constraints ->
+                            val extra = glowRoom.roundToPx()
+                            val placeable = measurable.measure(
+                                constraints.copy(
+                                    minWidth = constraints.minWidth + extra * 2, maxWidth = constraints.maxWidth + extra * 2,
                                 ),
-                                onFocus = {
-                                    vm.onChannelFocused(channel)
-                                    if (rememberLive) {
-                                        perCategoryChannelIds[selectedKey] = channel.id
-                                    }
-                                },
-                                onClick = {
-                                    vm.watchFullscreen(channel, channels.itemSnapshotList.items.filterNotNull())
-                                    // External player on for Live TV: the channel went to another app, so
-                                    // don't mount the fullscreen player (it would spin up an idle engine).
-                                    if (!externalPlayerOn) onFullscreen()
-                                },
-                                onLongClick = { contextChannel = channel; contextChannelId = channel.id },
                             )
+                            layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(-extra, 0) }
+                        },
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(start = glowRoom, end = glowRoom, bottom = 16.mpx),
+                    ) {
+                        items(
+                            count = channels.itemCount,
+                            key = channels.itemKey { it.id },
+                            contentType = channels.itemContentType { "channel" },
+                        ) { index ->
+                            val channel = channels[index]
+                            if (channel != null) {
+                                val isPreviewed by remember(channel.id) {
+                                    androidx.compose.runtime.derivedStateOf { previewChannel?.id == channel.id }
+                                }
+                                val isTarget by remember(channel.id) {
+                                    androidx.compose.runtime.derivedStateOf { targetChannelIdState.value == channel.id }
+                                }
+                                val parsed = remember(channel.name) { ProviderTags.parse(channel.name) }
+                                LiveStageRow(
+                                    channel = channel,
+                                    name = parsed,
+                                    // The channel under the cursor answers from the preview itself, so the row
+                                    // and the stage beside it can never disagree.
+                                    now = if (isPreviewed) nowNext?.now ?: nowProgrammes[channel.id] else nowProgrammes[channel.id],
+                                    nowTitle = nowPlaying[channel.id],
+                                    isFavorite = favoriteIds.contains(channel.id),
+                                    showNumber = showChannelNumbers,
+                                    mark = playlistMarks[channel.sourceId],
+                                    modifier = Modifier.gridFocusTarget(
+                                        itemId = channel.id, index = index,
+                                        contextId = contextChannelId, contextFocus = contextFocus,
+                                        selectedId = if (isTarget) channel.id else null, selectedFocus = selFocus,
+                                        firstItemFocus = firstItemFocus,
+                                    ).focusRequester(rowFocus(index)).onPreviewKeyEvent { e ->
+                                        if (e.type != androidx.compose.ui.input.key.KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                                        when (e.key) {
+                                            // D3: the remote's Menu key opens the same menu as holding OK.
+                                            androidx.compose.ui.input.key.Key.Menu -> { contextChannel = channel; contextChannelId = channel.id; true }
+                                            // ◀ Categories: the sheet (Stage) or the column (Separate); pinned lists have none.
+                                            androidx.compose.ui.input.key.Key.DirectionLeft -> when {
+                                                lockedKey != null -> false
+                                                separate -> { runCatching { railFocus.requestFocus() }; true }
+                                                else -> { categoriesOpen = true; true }
+                                            }
+                                            // ▶ Schedule: next / later under the stage; nothing else to the right.
+                                            androidx.compose.ui.input.key.Key.DirectionRight -> { runCatching { scheduleFocus.requestFocus() }; true }
+                                            // ▲/▼ step by row number, not by focus search: a held key outran the
+                                            // lazy list at the edge or a page boundary and stopped (owner).
+                                            androidx.compose.ui.input.key.Key.DirectionDown -> (stepTarget ?: index).let { from -> from + 1 < channels.itemCount && run { stepTo(from + 1); true } }
+                                            androidx.compose.ui.input.key.Key.DirectionUp -> (stepTarget ?: index).let { from -> from > 0 && run { stepTo(from - 1); true } }
+                                            else -> false
+                                        }
+                                    },
+                                    onFocus = {
+                                        vm.onChannelFocused(channel)
+                                        if (rememberLive) perCategoryChannelIds[selectedKey] = channel.id
+                                    },
+                                    onClick = {
+                                        vm.watchFullscreen(channel, channels.itemSnapshotList.items.filterNotNull())
+                                        if (!externalPlayerOn) onFullscreen()
+                                    },
+                                    onLongClick = { contextChannel = channel; contextChannelId = channel.id },
+                                )
+                            }
                         }
                     }
+                    }
+                }
+                // With the preview off the hints stay under the list, where there is nothing else to hold them.
+                if (lockedKey == null && !previewShown) {
+                    tv.own.owntv.ui.stage.StageKeyHints(
+                        liveHints,
+                        // A clear gap under the list, and 40 from the bottom rather than the mockup's 26:
+                        // TV panels overscan the very edge away (owner, 2026-09-30).
+                        modifier = Modifier.padding(start = 16.mpx, top = 22.mpx, bottom = 40.mpx),
+                    )
                 }
             }
-        }
 
-        // Layer 4 — preview pane (informational only — no focusable actions; management lives in long-press)
-        if (previewVisible) {
-            Spacer(Modifier.width(BrowseColumnGap))
-            Box(
-                modifier = Modifier
-                    .then(if (panels != null) Modifier.width(panels.preview) else Modifier.weight(1f))
-                    .fillMaxSize()
-                    .roundedPanel(fillColor = PreviewPanelFill, surface = GlassSurface.PREVIEW)
-                    .padding(BrowseContainerPadding),
-            ) {
-                LivePreviewPane(
+            // Under the preview, bottom right (owner, 2026-10-01), so the list runs down to the bottom edge.
+            if (lockedKey == null && previewShown) {
+                tv.own.owntv.ui.stage.StageKeyHints(
+                    liveHints,
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(end = margin, bottom = 40.mpx),
+                )
+            }
+
+            if (previewShown) {
+                LiveStagePane(
                     channel = previewChannel,
-                    categoryName = previewCategoryName,
+                    channelName = previewChannel?.let { ProviderTags.parse(it.name).name },
                     nowNext = nowNext,
                     previewEngine = vm.previewEngine,
                     showVideo = effectivePreview,
                     singleSessionBlocked = previewBlockedSingleSession,
+                    scheduleFocus = scheduleFocus,
+                    onOpenProgramme = { p -> previewChannel?.let { openProgramme = it to p } },
+                    onBackToList = { focusCurrentRow() },
+                    modifier = Modifier
+                        .padding(start = screenW - margin - stageW, top = 120.mpx)
+                        .width(stageW),
                 )
             }
         }
-    }
+
+        if (categoriesOpen) {
+            LiveCategories(
+                entries = categoryEntries,
+                selectedIndex = selectedIndex,
+                groupsHeading = groupsHeading,
+                sheet = true,
+                listState = catListState,
+                onSelect = onCategorySelect,
+                onLongSelect = onCategoryLongSelect,
+                onNavigateRight = { categoriesOpen = false; focusChannelList() },
+                focusRequester = railFocus,
+                focusRowIndex = railFocusRow,
+                onRowFocused = { railFocusRow = null },
+                onRowFocus = { catFocusIndex = it },
+                searchQuery = categoryQuery,
+                onSearchQueryChange = vm::setCategoryQuery,
+                modifier = categoriesModifier
+                    .padding(start = fx(24), top = 24.mpx, bottom = 24.mpx)
+                    .width(sheetW)
+                    .fillMaxHeight(),
+            )
+        }
     }
 
+    // A next / later programme opened from the schedule under the stage (▶ Schedule): the TV Guide's
+    // programme menu (P4-02), acting through the guide's view model so both screens do the same thing.
+    openProgramme?.let { (ch, xt) ->
+        val epgVm: tv.own.owntv.features.epg.EpgViewModel = koinViewModel()
+        val leadMinutes by epgVm.reminderLeadMinutes.collectAsStateWithLifecycle()
+        val p = remember(ch.id, xt.startMs) {
+            tv.own.owntv.core.database.entity.EpgProgrammeEntity(
+                sourceId = ch.sourceId, epgChannelId = ch.epgChannelId.orEmpty(),
+                startMs = xt.startMs, stopMs = xt.stopMs, title = xt.title, description = xt.description,
+            )
+        }
+        val formatTime = rememberSystemTimeFormatter()
+        tv.own.owntv.features.epg.GuideProgrammeMenu(
+            title = p.title,
+            subtitle = listOf(
+                stringResource(R.string.content_live_time_range_plain, formatTime(p.startMs), formatTime(p.stopMs)),
+                listOfNotNull(ch.number?.toString(), ProviderTags.parse(ch.name).name).joinToString(" "),
+            ).joinToString(" · "),
+            actions = tv.own.owntv.features.epg.guideProgrammeActions(
+                epgVm, ch, p, System.currentTimeMillis(),
+                onWatch = { vm.watchFullscreen(ch, emptyList()); if (!externalPlayerOn) onFullscreen() },
+                onPlayFromStart = { vm.playCatchupProgramme(ch, p); if (!externalPlayerOn) onFullscreen() },
+                onPickEpg = { contextChannelId = ch.id; matchingEpg = ch },
+                onEpgOffset = { contextChannelId = ch.id; offsettingEpg = ch },
+                autoMatch = false,
+            ),
+            leadMinutes = leadMinutes,
+            onDismiss = { openProgramme = null; runCatching { scheduleFocus.requestFocus() } },
+        )
+    }
     catchupChannel?.let { ch ->
         CatchupDialog(
             channelName = ch.name,
@@ -841,9 +1031,12 @@ fun LiveScreen(
     // Long-press a channel → quick actions.
     contextChannel?.let { ch ->
         ChannelContextMenu(
-            channelName = ch.name,
+            channel = ch,
+            title = ch.name,
+            subtitle = listOfNotNull(headerLabel, vm.sourceNameOf(ch.sourceId)).joinToString(" · "),
             isFavorite = favoriteIds.contains(ch.id),
-            hasCatchup = ch.catchup,
+            epgMatchManual = vm.currentEpgMatch(ch) != null,
+            epgShiftMinutes = vm.currentEpgShift(ch),
             canMove = selectedKey is LiveKey.Folder || selectedKey is LiveKey.Custom || selectedKey == LiveKey.Favorites,
             isHistory = selectedKey == LiveKey.History,
             onToggleFavorite = { vm.toggleFavorite(ch); contextChannel = null },
@@ -884,6 +1077,7 @@ fun LiveScreen(
                 contextChannel = null
             },
             onRemoveFromHistory = { vm.removeFromHistory(ch.id); contextChannel = null },
+            onRemoveFromCategory = (selectedKey as? LiveKey.Custom)?.let { k -> { vm.removeFromCustomCategory(ch, k); contextChannel = null } },
             onWatchInCorner = { pip.openCorner(ch); contextChannel = null },
             onDismiss = { contextChannel = null },
         )
@@ -958,84 +1152,23 @@ fun LiveScreen(
     }
 }
 
-@Composable
-private fun ChannelRow(
-    channel: ChannelEntity,
-    isFavorite: Boolean,
-    onFocus: () -> Unit,
-    onClick: () -> Unit,
-    onLongClick: (() -> Unit)? = null,
-    nowTitle: String? = null,
-    showNumber: Boolean = true,
-    providerName: String? = null,
-    modifier: Modifier = Modifier,
-) {
-    val colors = OwnTVTheme.colors
-    FocusableSurface(
-        onClick = onClick,
-        onLongClick = onLongClick,
-        modifier = modifier
-            .fillMaxWidth()
-            .onFocusChanged { if (it.hasFocus) onFocus() },
-        shape = RoundedCornerShape(12.dp),
-        surface = GlassSurface.CARDS,
-        contentAlignment = Alignment.CenterStart,
-    ) { focused ->
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            tv.own.owntv.ui.components.ChannelLogoTile(
-                logoUrl = channel.displayLogoUrl,
-                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)),
-            ) {
-                OwnTVIcon(OwnTVIcon.LIVE_TV, tint = colors.onSurfaceVariant, modifier = Modifier.size(24.dp))
-            }
-            // Provider channel number, in a fixed-width strip so every name below starts at the same x
-            // however many digits the number has. Hidden entirely when the setting is off.
-            if (showNumber) {
-                tv.own.owntv.ui.components.ChannelNumberColumn(
-                    number = channel.number,
-                    color = colors.onSurfaceVariant,
-                )
-            }
-            // Name + (optional) current programme. The subtitle is rendered only when guide data exists,
-            // so channels without EPG look exactly as before — single line.
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    channel.name,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = if (focused) colors.primary else colors.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (nowTitle != null) {
-                    Text(
-                        nowTitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = colors.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-            if (isFavorite) {
-                OwnTVIcon(OwnTVIcon.FAVORITE, tint = colors.favorite, filled = true, modifier = Modifier.size(20.dp))
-            }
-            providerName?.let { ProviderChip(name = it) }
-        }
-    }
-}
-
-/** Long-press quick actions for a Live channel (favourite / rename / hide / match EPG / EPG offset / catch-up / move / remove history). */
+/**
+ * ☰ Channel options (P3-04): the Stage options menu, 540 wide over the stage, above the scrim. Header
+ * = the logo plate, "256 · Sky Cinema Premieren" and "category · playlist"; the actions in the groups
+ * WATCH · CHANNEL · GUIDE DATA · ORGANISE with their values (Catch-up "7 days", Match EPG "Auto",
+ * EPG time offset "Global"). The order and visibility are the user's (Settings › Long-press menus ›
+ * Live TV); a group label is drawn wherever the group changes.
+ */
 @Composable
 private fun ChannelContextMenu(
-    channelName: String,
+    channel: ChannelEntity,
+    title: String,
+    subtitle: String?,
     isFavorite: Boolean,
-    hasCatchup: Boolean,
     canMove: Boolean,
     isHistory: Boolean,
+    epgMatchManual: Boolean,
+    epgShiftMinutes: Int?,
     onToggleFavorite: () -> Unit,
     onRename: () -> Unit,
     onHide: () -> Unit,
@@ -1050,407 +1183,88 @@ private fun ChannelContextMenu(
     // "Move to category…" (issue #87): send this channel into a user's combined category.
     onMoveToCategory: () -> Unit,
     onRemoveFromHistory: () -> Unit,
+    // Only inside a custom category: take the channel out of that category alone.
+    onRemoveFromCategory: (() -> Unit)?,
     onWatchInCorner: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val colors = OwnTVTheme.colors
     val focus = remember { androidx.compose.ui.focus.FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     androidx.activity.compose.BackHandler { onDismiss() }
-    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
-    Box(
-        modifier = Modifier.fillMaxSize().modalScrim()
-            .trapAllFocusExit().focusGroup()
-            .longPressMenuGuard(), // the long-press OK is still held — don't let it auto-click a menu item
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            modifier = Modifier.dialogPanel(),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(channelName, style = MaterialTheme.typography.titleMedium, color = colors.onSurface, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-            Spacer(Modifier.height(8.dp))
-            // The menu as data: same actions, same gating, same order as the buttons that used to be
-            // written out here one by one. Close is not in the list — it stays pinned last.
-            val actions = buildList {
-                add(MenuAction("favourite", if (isFavorite) stringResource(R.string.content_remove_favourite) else stringResource(R.string.content_add_favourite), OwnTVIcon.FAVORITE, group = 0, onClick = onToggleFavorite))
-                add(MenuAction("rename", stringResource(R.string.content_rename), group = 0, onClick = onRename))
-                add(MenuAction("match_epg", stringResource(R.string.content_match_epg), OwnTVIcon.EPG, group = 1, onClick = onMatchEpg))
-                add(MenuAction("epg_offset", stringResource(R.string.content_epg_time_offset), OwnTVIcon.EPG, group = 1, onClick = onEpgOffset))
-                if (hasCatchup) add(MenuAction("catchup", stringResource(R.string.content_catchup), group = 1, onClick = onCatchup))
-                // Record this channel from now. The guide's Record needs a programme, so a channel
-                // the provider publishes no guide for can only be recorded from here.
-                add(MenuAction("record", stringResource(R.string.recording_record), OwnTVIcon.LIVE_TV, group = 1, onClick = onRecord))
-                // Always offered, regardless of the Live TV external-player default — this is the per-channel
-                // escape hatch for a stream neither in-app engine can open (same as Movies/Series/Downloads).
-                add(MenuAction("play_external", stringResource(R.string.content_play_external_short), OwnTVIcon.PLAY, group = 1, onClick = onPlayExternal))
-                if (onAddToMultiview != null) {
-                    add(MenuAction("add_to_multiview", stringResource(R.string.multiview_add_to), OwnTVIcon.LIST_GRID, group = 1, onClick = onAddToMultiview))
-                }
-                // Fork: true PiP keeps this channel playing in a corner window alongside whatever else is on.
-                // Group 5 is fork-only, so it keeps its own divider wherever the user arranges the menu.
-                add(MenuAction("fork_pip", stringResource(R.string.fork_action_picture_in_picture), OwnTVIcon.PIP, group = 5, onClick = onWatchInCorner))
-                if (canMove) {
-                    add(MenuAction("move", stringResource(R.string.content_move), group = 2, onClick = onMove))
-                    add(MenuAction("move_to_category", stringResource(R.string.content_move_to_category), group = 2, onClick = onMoveToCategory))
-                }
-                add(MenuAction("hide", stringResource(R.string.content_hide_channel), destructive = true, group = 3, onClick = onHide))
-                if (isHistory) add(MenuAction("remove_history", stringResource(R.string.content_remove_history), destructive = true, group = 3, onClick = onRemoveFromHistory))
-            }
-            var previousGroup: Int? = null
-            arranged(ContentMenu.LIVE, actions).forEachIndexed { index, action ->
-                if (previousGroup != null && action.group != previousGroup) ChannelMenuDivider()
-                previousGroup = action.group
-                ChannelMenuAction(
-                    label = action.label,
-                    onClick = action.onClick,
-                    icon = action.icon,
-                    modifier = Modifier.fillMaxWidth().then(if (index == 0) Modifier.focusRequester(focus) else Modifier),
-                    destructive = action.destructive,
-                )
-            }
-
-            ChannelMenuDivider()
-            ChannelMenuAction(stringResource(R.string.content_close), onDismiss, OwnTVIcon.CLOSE, Modifier.fillMaxWidth())
+    val catchupValue = channel.catchupDays.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.settings_epg_guide_days_value, it, it) }
+    val matchValue = if (epgMatchManual) stringResource(R.string.settings_manual) else stringResource(R.string.settings_auto)
+    val offsetValue = epgShiftMinutes?.let { liveEpgShiftLabel(it) } ?: stringResource(R.string.content_epg_offset_global_short)
+    // Group ids = the mockup's four groups, in its order.
+    val watch = 0; val chan = 1; val guide = 2; val organise = 3
+    val actions = buildList {
+        if (channel.catchup) add(MenuAction("catchup", stringResource(R.string.content_catchup), OwnTVIcon.REWIND, group = watch, onClick = onCatchup))
+        // Record this channel from now. The guide's Record needs a programme, so a channel
+        // the provider publishes no guide for can only be recorded from here.
+        add(MenuAction("record", stringResource(R.string.recording_record), OwnTVIcon.REC, group = watch, onClick = onRecord))
+        if (onAddToMultiview != null) {
+            add(MenuAction("add_to_multiview", stringResource(R.string.multiview_add_to), OwnTVIcon.MULTIVIEW, group = watch, onClick = onAddToMultiview))
+        }
+        // Fork: true PiP keeps this channel playing in a corner window alongside whatever else is on.
+        // In the Watch group: the Stage menu labels groups by index (groupLabels), so no fork-only group.
+        add(MenuAction("fork_pip", stringResource(R.string.fork_action_picture_in_picture), OwnTVIcon.PIP, group = watch, onClick = onWatchInCorner))
+        // Always offered, regardless of the Live TV external-player default — this is the per-channel
+        // escape hatch for a stream neither in-app engine can open (same as Movies/Series/Downloads).
+        add(MenuAction("play_external", stringResource(R.string.content_play_external_short), OwnTVIcon.EXTERNAL, group = watch, onClick = onPlayExternal))
+        add(MenuAction("favourite", if (isFavorite) stringResource(R.string.content_remove_favourite) else stringResource(R.string.content_add_favourite), OwnTVIcon.FAVORITE, group = chan, onClick = onToggleFavorite))
+        add(MenuAction("rename", stringResource(R.string.content_rename), OwnTVIcon.PENCIL, group = chan, onClick = onRename))
+        add(MenuAction("hide", stringResource(R.string.content_hide_channel), OwnTVIcon.EYE_OFF, group = chan, onClick = onHide))
+        if (isHistory) add(MenuAction("remove_history", stringResource(R.string.content_remove_history), OwnTVIcon.HISTORY, group = chan, onClick = onRemoveFromHistory))
+        add(MenuAction("match_epg", stringResource(R.string.content_match_epg), OwnTVIcon.EPG, group = guide, onClick = onMatchEpg))
+        add(MenuAction("epg_offset", stringResource(R.string.content_epg_time_offset), OwnTVIcon.CLOCK, group = guide, onClick = onEpgOffset))
+        if (canMove) {
+            add(MenuAction("move", stringResource(R.string.content_move), OwnTVIcon.MOVE, group = organise, onClick = onMove))
+            add(MenuAction("move_to_category", stringResource(R.string.content_move_to_category), OwnTVIcon.FOLDER, group = organise, onClick = onMoveToCategory))
+        }
+        if (onRemoveFromCategory != null) {
+            add(MenuAction("remove_from_category", stringResource(R.string.content_remove_from_category), OwnTVIcon.CLOSE, group = organise, onClick = onRemoveFromCategory))
         }
     }
-    }
-}
-
-/** Quiet menu row: calm/transparent at rest, luminous material only on the focused action. */
-@Composable
-private fun ChannelMenuAction(
-    label: String,
-    onClick: () -> Unit,
-    icon: OwnTVIcon? = null,
-    modifier: Modifier = Modifier,
-    destructive: Boolean = false,
-) {
-    val colors = OwnTVTheme.colors
-    val danger = androidx.compose.ui.graphics.Color(0xFFFFB4AB)
-    FocusableSurface(
-        onClick = onClick,
-        modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
-        focusedScale = 1.012f,
-        unfocusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
-        focusedContainerColor = if (destructive) androidx.compose.ui.graphics.Color(0xFF6E2B2B) else colors.primaryContainer,
-        selectedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
-        surface = GlassSurface.DIALOGS,
-        glassFrostScale = 0.86f,
-        glassIdleRimAlpha = 0f,
-    ) { focused ->
-        val foreground = when {
-            destructive && !focused -> danger
-            destructive -> androidx.compose.ui.graphics.Color.White
-            focused -> colors.onPrimaryContainer
-            else -> colors.onSurface
-        }
-        Row(
-            Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+    val values = mapOf("catchup" to catchupValue, "match_epg" to matchValue, "epg_offset" to offsetValue)
+    val groupLabels = listOf(
+        stringResource(R.string.content_menu_group_watch),
+        stringResource(R.string.content_menu_group_channel),
+        stringResource(R.string.content_menu_group_guide_data),
+        stringResource(R.string.content_menu_group_organise),
+    ).map { it.uppercase(androidx.compose.ui.text.intl.Locale.current.platformLocale) }
+    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss, stageLayout = true) {
+        BoxWithConstraints(
+            Modifier.fillMaxSize().background(Color(2, 5, 6).copy(alpha = 0.55f)).longPressMenuGuard(),
         ) {
-            if (icon != null) OwnTVIcon(icon, foreground, Modifier.size(19.dp), filled = true)
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelLarge,
-                color = foreground,
-                maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-@Composable
-private fun ChannelMenuDivider() {
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .height(1.dp)
-            .background(OwnTVTheme.colors.outlineVariant.copy(alpha = 0.45f)),
-    )
-}
-
-@Composable
-private fun LivePreviewPane(
-    channel: ChannelEntity?,
-    categoryName: String?,
-    nowNext: EpgNowNext?,
-    previewEngine: tv.own.owntv.player.LivePreviewEngine,
-    showVideo: Boolean,
-    singleSessionBlocked: Boolean = false,
-) {
-    val colors = OwnTVTheme.colors
-    val previewState by previewEngine.state.collectAsStateWithLifecycle()
-    val previewHeight by previewEngine.videoHeight.collectAsStateWithLifecycle()
-    val streamChips by previewEngine.streamChips.collectAsStateWithLifecycle()
-    // Show the ExoPlayer surface once it's playing/buffering; on ERROR fall back to the channel logo.
-    val previewPlaying = showVideo && previewState != tv.own.owntv.player.LivePreviewEngine.State.ERROR &&
-        previewState != tv.own.owntv.player.LivePreviewEngine.State.IDLE
-    val previewLoading = showVideo && previewState == tv.own.owntv.player.LivePreviewEngine.State.LOADING
-    val videoRes = previewHeight?.let { "${it}p" }
-    if (channel == null) {
-        PreviewPane(hint = stringResource(R.string.content_focus_channel))
-        return
-    }
-    Column(
-        // Scrollable so the EPG (Now/Next/Later) never gets clipped when it makes the pane taller
-        // than the screen. The pane is informational only — there are NO focusable elements here,
-        // so D-pad right never enters it (management actions live in the long-press menu).
-        modifier = Modifier.fillMaxSize()
-            .verticalScroll(rememberScrollState()).padding(Dimens.GapLarge),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(
-            modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp)).background(colors.surfaceContainerLowest),
-            contentAlignment = Alignment.Center,
-        ) {
-            // No fill of its own: the 16:9 box behind it is already the video container's. The tile
-            // plates itself only if this channel's logo would be unreadable. Video covers it anyway
-            // once playback starts.
-            tv.own.owntv.ui.components.ChannelLogoTile(
-                logoUrl = channel.displayLogoUrl,
-                modifier = Modifier.size(160.dp).clip(RoundedCornerShape(12.dp)),
-                imageModifier = Modifier.size(120.dp),
-                fill = Color.Transparent,
+            val w = maxWidth
+            tv.own.owntv.ui.stage.StageMenu(
+                Modifier
+                    .padding(start = w * (930f / 1920f), top = 118.mpx, bottom = 24.mpx)
+                    .width(540.mpx)
+                    .verticalScroll(rememberScrollState())
+                    .trapAllFocusExit()
+                    .focusGroup(),
             ) {
-                OwnTVIcon(OwnTVIcon.LIVE_TV, tint = colors.onSurfaceVariant, modifier = Modifier.size(56.dp))
-            }
-            if (previewPlaying) {
-                tv.own.owntv.player.ExoPreviewSurface(engine = previewEngine, modifier = Modifier.fillMaxSize())
-            }
-            if (previewLoading) {
-                OwnTVSpinner(sizeDp = 28)
-            }
-            // One-stream provider with the stream already in use: explain the dead pane rather than
-            // leaving the user to read it as a broken channel (F31).
-            if (singleSessionBlocked && !previewPlaying) {
-                Box(
-                    Modifier.align(Alignment.BottomCenter).padding(10.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.7f))
-                        .padding(horizontal = 10.dp, vertical = 5.dp),
-                ) {
-                    Text(
-                        stringResource(R.string.content_preview_single_stream),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = androidx.compose.ui.graphics.Color.White,
-                    )
-                }
-            }
-            // Real stream spec — aspect · resolution · fps · audio. The channel NAME often lies ("…4K"),
-            // so this shows what you'll actually get before you commit to watching. Falls back to just the
-            // resolution until the full format is known.
-            val chips = streamChips.takeIf { it.isNotEmpty() } ?: videoRes?.let { listOf(it) }.orEmpty()
-            chips.takeIf { previewPlaying && it.isNotEmpty() }?.let { list ->
-                Row(
-                    Modifier.align(Alignment.TopStart).padding(8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    list.forEach { label ->
-                        Box(
-                            Modifier.clip(RoundedCornerShape(6.dp))
-                                .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.6f))
-                                .padding(horizontal = 8.dp, vertical = 3.dp),
-                        ) {
-                            Text(label, style = MaterialTheme.typography.labelMedium, color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.Bold)
+                tv.own.owntv.ui.stage.StageMenuHeader(
+                    title = listOfNotNull(channel.number?.toString(), ProviderTags.parse(channel.name).name).joinToString(" · "),
+                    subtitle = subtitle,
+                    leading = {
+                        Box(Modifier.size(70.mpx, 50.mpx).clip(RoundedCornerShape(12.mpx)).background(Color.White)) {
+                            tv.own.owntv.ui.components.ChannelLogoTile(channel.displayLogoUrl, Modifier.fillMaxSize(), fill = Color.Transparent) {}
                         }
-                    }
-                }
-            }
-        }
-        Spacer(Modifier.height(14.dp))
-        Text(channel.name, style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
-
-        // Metadata row — category · inferred genre (with colour dot) · catch-up status · EPG status.
-        // All informational, never focusable.
-        ChannelMetaRow(channel = channel, categoryName = categoryName, nowNext = nowNext)
-
-        EpgSection(nowNext)
-
-        // No action buttons — all management (Favorite / Rename / Hide / Match EPG / Catch-up) is in
-        // the long-press menu. Just a hint so the watch affordance + where-to-find-options stay obvious.
-        Spacer(Modifier.height(14.dp))
-        Text(
-            stringResource(R.string.content_press_ok_fullscreen),
-            style = MaterialTheme.typography.bodySmall,
-            color = colors.onSurfaceVariant,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-        )
-    }
-}
-
-/**
- * Informational metadata row under the channel name: the channel's category, its inferred genre
- * (with a colour dot), catch-up availability, and a short EPG-coverage hint. Purely visual —
- * nothing here is selectable/focusable, so D-pad navigation never enters the preview pane.
- */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ChannelMetaRow(
-    channel: ChannelEntity,
-    categoryName: String?,
-    nowNext: EpgNowNext?,
-) {
-    val colors = OwnTVTheme.colors
-    // Genre is inferred from the channel's real category name. Unmatched categories fall back to OTHER
-    // (grey dot) so every channel still gets a genre marker — the genre is never inferred from the
-    // channel NAME (a station brand like "CNN" / "Hindi MTV Plus" would be misleading).
-    val genre = remember(categoryName) { ChannelGenre.fromCategory(categoryName) }
-
-    // EPG status — "EPG · Nd" when we know the stored coverage span (bulk-guide channels), plain "EPG"
-    // when only now/next is available (short-EPG API channels), "No EPG" when nothing was resolved.
-    // coverageDays is read into a local: it is core's property now, and Kotlin will not smart-cast a
-    // public property declared in another module.
-    val coverageDays = nowNext?.coverageDays
-    val epgStatus = when {
-        nowNext == null || (nowNext.now == null && nowNext.next == null) -> stringResource(R.string.content_no_epg)
-        coverageDays != null && coverageDays > 0 -> stringResource(R.string.content_epg_days, coverageDays)
-        else -> stringResource(R.string.content_epg)
-    }
-
-    // Catch-up status — only meaningful when the channel actually supports it.
-    val catchupLabel = if (channel.catchup) {
-        channel.catchupDays.takeIf { it > 0 }?.let { stringResource(R.string.content_catchup_days, it) } ?: stringResource(R.string.content_catchup)
-    } else null
-
-    val chips = buildList {
-        // Genre chip (always shown, with its colour dot — including the grey "Other" fallback so every
-        // channel has a genre marker), then the raw category name when it differs from the genre label.
-        add(MetaChip(stringResource(genre.displayLabelRes), dot = genre.dot, primary = genre != ChannelGenre.OTHER))
-        if (!categoryName.isNullOrBlank() && categoryName != genre.canonicalLabel) add(MetaChip(categoryName))
-        if (catchupLabel != null) add(MetaChip(catchupLabel, accent = true))
-        add(MetaChip(epgStatus))
-    }
-
-    FlowRow(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        chips.forEach { chip -> MetaChipBadge(chip) }
-    }
-}
-
-/** A single metadata chip — small text, optional colour dot, on a hairline-rounded surface. */
-private data class MetaChip(
-    val text: String,
-    val dot: Color? = null,
-    val primary: Boolean = false,
-    val accent: Boolean = false,
-)
-
-@Composable
-private fun MetaChipBadge(chip: MetaChip) {
-    val colors = OwnTVTheme.colors
-    val fg = when {
-        chip.primary -> colors.primary
-        chip.accent -> colors.primary
-        else -> colors.onSurfaceVariant
-    }
-    Row(
-        modifier = Modifier
-            .height(26.dp)                  // uniform chip height — long category names can't wrap to 2 lines and make one chip taller than the others
-            .clip(RoundedCornerShape(7.dp))
-            .background(colors.surfaceContainerLow)
-            .padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
-    ) {
-        chip.dot?.let {
-            Box(Modifier.size(8.dp).clip(androidx.compose.foundation.shape.CircleShape).background(it))
-        }
-        Text(
-            chip.text,
-            style = MaterialTheme.typography.labelSmall,
-            color = fg,
-            fontFamily = LocalPopupFontFamily.current,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,                   // never wrap — keeps every chip the same height
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
-/** Now-playing (with progress) + up-next, from the channel's short EPG. Hidden when no guide exists. */
-@Composable
-private fun EpgSection(nowNext: EpgNowNext?) {
-    val colors = OwnTVTheme.colors
-    val formatTime = rememberSystemTimeFormatter()
-    val now = nowNext?.now
-    val next = nowNext?.next
-    if (now == null && next == null) return
-
-    Spacer(Modifier.height(16.dp))
-    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (now != null) {
-            Text(stringResource(R.string.content_live_now_label), style = MaterialTheme.typography.labelSmall, color = colors.primary, fontWeight = FontWeight.Bold)
-            Text(
-                now.title,
-                style = MaterialTheme.typography.titleSmall,
-                color = colors.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            val span = (now.stopMs - now.startMs).coerceAtLeast(1)
-            val progress = ((System.currentTimeMillis() - now.startMs).toFloat() / span).coerceIn(0f, 1f)
-            Box(
-                modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(colors.surfaceContainerLowest),
-            ) {
-                Box(Modifier.fillMaxWidth(progress).height(4.dp).clip(RoundedCornerShape(2.dp)).background(colors.primary))
-            }
-            Text(
-                stringResource(R.string.content_live_time_range_plain, formatTime(now.startMs), formatTime(now.stopMs)),
-                style = MaterialTheme.typography.labelSmall,
-                color = colors.onSurfaceVariant,
-            )
-            // The synopsis. This pane already scrolls, so it can afford the whole paragraph the guide
-            // carries rather than a teaser — this is where someone browsing channels decides whether
-            // the programme is worth watching.
-            now.description?.takeIf { it.isNotBlank() }?.let { synopsis ->
-                Text(
-                    synopsis,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.onSurfaceVariant,
-                    maxLines = 8,
-                    overflow = TextOverflow.Ellipsis,
+                    },
                 )
-            }
-        }
-        if (next != null) {
-            Spacer(Modifier.height(2.dp))
-            Text(stringResource(R.string.content_live_next_label, formatTime(next.startMs)), style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant, fontWeight = FontWeight.Bold)
-            Text(
-                next.title,
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            // Shorter than the "Now" one on purpose: what's on next is a decision about whether to
-            // stay, not about whether to tune in, so it gets a teaser rather than the paragraph.
-            next.description?.takeIf { it.isNotBlank() }?.let { synopsis ->
-                Text(
-                    synopsis,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = colors.onSurfaceVariant,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-        // Upcoming programmes after "next" — see what's on later without opening the Guide (#11).
-        val later = nowNext.upcoming
-        if (later.isNotEmpty()) {
-            Spacer(Modifier.height(6.dp))
-            Text(stringResource(R.string.content_live_later_label), style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant, fontWeight = FontWeight.Bold)
-            later.forEach { p ->
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(formatTime(p.startMs), style = MaterialTheme.typography.labelSmall, color = colors.primary)
-                    Text(p.title, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                var previousGroup: Int? = null
+                arranged(ContentMenu.LIVE, actions).forEachIndexed { index, action ->
+                    if (action.group != previousGroup) tv.own.owntv.ui.stage.StageGroupLabel(groupLabels[action.group])
+                    previousGroup = action.group
+                    tv.own.owntv.ui.stage.StageMenuItem(
+                        text = action.label,
+                        icon = action.icon,
+                        iconFilled = action.icon == OwnTVIcon.REC,
+                        value = values[action.key],
+                        onClick = action.onClick,
+                        modifier = if (index == 0) Modifier.focusRequester(focus) else Modifier,
+                    )
                 }
             }
         }
@@ -1481,12 +1295,10 @@ private fun CatchupDialog(
     onJump: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val colors = OwnTVTheme.colors
     val formatTime = rememberSystemTimeFormatter()
     val list by androidx.compose.runtime.produceState<List<tv.own.owntv.core.database.entity.EpgProgrammeEntity>?>(initialValue = null) {
         value = runCatching { loadProgrammes() }.getOrDefault(emptyList())
     }
-    androidx.activity.compose.BackHandler { onDismiss() }
     // "Choose exact time…" opens on top of this dialog, same as the player's route into it.
     var manualTime by remember { mutableStateOf(false) }
     if (manualTime) {
@@ -1502,76 +1314,44 @@ private fun CatchupDialog(
         if (list == null || (list!!.isEmpty() && jumpOffsetsSec.isEmpty())) return@LaunchedEffect
         kotlinx.coroutines.delay(60); runCatching { firstFocus.requestFocus() }
     }
-    // Popup(focusable = true) is a hard focus boundary: a stray D-pad press or the Live screen's own
-    // LaunchedEffect focus requests can no longer drop focus onto the channel grid behind the scrim
-    // (same fix as EpgMatchDialog / ChannelContextMenu). trapAllFocusExit() additionally blocks
-    // directional exits through the scrim. PopupFontTheme swaps in the selected popup family + scales fonts to
-    // match the other popup menus (0.75f), and the box is shrunk to that same denser size.
-    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
-    tv.own.owntv.ui.theme.PopupFontTheme(fontScale = 0.75f) {
-        Box(
-            Modifier.fillMaxSize()
-                .modalScrim()
-                .trapAllFocusExit()
-                .focusGroup(),
-            contentAlignment = Alignment.Center,
-        ) {
-        // Inner list is height-capped to the screen (minus the dialog chrome) so the Close button
-        // stays reachable on small/low-res screens; the outer column can't verticalScroll (LazyColumn).
-        val listHeight = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp - 220.dp).coerceIn(140.dp, 300.dp)
-        Column(Modifier.dialogPanel(width = 460.dp, corner = 16.dp, padding = 18.dp, scroll = false)) {
-            Text(stringResource(R.string.content_catchup_title, channelName), style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
-            Spacer(Modifier.height(2.dp))
-            val noGuide = list?.isEmpty() == true && jumpOffsetsSec.isNotEmpty()
-            Text(
-                stringResource(if (noGuide) R.string.content_catchup_jump_prompt else R.string.content_catchup_prompt),
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(12.dp))
-            when (val progs = list) {
-                null -> Box(Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) { OwnTVSpinner(sizeDp = 28) }
-                else -> if (progs.isEmpty()) {
-                    // No guide for this channel. The archive still exists, so offer times to jump to;
-                    // only fall back to the "match your EPG" note when there is no archive window either.
-                    if (jumpOffsetsSec.isNotEmpty()) {
-                        CatchupJumpRows(
-                            offsetsSec = jumpOffsetsSec,
-                            firstFocus = firstFocus,
-                            onPick = onJump,
-                            modifier = Modifier.fillMaxWidth().height(listHeight),
-                            onChooseExact = { manualTime = true },
-                        )
-                    } else {
-                        Text(
-                            stringResource(R.string.content_catchup_empty),
-                            style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant,
-                        )
-                    }
+    val noGuide = list?.isEmpty() == true && jumpOffsetsSec.isNotEmpty()
+    // A Stage popup: its own window, so nothing behind can take focus (as EpgMatchDialog / the menus).
+    tv.own.owntv.ui.stage.StagePopup(
+        onDismiss = onDismiss,
+        title = stringResource(R.string.content_catchup_title, channelName),
+        body = stringResource(if (noGuide) R.string.content_catchup_jump_prompt else R.string.content_catchup_prompt),
+        eyebrow = null,
+        scroll = false,
+        buttons = { tv.own.owntv.ui.stage.StageButton(stringResource(R.string.content_close), onClick = onDismiss, height = 56.mpx, textSize = 19) },
+    ) {
+        when (val progs = list) {
+            null -> Box(Modifier.fillMaxWidth().height(100.mpx), contentAlignment = Alignment.Center) { OwnTVSpinner(sizeDp = 28) }
+            else -> if (progs.isEmpty()) {
+                // No guide for this channel. The archive still exists, so offer times to jump to; only
+                // fall back to the "match your EPG" note when there is no archive window either.
+                if (jumpOffsetsSec.isNotEmpty()) {
+                    CatchupJumpRows(
+                        offsetsSec = jumpOffsetsSec,
+                        firstFocus = firstFocus,
+                        onPick = onJump,
+                        modifier = Modifier.fillMaxWidth().weight(1f, fill = false),
+                        onChooseExact = { manualTime = true },
+                    )
                 } else {
-                    LazyColumn(Modifier.fillMaxWidth().height(listHeight), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        items(progs, key = { it.id }) { p ->
-                            FocusableSurface(
-                                onClick = { onPick(p) },
-                                modifier = if (p == progs.first()) Modifier.fillMaxWidth().focusRequester(firstFocus) else Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
-                                contentAlignment = Alignment.CenterStart,
-                                surface = GlassSurface.DIALOGS,
-                            ) { _ ->
-                                Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
-                                    Text(p.title, style = MaterialTheme.typography.titleMedium, color = colors.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(formatCatchupTime(p.startMs, p.stopMs, formatTime), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
-                                }
-                            }
-                        }
+                    Text(stringResource(R.string.content_catchup_empty), style = tv.own.owntv.ui.theme.stageText(18, 500), color = tv.own.owntv.ui.theme.StageColors.Muted)
+                }
+            } else {
+                LazyColumn(Modifier.fillMaxWidth().weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(2.mpx)) {
+                    items(progs, key = { it.id }) { p ->
+                        tv.own.owntv.ui.stage.StagePopupOption(
+                            title = p.title, subtitle = formatCatchupTime(p.startMs, p.stopMs, formatTime), onClick = { onPick(p) },
+                            modifier = if (p == progs.first()) Modifier.focusRequester(firstFocus) else Modifier,
+                            leading = { tv.own.owntv.ui.stage.StagePopupIcon(tv.own.owntv.ui.components.OwnTVIcon.CATCHUP) },
+                        )
                     }
                 }
             }
-            Spacer(Modifier.height(14.dp))
-            OwnTVButton(stringResource(R.string.content_close), onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY)
         }
-        }
-    } // PopupFontTheme
     }
 }
 
@@ -1586,7 +1366,6 @@ internal fun EpgMatchDialog(
     onClear: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val colors = OwnTVTheme.colors
     var query by remember { mutableStateOf("") }
     val results by androidx.compose.runtime.produceState<List<tv.own.owntv.core.epg.GuideCandidate>?>(initialValue = null, query) {
         kotlinx.coroutines.delay(250)
@@ -1607,69 +1386,57 @@ internal fun EpgMatchDialog(
         else runCatching { searchFocus.requestFocus() }
     }
 
-    // Popup(focusable=true) is a hard focus boundary: a stray D-pad right/left with no target inside
-    // can no longer drop focus onto the screen behind the scrim (same fix as EpgMatchReviewDialog).
-    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
-    tv.own.owntv.ui.theme.PopupFontTheme(fontScale = 0.75f) {
-    androidx.compose.foundation.layout.Box(
-        Modifier.fillMaxSize().modalScrim().trapAllFocusExit().focusGroup(),
-        contentAlignment = Alignment.Center,
-    ) {
-        // Same small-screen cap as CatchupDialog: search bar + buttons must stay reachable.
-        val listHeight = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp - 260.dp).coerceIn(140.dp, 240.dp)
-        Column(Modifier.dialogPanel(width = 384.dp, corner = 16.dp, padding = 14.dp)) {
-            Text(stringResource(R.string.content_match_epg), style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
-            Spacer(Modifier.height(2.dp))
-            Text(
-                if (currentMatch != null) {
-                    stringResource(R.string.content_epg_match_prompt_current, channelName, currentMatch)
-                } else {
-                    stringResource(R.string.content_epg_match_prompt, channelName)
-                },
-                style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(12.dp))
-            // Actions live in a right-hand column so a D-pad right from the search bar or ANY list row
-            // reaches Close/Clear directly — no scrolling to the bottom of a long list.
-            Row(Modifier.fillMaxWidth()) {
-                Column(Modifier.weight(1f)) {
-                    SearchBar(query = query, onQueryChange = { query = it }, placeholder = stringResource(R.string.content_search_guide_channels), modifier = Modifier.fillMaxWidth().focusRequester(searchFocus), surface = GlassSurface.DIALOGS)
-                    Spacer(Modifier.height(12.dp))
-                    val list = results
-                    when {
-                        list == null -> androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) { OwnTVSpinner(sizeDp = 28) }
-                        list.isEmpty() -> Text(
-                            if (query.isBlank()) stringResource(R.string.content_no_epg_data) else stringResource(R.string.content_no_guide_channels, query),
-                            style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant,
-                        )
-                        else -> LazyColumn(Modifier.fillMaxWidth().height(listHeight), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            items(list, key = { it.epgChannelId }) { epg ->
-                                FocusableSurface(
-                                    onClick = { onPick(epg.epgChannelId) },
-                                    modifier = if (epg == list.first()) Modifier.fillMaxWidth().focusRequester(firstItemFocus) else Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(12.dp),
-                                    contentAlignment = Alignment.CenterStart,
-                                    surface = GlassSurface.DIALOGS,
-                                ) { _ ->
-                                    Column(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 7.dp)) {
-                                        Text(epg.displayName ?: epg.epgChannelId, style = MaterialTheme.typography.bodyMedium, color = colors.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        Text(epg.epgChannelId, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    }
-                                }
-                            }
+    // The Stage picker: a menu panel over the scrim, focus trapped inside, the list capped so Close stays reachable.
+    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss, stageLayout = true) {
+        androidx.compose.foundation.layout.Box(
+            Modifier.fillMaxSize().background(Color(2, 5, 6).copy(alpha = 0.55f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            tv.own.owntv.ui.stage.StageMenu(Modifier.width(640.mpx).trapAllFocusExit().focusGroup()) {
+                tv.own.owntv.ui.stage.StageMenuHeader(
+                    title = stringResource(R.string.content_match_epg),
+                    subtitle = if (currentMatch != null) {
+                        stringResource(R.string.content_epg_match_prompt_current, channelName, currentMatch)
+                    } else {
+                        stringResource(R.string.content_epg_match_prompt, channelName)
+                    },
+                )
+                tv.own.owntv.ui.stage.StageSearchField(
+                    query = query, onQueryChange = { query = it },
+                    placeholder = stringResource(R.string.content_search_guide_channels).trimEnd('…'),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.mpx).focusRequester(searchFocus),
+                )
+                Spacer(Modifier.height(12.mpx))
+                val list = results
+                when {
+                    list == null -> androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth().height(120.mpx), contentAlignment = Alignment.Center) { OwnTVSpinner(sizeDp = 24) }
+                    list.isEmpty() -> Text(
+                        if (query.isBlank()) stringResource(R.string.content_no_epg_data) else stringResource(R.string.content_no_guide_channels, query),
+                        style = tv.own.owntv.ui.theme.stageText(18, 500), color = tv.own.owntv.ui.theme.StageColors.Muted,
+                        modifier = Modifier.padding(horizontal = 14.mpx, vertical = 12.mpx),
+                    )
+                    else -> LazyColumn(Modifier.fillMaxWidth().height(400.mpx)) {
+                        items(list, key = { it.epgChannelId }) { epg ->
+                            tv.own.owntv.ui.stage.StageMenuItem(
+                                text = epg.displayName ?: epg.epgChannelId,
+                                value = epg.epgChannelId.takeIf { epg.displayName != null },
+                                checked = epg.epgChannelId == currentMatch,
+                                onClick = { onPick(epg.epgChannelId) },
+                                modifier = if (epg == list.first()) Modifier.focusRequester(firstItemFocus) else Modifier,
+                            )
                         }
                     }
                 }
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.width(110.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OwnTVButton(stringResource(R.string.content_close), onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY, modifier = Modifier.fillMaxWidth())
-                    if (currentMatch != null) OwnTVButton(stringResource(R.string.content_clear_match), onClick = onClear, style = OwnTVButtonStyle.SECONDARY, modifier = Modifier.fillMaxWidth())
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 14.mpx),
+                    horizontalArrangement = Arrangement.spacedBy(12.mpx, Alignment.End),
+                ) {
+                    if (currentMatch != null) tv.own.owntv.ui.stage.StageButton(stringResource(R.string.content_clear_match), onClick = onClear, height = 56.mpx, textSize = 19)
+                    tv.own.owntv.ui.stage.StageButton(stringResource(R.string.content_close), onClick = onDismiss, height = 56.mpx, textSize = 19, tinted = true)
                 }
             }
         }
     }
-    } // PopupFontTheme
-    } // Popup
 }
 
 /**
@@ -1686,84 +1453,54 @@ internal fun EpgOffsetDialog(
     onSet: (Int?) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val colors = OwnTVTheme.colors
     var minutes by remember { mutableStateOf(currentMinutes ?: globalMinutes) }
-    val doneFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { doneFocus.requestFocus() } }
-    androidx.activity.compose.BackHandler { onDismiss() }
-    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
-    tv.own.owntv.ui.theme.PopupFontTheme(fontScale = 0.75f) {
-    androidx.compose.foundation.layout.Box(
-        // trapAllFocusExit, like every other dialog here: a D-pad press at the edge of a row must not
-        // walk out of the popup onto the screen behind the scrim.
-        Modifier.fillMaxSize().modalScrim()
-            .trapAllFocusExit().focusGroup(),
-        contentAlignment = Alignment.Center,
+    val valueFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { kotlinx.coroutines.delay(60); runCatching { valueFocus.requestFocus() } }
+    tv.own.owntv.ui.stage.StagePopup(
+        onDismiss = onDismiss,
+        title = stringResource(R.string.content_epg_time_offset),
+        body = stringResource(R.string.content_epg_offset_channel_description, channelName),
+        eyebrow = null,
+        width = 760.mpx,
+        buttons = {
+            if (currentMinutes != null) tv.own.owntv.ui.stage.StageButton(stringResource(R.string.content_epg_offset_use_global), onClick = { onSet(null); onDismiss() }, height = 56.mpx, textSize = 19)
+            tv.own.owntv.ui.stage.StageButton(stringResource(R.string.common_cancel), onClick = onDismiss, height = 56.mpx, textSize = 19)
+            tv.own.owntv.ui.stage.StageButton(stringResource(R.string.common_done), onClick = { onSet(minutes); onDismiss() }, height = 56.mpx, textSize = 19, tinted = true)
+        },
     ) {
-        Column(
-            Modifier.dialogPanel(width = 420.dp, corner = 16.dp, padding = 18.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+        // ◀ ▶ shift by half an hour, -12 h … +14 h; Done keeps it.
+        tv.own.owntv.ui.stage.StageSurface(
+            onClick = { onSet(minutes); onDismiss() },
+            radius = 18.mpx,
+            focusStyle = tv.own.owntv.ui.stage.StageFocus.FX,
+            modifier = Modifier.fillMaxWidth().height(84.mpx).focusRequester(valueFocus).onPreviewKeyEvent { e ->
+                val d = when (e.key) { Key.DirectionLeft -> -1; Key.DirectionRight -> 1; else -> 0 }
+                if (d != 0 && e.type == KeyEventType.KeyDown) minutes = (minutes + d * 30).coerceIn(-12 * 60, 14 * 60)
+                d != 0
+            },
+            contentAlignment = Alignment.Center,
         ) {
-            Text(stringResource(R.string.content_epg_time_offset), style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
-            Spacer(Modifier.height(2.dp))
-            Text(
-                stringResource(R.string.content_epg_offset_channel_description, channelName),
-                style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            )
-            Spacer(Modifier.height(14.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OwnTVButton(
-                    stringResource(R.string.content_epg_shift_minutes, "−", "30"),
-                    onClick = { minutes = (minutes - 30).coerceAtLeast(-12 * 60) },
-                    style = OwnTVButtonStyle.SECONDARY, compact = true,
-                )
-                Text(
-                    liveEpgShiftLabel(minutes),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = colors.primary,
-                    modifier = Modifier.width(120.dp),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                )
-                OwnTVButton(
-                    stringResource(R.string.content_epg_shift_minutes, "+", "30"),
-                    onClick = { minutes = (minutes + 30).coerceAtMost(14 * 60) },
-                    style = OwnTVButtonStyle.SECONDARY, compact = true,
-                )
-            }
-            Spacer(Modifier.height(6.dp))
-            Text(
-                stringResource(
-                    if (currentMinutes == null) R.string.content_epg_offset_following_global else R.string.content_epg_offset_channel_only,
-                    liveEpgShiftLabel(globalMinutes),
-                ),
-                style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(14.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OwnTVButton(
-                    stringResource(R.string.common_done),
-                    onClick = { onSet(minutes); onDismiss() },
-                    modifier = Modifier.weight(1f).focusRequester(doneFocus),
-                )
-                if (currentMinutes != null) {
-                    OwnTVButton(
-                        stringResource(R.string.content_epg_offset_use_global),
-                        onClick = { onSet(null); onDismiss() },
-                        style = OwnTVButtonStyle.SECONDARY,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                OwnTVButton(stringResource(R.string.common_cancel), onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY, modifier = Modifier.weight(1f))
+            Row(Modifier.fillMaxWidth().padding(horizontal = 22.mpx), verticalAlignment = Alignment.CenterVertically) {
+                tv.own.owntv.ui.components.OwnTVIcon(tv.own.owntv.ui.components.OwnTVIcon.CHEVRON, tv.own.owntv.ui.theme.StageColors.Muted, Modifier.size(26.mpx).graphicsLayer { rotationZ = 180f })
+                Text(liveEpgShiftLabel(minutes), style = tv.own.owntv.ui.theme.stageText(36, 800), color = tv.own.owntv.ui.theme.stageAccent.accent, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.weight(1f))
+                tv.own.owntv.ui.components.OwnTVIcon(tv.own.owntv.ui.components.OwnTVIcon.CHEVRON, tv.own.owntv.ui.theme.StageColors.Muted, Modifier.size(26.mpx))
             }
         }
+        Text(
+            stringResource(if (currentMinutes == null) R.string.content_epg_offset_following_global else R.string.content_epg_offset_channel_only, liveEpgShiftLabel(globalMinutes)),
+            style = tv.own.owntv.ui.theme.stageText(15, 500), color = tv.own.owntv.ui.theme.StageColors.Muted, modifier = Modifier.padding(top = 12.mpx),
+        )
     }
-    } // PopupFontTheme
-    } // Popup
 }
 
+/** Remind me's value: "5 min before", or "At the start" when the reminder comes at the start. */
 @Composable
-private fun liveEpgShiftLabel(minutes: Int): String {
+internal fun reminderLeadText(minutes: Int): String =
+    if (minutes == 0) stringResource(R.string.settings_reminder_at_start)
+    else stringResource(R.string.content_remind_before, stringResource(R.string.player_duration_minutes, minutes))
+
+@Composable
+internal fun liveEpgShiftLabel(minutes: Int): String {
     if (minutes == 0) return stringResource(R.string.common_off)
     val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0] ?: java.util.Locale.US
     val number = java.text.NumberFormat.getIntegerInstance(locale)

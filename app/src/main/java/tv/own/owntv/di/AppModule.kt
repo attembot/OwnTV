@@ -4,6 +4,7 @@ import org.koin.core.module.dsl.viewModel
 import org.koin.core.module.dsl.singleOf
 import org.koin.core.module.dsl.viewModelOf
 import tv.own.owntv.features.more.MoreCountsViewModel
+import tv.own.owntv.features.shell.RailCountsViewModel
 import org.koin.dsl.module
 import tv.own.owntv.features.customize.CustomizeItemsViewModel
 import tv.own.owntv.features.customize.CustomizeViewModel
@@ -61,7 +62,7 @@ val appModule = module {
     // Takes a Context first; Koin resolves it from androidContext().
     //
     // Spelled out rather than `viewModelOf(::LiveViewModel)`: that reflective helper is generated for
-    // up to 22 constructor parameters and this class now has 23. The failure is a "none of the
+    // up to 22 constructor parameters and this class now has 24. The failure is a "none of the
     // following candidates is applicable" at the call above, which says nothing about arity — hence
     // this note. Every argument is resolved by type, so the order here does not matter.
     viewModel {
@@ -154,4 +155,6 @@ val appModule = module {
     viewModelOf(::EpgSourcesViewModel)
     // The counts the More rows and the Favourites / History tabs carry.
     viewModelOf(::MoreCountsViewModel)
+    // The counts beside the sections in the open Stage rail.
+    viewModelOf(::RailCountsViewModel)
 }

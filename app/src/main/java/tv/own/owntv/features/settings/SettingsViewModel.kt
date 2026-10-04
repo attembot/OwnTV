@@ -47,7 +47,6 @@ import tv.own.owntv.core.util.throttleLatest
 import tv.own.owntv.core.database.dao.resolveExistingProfileId
 import tv.own.owntv.core.launcher.LauncherIntegrationRepository
 import tv.own.owntv.core.settings.ChNavLimits
-import tv.own.owntv.core.settings.EpgAutoRefresh
 import tv.own.owntv.core.settings.EpgRefresh
 import tv.own.owntv.core.settings.PanelSection
 import tv.own.owntv.core.settings.PanelShares
@@ -58,6 +57,7 @@ import tv.own.owntv.core.settings.SubtitleStyle
 import tv.own.owntv.core.theme.AccentColor
 import tv.own.owntv.core.theme.ThemeMode
 import tv.own.owntv.core.theme.UiZoom
+import tv.own.owntv.core.settings.EpgAutoRefresh
 
 /** Phase 13 — manage IPTV sources (list / add / re-sync / delete) for the active profile. */
 class SettingsViewModel(
@@ -319,6 +319,12 @@ class SettingsViewModel(
     val surroundMode: StateFlow<SurroundMode> = settings.surroundMode
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SurroundMode.AUTO)
 
+    /** Picked from its list. Like [cycleSurroundMode], it gives the audio output another chance. */
+    fun setSurroundMode(mode: SurroundMode) {
+        AudioOutputPolicy.clearLatch()
+        viewModelScope.launch { settings.setSurroundMode(mode) }
+    }
+
     /** Cycle Auto → Stereo only → Surround → Auto. Any change clears the session's stereo latch: the
      *  user touching this control is explicitly asking the audio output for another chance. */
     fun cycleSurroundMode() {
@@ -531,6 +537,13 @@ class SettingsViewModel(
         viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.core.timeshift.TimeshiftRules.DEFAULT_WINDOW_MINUTES,
     )
     fun setTimeshiftWindowMinutes(minutes: Int) { viewModelScope.launch { settings.setTimeshiftWindowMinutes(minutes) } }
+    val timeshiftResumeMode: StateFlow<SettingsRepository.ResumeMode> =
+        settings.timeshiftResumeMode.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsRepository.ResumeMode.ASK)
+    fun setTimeshiftResumeMode(name: String) {
+        viewModelScope.launch {
+            settings.setTimeshiftResumeMode(runCatching { SettingsRepository.ResumeMode.valueOf(name) }.getOrDefault(SettingsRepository.ResumeMode.ASK))
+        }
+    }
 
     // N18 — films' buffer, network timeout and reconnect attempts.
     val vodBufferChoicesSecs: List<Int> get() = settings.vodBufferChoicesSecs
@@ -755,6 +768,16 @@ class SettingsViewModel(
         viewModelScope.launch { settings.setCinematicDetailsHeight(s, percent) }
     }
 
+    /** Cinematic's categories sheet width — its own value, so the Separate widths are never touched. */
+    private val cinematicSheetWidths: Map<PanelSection, StateFlow<Int>> =
+        panelFlows(settings::cinematicSheetWidth, tv.own.owntv.core.settings.LiveStageWidths.DEFAULT.sheet)
+
+    fun cinematicSheetWidth(s: PanelSection): StateFlow<Int> = cinematicSheetWidths.getValue(s)
+
+    fun setCinematicSheetWidth(s: PanelSection, percent: Int) {
+        viewModelScope.launch { settings.setCinematicSheetWidth(s, percent) }
+    }
+
     val guideWidthEnabled: StateFlow<Boolean> = settings.guideWidthEnabled
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
     val guideWidthShares: StateFlow<GuideWidthShares?> = settings.guideWidthShares
@@ -799,6 +822,18 @@ class SettingsViewModel(
     val bgImagePath: StateFlow<String> = settings.bgImagePath.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
     val glassConfig: StateFlow<tv.own.owntv.core.theme.GlassConfig> = settings.glassConfig.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.core.theme.GlassConfig())
     fun setBgImagePath(path: String) { viewModelScope.launch { settings.setBgImagePath(path) } }
+
+    // --- Glass & background ---
+    val backgroundConfig: StateFlow<tv.own.owntv.core.theme.BackgroundConfig> =
+        settings.backgroundConfig.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.core.theme.BackgroundConfig())
+    /** A newly picked picture: Background becomes Picture, on Soft. */
+    fun setNewBackgroundPicture(path: String) { viewModelScope.launch { settings.setNewBackgroundPicture(path) } }
+    fun setBackgroundStyle(style: tv.own.owntv.core.theme.BackgroundStyle) { viewModelScope.launch { settings.setBackgroundStyle(style) } }
+    fun setPictureLook(look: tv.own.owntv.core.theme.PictureLook) { viewModelScope.launch { settings.setPictureLook(look) } }
+    fun setBackgroundDim(pct: Int) { viewModelScope.launch { settings.setBackgroundDim(pct) } }
+    fun setBackgroundBlur(pct: Int) { viewModelScope.launch { settings.setBackgroundBlur(pct) } }
+    fun setBackgroundAccentLight(on: Boolean) { viewModelScope.launch { settings.setBackgroundAccentLight(on) } }
+    fun resetGlassAndBackground(allSurfacesBits: Int) { viewModelScope.launch { settings.resetGlassAndBackground(allSurfacesBits) } }
     fun setGlassScopeBitmask(bits: Int) { viewModelScope.launch { settings.setGlassScopeBitmask(bits) } }
     fun setGlassPreset(preset: tv.own.owntv.core.theme.GlassPreset) { viewModelScope.launch { settings.setGlassPreset(preset) } }
     fun setGlassAlphaPercent(pct: Int, currentBlurPct: Int) {
@@ -821,6 +856,32 @@ class SettingsViewModel(
         settings.navMenuMode.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.core.settings.SettingsRepository.NavMenuMode.STATIC)
     fun setNavMenuMode(mode: tv.own.owntv.core.settings.SettingsRepository.NavMenuMode) {
         viewModelScope.launch { settings.setNavMenuMode(mode) }
+    }
+
+    // --- Stage navigation (the rail's style, size, length, hide delay) ---
+    val navStyle: StateFlow<tv.own.owntv.core.settings.SettingsRepository.NavStyle> =
+        settings.navStyle.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.core.settings.SettingsRepository.NavStyle.DOCKED)
+    fun setNavStyle(style: tv.own.owntv.core.settings.SettingsRepository.NavStyle) {
+        viewModelScope.launch { settings.setNavStyle(style) }
+    }
+    val navSize: StateFlow<tv.own.owntv.core.settings.SettingsRepository.NavSize> =
+        settings.navSize.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.core.settings.SettingsRepository.NavSize.COMPACT)
+    fun setNavSize(size: tv.own.owntv.core.settings.SettingsRepository.NavSize) {
+        viewModelScope.launch { settings.setNavSize(size) }
+    }
+    val navLength: StateFlow<tv.own.owntv.core.settings.SettingsRepository.NavLength> =
+        settings.navLength.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.core.settings.SettingsRepository.NavLength.FIT)
+    fun setNavLength(length: tv.own.owntv.core.settings.SettingsRepository.NavLength) {
+        viewModelScope.launch { settings.setNavLength(length) }
+    }
+    val navWiden: StateFlow<tv.own.owntv.core.settings.SettingsRepository.NavSize?> =
+        settings.navWiden.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    fun setNavWiden(size: tv.own.owntv.core.settings.SettingsRepository.NavSize?) { viewModelScope.launch { settings.setNavWiden(size) } }
+
+    val navHideAfterMs: StateFlow<Int> =
+        settings.navHideAfterMs.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.core.settings.SettingsRepository.NavHideAfter.DEFAULT_MS)
+    fun setNavHideAfterMs(ms: Int) {
+        viewModelScope.launch { settings.setNavHideAfterMs(ms) }
     }
 
     /** Browse sections the user has hidden (STATIC mode only). */
@@ -848,6 +909,8 @@ class SettingsViewModel(
 
     val appIcon: StateFlow<AppIcon> = settings.appIcon.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppIcon.DEFAULT)
     fun setAppIcon(icon: AppIcon) { viewModelScope.launch { settings.setAppIcon(icon) } }
+    val brandAccentTriangle: StateFlow<Boolean> = settings.brandAccentTriangle.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+    fun setBrandAccentTriangle(on: Boolean) { viewModelScope.launch { settings.setBrandAccentTriangle(on) } }
 
     // Docked mini-player: size (% of screen width) and screen position.
     val miniPlayerSizePct: StateFlow<Int> =
@@ -930,6 +993,24 @@ class SettingsViewModel(
     val vodLayout: StateFlow<tv.own.owntv.core.settings.SettingsRepository.VodLayout> =
         settings.vodLayout.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.core.settings.SettingsRepository.VodLayout.SEPARATE)
     fun setVodLayout(layout: tv.own.owntv.core.settings.SettingsRepository.VodLayout) { viewModelScope.launch { settings.setVodLayout(layout) } }
+    val liveLayout: StateFlow<tv.own.owntv.core.settings.SettingsRepository.LiveLayout> =
+        settings.liveLayout.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.core.settings.SettingsRepository.LiveLayout.STAGE)
+    fun setLiveLayout(layout: tv.own.owntv.core.settings.SettingsRepository.LiveLayout) { viewModelScope.launch { settings.setLiveLayout(layout) } }
+    val liveView: StateFlow<tv.own.owntv.core.settings.SettingsRepository.LiveView> =
+        settings.liveView.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.core.settings.SettingsRepository.LiveView.LIST)
+    fun setLiveView(view: tv.own.owntv.core.settings.SettingsRepository.LiveView) { viewModelScope.launch { settings.setLiveView(view) } }
+    val reminderMode: StateFlow<tv.own.owntv.core.settings.SettingsRepository.ReminderMode> =
+        settings.reminderMode.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.core.settings.SettingsRepository.ReminderMode.ASK)
+    fun setReminderMode(mode: tv.own.owntv.core.settings.SettingsRepository.ReminderMode) { viewModelScope.launch { settings.setReminderMode(mode) } }
+    val reminderLeadMinutes: StateFlow<Int> =
+        settings.reminderLeadMinutes.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.core.reminder.ReminderSchedule.DEFAULT_LEAD_MINUTES)
+    fun setReminderLeadMinutes(minutes: Int) { viewModelScope.launch { settings.setReminderLeadMinutes(minutes) } }
+    /** Live TV's Stage-layout widths: the categories sheet on its own, list + preview = 100. */
+    val liveStageWidths: StateFlow<tv.own.owntv.core.settings.LiveStageWidths?> =
+        settings.liveStageWidths.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    fun setLiveStageWidths(enabled: Boolean, widths: tv.own.owntv.core.settings.LiveStageWidths) {
+        viewModelScope.launch { settings.setLiveStageWidths(enabled, widths) }
+    }
 
     val ambientGlowEnabled: StateFlow<Boolean> =
         settings.ambientGlowEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
@@ -949,6 +1030,10 @@ class SettingsViewModel(
     val weatherFahrenheit: StateFlow<Boolean> =
         settings.weatherFahrenheit.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
     fun setWeatherFahrenheit(fahrenheit: Boolean) { viewModelScope.launch { settings.setWeatherFahrenheit(fahrenheit) } }
+
+    val clockColors: StateFlow<tv.own.owntv.core.settings.ClockColors> =
+        settings.clockColors.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.core.settings.ClockColors())
+    fun setClockColor(part: tv.own.owntv.core.settings.ClockPart, value: String) { viewModelScope.launch { settings.setClockColor(part, value) } }
 
     // Per-section "remember last item per category" (default OFF). OFF resets the browse list to the top
     // when switching category; ON keeps a separate scroll position per category. The Live toggle also

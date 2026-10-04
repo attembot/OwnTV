@@ -1,7 +1,6 @@
 package tv.own.owntv.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
@@ -11,14 +10,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import tv.own.owntv.core.theme.GlassSurface
-import tv.own.owntv.ui.theme.LocalGlass
-import tv.own.owntv.ui.theme.OwnTVTheme
-import tv.own.owntv.ui.theme.glass
+import tv.own.owntv.ui.stage.stageGlass
 
 /**
  * Shared panel chrome for centered popup dialogs: fixed width, rounded clip, surface fill —
@@ -29,43 +24,30 @@ import tv.own.owntv.ui.theme.glass
  * Pass [scroll] = false when the dialog's column already contains a LazyColumn or `weight()`
  * children — nesting two same-direction scrollers is illegal in Compose, so the dialog must manage
  * its own scrolling (typically by capping the inner LazyColumn's height and leaving the outer
- * column fixed). The clip + glass fill still apply.
+ * column fixed). The clip + fill still apply.
  *
- * Glass effect: when [GlassSurface.DIALOGS] is in scope, the fill becomes translucent + gains the
- * specular highlight, so the background image reads through the popups too (Phase 1: all on).
+ * The fill is the Stage glass panel (rim, top highlight, shadow; solid with Glass Effect off), so every
+ * popup built on this follows the new design. A dialog that asks for its own [fill] keeps it.
  */
 @Composable
 fun Modifier.dialogPanel(
     width: Dp = 440.dp,
-    corner: Dp = 20.dp,
+    corner: Dp = 24.dp,
     padding: Dp = 24.dp,
     fill: Color? = null,
     scroll: Boolean = true,
     panelHeight: Dp? = null,
 ): Modifier {
     val shape = RoundedCornerShape(corner)
-    val glassy = LocalGlass.current.isGlassy(GlassSurface.DIALOGS)
-    val outline = OwnTVTheme.colors.outlineVariant.copy(alpha = 0.72f)
     val base = this
         .width(width)
         .then(panelHeight?.let { Modifier.height(it) } ?: Modifier)
-        .shadow(elevation = if (glassy) 16.dp else 24.dp, shape = shape, clip = false)
-        .clip(shape)
-        .glass(
-            surface = GlassSurface.DIALOGS,
-            baseFill = fill ?: OwnTVTheme.colors.surfaceContainerHigh,
-            shape = shape,
-        )
-        .then(if (glassy) Modifier else Modifier.border(1.dp, outline, shape))
+        .then(if (fill != null) Modifier.clip(shape).background(fill) else Modifier.stageGlass(corner, overContent = true).clip(shape))
     // verticalScroll + a nested LazyColumn is an illegal same-direction nest; callers with an inner
     // LazyColumn pass scroll = false and cap the list height themselves.
     return if (scroll) base.verticalScroll(rememberScrollState()).padding(padding) else base.padding(padding)
 }
 
-/** Shared modal wash: glass keeps spatial context; solid mode remains stronger but avoids black slabs. */
-@Composable
-fun Modifier.modalScrim(strength: Float = 1f): Modifier {
-    val glassy = LocalGlass.current.isGlassy(GlassSurface.DIALOGS)
-    val alpha = (if (glassy) 0.30f else 0.58f) * strength.coerceIn(0f, 1.35f)
-    return background(Color.Black.copy(alpha = alpha.coerceAtMost(0.72f)))
-}
+/** Shared modal wash, as the Stage menus draw it: the screen behind stays readable, the popup in front. */
+fun Modifier.modalScrim(strength: Float = 1f): Modifier =
+    background(Color(2, 5, 6).copy(alpha = (0.55f * strength.coerceIn(0f, 1.35f)).coerceAtMost(0.72f)))
