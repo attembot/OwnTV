@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Fork-only user-visible text: true picture-in-picture and its channel picker.
+  Fork-only user-visible text: true picture-in-picture.
 
   Kept in its own file (upstream has no strings_fork.xml) so that upstream syncs never conflict here,
   and so the fork's Kotlin never depends on an upstream string key a later release might rename.
@@ -9,7 +9,7 @@
   uses (common_search_hint, common_move_instructions). That is deliberate: tooling has double-encoded
   UTF-8 in this repo before, and an escaped file cannot be corrupted that way. The escapes below are
   the exact codepoints the hardcoded literals used, so no on-screen text changes:
-  \u00b7 middle dot, \u2014 em dash, \u2026 ellipsis, \u201c/\u201d curly quotes.
+  \u00b7 middle dot.
 -->
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
 
@@ -43,27 +43,8 @@
     <string name="fork_pip_size_decrease">Size -</string>
     <!-- Translators: Button that closes the corner window; the full-screen stream keeps playing. -->
     <string name="fork_pip_close">Close</string>
-    <!-- Translators: Title of the channel picker that retunes the small corner window. The em dash
-         introduces an explanation of which of the two windows is meant. -->
-    <string name="fork_pip_picker_corner_title">Change the PiP channel \u2014 the small window</string>
-    <!-- Translators: Title of the channel picker that retunes the full-screen window. -->
-    <string name="fork_pip_picker_main_title">Change the main channel \u2014 the full screen</string>
-    <!-- Translators: Title of the channel picker that starts a second stream in the corner. -->
-    <string name="fork_pip_picker_add_title">Add a stream to the corner</string>
-
-    <!-- ===== Shared channel picker ===== -->
-
-    <!-- Translators: Category in the channel picker listing recently watched channels. -->
-    <string name="fork_category_recent">Recent</string>
-    <!-- Translators: Placeholder in the picker's search field. Ends with an ellipsis. -->
-    <string name="fork_switcher_search_hint">Search all channels\u2026</string>
-    <!-- Translators: Remote-control hint under the picker. "Back" is the back button on a TV remote.
-         Middle dots separate the three hints. -->
-    <string name="fork_switcher_hint">Browse categories on the left, channels on the right \u00b7 type above to search \u00b7 Back to cancel</string>
-    <!-- Translators: Shown when the selected category contains no channels. -->
-    <string name="fork_switcher_empty_category">No channels in this category.</string>
-    <!-- Translators: Shown when a search returns nothing. "query" is the text the user typed, wrapped in
-         curly double quotation marks. -->
-    <string name="fork_switcher_no_match">No channels match \u201c<xliff:g id="query">%1$s</xliff:g>\u201d.</string>
+    <!-- Translators: Heading of the channel list in the picture-in-picture channel picker: "PiP" (the
+         abbreviation used on the player's PiP button), a middle dot, then the category being browsed. -->
+    <string name="fork_pip_picker_list_title">PiP \u00b7 <xliff:g id="category">%1$s</xliff:g></string>
 
 </resources>

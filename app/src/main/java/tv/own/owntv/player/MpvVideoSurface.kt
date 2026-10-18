@@ -69,7 +69,7 @@ fun MpvVideoSurface(
     player: OwnTVPlayer,
     modifier: Modifier = Modifier,
     autoFrameRate: Boolean = true,
-    // N7 — Auto frame rate's two film extras (Settings → Video player). Ignored on live.
+    // Auto frame rate's two film extras (Settings → Video player). Ignored on live.
     afrMatchResolution: Boolean = false,
     afrHoldSecs: Int = 0,
 ) {
@@ -105,7 +105,7 @@ fun MpvVideoSurface(
         // owns playback — putting ANY view over the SurfaceView (even an empty one) knocks it off the
         // hardware-overlay / direct scan-out path, which stutters 4K to a ~2 fps slideshow under GPU
         // composition. During normal mpv playback this isn't composed, so the surface scans out directly.
-        // T16 — and only while a subtitle track is actually on, as the live path already does with
+        // And only while a subtitle track is actually on, as the live path already does with
         // `subOn`: a film on ExoPlayer with subtitles off would otherwise keep an empty view over it.
         val exoActive by player.exoActiveState.collectAsStateWithLifecycle()
         val exoSubOn by player.exoSubtitleOn.collectAsStateWithLifecycle()
@@ -218,7 +218,7 @@ fun ExoPreviewSurface(
             }
         }
         // Subtitle overlay — mounted ONLY while subs are on, so 4K live keeps its direct hardware-overlay path.
-        // Sized like the video, not like the screen (F17): at any zoom other than Fit the two differ, and
+        // Sized like the video, not like the screen: at any zoom other than Fit the two differ, and
         // mounting this full-screen put the same subtitle in a different place depending on which engine
         // happened to be running. The picture is the reference, so a line stays inside the frame the user
         // is actually looking at.
@@ -231,7 +231,7 @@ fun ExoPreviewSurface(
 }
 
 /**
- * Media3's [androidx.media3.ui.SubtitleView] with the user's subtitle appearance (#96) applied —
+ * Media3's [androidx.media3.ui.SubtitleView] with the user's subtitle appearance applied —
  * shared by Live TV (the default live engine) and the VOD image-subtitle handoff, so a subtitle
  * looks the same on both.
  *
@@ -239,7 +239,7 @@ fun ExoPreviewSurface(
  * master toggle is off) leaves this the plain, unstyled view it has always been. In particular
  * `applyEmbeddedStyles` is only switched off once a color or a background transparency is actually
  * chosen: that discards broadcaster CEA-608/teletext styling, which is the only way an override can
- * take effect — and exactly what #96 asks for, since the opaque black box comes from the broadcaster.
+ * take effect — and exactly what is wanted, since the opaque black box comes from the broadcaster.
  * Whichever of the two is still on "Default" falls back to [androidx.media3.ui.CaptionStyleCompat]'s
  * own value rather than to the (now discarded) embedded one.
  *

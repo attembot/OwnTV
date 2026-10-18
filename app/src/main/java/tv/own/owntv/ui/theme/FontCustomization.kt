@@ -43,7 +43,7 @@ private val DancingScriptFamily = FontFamily(
     variableFont(R.font.dancing_script_variable, FontWeight.Bold),
 )
 
-// Stage's typeface: every weight the mockup uses (400–800) from one variable file.
+// Stage's typeface: every weight it uses (400–800) from one variable file.
 private val PlusJakartaSansFamily = FontFamily(
     variableFont(R.font.plus_jakarta_sans_variable, FontWeight.Normal),
     variableFont(R.font.plus_jakarta_sans_variable, FontWeight.Medium),

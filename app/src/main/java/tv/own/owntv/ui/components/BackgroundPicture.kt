@@ -24,7 +24,7 @@ private const val BG_TAG = "BgImage"
 /**
  * The user's picture as Glass & background draws it: with Blur above 0, the matching level of the
  * blurred copy stretched over the area (one texture, the same cost as the sharp picture; until the copy
- * exists the sharp picture shows), then Darken as the page colour over it (Sharp's 15% = the old fixed
+ * exists the sharp picture shows), then Darken as the page colour over it (Sharp's 15% = the former fixed
  * 16% scrim). Used behind the whole app and, scaled, in the Settings preview.
  */
 @Composable
@@ -49,6 +49,11 @@ fun BackgroundPicture(background: BackgroundConfig, blurred: BlurredBackdrop?, m
                 modifier = Modifier.fillMaxSize(),
             )
         }
-        Box(Modifier.fillMaxSize().background(Color(0xFF05080A).copy(alpha = background.dimPct / 100f)))
+        // Light: the picture fades into the paper instead, and always far enough for dark ink to read on it
+        // (Sharp 15% → 62%, Soft 50% → 78%, Dark 75% → 89%).
+        val dim = background.dimPct / 100f
+        val wash = if (tv.own.owntv.ui.theme.LocalStagePalette.current.isLight) Color(0xFFF4F7F5).copy(alpha = 0.55f + 0.45f * dim)
+        else Color(0xFF05080A).copy(alpha = dim)
+        Box(Modifier.fillMaxSize().background(wash))
     }
 }

@@ -15,7 +15,7 @@ import tv.own.owntv.R
 import tv.own.owntv.ui.components.OwnTVIcon
 
 /**
- * Settings › Layout › Browsing lists as a Stage page (owner, P12: six switches are not a popup): what
+ * Settings › Layout › Browsing lists as a Stage page (six switches are not a popup): what
  * each section remembers — its last category, then its last item — one switch per section.
  */
 @Composable

@@ -5,7 +5,7 @@ import androidx.compose.ui.res.stringResource
 import tv.own.owntv.R
 
 /**
- * N4 — back on a live channel whose saved copy was kept while the user was away: continue from where
+ * Back on a live channel whose saved copy was kept while the user was away: continue from where
  * they left, or watch live. Resume is focused (the likelier wish after an accidental exit); Back
  * leaves them live, where the channel already is.
  */

@@ -1,5 +1,7 @@
 package tv.own.owntv.features.shell.components
 
+import tv.own.owntv.ui.theme.stageTone
+import tv.own.owntv.ui.theme.LocalStagePalette
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -228,7 +230,7 @@ internal fun glassBackgroundSummary(background: BackgroundConfig, glass: tv.own.
     return bg + dotSeparator() + g
 }
 
-/** The value a row shows when it does not apply right now: dim text, no chevron (the mockup's `off()`). */
+/** The value a row shows when it does not apply right now: dim text, no chevron. */
 private fun dimValue(text: String) = SettingValue.Custom {
     Text(text, style = stageText(18, 700), color = StageColors.Dim, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
@@ -275,14 +277,15 @@ private fun GlassBackgroundPreview() {
     val background = LocalBackground.current
     val blurred = LocalBlurredBackdrop.current
     val a = stageAccent
+    val previewRim = StageColors.Ink.copy(alpha = 0.1f)
     Column(Modifier.padding(top = 16.mpx)) {
         BoxWithConstraints(
             Modifier
                 .fillMaxWidth()
                 .aspectRatio(16f / 9f)
                 .clip(RoundedCornerShape(18.mpx))
-                .background(Color(0xFF05080A))
-                .drawBehind { drawInnerRing(Color.White.copy(alpha = 0.1f), 1.mpx.toPx(), 18.mpx.toPx()) },
+                .background(stageTone(Color(0xFF05080A), LocalStagePalette.current.page))
+                .drawBehind { drawInnerRing(previewRim, 1.mpx.toPx(), 18.mpx.toPx()) },
         ) {
             val scale = maxWidth / 1920.mpx
             Box(

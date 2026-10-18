@@ -60,12 +60,9 @@ import tv.own.owntv.features.setup.playlistAutoRefreshLabel
 import tv.own.owntv.features.setup.AddSourceChooserScreen
 import tv.own.owntv.features.setup.AddSourceScreen
 import tv.own.owntv.features.setup.RemoteSetupScreen
-import tv.own.owntv.ui.components.OwnTVButton
-import tv.own.owntv.ui.components.OwnTVButtonStyle
 import tv.own.owntv.ui.components.OwnTVSpinner
-import tv.own.owntv.ui.theme.OwnTVTheme
 
-/** Phase 13 — list / add / re-sync / delete the active profile's IPTV sources. */
+/** List / add / re-sync / delete the active profile's IPTV sources. */
 @Composable
 fun ManageSourcesScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val vm: SettingsViewModel = koinViewModel()
@@ -78,7 +75,6 @@ fun ManageSourcesScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val sourceTest by vm.sourceTest.collectAsStateWithLifecycle()
     val deletingIds by vm.deletingSourceIds.collectAsStateWithLifecycle()
     val epgSync by vm.epgSync.collectAsStateWithLifecycle()
-    val colors = OwnTVTheme.colors
     val defaultIptvName = stringResource(R.string.setup_default_iptv)
     val defaultPlaylistName = stringResource(R.string.setup_name_default_playlist)
     val defaultPortalName = stringResource(R.string.setup_default_portal)
@@ -240,7 +236,7 @@ fun ManageSourcesScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                     Spacer(Modifier.height(6.mpx))
                     Text(display?.detailText() ?: stringResource(R.string.settings_sources_preparing), style = stageText(18, 400), color = StageColors.Muted)
                     Spacer(Modifier.height(30.mpx))
-                    OwnTVButton(stringResource(R.string.common_cancel), onClick = { showAdd = false; vm.cancelImport() }, style = OwnTVButtonStyle.SECONDARY)
+                    tv.own.owntv.ui.stage.StageButton(stringResource(R.string.common_cancel), onClick = { showAdd = false; vm.cancelImport() })
                 }
                 is SettingsViewModel.ImportState.Success -> {
                     // Semi-auto EPG: ask → sync (with a live count, like the import) → done, before returning.
@@ -260,7 +256,7 @@ fun ManageSourcesScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                                 Text(remainder, style = stageText(18, 400), color = StageColors.Muted)
                             }
                             Spacer(Modifier.height(30.mpx))
-                            OwnTVButton(stringResource(R.string.common_done), onClick = { showAdd = false; vm.resetImport() })
+                            tv.own.owntv.ui.stage.StageButton(stringResource(R.string.common_done), onClick = { showAdd = false; vm.resetImport() }, tinted = true)
                         }
                     } else {
                         LaunchedEffect(Unit) { showAdd = false; vm.resetImport() }
@@ -272,13 +268,13 @@ fun ManageSourcesScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                     Text(s.failure.displayText(), style = stageText(18, 400), color = StageColors.Muted)
                     Spacer(Modifier.height(30.mpx))
                     Row(horizontalArrangement = Arrangement.spacedBy(14.mpx)) {
-                        OwnTVButton(stringResource(R.string.common_back), onClick = { showAdd = false; vm.resetImport() }, style = OwnTVButtonStyle.SECONDARY)
-                        OwnTVButton(stringResource(R.string.settings_sources_try_again), onClick = { vm.resetImport() }, modifier = Modifier.focusRequester(errorFocus))
+                        tv.own.owntv.ui.stage.StageButton(stringResource(R.string.common_back), onClick = { showAdd = false; vm.resetImport() })
+                        tv.own.owntv.ui.stage.StageButton(stringResource(R.string.settings_sources_try_again), onClick = { vm.resetImport() }, modifier = Modifier.focusRequester(errorFocus), tinted = true)
                     }
                 }
             }
         } else {
-            // P10B-07: the playlists as rows; the focused one's Edit / Info / Re-sync / Delete in the panel.
+            // The playlists as rows; the focused one's Edit / Info / Re-sync / Delete in the panel.
             val actionsFocus = remember { FocusRequester() }
             StageFullPage(
                 parents = listOf(stringResource(R.string.settings_group_sources)),
@@ -437,7 +433,7 @@ private fun SourceRow(
         keepPanel = keepPanel,
         help = SettingHelp(
             title = source.name,
-            // The address on one line, the counts on the next (owner).
+            // The address on one line, the counts on the next.
             text = listOfNotNull(typeName, visibleCounts).joinToString("\n"),
             hints = listOf(
                 "▶" to stringResource(R.string.settings_key_actions),
@@ -494,7 +490,7 @@ private fun CatalogSyncState.Syncing.countsLabel(sourceType: SourceType, stored:
             moviesActive = false,
             seriesActive = false,
         )
-        // Stalker: LIVE (Phase C-1) + VOD/series (Phase D-1) all populate.
+        // Stalker: LIVE + VOD/series all populate.
         SourceType.STALKER -> SyncProgressCounts(
             live = live,
             movies = movies,

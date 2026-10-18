@@ -70,10 +70,10 @@ import tv.own.owntv.ui.theme.stageText
 private enum class MoreItem { SETTINGS, FAVORITES, HISTORY, BACKUP, LOCAL_SYNC, ERROR_LOG, ABOUT, DEVELOPER }
 
 /**
- * More (Stage P8-01 … P8-08): the glass section sheet, topped by the profile, and one page on the right
+ * More: the glass section sheet, topped by the profile, and one page on the right
  * for the item chosen with OK. Two layers, never three: ▲ ▼ move focus, OK selects the item (focus stays), ▶ enters the page, Back returns to
  * the sheet, Back again leaves More. Nothing opens full screen any more — Settings is the one door out,
- * through its group cards (until P10 redraws Settings itself).
+ * through its group cards.
  */
 @Composable
 fun MoreScreen(
@@ -104,15 +104,15 @@ fun MoreScreen(
     val pageTarget = remember { FocusRequester() }
     var pageEntry by remember { mutableStateOf<(() -> Boolean)?>(null) }
     var pageFocused by remember { mutableStateOf(false) }
-    val enterPage: () -> Boolean = { pageEntry?.invoke() ?: runCatching { pageTarget.requestFocus() }.isSuccess }
+    val enterPage: () -> Boolean = { pageEntry?.invoke() ?: runCatching { pageTarget.requestFocus() }.getOrDefault(false) }
     val backToSheet: () -> Unit = { runCatching { itemFocus.getValue(selected).requestFocus() } }
     // Like the rail: ▲ ▼ move focus, OK selects the item (its page shows, focus stays on the item),
-    // ▶ goes into the page that is shown (owner).
+    // ▶ goes into the page that is shown.
     val choose: (MoreItem) -> Unit = { item -> if (item != selected) { selected = item; pageEntry = null } }
 
     // The rail's ▶ lands on the item the sheet was last on.
     DisposableEffect(onEntryHook) {
-        onEntryHook?.invoke { runCatching { itemFocus.getValue(selected).requestFocus() }.isSuccess }
+        onEntryHook?.invoke { runCatching { itemFocus.getValue(selected).requestFocus() }.getOrDefault(false) }
         onDispose { onEntryHook?.invoke(null) }
     }
     LaunchedEffect(restoreFocus) {
@@ -136,7 +136,7 @@ fun MoreScreen(
     val logCount by produceState(0, logVersion) { value = withContext(Dispatchers.IO) { PlaybackErrorLog.read(context).size } }
 
     Box(modifier.fillMaxSize().onFocusChanged { if (it.hasFocus) onChildFocused() }) {
-        // --- The sheet (`.gsheet`, 440 wide at 24 / 24 / 24): the full height (owner tried level with the page, kept this).
+        // --- The sheet (`.gsheet`, 440 wide at 24 / 24 / 24): the full height.
         Column(
             Modifier
                 .padding(start = 24.mpx, top = 24.mpx, bottom = 24.mpx)

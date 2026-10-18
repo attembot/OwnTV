@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.tv.material3.Text
 import tv.own.owntv.ui.components.LocalTvImeMetrics
@@ -43,14 +44,14 @@ import tv.own.owntv.ui.theme.stageText
 
 /**
  * The eyebrow a popup shows when it gives none of its own: a Settings page provides
- * "SETTINGS · PLAYER", so every popup opened from it is labelled as the mockup draws them.
+ * "SETTINGS · PLAYER", so every popup opened from it is labelled with its path.
  */
 val LocalPopupEyebrow = staticCompositionLocalOf<String?> { null }
 
 /**
- * The Stage popup (P1-06, P4-05, P9-05): the wash over the screen, one glass panel (radius 30, padding
+ * The Stage popup: the wash over the screen, one glass panel (radius 30, padding
  * 30) with the eyebrow 15/800, the title 38/800 and a muted 18 px text, then [content], then [buttons]
- * at the bottom right. Drawn in mockup pixels; the host applies Popup size and popup font size. While the TV keyboard is up the panel moves to the top and is capped to the room above the
+ * at the bottom right. Drawn in design pixels; the host applies Popup size and popup font size. While the TV keyboard is up the panel moves to the top and is capped to the room above the
  * keys, so the field being typed in stays visible. Focus never leaves it; Back closes it.
  *
  * [scroll] = false when [content] holds its own LazyColumn (give it `weight(1f, fill = false)`).
@@ -75,7 +76,7 @@ fun StagePopup(
         val ime = LocalTvImeMetrics.current
         val density = LocalDensity.current
         BoxWithConstraints(
-            Modifier.fillMaxSize().background(Color(2, 5, 6).copy(alpha = 0.55f)).trapAllFocusExit().focusGroup(),
+            Modifier.fillMaxSize().background(StageColors.Scrim).trapAllFocusExit().focusGroup(),
             contentAlignment = if (ime.visible) Alignment.TopCenter else Alignment.Center,
         ) {
             val edge = 40.mpx
@@ -91,8 +92,8 @@ fun StagePopup(
                     .padding(30.mpx),
             ) {
                 StagePopupHeading(title, eyebrow, eyebrowAccent, eyebrowIcon, body)
-                // Text inside written with the old type styles reads as Stage type here.
-                androidx.tv.material3.MaterialTheme(typography = stagePopupTypography()) { content() }
+                // Text given no style of its own reads as the popup's body text.
+                androidx.tv.material3.ProvideTextStyle(stageText(19, 500)) { content() }
                 if (buttons != null) {
                     Row(
                         Modifier.fillMaxWidth().padding(top = 24.mpx),
@@ -149,18 +150,6 @@ fun StageNotice(
     StagePopup(
         onDismiss = onDismiss, title = title, body = body, eyebrow = eyebrow, width = 760.mpx,
         buttons = { StageButton(ok, onClick = onDismiss, height = 56.mpx, textSize = 19, tinted = true, modifier = Modifier.focusRequester(first)) },
-    )
-}
-
-/** The Material type scale as Stage popups set text (titles 800, body 18 / 15), in the app's font. */
-@Composable
-private fun stagePopupTypography(): androidx.tv.material3.Typography {
-    val t = androidx.tv.material3.MaterialTheme.typography
-    return t.copy(
-        headlineLarge = stageText(40, 800), headlineMedium = stageText(36, 800), headlineSmall = stageText(32, 800),
-        titleLarge = stageText(30, 800), titleMedium = stageText(22, 700), titleSmall = stageText(19, 700),
-        bodyLarge = stageText(19, 500), bodyMedium = stageText(18, 400), bodySmall = stageText(15, 500),
-        labelLarge = stageText(19, 700), labelMedium = stageText(16, 700), labelSmall = stageText(14, 700),
     )
 }
 
@@ -255,11 +244,12 @@ fun StagePopupOption(
 @Composable
 fun StagePopupRadio(on: Boolean, focused: Boolean) {
     val a = stageAccent
+    val dim = StageColors.Dim
     Box(
         Modifier.size(24.mpx).drawBehind {
             val r = size.minDimension / 2f
             if (on) drawInnerRing(if (focused) Color.White else a.accent, 7.mpx.toPx(), r)
-            else drawInnerRing(StageColors.Dim, 2.mpx.toPx(), r)
+            else drawInnerRing(dim, 2.mpx.toPx(), r)
         },
     )
 }
@@ -269,11 +259,12 @@ fun StagePopupRadio(on: Boolean, focused: Boolean) {
 fun StagePopupCheck(on: Boolean, focused: Boolean) {
     val a = stageAccent
     val fill = if (focused) Color.White else a.accent
+    val dim = StageColors.Dim
     Box(
         Modifier.size(24.mpx).drawBehind {
             val r = 7.mpx.toPx()
             if (on) drawRoundRect(fill, cornerRadius = androidx.compose.ui.geometry.CornerRadius(r))
-            else drawRoundRect(StageColors.Dim, cornerRadius = androidx.compose.ui.geometry.CornerRadius(r), style = androidx.compose.ui.graphics.drawscope.Stroke(2.mpx.toPx()))
+            else drawRoundRect(dim, cornerRadius = androidx.compose.ui.geometry.CornerRadius(r), style = androidx.compose.ui.graphics.drawscope.Stroke(2.mpx.toPx()))
         },
         contentAlignment = Alignment.Center,
     ) {
@@ -290,7 +281,7 @@ fun StagePopupIcon(icon: OwnTVIcon, tint: Color = StageColors.Text) {
 /** The 1 px line between a popup's parts. */
 @Composable
 fun StagePopupDivider() {
-    Box(Modifier.padding(vertical = 18.mpx).fillMaxWidth().height(1.mpx).background(Color.White.copy(alpha = 0.10f)))
+    Box(Modifier.padding(vertical = 18.mpx).fillMaxWidth().height(1.mpx).background(StageColors.Ink.copy(alpha = 0.10f)))
 }
 
 /** A dim group label inside a popup ("PRESETS", "HEX CODE"). Passed in capitals; see [StageGroupLabel]. */
@@ -301,4 +292,56 @@ fun StagePopupLabel(text: String, modifier: Modifier = Modifier) {
         maxLines = 1, overflow = TextOverflow.Ellipsis,
         modifier = modifier.padding(top = 6.mpx, bottom = 10.mpx),
     )
+}
+
+/**
+ * A button inside a popup's content: the main action ([primary]) on accent 20% in accent text, the
+ * others on white 8% in text colour, radius 14; focused = the FILLED treatment (accent fill, focus
+ * ring, glow). Disabled at 45%.
+ */
+@Composable
+fun StagePopupButton(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    primary: Boolean = true,
+    icon: OwnTVIcon? = null,
+    enabled: Boolean = true,
+    onLongClick: (() -> Unit)? = null,
+    // Denser (tighter padding + smaller icon) for space-constrained popups like the storage picker.
+    compact: Boolean = false,
+) {
+    val a = stageAccent
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp)
+    StageSurface(
+        onClick = onClick,
+        onLongClick = onLongClick,
+        radius = 14.dp,
+        enabled = enabled,
+        modifier = modifier.then(if (enabled) Modifier else Modifier.alpha(0.45f)),
+        idle = Modifier.background(if (primary) a.accent.copy(alpha = 0.2f) else StageColors.Ink.copy(alpha = 0.08f), shape),
+        contentAlignment = Alignment.Center,
+    ) { focused ->
+        val content = when {
+            focused -> a.onAccent
+            primary -> a.accent
+            else -> StageColors.Text
+        }
+        Row(
+            modifier = Modifier.padding(horizontal = if (compact) 13.dp else 22.dp, vertical = if (compact) 6.dp else 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 10.dp),
+        ) {
+            if (icon != null) OwnTVIcon(icon = icon, tint = content, filled = true, modifier = Modifier.size(if (compact) 14.dp else 20.dp))
+            Text(
+                text = label,
+                style = (if (compact) tv.own.owntv.ui.theme.stageText(16, 700) else tv.own.owntv.ui.theme.stageText(19, 700))
+                    .copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                color = content,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+        }
+    }
 }

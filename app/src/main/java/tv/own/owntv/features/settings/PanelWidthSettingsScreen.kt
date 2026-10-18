@@ -29,12 +29,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import org.koin.androidx.compose.koinViewModel
 import tv.own.owntv.R
@@ -56,12 +54,9 @@ import tv.own.owntv.features.settings.data.BrowseColumnDividerSpace
 import tv.own.owntv.features.settings.data.BrowseContainerPadding
 import tv.own.owntv.features.settings.data.defaultPanelShares
 import tv.own.owntv.ui.components.ContentPanelFill
-import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.PreviewPanelFill
 import tv.own.owntv.ui.components.restoreAfterDialogClose
-import tv.own.owntv.core.theme.GlassSurface
-import tv.own.owntv.ui.theme.OwnTVTheme
 
 /**
  * Panel Width Adjustment — lets the user re-balance the three browse panels (category rail · item
@@ -92,7 +87,7 @@ fun PanelWidthSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) 
         if (dialogReturn != null) restoreAfterDialogClose(dialogReturn, scrollState, savedScroll)
         dialogReturn = null
     }
-    // P10B-17: one row per screen, named with the layout it uses now; the panel draws that layout at its widths.
+    // One row per screen, named with the layout it uses now; the panel draws that layout at its widths.
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val rowWidth = maxWidth - BrowseContainerPadding * 2
         val vodLayout by vm.vodLayout.collectAsStateWithLifecycle()
@@ -391,19 +386,18 @@ private fun PanelWidthDialog(
 /** Live TV, Stage layout: the list and the preview across the row, the categories sheet drawn over its left edge. */
 @Composable
 private fun StageWidthDiagram(w: tv.own.owntv.core.settings.LiveStageWidths) {
-    val colors = OwnTVTheme.colors
     Box(
         Modifier
             .fillMaxWidth()
             .height(44.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(colors.surfaceContainerLowest)
+            .background(tv.own.owntv.ui.theme.StageColors.Ink.copy(alpha = 0.04f))
             .padding(4.dp),
     ) {
         Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Box(Modifier.weight(w.list.toFloat()).fillMaxHeight().clip(RoundedCornerShape(6.dp)).background(colors.surfaceContainerHigh))
+            Box(Modifier.weight(w.list.toFloat()).fillMaxHeight().clip(RoundedCornerShape(6.dp)).background(tv.own.owntv.ui.theme.StageColors.Ink.copy(alpha = 0.08f)))
             if (w.preview > 0) {
-                Box(Modifier.weight(w.preview.toFloat()).fillMaxHeight().clip(RoundedCornerShape(6.dp)).background(colors.surfaceContainerHighest))
+                Box(Modifier.weight(w.preview.toFloat()).fillMaxHeight().clip(RoundedCornerShape(6.dp)).background(tv.own.owntv.ui.theme.StageColors.Ink.copy(alpha = 0.12f)))
             }
         }
         Box(
@@ -411,7 +405,7 @@ private fun StageWidthDiagram(w: tv.own.owntv.core.settings.LiveStageWidths) {
                 .fillMaxWidth(w.sheet / 100f)
                 .fillMaxHeight()
                 .clip(RoundedCornerShape(6.dp))
-                .background(colors.primary.copy(alpha = 0.55f)),
+                .background(tv.own.owntv.ui.theme.stageAccent.accent.copy(alpha = 0.55f)),
         )
     }
 }
@@ -419,7 +413,6 @@ private fun StageWidthDiagram(w: tv.own.owntv.core.settings.LiveStageWidths) {
 /** The browse layout users are sizing: one container, two plain columns, and a raised preview. */
 @Composable
 private fun PanelWidthDiagram(shares: PanelShares, cinematic: Boolean = false, detailsHeight: Int = 0) {
-    val colors = OwnTVTheme.colors
     if (cinematic) {
         // The titles across the whole row with the details band on top, and the categories sheet
         // drawn over its left edge — the Stage Cinematic layout, as Live TV's Stage diagram.
@@ -433,15 +426,15 @@ private fun PanelWidthDiagram(shares: PanelShares, cinematic: Boolean = false, d
         ) {
             Column(Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp))) {
                 val detailsWeight = detailsHeight.toFloat().coerceIn(0f, CINEMATIC_DETAILS_MAX.toFloat())
-                Box(Modifier.weight(detailsWeight.coerceAtLeast(0.01f)).fillMaxWidth().background(colors.primary.copy(alpha = 0.32f)))
-                Box(Modifier.weight((100f - detailsWeight).coerceAtLeast(1f)).fillMaxWidth().background(colors.onSurface.copy(alpha = 0.10f)))
+                Box(Modifier.weight(detailsWeight.coerceAtLeast(0.01f)).fillMaxWidth().background(tv.own.owntv.ui.theme.stageAccent.accent.copy(alpha = 0.32f)))
+                Box(Modifier.weight((100f - detailsWeight).coerceAtLeast(1f)).fillMaxWidth().background(tv.own.owntv.ui.theme.StageColors.Text.copy(alpha = 0.10f)))
             }
             Box(
                 Modifier
                     .fillMaxWidth(shares.category / 100f)
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(6.dp))
-                    .background(colors.primary.copy(alpha = 0.55f)),
+                    .background(tv.own.owntv.ui.theme.stageAccent.accent.copy(alpha = 0.55f)),
             )
         }
         return
@@ -460,7 +453,7 @@ private fun PanelWidthDiagram(shares: PanelShares, cinematic: Boolean = false, d
                 .weight(shares.category.toFloat())
                 .fillMaxHeight()
                 .clip(RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp))
-                .background(colors.onSurface.copy(alpha = 0.035f)),
+                .background(tv.own.owntv.ui.theme.StageColors.Text.copy(alpha = 0.035f)),
         )
         Spacer(Modifier.width(BrowseColumnGap))
         Box(
@@ -468,7 +461,7 @@ private fun PanelWidthDiagram(shares: PanelShares, cinematic: Boolean = false, d
                 .width(BrowseColumnDividerSpace)
                 .fillMaxHeight()
                 .padding(vertical = 2.dp)
-                .background(colors.outlineVariant.copy(alpha = 0.35f)),
+                .background(tv.own.owntv.ui.theme.StageColors.Ink.copy(alpha = 0.10f)),
         )
         Spacer(Modifier.width(BrowseColumnGap))
         Box(

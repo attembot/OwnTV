@@ -38,9 +38,7 @@ import tv.own.owntv.ui.theme.stageText
 import tv.own.owntv.ui.theme.stageAccent
 import tv.own.owntv.ui.theme.StageColors
 import tv.own.owntv.ui.components.OwnTVIcon
-import tv.own.owntv.ui.components.dialogPanel
 import tv.own.owntv.ui.components.displayLabel
-import tv.own.owntv.ui.components.modalScrim
 import tv.own.owntv.ui.format.localizedDecimal
 
 /**
@@ -72,11 +70,11 @@ internal fun TrackDialog(
     audioDelayRemembered: Boolean = false,
     onToggleRememberAudioDelay: (() -> Unit)? = null,
     // Non-null on the Subtitles dialog for a movie/episode → an "ADD SUBTITLES" row that opens the
-    // OpenSubtitles search (subtitle plan §4). Absent for Live TV and when no item context exists.
+    // OpenSubtitles search. Absent for Live TV and when no item context exists.
     onSearchSubtitles: (() -> Unit)? = null,
-    // Non-null on the Subtitles dialog for a movie/episode → "Select local subtitle file" (plan §7).
+    // Non-null on the Subtitles dialog for a movie/episode → "Select local subtitle file".
     onSelectLocalSubtitle: (() -> Unit)? = null,
-    // Non-null on the Subtitles dialog when timing adjustment applies to the active track (plan §8) →
+    // Non-null on the Subtitles dialog when timing adjustment applies to the active track →
     // an "ADJUST" section with a "Subtitle timing" row: ◀ ▶ nudge it, OK sets it back to zero.
     subDelayMs: Int = 0,
     onAdjustSubDelay: ((Int) -> Unit)? = null,
@@ -103,7 +101,7 @@ internal fun TrackDialog(
         repeat(10) {
             androidx.compose.runtime.withFrameNanos { }
             if (selectedIndex >= 0) runCatching { listState.scrollToItem(target) }
-            if (runCatching { focus.requestFocus() }.isSuccess) return@LaunchedEffect
+            if (runCatching { focus.requestFocus() }.getOrDefault(false)) return@LaunchedEffect
             delay(50)
         }
     }
@@ -130,7 +128,7 @@ internal fun TrackDialog(
                 onClick = { onSelect(track) },
             )
         }
-        // ADD SUBTITLES (subtitles dialog, movie/episode only) — OpenSubtitles search + local file (§4/§7).
+        // ADD SUBTITLES (subtitles dialog, movie/episode only) — OpenSubtitles search + local file.
         if (onSearchSubtitles != null || onSelectLocalSubtitle != null) {
             item { tv.own.owntv.ui.stage.StagePopupLabel(stringResource(R.string.player_add_subtitles), Modifier.padding(top = 12.mpx)) }
             if (onSearchSubtitles != null) {
@@ -140,7 +138,7 @@ internal fun TrackDialog(
                 item { ActionRow(stringResource(R.string.player_select_local_subtitle), OwnTVIcon.FOLDER, onSelectLocalSubtitle) }
             }
         }
-        // ADJUST (subtitles dialog): timing panel for the active subtitle (plan §8).
+        // ADJUST (subtitles dialog): timing panel for the active subtitle.
         if (onAdjustSubDelay != null) {
             item { tv.own.owntv.ui.stage.StagePopupLabel(stringResource(R.string.player_adjust), Modifier.padding(top = 12.mpx)) }
             item {
@@ -191,7 +189,7 @@ internal fun TrackDialog(
 private suspend fun requestFocusRetrying(focus: FocusRequester) {
     repeat(10) {
         androidx.compose.runtime.withFrameNanos {}
-        if (runCatching { focus.requestFocus() }.isSuccess) return
+        if (runCatching { focus.requestFocus() }.getOrDefault(false)) return
         delay(50)
     }
 }
@@ -223,7 +221,7 @@ internal fun SpeedDialog(current: Double, onSelect: (Double) -> Unit, onDismiss:
 }
 
 /**
- * The sleep timer's choices (N17), the phone's sheet in the television's dialog: Off while one is
+ * The sleep timer's choices, the phone's sheet in the television's dialog: Off while one is
  * running, the shared minute choices, "End of programme" only when the guide says when that is, and
  * "End of movie / episode" only while one plays.
  * The title turns into the countdown while a timer runs, so re-opening it says what is set.
@@ -327,7 +325,7 @@ internal fun ZoomDialog(current: ZoomMode, onSelect: (ZoomMode) -> Unit, onDismi
     }
 }
 
-/** N11 — Auto (Settings → Maximum video quality), then every height this stream offers, highest first. */
+/** Auto (Settings → Maximum video quality), then every height this stream offers, highest first. */
 @Composable
 internal fun QualityDialog(heights: List<Int>, current: Int?, onSelect: (Int?) -> Unit, onDismiss: () -> Unit) {
     val focus = remember { FocusRequester() }

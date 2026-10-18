@@ -25,7 +25,7 @@ plugins {
     // Kotlin is provided by AGP 9's built-in Kotlin support. KSP 2.3.6+ is compatible with it.
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.ksp)
-    // Consumes :baselineprofile's output and packages it as baseline.prof (audit ST1).
+    // Consumes :baselineprofile's output and packages it as baseline.prof.
     alias(libs.plugins.baselineprofile)
 }
 
@@ -168,7 +168,7 @@ android {
     buildTypes {
         debug {
             // Pseudolocales (en-XA / ar-XB) are generated for the debug BuildType, NOT androidResources.
-            // They are the Phase 3g QA sweep instrument; localeFilters below would otherwise strip them,
+            // They are the pseudolocale QA instrument; localeFilters below would otherwise strip them,
             // so the debug-only qualifiers are added back via the per-variant API in the androidComponents
             // block at the bottom of this file (see docs/internationalization.md 0b, "Pseudolocales must
             // survive the filter").
@@ -396,10 +396,10 @@ dependencies {
     // ART on first launch. OwnTV is sideloaded, so without this the bundled profiles never apply.
     implementation(libs.androidx.profileinstaller)
 
-    // Compat splash screen (audit ST3) — branded cold start instead of a blank window.
+    // Compat splash screen — branded cold start instead of a blank window.
     implementation(libs.androidx.core.splashscreen)
 
-    // The recorded startup journey (audit ST1). Regenerate with
+    // The recorded startup journey. Regenerate with
     // `./gradlew :app:generateBaselineProfile` whenever the startup path changes. `mergeIntoMain`
     // collapses the per-variant tasks into that single one; it records against :app's x86_64 flavor
     // (see baselineprofile/build.gradle.kts) because collection needs an API 33+ device.
@@ -416,7 +416,7 @@ dependencies {
     // Networking
     implementation(libs.okhttp)
     implementation(libs.zxing.core) // QR generation for the Remote (companion) add-source flow
-    implementation(libs.juniversalchardet) // local subtitle charset detection (subtitle plan §7.2)
+    implementation(libs.juniversalchardet) // local subtitle charset detection
 
     // Media playback — libmpv (FFmpeg) is NOT declared here. `:player-core` exposes it as `api`, so it
     // arrives with core, on core's version. Two hosts each naming their own copy is exactly the
@@ -426,13 +426,13 @@ dependencies {
     // sidecar: mpv is stopped first, so the provider only ever sees one connection.
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.exoplayer.hls) // HLS (.m3u8) support for the Live preview engine
-    // DASH (.mpd) — the container protected channels use (#115). DefaultMediaSourceFactory only
+    // DASH (.mpd) — the container protected channels use. DefaultMediaSourceFactory only
     // builds a DASH source when this is on the classpath; without it a .mpd fails as "unsupported".
     implementation(libs.androidx.media3.exoplayer.dash)
     implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.datasource.okhttp)
 
-    // In-app YouTube trailer playback (plan §7.3) — WebView-backed IFrame player; the only ToS-clean
+    // In-app YouTube trailer playback — WebView-backed IFrame player; the only ToS-clean
     // way to play YouTube trailers inside the app. Falls back to an "Open in YouTube" intent.
     implementation(libs.youtube.player)
 

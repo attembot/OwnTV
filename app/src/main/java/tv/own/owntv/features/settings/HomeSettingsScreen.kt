@@ -38,7 +38,7 @@ import tv.own.owntv.ui.theme.stageAccent
 import tv.own.owntv.ui.theme.stageText
 
 /**
- * Settings › Layout › Home screen (P10B-01): Now trending and its layout, the Home rows (shown or hidden,
+ * Settings › Layout › Home screen: Now trending and its layout, the Home rows (shown or hidden,
  * in Home's order; the focused row's Hide / Move / Mode in the panel, Hold OK = Move), then Keep watching
  * and Android TV home.
  */
@@ -238,8 +238,11 @@ private fun HomeSwitchRow(icon: OwnTVIcon, titleRes: Int, descRes: Int, on: Bool
 private val HomeRow.icon: OwnTVIcon get() = when (this) {
     HomeRow.TRENDING -> OwnTVIcon.STAR
     HomeRow.HERO -> OwnTVIcon.PLAY_CIRCLE
+    HomeRow.LIVE_SPORTS -> OwnTVIcon.SPORTS
     HomeRow.RECENT_CHANNELS -> OwnTVIcon.LIVE_TV
     HomeRow.FAVORITE_CHANNELS -> OwnTVIcon.FAVORITE
+    HomeRow.FAVORITE_MOVIES -> OwnTVIcon.MOVIES
+    HomeRow.FAVORITE_SERIES -> OwnTVIcon.SERIES
     HomeRow.CONTINUE_MOVIES -> OwnTVIcon.MOVIES
     HomeRow.CONTINUE_SERIES -> OwnTVIcon.SERIES
 }

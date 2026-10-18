@@ -92,7 +92,7 @@ fun MiniPlayerSettingsDialog(onDismiss: () -> Unit) {
             }
         }
     }
-    // Two settings: in the page's panel (owner, P12), a Stage popup elsewhere.
+    // Two settings: in the page's panel, a Stage popup elsewhere.
     if (panelEditor(onDismiss) { form() }) return
     tv.own.owntv.ui.stage.StagePopup(onDismiss = onDismiss, title = stringResource(R.string.settings_mini_player), body = stringResource(R.string.settings_mini_player_description)) { form() }
 }

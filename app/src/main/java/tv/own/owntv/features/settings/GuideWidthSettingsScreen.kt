@@ -1,5 +1,6 @@
 package tv.own.owntv.features.settings
 
+import tv.own.owntv.ui.theme.StageColors
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
@@ -49,7 +50,7 @@ fun GuideWidthSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) 
     LaunchedEffect(showDialog) {
         if (!showDialog) runCatching { rowFocus.requestFocus() }
     }
-    // P10B-18: the TV Guide row and Reset; the panel draws the two columns at their widths.
+    // The TV Guide row and Reset; the panel draws the two columns at their widths.
     val rules = stringResource(R.string.settings_guide_width_help, *NO_ARGS)
     StageFullPage(
         parents = listOf(stringResource(R.string.settings_group_layout)),
@@ -82,7 +83,7 @@ fun GuideWidthSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) 
             onClick = { vm.setGuideWidths(false, GuideWidthLimits.defaults) },
             help = SettingHelp(reset, rules, hints = settingHints(null, pinnable = false)),
         )
-        // In the page's panel (owner, P12).
+        // In the page's panel.
         if (showDialog) panelEditor({ showDialog = false }) {
             GuideWidthDialog(savedEnabled = enabled, savedShares = current, onSave = vm::setGuideWidths, onDismiss = { showDialog = false })
         }
@@ -98,7 +99,7 @@ private fun GuideWidthDialog(
     onDismiss: () -> Unit,
 ) {
     // The two columns always add up to 100%, so there is one number to set: the channel column's
-    // width; the guide takes the rest. In the page's panel (owner, P12), saved as it changes.
+    // width; the guide takes the rest. In the page's panel, saved as it changes.
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) { kotlinx.coroutines.delay(60); runCatching { first.requestFocus() } }
     androidx.compose.foundation.layout.Column(Modifier.trapAllFocusExit().focusGroup()) {
@@ -125,7 +126,7 @@ private fun GuideWidthDiagram(shares: GuideWidthShares) {
     // The two columns at their widths, in the Stage colours: channels in accent, the guide plain.
     val a = tv.own.owntv.ui.theme.stageAccent
     androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().height(52.mpx), horizontalArrangement = Arrangement.spacedBy(6.mpx)) {
-        listOf(shares.channels to a.accent.copy(alpha = 0.32f), shares.epg to Color.White.copy(alpha = 0.08f)).forEach { (w, fill) ->
+        listOf(shares.channels to a.accent.copy(alpha = 0.32f), shares.epg to tv.own.owntv.ui.theme.StageColors.Ink.copy(alpha = 0.08f)).forEach { (w, fill) ->
             Box(Modifier.weight(w.toFloat()).fillMaxSize().background(fill, RoundedCornerShape(10.mpx)), contentAlignment = Alignment.Center) {
                 Text(stringResource(R.string.common_percent, w), style = tv.own.owntv.ui.theme.stageText(15, 700), color = tv.own.owntv.ui.theme.StageColors.Text, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             }

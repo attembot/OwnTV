@@ -86,8 +86,8 @@ data class FavouriteMove(val type: MediaType, val ids: List<Long>, val names: Li
  * More's data: the sheet's counts, and the Favourites and History pages.
  *
  * Deliberately its own view model and plain DAO reads, never a browse view model: on the TV
- * `koinViewModel()` scopes to the Activity, so borrowing `MoviesScreen`'s would share its pinned folder
- * (Plan Z defect 6). Writes go through the same [UserDataWriter] and order table the browse screens use.
+ * `koinViewModel()` scopes to the Activity, so borrowing `MoviesScreen`'s would share its pinned folder.
+ * Writes go through the same [UserDataWriter] and order table the browse screens use.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class MoreCountsViewModel(
@@ -227,12 +227,11 @@ class MoreCountsViewModel(
         _move.value = FavouriteMove(type, pairs.map { it.first }, pairs.map { it.second }, index)
     }
 
-    fun moveBy(step: Int) {
+    fun move(from: Int, to: Int) {
         val m = _move.value ?: return
-        val to = m.index + step
-        if (to !in m.ids.indices) return
-        fun <T> List<T>.swapped() = toMutableList().also { it[m.index] = this[to]; it[to] = this[m.index] }
-        _move.value = m.copy(ids = m.ids.swapped(), names = m.names.swapped(), index = to)
+        if (from !in m.ids.indices || to !in m.ids.indices || from == to) return
+        fun <T> List<T>.moved() = toMutableList().apply { add(to, removeAt(from)) }
+        _move.value = m.copy(ids = m.ids.moved(), names = m.names.moved(), index = to)
     }
 
     fun commitMove() {

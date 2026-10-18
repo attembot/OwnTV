@@ -1,5 +1,7 @@
 package tv.own.owntv.features.settings
 
+import tv.own.owntv.ui.theme.stageTone
+import tv.own.owntv.ui.theme.LocalStagePalette
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
@@ -68,12 +70,11 @@ import tv.own.owntv.ui.theme.StageRadii
 import tv.own.owntv.ui.theme.mpx
 import tv.own.owntv.ui.theme.stageAccent
 import tv.own.owntv.ui.theme.stageText
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
 /*
- * Stage Settings (P10, references P9-01 … P9-13): a group is one page. The band (crumb as the title,
+ * Stage Settings: a group is one page. The band (crumb as the title,
  * the count, "Search all settings" on the same line), the rows on the left (x 50–1110 from y 210) and
  * the context panel on the right (x 1160–1856 from y 240) explaining whatever row has focus.
  */
@@ -94,7 +95,7 @@ sealed interface SettingValue {
     class Saved(val text: String, val any: Boolean) : SettingValue
     /** A plain action word in full text colour ("Forget", "Check now"). */
     class Action(val text: String) : SettingValue
-    /** Anything else the mockup draws there (accent swatches, profile tags). */
+    /** Anything else drawn there (accent swatches, profile tags). */
     class Custom(val content: @Composable () -> Unit) : SettingValue
 }
 
@@ -110,14 +111,14 @@ data class SettingHelp(
     val chosen: Int = -1,
     val recommended: Int = -1,
     val hints: List<Pair<String, String>> = emptyList(),
-    /** Drawn under the text: Playlists lists the playlists themselves (P9-03). */
+    /** Drawn under the text: Playlists lists the playlists themselves. */
     val extra: (@Composable () -> Unit)? = null,
-    /** Drawn under the key hints (P10B: Customize's span help, owner). */
+    /** Drawn under the key hints (Customize's span help). */
     val footer: (@Composable () -> Unit)? = null,
 )
 
 /**
- * What a row of a Stage settings page opens in the panel instead of a popup (owner, P12): a choice
+ * What a row of a Stage settings page opens in the panel instead of a popup: a choice
  * list, a stepper. [owner] tells the one that opened it from a later one; [content] is drawn under the
  * row's heading and text.
  */
@@ -149,9 +150,6 @@ class SettingsPanelState {
 
 val LocalSettingsPanel = staticCompositionLocalOf<SettingsPanelState?> { null }
 
-/** True inside a Stage settings page: [Row2] then draws [StageSettingRow]. Other screens keep their rows. */
-val LocalStageRows = staticCompositionLocalOf { false }
-
 /**
  * The panel text for the row [key]: its long explanation from [SETTING_HELP] (falling back to the
  * row's own line), the choices, and key hints from what the row does.
@@ -168,7 +166,7 @@ fun settingHelp(
     pinnable: Boolean = true,
 ): SettingHelp {
     val text = key?.let { SETTING_HELP[it] }?.let { stringResource(it, *NO_ARGS) } ?: desc.orEmpty()
-    // A switch lists On and Off as its choices (P9-09, P9-11).
+    // A switch lists On and Off as its choices.
     if (value is SettingValue.Switch && choices.isEmpty()) {
         val rec = key?.let { SWITCH_RECOMMENDED[it] }?.let { if (it) 0 else 1 } ?: -1
         return SettingHelp(
@@ -239,11 +237,11 @@ fun StageSettingsPage(
     tools: (@Composable RowScope.() -> Unit)? = null,
     searchAutoEdit: Boolean = false,
     onSearchActivate: (() -> Unit)? = null,
-    /** A list page's tool row (P10B: Customize's tabs, Sort, Filter…), above the rows. */
+    /** A list page's tool row (Customize's tabs, Sort, Filter…), above the rows. */
     toolbar: (@Composable RowScope.() -> Unit)? = null,
     /** A list too long for one column (Customize): drawn in place of [rows], given the rows' position. */
     list: (@Composable (Modifier) -> Unit)? = null,
-    /** Off: the path starts at [parents] ("Add a source › Type it here", P10B-08 … 12), not at Settings. */
+    /** Off: the path starts at [parents] ("Add a source › Type it here"), not at Settings. */
     settingsRoot: Boolean = true,
     /** Off where there is no Settings to search (the setup wizard reuses the Add a source pages). */
     showSearch: Boolean = true,
@@ -251,13 +249,13 @@ fun StageSettingsPage(
 ) {
     val searching = searchQuery.isNotBlank()
     androidx.compose.runtime.LaunchedEffect(searching) { if (searching) panel.help = null }
-    // Popups opened from this page are labelled with its path, "SETTINGS · PLAYER" (P1-06).
+    // Popups opened from this page are labelled with its path, "SETTINGS · PLAYER".
     val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
     val from = ((if (settingsRoot) listOf(stringResource(R.string.common_nav_settings)) else emptyList()) + parents).lastOrNull()
     val eyebrow = (if (from != null) stringResource(R.string.settings_breadcrumb_eyebrow, from, group) else group).uppercase(locale)
     CompositionLocalProvider(LocalSettingsPanel provides panel, tv.own.owntv.ui.stage.LocalPopupEyebrow provides eyebrow) {
         BoxWithConstraints(modifier.fillMaxSize()) {
-            // The mockup's 1920 px frame as fractions of the real width, so other zooms reflow.
+            // The 1920 px design frame as fractions of the real width, so other zooms reflow.
             val w = maxWidth / 1920f
             Row(
                 Modifier.fillMaxWidth().padding(start = w * 64, end = w * 64, top = 128.mpx).height(60.mpx),
@@ -271,7 +269,7 @@ fun StageSettingsPage(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (crumb) {
-                        // Two steps only (owner): the page it came from, then this one.
+                        // Two steps only: the page it came from, then this one.
                         ((if (settingsRoot) listOf(stringResource(R.string.common_nav_settings)) else emptyList()) + parents).takeLast(1).forEach { p ->
                             Text(p, style = stageText(42, 800, (-1f / 46f).em), color = StageColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                             OwnTVIcon(OwnTVIcon.CHEVRON, StageColors.Dim, Modifier.size(30.mpx))
@@ -353,7 +351,7 @@ private fun SettingPanelBody(help: SettingHelp) {
     Text(help.text, style = stageText(17, 500).copy(lineHeight = 27.mpxSpLine()), color = PanelText)
     help.extra?.invoke()
     if (help.choices.isNotEmpty()) {
-        Box(Modifier.padding(top = 22.mpx, bottom = 16.mpx).fillMaxWidth().height(1.mpx).background(Color.White.copy(alpha = 0.1f)))
+        Box(Modifier.padding(top = 22.mpx, bottom = 16.mpx).fillMaxWidth().height(1.mpx).background(StageColors.Ink.copy(alpha = 0.1f)))
         SettingPanelHeading(stringResource(R.string.settings_panel_choices))
         val a = stageAccent
         help.choices.forEachIndexed { i, label ->
@@ -375,13 +373,13 @@ private fun SettingPanelBody(help: SettingHelp) {
 
 /**
  * Opens [content] in the page's panel while this is composed — the way a settings row edits its value
- * without a popup (owner, P12). Returns false off a Stage settings page or inside a popup, where the
+ * without a popup. Returns false off a Stage settings page or inside a popup, where the
  * caller draws its own popup instead.
  */
 @Composable
 fun panelEditor(onDismiss: () -> Unit, content: @Composable androidx.compose.foundation.layout.ColumnScope.(help: SettingHelp?) -> Unit): Boolean {
     val panel = LocalSettingsPanel.current
-    if (panel == null || tv.own.owntv.ui.components.LocalStagePopup.current) return false
+    if (panel == null) return false
     val token = remember { Any() }
     val editor = PanelEditor(token, onDismiss, content)
     androidx.compose.runtime.SideEffect { panel.editor = editor }
@@ -397,7 +395,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.SettingPanelEditor(ed
     androidx.activity.compose.BackHandler { editor.onDismiss() }
     if (help != null && help.title.isNotEmpty()) SettingPanelHeading(help.title)
     if (help != null) Text(help.text, style = stageText(17, 500).copy(lineHeight = 27.mpxSpLine()), color = PanelText, maxLines = 3, overflow = TextOverflow.Ellipsis)
-    Box(Modifier.padding(top = 22.mpx, bottom = 16.mpx).fillMaxWidth().height(1.mpx).background(Color.White.copy(alpha = 0.1f)))
+    Box(Modifier.padding(top = 22.mpx, bottom = 16.mpx).fillMaxWidth().height(1.mpx).background(StageColors.Ink.copy(alpha = 0.1f)))
     editor.content(this, help)
 }
 
@@ -469,8 +467,8 @@ fun androidx.compose.foundation.layout.ColumnScope.PanelChoices(picker: PanelPic
 }
 
 /**
- * A number changed in the panel: the value 40/800 in accent between ◀ ▶ — ◀ ▶ change it at once (as the
- * old popup's − / + did), then Reset and Done. Back or Done closes.
+ * A number changed in the panel: the value 40/800 in accent between ◀ ▶ — ◀ ▶ change it at once,
+ * then Reset and Done. Back or Done closes.
  */
 @Composable
 fun PanelStepper(
@@ -566,7 +564,7 @@ fun PopupSizeSample(sizePercent: Int) {
     }
 }
 
-private val PanelText = Color(0xFFD3DCD8)
+private val PanelText: Color @Composable get() = stageTone(Color(0xFFD3DCD8), StageColors.Body)
 
 /** A "label  value" line in the panel (OpenSubtitles' account details). */
 @Composable
@@ -581,11 +579,12 @@ fun SettingPanelLine(label: String, value: String) {
 @Composable
 fun StageRadio(on: Boolean) {
     val a = stageAccent
+    val dim = StageColors.Dim
     Box(
         Modifier.size(22.mpx).drawBehind {
             val r = size.minDimension / 2f
             val ring = (if (on) 7 else 2) * 1.mpx.toPx()
-            drawCircle(if (on) a.accent else StageColors.Dim, radius = r - ring / 2f, style = androidx.compose.ui.graphics.drawscope.Stroke(ring))
+            drawCircle(if (on) a.accent else dim, radius = r - ring / 2f, style = androidx.compose.ui.graphics.drawscope.Stroke(ring))
         },
     )
 }
@@ -604,12 +603,12 @@ fun StageSettingsHeading(text: String, count: Int?, first: Boolean = false) {
         horizontalArrangement = Arrangement.spacedBy(10.mpx),
     ) {
         Text(text.uppercase(), style = stageText(13, 800, 0.13.em), color = StageColors.Dim, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        // A heading over a single setting carries no count (P10B-01 NOW TRENDING).
+        // A heading over a single setting carries no count (Home's NOW TRENDING).
         if (count != null) Text(count.toString(), style = stageText(13, 800, 0.13.em), color = HeadingCount, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
-private val HeadingCount = Color(0xFF4D5955)
+private val HeadingCount: Color @Composable get() = stageTone(Color(0xFF4D5955), Color(0xFFA3AEA9))
 
 /**
  * `.srow`: 84 high, radius 20, padding 0 22, gap 18 — a 24 px muted icon, the title 21/700 over a
@@ -631,9 +630,9 @@ fun StageSettingRow(
     /** The small accent dot after the title: this row is also pinned to Quick. */
     pinned: Boolean = false,
     enabled: Boolean = true,
-    /** Part of a span being picked (P10B): a faint accent wash. */
+    /** Part of a span being picked: a faint accent wash. */
     marked: Boolean = false,
-    /** Keep the panel on this row while focus is in its actions (P10B list pages). */
+    /** Keep the panel on this row while focus is in its actions (list pages). */
     keepPanel: Boolean = false,
 ) {
     val a = stageAccent
@@ -700,7 +699,7 @@ fun StageSettingRow(
     }
 }
 
-private val FocusedDesc = Color(0xFFD9E6E1)
+private val FocusedDesc: Color @Composable get() = StageColors.FxLine
 
 @Composable
 private fun SettingValueView(value: SettingValue) {
@@ -746,7 +745,7 @@ private fun SegmentedDisplay(options: List<String>, selected: Int) {
             Box(
                 Modifier
                     .height(40.mpx)
-                    .then(if (on) Modifier.background(Color.White.copy(alpha = 0.13f), RoundedCornerShape(11.mpx)) else Modifier)
+                    .then(if (on) Modifier.background(LocalStagePalette.current.segmentOn, RoundedCornerShape(11.mpx)) else Modifier)
                     .padding(horizontal = 14.mpx),
                 contentAlignment = Alignment.Center,
             ) {
@@ -756,7 +755,7 @@ private fun SegmentedDisplay(options: List<String>, selected: Int) {
     }
 }
 
-/** `.swrow`: the accent presets, then the colour in use ringed white (P9-04). */
+/** `.swrow`: the accent presets, then the colour in use ringed white. */
 @Composable
 fun AccentSwatches(presets: List<Color>, current: Color) {
     Row(horizontalArrangement = Arrangement.spacedBy(10.mpx), verticalAlignment = Alignment.CenterVertically) {
@@ -790,7 +789,7 @@ fun StageSettingsNote(title: String, body: String?) {
 }
 
 /**
- * A search result (P8-02): where the setting lives in dim above its title, and its value muted with ›.
+ * A search result: where the setting lives in dim above its title, and its value muted with ›.
  * Opening it goes to the setting itself.
  */
 @Composable
@@ -819,7 +818,7 @@ fun StageSearchResultRow(icon: OwnTVIcon, path: String, title: String, value: St
     }
 }
 
-/** Playlists' panel (P9-03): each playlist's mark, its name and when it last synced. */
+/** Playlists' panel: each playlist's mark, its name and when it last synced. */
 @Composable
 fun PlaylistSyncList(sources: List<tv.own.owntv.core.database.entity.SourceEntity>) {
     Column(Modifier.padding(top = 18.mpx), verticalArrangement = Arrangement.spacedBy(10.mpx)) {
@@ -839,13 +838,13 @@ fun PlaylistSyncList(sources: List<tv.own.owntv.core.database.entity.SourceEntit
 }
 
 /**
- * Settings search from a full page (P10B): set by Settings. OK on a full page's search field calls it,
+ * Settings search from a full page: set by Settings. OK on a full page's search field calls it,
  * and Settings opens its search with the keyboard up.
  */
 val LocalSettingsSearch = staticCompositionLocalOf<(() -> Unit)?> { null }
 
 /**
- * A page Settings opens full screen (P10B, references P10B-01 … 21), drawn exactly as a group page:
+ * A page Settings opens full screen, drawn exactly as a group page:
  * the band (Settings › [parents] › [title] + [count], [tools], search), the rows and the context panel.
  * Back returns to the group it was opened from.
  */
@@ -864,39 +863,37 @@ fun StageFullPage(
     list: (@Composable (Modifier) -> Unit)? = null,
     /** Off when the page handles Back itself (Customize cancels a span first). */
     handleBack: Boolean = true,
-    /** Off for a page opened from another page: its path starts at that page (P10B-03, 06, 08 … 12). */
+    /** Off for a page opened from another page: its path starts at that page. */
     settingsRoot: Boolean = true,
     rows: @Composable ColumnScope.() -> Unit = {},
 ) {
     androidx.activity.compose.BackHandler(enabled = handleBack) { onBack() }
     val search = LocalSettingsSearch.current
-    CompositionLocalProvider(LocalStageRows provides true) {
-        StageSettingsPage(
-            group = title,
-            count = count,
-            searchQuery = "",
-            onSearchQuery = {},
-            scroll = scroll,
-            modifier = modifier,
-            rowsFocus = rowsFocus,
-            parents = parents,
-            tools = tools,
-            panelTop = panelTop,
-            onSearchActivate = { search?.invoke() },
-            toolbar = toolbar,
-            list = list,
-            settingsRoot = settingsRoot,
-            // A full page outside Settings (the setup wizard) has nowhere to hand its search to.
-            showSearch = search != null,
-            rows = rows,
-        )
-    }
+    StageSettingsPage(
+        group = title,
+        count = count,
+        searchQuery = "",
+        onSearchQuery = {},
+        scroll = scroll,
+        modifier = modifier,
+        rowsFocus = rowsFocus,
+        parents = parents,
+        tools = tools,
+        panelTop = panelTop,
+        onSearchActivate = { search?.invoke() },
+        toolbar = toolbar,
+        list = list,
+        settingsRoot = settingsRoot,
+        // A full page outside Settings (the setup wizard) has nowhere to hand its search to.
+        showSearch = search != null,
+        rows = rows,
+    )
 }
 
 /**
- * `fld` (P10B): a text field as a settings row — the label as the title, the value (or the dim
- * placeholder) as its line, "Edit" on the right while focused. TV behaviour as [OwnTVTextField]: D-pad
- * focus only highlights the row, OK opens the keyboard, Back or Done ends editing and calls [onDone].
+ * `fld`: a text field as a settings row — the label as the title, the value (or the dim
+ * placeholder) as its line, "Edit" on the right while focused. D-pad focus only highlights the row, OK
+ * opens the keyboard, Back or Done ends editing and calls [onDone].
  * A password row shows dots; ▶ shows or hides it.
  */
 @Composable
@@ -905,13 +902,14 @@ fun StageFieldRow(
     label: String,
     value: String,
     onValueChange: (String) -> Unit,
-    help: SettingHelp,
+    /** The panel text while focused; null in a popup, which has no panel. */
+    help: SettingHelp? = null,
     modifier: Modifier = Modifier,
     placeholder: String = "",
     password: Boolean = false,
     keyboardType: androidx.compose.ui.text.input.KeyboardType = androidx.compose.ui.text.input.KeyboardType.Text,
     onDone: () -> Unit = {},
-    /** Where Back goes, for the key hint ("Add a source" on a form, P10B-10). */
+    /** Where Back goes, for the key hint ("Add a source" on a form). */
     backLabel: String? = null,
     /** "▶ Start Import" on a form whose button sits in the panel; a password row's ▶ shows the text instead. */
     submitHint: Pair<String, String>? = null,
@@ -967,7 +965,7 @@ fun StageFieldRow(
             if (password) "▶" to stringResource(if (shown) R.string.common_hide else R.string.common_show) else submitHint,
             stringResource(R.string.common_back) to (backLabel ?: stringResource(R.string.common_nav_settings)),
         )
-        if ((focused || editing) && panel != null) androidx.compose.runtime.SideEffect { panel.help = help.copy(hints = hints) }
+        if ((focused || editing) && panel != null && help != null) androidx.compose.runtime.SideEffect { panel.help = help.copy(hints = hints) }
         val lit = focused || editing
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 22.mpx),
@@ -999,19 +997,29 @@ fun StageFieldRow(
                         textStyle = stageText(15.5f, 500).copy(color = if (focused || editing) FocusedDesc else StageColors.Text),
                         singleLine = true,
                         cursorBrush = androidx.compose.ui.graphics.SolidColor(a.accent),
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = keyboardType, imeAction = androidx.compose.ui.text.input.ImeAction.Done),
+                        // A password row gets the password keyboard: the text one auto-corrects and
+                        // capitalises, which turned a correct backup password into a wrong one.
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = if (password && keyboardType == androidx.compose.ui.text.input.KeyboardType.Text) androidx.compose.ui.text.input.KeyboardType.Password else keyboardType,
+                            imeAction = androidx.compose.ui.text.input.ImeAction.Done,
+                            autoCorrectEnabled = if (password) false else null,
+                        ),
                         keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { stop() }),
                         visualTransformation = if (password && !shown) androidx.compose.ui.text.input.PasswordVisualTransformation()
                             else androidx.compose.ui.text.input.VisualTransformation.None,
                     )
                 }
             }
+            // Without a settings panel (the setup wizard, a popup) nothing else tells the user ▶ shows the password.
+            if (password && lit && !editing && panel == null) {
+                Text("▶ " + stringResource(if (shown) R.string.common_hide else R.string.common_show), style = stageText(18, 700), color = StageColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
             if (lit && !editing) Text(stringResource(R.string.common_edit), style = stageText(18, 700), color = a.accent, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
 
-/** One action of a list page's focused item, drawn in the panel (P10B): Edit, Re-sync, Hide… */
+/** One action of a list page's focused item, drawn in the panel: Edit, Re-sync, Hide… */
 class StageAction(
     val icon: OwnTVIcon,
     val label: String,
@@ -1065,10 +1073,10 @@ fun StageActionColumn(actions: List<StageAction>, back: FocusRequester?, first: 
     }
 }
 
-/** The panel's SPAN / MULTI-SELECT block (P10B, owner): how a span is picked, and the CH keys that reach its end. */
+/** The panel's SPAN / MULTI-SELECT block: how a span is picked, and the CH keys that reach its end. */
 @Composable
 fun SpanHelpBlock() {
-    Box(Modifier.padding(top = 18.mpx, bottom = 14.mpx).fillMaxWidth().height(1.mpx).background(Color.White.copy(alpha = 0.1f)))
+    Box(Modifier.padding(top = 18.mpx, bottom = 14.mpx).fillMaxWidth().height(1.mpx).background(StageColors.Ink.copy(alpha = 0.1f)))
     SettingPanelHeading(stringResource(R.string.settings_span_heading))
     Text(stringResource(R.string.settings_span_help), style = stageText(15, 500), color = StageColors.Muted)
     Text(stringResource(R.string.settings_span_ch_help), style = stageText(15, 500), color = StageColors.Muted, modifier = Modifier.padding(top = 6.mpx))

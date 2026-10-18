@@ -17,6 +17,16 @@ plugins {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        // A libmpv built on this PC (OwnTV_libmpv's buildscripts/wsl_build.sh), only while
+        // the build command carries -Powntv.libmpvLocalRepo=<folder> (never a file) — core's :player-core then asks
+        // for version "local". Core's settings carry the same lines.
+        providers.gradleProperty("owntv.libmpvLocalRepo").orNull?.let { dir ->
+            maven {
+                name = "LocalLibmpv"
+                url = uri(file(dir))
+                content { includeVersion("tv.own.owntv", "libmpv", "local") }
+            }
+        }
         google()
         mavenCentral()
         // OwnTV's own Maven repository — public, no login: tv.own.owntv:core and :player-core
@@ -39,7 +49,7 @@ providers.gradleProperty("owntv.corePath").orNull?.takeIf { it.isNotBlank() }?.l
 
 rootProject.name = "OwnTV"
 include(":app")
-// Baseline-profile generator (audit ST1). Test-only module: it ships nothing to users, it records
+// Baseline-profile generator. Test-only module: it ships nothing to users, it records
 // the cold-start journey on a device and writes the profile :app packages.
 include(":baselineprofile")
  

@@ -26,7 +26,7 @@ import tv.own.owntv.ui.components.rememberDialogFocusRestore
 import tv.own.owntv.ui.components.OwnTVIcon
 
 /**
- * Settings → OpenSubtitles account → Delete subtitles (subtitle plan §11). A Movies/Series toggle at
+ * Settings → OpenSubtitles account → Delete subtitles. A Movies/Series toggle at
  * the top, the downloaded subtitles for the selected section below (tap to delete one), and a
  * Delete all action (all / all movies / all series).
  */
@@ -53,7 +53,7 @@ fun DeleteSubtitlesScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val dialogFocus = rememberDialogFocusRestore(showDeleteAll, scrollState)
     val deleteAllFocus = remember { FocusRequester() }
 
-    // P10B-06: Movies | Series and Delete all in the tool row, the files as rows, Delete in the panel.
+    // Movies | Series and Delete all in the tool row, the files as rows, Delete in the panel.
     val total = movieCount + seriesCount
     val openSubtitles = stringResource(R.string.settings_open_subtitles)
     val sections = DeleteSubtitlesViewModel.Section.entries

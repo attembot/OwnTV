@@ -55,7 +55,7 @@ fun Modifier.trapAllFocusExit(): Modifier =
  *     that is suddenly exposed again; it lands on the first row, resets the offset and
  *     bringIntoView-animates. The previous fix snapped the offset back **once** and then waited 80 ms
  *     before asking for focus — which works only while the dialog tears down inside that one frame. A
- *     heavier dialog (Glass Effect, About) tore down *after* the snap, so the re-search scrolled the
+ *     heavier dialog (Glass & background, About) tore down *after* the snap, so the re-search scrolled the
  *     list anyway and the restore then animated all the way back down: the "focus arriving from
  *     another setting" the user sees. Re-asserting the offset every frame leaves the re-search nothing
  *     to animate.
@@ -76,7 +76,7 @@ suspend fun restoreAfterDialogClose(
             // scrollTo takes the scroll mutex, so it also cancels a bringIntoView animation in flight.
             runCatching { scrollState.scrollTo(scrollOffset) }
         }
-        if (!landed) landed = opener != null && runCatching { opener.requestFocus() }.isSuccess
+        if (!landed) landed = opener != null && runCatching { opener.requestFocus() }.getOrDefault(false)
         if (landed && ++settled > RESTORE_SETTLE_FRAMES) return
     }
 }
@@ -102,7 +102,7 @@ suspend fun restoreAfterDialogClose(
         if (listState.firstVisibleItemIndex != index || listState.firstVisibleItemScrollOffset != offset) {
             runCatching { listState.scrollToItem(index, offset) }
         }
-        if (!landed) landed = opener != null && runCatching { opener.requestFocus() }.isSuccess
+        if (!landed) landed = opener != null && runCatching { opener.requestFocus() }.getOrDefault(false)
         if (landed && ++settled > RESTORE_SETTLE_FRAMES) return
     }
 }

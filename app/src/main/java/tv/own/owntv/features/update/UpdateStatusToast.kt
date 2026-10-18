@@ -31,7 +31,6 @@ import tv.own.owntv.ui.theme.stageText
 import tv.own.owntv.ui.theme.mpx
 import tv.own.owntv.core.update.UpdateManager
 import tv.own.owntv.ui.components.OwnTVSpinner
-import tv.own.owntv.ui.theme.OwnTVTheme
 
 /**
  * Small semi-transparent status card (top-right corner) for the automatic startup update check:
@@ -43,7 +42,6 @@ import tv.own.owntv.ui.theme.OwnTVTheme
 fun UpdateStatusToast(onDone: () -> Unit, onViewChangelog: () -> Unit, modifier: Modifier = Modifier) {
     val manager: UpdateManager = koinInject()
     val state by manager.state.collectAsStateWithLifecycle()
-    val colors = OwnTVTheme.colors
     val focus = remember { FocusRequester() }
 
     // Transient outcomes hide themselves; an available update keeps the card up.

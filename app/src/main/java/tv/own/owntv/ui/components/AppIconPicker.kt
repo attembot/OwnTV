@@ -16,6 +16,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -24,7 +26,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import tv.own.owntv.R
 import tv.own.owntv.ui.theme.mpx
@@ -32,7 +33,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxWidth
 import tv.own.owntv.core.brand.AppIcon
 import tv.own.owntv.core.brand.AppIconSwitcher
-import tv.own.owntv.ui.theme.OwnTVTheme
 
 /**
  * The icon colours as two rows of tiles, each showing its own flat mark, with the focused (or
@@ -52,12 +52,16 @@ fun AppIconPicker(
             if (row > 0) Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 icons.forEach { icon ->
-                    FocusableSurface(
+                    tv.own.owntv.ui.stage.StageSurface(
                         onClick = { onPick(icon) },
-                        selected = icon == selected,
+                        radius = 20.dp,
                         modifier = Modifier
                             .size(84.dp)
                             .then(if (icon == selected && firstFocus != null) Modifier.focusRequester(firstFocus) else Modifier),
+                        focusStyle = tv.own.owntv.ui.stage.StageFocus.FX,
+                        // The chosen icon keeps an accent ring while focus is elsewhere.
+                        idle = if (icon == selected) Modifier.border(3.mpx, tv.own.owntv.ui.theme.stageAccent.accent, RoundedCornerShape(20.dp)) else Modifier,
+                        contentAlignment = Alignment.Center,
                     ) { focused ->
                         LaunchedEffect(focused) { if (focused) focusedIcon = icon }
                         BrandMark(icon, 56.dp, followAccent = false)
@@ -68,8 +72,8 @@ fun AppIconPicker(
         Spacer(Modifier.height(8.dp))
         Text(
             stringResource((focusedIcon ?: selected).label),
-            style = MaterialTheme.typography.bodyLarge,
-            color = OwnTVTheme.colors.onSurface,
+            style = tv.own.owntv.ui.theme.stageText(19, 500),
+            color = tv.own.owntv.ui.theme.StageColors.Text,
             textAlign = TextAlign.Center,
         )
     }

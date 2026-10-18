@@ -30,13 +30,10 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.koin.androidx.compose.koinViewModel
 import androidx.tv.material3.Text
-import tv.own.owntv.ui.components.OwnTVButton
-import tv.own.owntv.ui.components.OwnTVButtonStyle
 import tv.own.owntv.ui.components.OwnTVSpinner
-import tv.own.owntv.ui.components.OwnTVTextField
 
 /**
- * OpenSubtitles search overlay, opened from the player HUD's ADD SUBTITLES entry (subtitle plan §6).
+ * OpenSubtitles search overlay, opened from the player HUD's ADD SUBTITLES entry.
  * Shows results for the playing movie/episode; selecting one downloads, attaches, and remembers it.
  */
 @Composable
@@ -182,9 +179,9 @@ private fun ResultsList(
             }
         }
         ButtonRow {
-            OwnTVButton(stringResource(tv.own.owntv.R.string.player_subtitles_edit_search), onClick = onEdit, style = OwnTVButtonStyle.SECONDARY)
-            onShowAll?.let { OwnTVButton(stringResource(tv.own.owntv.R.string.player_subtitles_all_languages), onClick = it, style = OwnTVButtonStyle.SECONDARY) }
-            OwnTVButton(stringResource(tv.own.owntv.R.string.settings_close), onClick = onClose, style = OwnTVButtonStyle.SECONDARY)
+            tv.own.owntv.ui.stage.StagePopupButton(stringResource(tv.own.owntv.R.string.player_subtitles_edit_search), onClick = onEdit, primary = false)
+            onShowAll?.let { tv.own.owntv.ui.stage.StagePopupButton(stringResource(tv.own.owntv.R.string.player_subtitles_all_languages), onClick = it, primary = false) }
+            tv.own.owntv.ui.stage.StagePopupButton(stringResource(tv.own.owntv.R.string.settings_close), onClick = onClose, primary = false)
         }
     }
 }
@@ -202,10 +199,16 @@ private fun EditSearchField(initial: String, onSubmit: (String) -> Unit, onCance
     LaunchedEffect(Unit) { runCatching { fieldFocus.requestFocus() } }
     Column {
         tv.own.owntv.ui.stage.StagePopupLabel(stringResource(tv.own.owntv.R.string.player_subtitles_edit_search).uppercase())
-        OwnTVTextField(value = value, onValueChange = { value = it }, label = stringResource(tv.own.owntv.R.string.player_subtitles_title_label), modifier = Modifier.fillMaxWidth(), focusRequester = fieldFocus)
+        tv.own.owntv.features.settings.StageFieldRow(
+            icon = tv.own.owntv.ui.components.OwnTVIcon.SEARCH,
+            label = stringResource(tv.own.owntv.R.string.player_subtitles_title_label),
+            value = value,
+            onValueChange = { value = it },
+            modifier = Modifier.fillMaxWidth().focusRequester(fieldFocus),
+        )
         ButtonRow {
-            OwnTVButton(stringResource(tv.own.owntv.R.string.common_cancel), onClick = onCancel, style = OwnTVButtonStyle.SECONDARY)
-            OwnTVButton(stringResource(tv.own.owntv.R.string.player_subtitles_search), onClick = { onSubmit(value.trim()) })
+            tv.own.owntv.ui.stage.StagePopupButton(stringResource(tv.own.owntv.R.string.common_cancel), onClick = onCancel, primary = false)
+            tv.own.owntv.ui.stage.StagePopupButton(stringResource(tv.own.owntv.R.string.player_subtitles_search), onClick = { onSubmit(value.trim()) })
         }
     }
 }
@@ -225,9 +228,9 @@ private fun Message(
     Column {
         Text(text, style = stageText(18, 400), color = StageColors.Muted)
         ButtonRow {
-            secondary?.let { OwnTVButton(it, onClick = { onSecondary?.invoke() }, style = OwnTVButtonStyle.SECONDARY) }
-            tertiary?.let { OwnTVButton(it, onClick = { onTertiary?.invoke() }, style = OwnTVButtonStyle.SECONDARY) }
-            OwnTVButton(primary, onClick = onPrimary, modifier = Modifier.focusRequester(focus))
+            secondary?.let { tv.own.owntv.ui.stage.StagePopupButton(it, onClick = { onSecondary?.invoke() }, primary = false) }
+            tertiary?.let { tv.own.owntv.ui.stage.StagePopupButton(it, onClick = { onTertiary?.invoke() }, primary = false) }
+            tv.own.owntv.ui.stage.StagePopupButton(primary, onClick = onPrimary, modifier = Modifier.focusRequester(focus))
         }
     }
 }

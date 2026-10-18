@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -52,9 +51,7 @@ import tv.own.owntv.R
 import tv.own.owntv.core.theme.AccentColor
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.OwnTVPopup
-import tv.own.owntv.ui.components.OwnTVTextField
 import tv.own.owntv.ui.components.hsvToHex
-import tv.own.owntv.ui.components.modalScrim
 import tv.own.owntv.ui.components.trapAllFocusExit
 import tv.own.owntv.ui.stage.StageButton
 import tv.own.owntv.ui.stage.StageProgress
@@ -72,7 +69,7 @@ import tv.own.owntv.ui.theme.stageAccent
 import tv.own.owntv.ui.theme.stageText
 
 /**
- * Settings › Appearance › Accent color (P9-05): presets, a hex code and an HSV picker, with a preview of
+ * Settings › Appearance › Accent color: presets, a hex code and an HSV picker, with a preview of
  * what the accent tints. The whole app behind re-tints while the picker moves; Cancel puts the colour
  * that was there back, "Use this color" keeps the new one.
  */
@@ -125,7 +122,7 @@ fun AccentPopup(
 class ColorChoice(val color: Color, val label: String, val pick: () -> Unit)
 
 /**
- * The Stage colour picker (P9-05), shared by Accent color and the clock colours (P10B): presets, the
+ * The Stage colour picker, shared by Accent color and the clock colours: presets, the
  * colour in use ("Yours"), a hex code and the HSV field, with [preview] under them. [onLive] receives the
  * picked hex a beat after the picker moves; Cancel / Back call [onCancel]; "Use this color" calls
  * [onDone] with the picked hex, or null when a preset was the last choice (already stored).
@@ -164,7 +161,7 @@ fun StageColorPopup(
     OwnTVPopup(onDismissRequest = cancel, stageLayout = true) {
         BackHandler { cancel() }
         Box(
-            Modifier.fillMaxSize().modalScrim().trapAllFocusExit().focusGroup(),
+            Modifier.fillMaxSize().background(StageColors.Scrim).trapAllFocusExit().focusGroup(),
             contentAlignment = Alignment.TopCenter,
         ) {
             Row(
@@ -204,8 +201,9 @@ fun StageColorPopup(
                         }
                         Swatch(current, stringResource(R.string.settings_accent_yours), chosen = true, onClick = {})
                     }
-                    SectionLabel(stringResource(R.string.settings_hex_code))
-                    OwnTVTextField(
+                    StageFieldRow(
+                        icon = OwnTVIcon.PENCIL,
+                        label = stringResource(R.string.settings_hex_code),
                         value = hexInput,
                         onValueChange = { s ->
                             hexInput = s.removePrefix("#").take(6)
@@ -216,10 +214,7 @@ fun StageColorPopup(
                                 hue = hsv[0]; sat = hsv[1]; value = hsv[2]
                             }
                         },
-                        // Captioned by HEX CODE above it, as drawn.
-                        label = "",
                         placeholder = "4E952A",
-                        modifier = Modifier.width(300.mpx),
                     )
                     SectionLabel(stringResource(R.string.settings_panel_width_preview), Modifier.padding(top = 26.mpx))
                     preview()
@@ -319,7 +314,7 @@ private fun Swatch(color: Color, label: String, chosen: Boolean, onClick: () -> 
 }
 
 /**
- * The saturation/brightness square and the hue bar, each its own focus stop (owner, 2026-10-02): focus
+ * The saturation/brightness square and the hue bar, each its own focus stop: focus
  * rings it, OK goes in, then the square moves its point freely (◀ ▶ saturation, ▲ ▼ brightness) and the
  * bar its hue (◀ ▶); OK or Back comes out. Outside, the D-pad only moves focus, so nothing changes by
  * passing over them.

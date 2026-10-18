@@ -8,11 +8,9 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -36,35 +34,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 import tv.own.owntv.R
 import tv.own.owntv.ui.theme.mpx
 import tv.own.owntv.core.customize.BULK_RENAME_MAX_ROWS
-import tv.own.owntv.core.customize.BulkPreviewRow
 import tv.own.owntv.core.customize.BulkRenameSession
 import tv.own.owntv.core.customize.RenameRules
 import tv.own.owntv.features.settings.PickerDialog
-import tv.own.owntv.ui.components.OwnTVButton
-import tv.own.owntv.ui.components.OwnTVButtonStyle
 import tv.own.owntv.ui.components.TextInputDialog
-import tv.own.owntv.ui.components.dialogPanel
-import tv.own.owntv.ui.components.modalScrim
-import tv.own.owntv.ui.components.trapAllFocusExit
-import tv.own.owntv.ui.theme.PopupFontTheme
 
 /** Which field of a rule-builder row a nested picker is editing (focus returns to that row after). */
 private enum class RuleField { TYPE, PLACEMENT, VALUE }
@@ -102,7 +83,7 @@ fun BulkRenameFlow(session: BulkRenameSession, returnFocus: FocusRequester? = nu
     }
 }
 
-/** [mockup frame 2] The four-way choice that opens a bulk rename. */
+/** The four-way choice that opens a bulk rename. */
 @Composable
 private fun BulkRenameChoicePopup(session: BulkRenameSession) {
     val count = session.entries.collectAsStateWithLifecycle().value.size
@@ -114,7 +95,7 @@ private fun BulkRenameChoicePopup(session: BulkRenameSession) {
         title = stringResource(R.string.settings_bulk_rename_title),
         body = pluralStringResource(R.plurals.settings_bulk_rename_selected, count, count),
         width = 760.mpx,
-        buttons = { OwnTVButton(stringResource(R.string.common_cancel), onClick = { session.close() }, style = OwnTVButtonStyle.SECONDARY) },
+        buttons = { tv.own.owntv.ui.stage.StagePopupButton(stringResource(R.string.common_cancel), onClick = { session.close() }, primary = false) },
     ) {
         tv.own.owntv.ui.stage.StagePopupOption(
             title = stringResource(R.string.settings_bulk_rename_add_rule), onClick = { session.openBuilder() },
@@ -131,7 +112,7 @@ private fun BulkRenameChoicePopup(session: BulkRenameSession) {
     }
 }
 
-/** [mockup frame 3] Rule builder: rows of type/placement/value/✕, options checkboxes, Apply. */
+/** Rule builder: rows of type/placement/value/✕, options checkboxes, Apply. */
 @Composable
 private fun BulkRuleBuilderDialog(session: BulkRenameSession) {
     val rules = session.rules.collectAsStateWithLifecycle().value
@@ -180,7 +161,7 @@ private fun BulkRuleBuilderDialog(session: BulkRenameSession) {
         for (rule in draft) {
             if (rule.pattern != null) {
                 // Auto-cleanup rules are internal regexes, but remain visible/removable in this
-                // editor so "Edit rules" genuinely tunes the generated preset (plan §2.6).
+                // editor so "Edit rules" genuinely tunes the generated preset.
                 out += rule
             } else if (rule.action == RenameRules.Action.ADD) {
                 if (RenameRules.tokensOf(rule).size != 1) {
@@ -206,8 +187,8 @@ private fun BulkRuleBuilderDialog(session: BulkRenameSession) {
         body = stringResource(R.string.settings_bulk_rename_rules_description),
         width = 1240.mpx,
         buttons = {
-            OwnTVButton(stringResource(R.string.common_cancel), onClick = { session.backToChoice() }, style = OwnTVButtonStyle.SECONDARY)
-            OwnTVButton(stringResource(R.string.settings_bulk_rename_apply), onClick = { submit() })
+            tv.own.owntv.ui.stage.StagePopupButton(stringResource(R.string.common_cancel), onClick = { session.backToChoice() }, primary = false)
+            tv.own.owntv.ui.stage.StagePopupButton(stringResource(R.string.settings_bulk_rename_apply), onClick = { submit() })
         },
     ) {
                 Column(
@@ -223,26 +204,26 @@ private fun BulkRuleBuilderDialog(session: BulkRenameSession) {
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.mpx),
                         ) {
-                            OwnTVButton(
-                                label = stringResource(
+                            tv.own.owntv.ui.stage.StagePopupButton(
+                                stringResource(
                                     if (rule.action == RenameRules.Action.ADD) R.string.settings_bulk_rename_action_add
                                     else R.string.settings_bulk_rename_action_remove,
                                 ) + " ▾",
                                 onClick = { editing = i to RuleField.TYPE },
-                                style = OwnTVButtonStyle.SECONDARY,
                                 modifier = Modifier.width(180.mpx),
+                                primary = false,
                             )
-                            OwnTVButton(
-                                label = stringResource(
+                            tv.own.owntv.ui.stage.StagePopupButton(
+                                stringResource(
                                     if (rule.placement == RenameRules.Placement.PREFIX) R.string.settings_bulk_rename_before
                                     else R.string.settings_bulk_rename_after,
                                 ) + " ▾",
                                 onClick = { editing = i to RuleField.PLACEMENT },
-                                style = OwnTVButtonStyle.SECONDARY,
                                 modifier = Modifier.width(180.mpx),
+                                primary = false,
                             )
-                            OwnTVButton(
-                                label = rule.autoLabel?.let { label ->
+                            tv.own.owntv.ui.stage.StagePopupButton(
+                                rule.autoLabel?.let { label ->
                                     stringResource(
                                         when (label) {
                                             RenameRules.AutoLabel.COUNTRY_PROVIDER -> R.string.settings_bulk_rename_auto_country_provider
@@ -252,28 +233,28 @@ private fun BulkRuleBuilderDialog(session: BulkRenameSession) {
                                     )
                                 } ?: rule.value.ifBlank { stringResource(R.string.settings_bulk_rename_value_example) },
                                 onClick = { editing = i to RuleField.VALUE },
-                                style = OwnTVButtonStyle.SECONDARY,
                                 modifier = Modifier.weight(1f),
+                                primary = false,
                             )
-                            OwnTVButton(
+                            tv.own.owntv.ui.stage.StagePopupButton(
                                 "✕",
                                 onClick = {
                                     val next = draft.toMutableList().apply { removeAt(i) }
                                     draft = next
                                     pendingRowFocus = if (next.isEmpty()) -1 else i.coerceAtMost(next.lastIndex)
                                 },
-                                style = OwnTVButtonStyle.SECONDARY,
+                                primary = false,
                             )
                         }
                     }
-                    OwnTVButton(
+                    tv.own.owntv.ui.stage.StagePopupButton(
                         stringResource(R.string.settings_bulk_rename_add_another_rule),
                         onClick = {
                             pendingRowFocus = draft.size
                             draft = draft + RenameRules.Rule(RenameRules.Action.ADD, RenameRules.Placement.PREFIX, "")
                         },
-                        style = OwnTVButtonStyle.SECONDARY,
                         modifier = Modifier.fillMaxWidth().focusRequester(addRuleFocus),
+                        primary = false,
                     )
                 }
                 tv.own.owntv.ui.stage.StagePopupDivider()
@@ -345,7 +326,7 @@ private fun BulkRuleBuilderDialog(session: BulkRenameSession) {
     }
 }
 
-/** [mockup frame 4] Review modeled on EpgMatchReviewDialog: left rows, right centred bulk column. */
+/** Review modeled on EpgMatchReviewDialog: left rows, right centred bulk column. */
 @Composable
 private fun BulkReviewDialog(session: BulkRenameSession) {
     val rows = session.preview.collectAsStateWithLifecycle().value
@@ -380,12 +361,12 @@ private fun BulkReviewDialog(session: BulkRenameSession) {
                                horizontalArrangement = Arrangement.spacedBy(10.mpx),
                            ) {
                                Column(Modifier.weight(1f)) {
-                                   Text(r.oldName, style = MaterialTheme.typography.bodyMedium, color = StageColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                   Text(r.oldName, style = tv.own.owntv.ui.theme.stageText(18, 400), color = StageColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                    if (r.unchanged) {
                                        Text(
                                            if (r.blankRejected) stringResource(R.string.settings_bulk_rename_blank_rejected)
                                            else stringResource(R.string.settings_bulk_rename_unchanged),
-                                           style = MaterialTheme.typography.bodySmall,
+                                           style = tv.own.owntv.ui.theme.stageText(15, 500),
                                            color = StageColors.Muted,
                                            maxLines = 1,
                                            overflow = TextOverflow.Ellipsis,
@@ -393,7 +374,7 @@ private fun BulkReviewDialog(session: BulkRenameSession) {
                                    } else {
                                        Text(
                                            stringResource(R.string.settings_bulk_rename_result, r.newName),
-                                           style = MaterialTheme.typography.bodySmall,
+                                           style = tv.own.owntv.ui.theme.stageText(15, 500),
                                            color = if (r.duplicate) StageColors.Danger else stageAccent.accent,
                                            maxLines = 1,
                                            overflow = TextOverflow.Ellipsis,
@@ -401,7 +382,7 @@ private fun BulkReviewDialog(session: BulkRenameSession) {
                                        if (r.duplicate) {
                                            Text(
                                                stringResource(R.string.settings_bulk_rename_duplicate),
-                                               style = MaterialTheme.typography.bodySmall,
+                                               style = tv.own.owntv.ui.theme.stageText(15, 500),
                                                color = StageColors.Danger,
                                                maxLines = 1,
                                                overflow = TextOverflow.Ellipsis,
@@ -410,18 +391,20 @@ private fun BulkReviewDialog(session: BulkRenameSession) {
                                    }
                                }
                                if (!r.unchanged) {
-                                   OwnTVButton(
-                                       stringResource(R.string.settings_bulk_rename_apply), onClick = { session.applyRows(setOf(r.key)) }, compact = true,
+                                   tv.own.owntv.ui.stage.StagePopupButton(
+                                       stringResource(R.string.settings_bulk_rename_apply),
+                                       onClick = { session.applyRows(setOf(r.key)) },
                                        modifier = if (index == firstChanged) Modifier.focusRequester(firstApplyFocus) else Modifier,
+                                       compact = true,
                                    )
-                                   OwnTVButton(stringResource(R.string.settings_bulk_rename_decline), onClick = { session.declineRows(setOf(r.key)) }, style = OwnTVButtonStyle.SECONDARY, compact = true)
+                                   tv.own.owntv.ui.stage.StagePopupButton(stringResource(R.string.settings_bulk_rename_decline), onClick = { session.declineRows(setOf(r.key)) }, primary = false, compact = true)
                                }
                            }
                        }
                    }
                    Spacer(Modifier.width(18.mpx))
                    // Right: bulk actions, VERTICALLY CENTRED so D-pad right from any middle row lands
-                   // here without scrolling (owner requirement for this dialog).
+                   // here without scrolling.
                    Column(
                        Modifier.width(240.mpx).height(listHeight),
                        verticalArrangement = Arrangement.Center,
@@ -434,7 +417,7 @@ private fun BulkReviewDialog(session: BulkRenameSession) {
                                    rows.count { !it.unchanged },
                                    rows.count { !it.unchanged },
                                ),
-                               style = MaterialTheme.typography.labelLarge,
+                               style = tv.own.owntv.ui.theme.stageText(19, 700),
                                color = StageColors.Text,
                                maxLines = 1,
                                overflow = TextOverflow.Ellipsis,
@@ -445,7 +428,7 @@ private fun BulkReviewDialog(session: BulkRenameSession) {
                                    rows.count { it.unchanged },
                                    rows.count { it.unchanged },
                                ),
-                               style = MaterialTheme.typography.labelLarge,
+                               style = tv.own.owntv.ui.theme.stageText(19, 700),
                                color = StageColors.Muted,
                                maxLines = 1,
                                overflow = TextOverflow.Ellipsis,
@@ -456,24 +439,26 @@ private fun BulkReviewDialog(session: BulkRenameSession) {
                                    rows.count { it.duplicate },
                                    rows.count { it.duplicate },
                                ),
-                               style = MaterialTheme.typography.labelLarge,
+                               style = tv.own.owntv.ui.theme.stageText(19, 700),
                                color = StageColors.Danger,
                                maxLines = 1,
                                overflow = TextOverflow.Ellipsis,
                            )
                        }
                        Spacer(Modifier.height(14.mpx))
-                       OwnTVButton(
-                           stringResource(R.string.settings_bulk_rename_apply_all), onClick = { session.applyAll() }, icon = OwnTVIcon.PLAY,
+                       tv.own.owntv.ui.stage.StagePopupButton(
+                           stringResource(R.string.settings_bulk_rename_apply_all),
+                           onClick = { session.applyAll() },
                            modifier = Modifier.fillMaxWidth().then(if (firstChanged == -1) Modifier.focusRequester(firstApplyFocus) else Modifier),
+                           icon = OwnTVIcon.PLAY,
                            compact = true,
                        )
                        Spacer(Modifier.height(8.mpx))
-                       OwnTVButton(stringResource(R.string.settings_bulk_rename_decline_all), onClick = { session.declineAll() }, style = OwnTVButtonStyle.SECONDARY, modifier = Modifier.fillMaxWidth(), compact = true)
+                       tv.own.owntv.ui.stage.StagePopupButton(stringResource(R.string.settings_bulk_rename_decline_all), onClick = { session.declineAll() }, modifier = Modifier.fillMaxWidth(), primary = false, compact = true)
                        Spacer(Modifier.height(8.mpx))
-                       OwnTVButton(stringResource(R.string.settings_bulk_rename_edit_rules), onClick = { session.editRules() }, style = OwnTVButtonStyle.SECONDARY, modifier = Modifier.fillMaxWidth(), compact = true)
+                       tv.own.owntv.ui.stage.StagePopupButton(stringResource(R.string.settings_bulk_rename_edit_rules), onClick = { session.editRules() }, modifier = Modifier.fillMaxWidth(), primary = false, compact = true)
                        Spacer(Modifier.height(8.mpx))
-                       OwnTVButton(stringResource(R.string.common_done), onClick = { session.done() }, style = OwnTVButtonStyle.SECONDARY, modifier = Modifier.fillMaxWidth(), compact = true)
+                       tv.own.owntv.ui.stage.StagePopupButton(stringResource(R.string.common_done), onClick = { session.done() }, modifier = Modifier.fillMaxWidth(), primary = false, compact = true)
                    }
                }
 
@@ -497,7 +482,7 @@ private fun BulkRestoreConfirmDialog(session: BulkRenameSession) {
     )
 }
 
-/** The > [BULK_RENAME_MAX_ROWS] refusal (plan §2.7): a clear message, nothing else. */
+/** The > [BULK_RENAME_MAX_ROWS] refusal: a clear message, nothing else. */
 @Composable
 private fun BulkRefusedDialog(session: BulkRenameSession) {
     tv.own.owntv.ui.stage.StageNotice(

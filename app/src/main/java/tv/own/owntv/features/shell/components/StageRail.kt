@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -90,13 +91,13 @@ enum class RailState {
  */
 data class NowPlayingRail(val logoUrl: String?, val audioMode: Boolean, val playing: Boolean)
 
-/** The mockup's rail order (`screens.js` `cRail`): Search first, the Guide right after Live TV, More last. */
+/** The rail order: Search first, Sports then the Guide right after Live TV, More last. */
 private val StageRailOrder = listOf(
-    MainSection.SEARCH, MainSection.HOME, MainSection.LIVE_TV, MainSection.EPG,
+    MainSection.SEARCH, MainSection.HOME, MainSection.LIVE_TV, MainSection.SPORTS, MainSection.EPG,
     MainSection.MOVIES, MainSection.SERIES, MainSection.DOWNLOADS,
 )
 
-/** The rail's width with names (P1b): Normal 280 · Wide 340 · Extra wide 400; Compact is the 84 capsule. */
+/** The rail's width with names: Normal 280 · Wide 340 · Extra wide 400; Compact is the 84 capsule. */
 private val NavSize.openWidth get() = when (this) {
     NavSize.COMPACT -> 84
     NavSize.NORMAL -> 280
@@ -115,7 +116,7 @@ fun railDockedReserve(size: NavSize) =
 val StageContentTop = 110.mpx
 
 /**
- * The Stage navigation rail (P1-01 … P1-05, P1-13 … P1-17): a floating glass capsule, the rail at its
+ * The Stage navigation rail: a floating glass capsule, the rail at its
  * [size] over a scrim or docked, or only the accent glow at the edge. [count] is the number beside an
  * item (Wide and up) and [detail] the line under its name (Extra wide), null for none. [length] Full
  * runs the rail the height of the screen. Entering the rail from the content always lands on the
@@ -174,7 +175,7 @@ fun StageRail(
 
     Box(modifier.fillMaxSize()) {
         if (state == RailState.OPEN && open) {
-            Box(Modifier.fillMaxSize().background(Color(2, 5, 6).copy(alpha = 0.55f)))
+            Box(Modifier.fillMaxSize().background(StageColors.Scrim))
         }
         if (state == RailState.HIDDEN) RailEdgeGlow(Modifier.align(Alignment.CenterStart))
 
@@ -216,7 +217,7 @@ fun StageRail(
                         }
                     }
                 }
-                // ▶ always leaves for the content (P10B B1). The open rail can cover the content's left
+                // ▶ always leaves for the content. The open rail can cover the content's left
                 // column (More's sheet), and then the D-pad search finds nothing to its right and focus
                 // simply stayed in the rail.
                 .onKeyEvent { e ->
@@ -277,6 +278,7 @@ private val MainSection.stageIcon: OwnTVIcon
         MainSection.HOME -> OwnTVIcon.HOME
         MainSection.LIVE_TV -> OwnTVIcon.LIVE_TV
         MainSection.EPG -> OwnTVIcon.EPG
+        MainSection.SPORTS -> OwnTVIcon.SPORTS
         MainSection.MOVIES -> OwnTVIcon.MOVIES
         MainSection.SERIES -> OwnTVIcon.SERIES
         MainSection.DOWNLOADS -> OwnTVIcon.DOWNLOADS
@@ -316,7 +318,7 @@ private fun ColumnScope.RailBrand(open: Boolean) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         BrandMark(icon, 50.mpx)
-        // The #227 wordmark, 130 wide (`.brandrow`, `wordmarkC()`).
+        // The wordmark, 130 wide (`.brandrow`, `wordmarkC()`).
         Wordmark(130.mpx)
     }
 }
@@ -327,7 +329,7 @@ private fun RailSeparator(open: Boolean) {
         Modifier
             .then(if (open) Modifier.fillMaxWidth().padding(horizontal = 14.mpx, vertical = 10.mpx) else Modifier.padding(vertical = 8.mpx).width(34.mpx))
             .height(1.mpx)
-            .background(Color.White.copy(alpha = 0.12f)),
+            .background(StageColors.Ink.copy(alpha = 0.12f)),
     )
 }
 
@@ -353,14 +355,16 @@ private fun RailItem(
     StageSurface(
         onClick = onClick,
         radius = r,
-        modifier = modifier.then(if (open) Modifier.fillMaxWidth().height(60.mpx) else Modifier.size(58.mpx)),
+        // At least 60, not exactly: with a large font size the name and its detail line need more, and a
+        // fixed height cut the detail line off (#7.2).
+        modifier = modifier.then(if (open) Modifier.fillMaxWidth().heightIn(min = 60.mpx) else Modifier.size(58.mpx)),
         idle = if (active) Modifier.background(a.accent.copy(alpha = 0.14f), RoundedCornerShape(r)) else Modifier,
         contentAlignment = if (open) Alignment.CenterStart else Alignment.Center,
     ) { focused ->
         val iconTint = when {
             focused -> a.onAccent
             active || accentIcon -> a.accent
-            else -> Color(0xFFC4CFCA)
+            else -> StageColors.NavText
         }
         if (!open) {
             OwnTVIcon(icon, iconTint, Modifier.size(27.mpx))
@@ -368,7 +372,7 @@ private fun RailItem(
             return@StageSurface
         }
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 18.mpx),
+            Modifier.fillMaxWidth().padding(horizontal = 18.mpx, vertical = 6.mpx),
             horizontalArrangement = Arrangement.spacedBy(18.mpx),
             verticalAlignment = Alignment.CenterVertically,
         ) {

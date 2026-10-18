@@ -68,7 +68,7 @@ fun ChNavSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         dialogReturn = null
     }
 
-    // P10B-20: the switch, the button assignments as rows, the two skip counts; how it works in the panel.
+    // The switch, the button assignments as rows, the two skip counts; how it works in the panel.
     val back = stringResource(R.string.common_back)
     val layout = stringResource(R.string.settings_group_layout)
     val pageHints = listOf(stringResource(R.string.common_ok) to stringResource(R.string.settings_key_change), back to layout)

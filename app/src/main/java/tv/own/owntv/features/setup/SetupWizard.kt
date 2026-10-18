@@ -70,10 +70,10 @@ import tv.own.owntv.ui.theme.stageText
 private enum class Step { WELCOME, DISPLAY_SIZE, DISCLAIMER, SETUP_CHOICE, SYNC_DEVICE, CREATE_PROFILE, ADD_CONTENT, ADD_SOURCE_REMOTE, ADD_SOURCE, IMPORTING, EXISTING, IMPORT_BACKUP_CHOOSER, IMPORT_BACKUP_REMOTE, IMPORT_BACKUP }
 
 /**
- * Onboarding for one profile (P10B-W1 … W9). [firstRun] shows language/welcome/disclaimer; otherwise it
+ * Onboarding for one profile. [firstRun] shows language/welcome/disclaimer; otherwise it
  * starts at profile creation (used by "Add profile"). [onDone] receives the newly active profile id and
  * enters the app; [onCancel] backs out (to the gate). Every step is a [WizardFrame]; adding a playlist
- * reuses the Settings › Add a source pages (P10B step 4).
+ * reuses the Settings › Add a source pages.
  */
 @Composable
 fun Onboarding(firstRun: Boolean, onDone: (Long?) -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
@@ -89,7 +89,7 @@ fun Onboarding(firstRun: Boolean, onDone: (Long?) -> Unit, onCancel: () -> Unit,
     var existing by remember { mutableStateOf<List<SourceEntity>>(emptyList()) }
     // Where "Try Again" returns to when an import fails (new source vs. linking existing).
     var importOrigin by remember { mutableStateOf(Step.ADD_SOURCE) }
-    // The playlist being imported, for "Importing <name>" (W8); null when linking existing playlists.
+    // The playlist being imported, for "Importing <name>"; null when linking existing playlists.
     var importName by remember { mutableStateOf<String?>(null) }
     // Where Back from the backup-restore picker returns to (first-run choice vs. add-content step).
     var backupOrigin by remember { mutableStateOf(Step.ADD_CONTENT) }
@@ -108,7 +108,7 @@ fun Onboarding(firstRun: Boolean, onDone: (Long?) -> Unit, onCancel: () -> Unit,
         when (step) {
             Step.WELCOME -> WelcomeStep(onNext = { step = Step.DISPLAY_SIZE })
             // Before the disclaimer, which is the first screen with a paragraph of real text on it:
-            // if the interface is too small to read, that is the screen it first hurts on (#179).
+            // if the interface is too small to read, that is the screen it first hurts on.
             Step.DISPLAY_SIZE -> DisplaySizeStep(onNext = { step = Step.DISCLAIMER }, onBack = { step = Step.WELCOME })
             Step.DISCLAIMER -> WizardFrame(
                 step = WizardStep.DISPLAY,
@@ -148,7 +148,7 @@ fun Onboarding(firstRun: Boolean, onDone: (Long?) -> Unit, onCancel: () -> Unit,
                 onBack = { step = Step.SETUP_CHOICE },
             )
             Step.CREATE_PROFILE -> ProfileStep(
-                onCreate = { name, avatar, kids, pin -> vm.createProfile(name.ifBlank { defaultProfileName }, avatar, kids, pin) { step = Step.ADD_CONTENT } },
+                onCreate = { name, avatar, kids, pin, picture -> vm.createProfile(name.ifBlank { defaultProfileName }, avatar, kids, pin, picture) { step = Step.ADD_CONTENT } },
                 onBack = { if (firstRun) step = Step.SETUP_CHOICE else onCancel() },
             )
             Step.ADD_CONTENT -> AddContentStep(
@@ -201,7 +201,7 @@ fun Onboarding(firstRun: Boolean, onDone: (Long?) -> Unit, onCancel: () -> Unit,
                 progress = progress,
                 name = importName,
                 onContinue = { vm.finish(onDone) }, // playlist + its EPG synced (auto)
-                // "Add a TV guide" (owner, 1 Oct): finish setup, then the shell opens Settings › EPG sources › Add.
+                // "Add a TV guide": finish setup, then the shell opens Settings › EPG sources › Add.
                 onAddGuide = { PendingShellRequest.addEpg = true; vm.finish(onDone) },
                 onRetry = { vm.reset(); step = importOrigin },
                 onCancel = { vm.cancelImport(); step = importOrigin },
@@ -248,6 +248,7 @@ fun Onboarding(firstRun: Boolean, onDone: (Long?) -> Unit, onCancel: () -> Unit,
                 state = importState,
                 wizardStep = if (backupOrigin == Step.SETUP_CHOICE) WizardStep.PROFILE else WizardStep.PLAYLIST,
                 onPick = { file -> restoreSections = null; restoreFile = file },
+                fileChosen = restoreFile != null,
                 // The same choice, carried across the password question: a sealed file is chosen
                 // from before it can be opened, so the answer has to outlive the prompt.
                 onPassword = { file, pass ->
@@ -272,6 +273,7 @@ fun Onboarding(firstRun: Boolean, onDone: (Long?) -> Unit, onCancel: () -> Unit,
                 },
                 onDismiss = { vm.reset(); restoreFile = null; step = backupOrigin },
                 deviceSettings = restoreDeviceSettings,
+                warnWithoutSources = firstRun,
             )
         }
         // Semi-auto EPG: after the first playlist imports, ask → sync (live count) → done (overlays "All set!").
@@ -292,7 +294,7 @@ private fun rememberFirstFocus(): FocusRequester {
     return fr
 }
 
-/** W1: the language as a row (OK opens the list), then Get started. */
+/** The language as a row (OK opens the list), then Get started. */
 @Composable
 private fun WelcomeStep(onNext: () -> Unit) {
     WizardFrame(
@@ -307,7 +309,7 @@ private fun WelcomeStep(onNext: () -> Unit) {
 }
 
 /**
- * W2, first-run interface size (#179): UI zoom and text size as steppers (◀ ▶), the app icon, and a
+ * First-run interface size: UI zoom and text size as steppers (◀ ▶), the app icon, and a
  * sample row to judge them by. Both steppers write straight through, so the whole step — rows and
  * sample alike — resizes as the user presses. No draft state and no Apply.
  */
@@ -318,7 +320,7 @@ private fun DisplaySizeStep(onNext: () -> Unit, onBack: () -> Unit) {
     val fontSize by vm.fontSizePercent.collectAsStateWithLifecycle()
     val appIcon by vm.appIcon.collectAsStateWithLifecycle()
     val zoomFocus = rememberFirstFocus()
-    // Zoom below LOW_RAM_WARN can OOM a 2 GB device (#51), so the first step under the line is gated
+    // Zoom below LOW_RAM_WARN can OOM a 2 GB device, so the first step under the line is gated
     // exactly as the Settings dialog gates it. Accepting once arms the rest of this visit; arriving
     // already below the line (a restored backup) must not nag.
     var lowZoomAccepted by remember { mutableStateOf(zoom < UiZoom.LOW_RAM_WARN) }
@@ -368,13 +370,13 @@ private fun DisplaySizeStep(onNext: () -> Unit, onBack: () -> Unit) {
             onClick = { pickIcon = true },
             onStep = { dir -> vm.setAppIcon(icons[(at + dir + icons.size) % icons.size]) },
         )
-        // The sample (W2): a row's own type at the size it will really be.
+        // The sample: a row's own type at the size it will really be.
         Row(
             Modifier
                 .padding(top = 14.mpx)
                 .fillMaxWidth()
                 .height(84.mpx)
-                .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(20.mpx))
+                .background(StageColors.Ink.copy(alpha = 0.05f), RoundedCornerShape(20.mpx))
                 .padding(horizontal = 22.mpx),
             horizontalArrangement = Arrangement.spacedBy(18.mpx),
             verticalAlignment = Alignment.CenterVertically,
@@ -398,7 +400,7 @@ private fun DisplaySizeStep(onNext: () -> Unit, onBack: () -> Unit) {
         }
     }
 
-    // Accept-the-risk gate for zoom below LOW_RAM_WARN (#51), the same prompt Settings shows. One
+    // Accept-the-risk gate for zoom below LOW_RAM_WARN, the same prompt Settings shows. One
     // button, focus locked in every D-pad direction — OK accepts and applies the pending step, Back
     // cancels and leaves the zoom where it was.
     pendingLowZoom?.let { target ->
@@ -423,7 +425,7 @@ private fun DisplaySizeStep(onNext: () -> Unit, onBack: () -> Unit) {
     }
 }
 
-/** The app icon row's value (W2): the first five icon colours, the chosen one ringed, then "+N". */
+/** The app icon row's value: the first five icon colours, the chosen one ringed, then "+N". */
 @Composable
 private fun AppIconSwatches(icons: List<AppIcon>, chosen: AppIcon) {
     val a = stageAccent
@@ -444,15 +446,18 @@ private fun AppIconSwatches(icons: List<AppIcon>, chosen: AppIcon) {
 }
 
 /**
- * W6, Who's watching?: Name, Avatar (◀ ▶ through the pictures, the letter first), Kids profile and an
- * optional PIN, then Create profile.
+ * Who's watching?: Name, Avatar (◀ ▶ through the pictures, the letter first), a picture of the
+ * user's own, Kids profile and an optional PIN, then Create profile. The picture is held until then:
+ * the profile has no id to store it under before it exists.
  */
 @Composable
-private fun ProfileStep(onCreate: (name: String, avatarId: Int, isKids: Boolean, pin: String?) -> Unit, onBack: () -> Unit) {
+private fun ProfileStep(onCreate: (name: String, avatarId: Int, isKids: Boolean, pin: String?, picture: java.io.File?) -> Unit, onBack: () -> Unit) {
     var name by remember { mutableStateOf("") }
     var avatarId by remember { mutableIntStateOf(-1) } // new profiles start on the letter
     var isKids by remember { mutableStateOf(false) }
     var pin by remember { mutableStateOf("") }
+    var picture by remember { mutableStateOf<java.io.File?>(null) }
+    var choosingPicture by remember { mutableStateOf(false) }
     val nameFocus = rememberFirstFocus()
     val valid = name.isNotBlank() && (pin.isEmpty() || pin.length >= 4)
     val nameLabel = stringResource(R.string.profiles_name)
@@ -463,7 +468,7 @@ private fun ProfileStep(onCreate: (name: String, avatarId: Int, isKids: Boolean,
         title = stringResource(R.string.profiles_gate_title),
         sub = stringResource(R.string.setup_profile_sub),
         back = WizardAction(stringResource(R.string.common_back), onBack),
-        next = WizardAction(stringResource(R.string.setup_create_profile), { if (valid) onCreate(name, avatarId, isKids, pin.takeIf { it.isNotBlank() }) }, enabled = valid),
+        next = WizardAction(stringResource(R.string.setup_create_profile), { if (valid) onCreate(name, avatarId, isKids, pin.takeIf { it.isNotBlank() }, picture) }, enabled = valid),
     ) {
         StageFieldRow(
             OwnTVIcon.PENCIL, nameLabel, name, { name = it }, SettingHelp(nameLabel, fieldHelp),
@@ -480,6 +485,13 @@ private fun ProfileStep(onCreate: (name: String, avatarId: Int, isKids: Boolean,
             onStep = { dir -> avatarId = ids[(at + dir + ids.size) % ids.size] },
         )
         StageSettingRow(
+            icon = OwnTVIcon.IMAGE,
+            title = stringResource(R.string.profiles_avatar_own_picture),
+            desc = null,
+            value = picture?.let { file -> SettingValue.Custom { OwnTVAvatar(avatarId = avatarId, imagePath = file.absolutePath, modifier = Modifier.size(34.mpx)) } },
+            onClick = { choosingPicture = true },
+        )
+        StageSettingRow(
             icon = OwnTVIcon.FAVORITE,
             title = stringResource(R.string.profiles_kids),
             desc = stringResource(R.string.profiles_kids_description),
@@ -491,9 +503,17 @@ private fun ProfileStep(onCreate: (name: String, avatarId: Int, isKids: Boolean,
             placeholder = stringResource(R.string.profiles_pin_digits), password = true, keyboardType = KeyboardType.NumberPassword,
         )
     }
+    if (choosingPicture) {
+        tv.own.owntv.features.profiles.ProfilePictureChooser(
+            hasImage = picture != null,
+            onPicked = { picture = it; choosingPicture = false },
+            onClear = { picture = null; choosingPicture = false },
+            onDismiss = { choosingPicture = false },
+        )
+    }
 }
 
-/** The avatar row's value (W6): six pictures from the chosen one on, the chosen ringed, then "+N". */
+/** The avatar row's value: six pictures from the chosen one on, the chosen ringed, then "+N". */
 @Composable
 private fun AvatarStrip(ids: List<Int>, chosen: Int) {
     val a = stageAccent
@@ -510,7 +530,7 @@ private fun AvatarStrip(ids: List<Int>, chosen: Int) {
     }
 }
 
-/** W7, Add a playlist: From your phone, Type it here, Import (and Existing when another profile has some). */
+/** Add a playlist: From your phone, Type it here, Import (and Existing when another profile has some). */
 @Composable
 private fun AddContentStep(hasExisting: Boolean, onPhone: () -> Unit, onType: () -> Unit, onExisting: () -> Unit, onImport: () -> Unit, onSkip: () -> Unit) {
     val first = rememberFirstFocus()
@@ -571,6 +591,8 @@ private fun ImportBackupStep(
     state: SourceImporter.ImportState,
     wizardStep: WizardStep,
     onPick: (java.io.File) -> Unit,
+    /** A file is picked: the browser closes, so it is not left behind the restore dialog. */
+    fileChosen: Boolean,
     onPassword: (java.io.File, String?) -> Unit,
     onBack: () -> Unit,
 ) {
@@ -614,7 +636,7 @@ private fun ImportBackupStep(
             next = WizardAction(stringResource(R.string.common_back), onBack, rememberFirstFocus()),
             onBack = onBack,
         )
-        else -> StorageBrowser(
+        else -> if (!fileChosen) StorageBrowser(
             title = stringResource(R.string.setup_pick_backup_file),
             mode = BrowseMode.FILE,
             // `.own` containers plus pre-4.2 `.json` backups.
@@ -630,7 +652,7 @@ private val allRestoreSections: Set<tv.own.owntv.core.backup.BackupManager.Secti
     get() = tv.own.owntv.core.backup.BackupManager.Section.entries.toSet()
 
 /**
- * W8 / W9: "Importing <name>" with the bar and where the import is, Cancel and Run in background; then
+ * "Importing <name>" with the bar and where the import is, Cancel and Run in background; then
  * "All set!" with what arrived and an Add a TV guide row; or the failure with Back and Try again.
  */
 @Composable

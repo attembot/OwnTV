@@ -7,6 +7,23 @@
 > Issue numbers that are part of a title are fine; explanatory parentheticals are not. The detail —
 > what, why, files and verification — belongs in the commit message, never here.
 
+## v2026.10.18 (fork) — 2026-10-18
+
+Everything in upstream v5.2.0 below, plus the fork's picture-in-picture and always-on Multiview button.
+
+### ✨ New features
+
+- **🖼️ The PiP channel picker is Multiview's: every category with its count, then the channel list with what is on now**
+- **🔄 The PiP window says "Stream interrupted. Reconnecting…" while its channel recovers**
+
+### 🐛 Fixes
+
+- **PiP stops on Home and the screensaver, and comes back with the app**
+- **PiP no longer plays on behind the profile picker**
+- **PiP shows its picture with Tunneled playback switched on**
+- **Hidden and renamed channels look the same in the PiP picker as in Live TV**
+- **PiP window and its controls follow the Light theme**
+
 ## v2026.10.04 (fork) — 2026-10-04
 
 Everything in upstream v5.1.0 below, plus the fork's picture-in-picture and always-on Multiview button.
@@ -104,6 +121,109 @@ Everything in upstream v5.0.0 below, plus the fork's picture-in-picture.
 - **Custom DNS resolves IPv6-only hosts**
 - **Audio focus is released while you are paused**
 - **Many smaller player, subtitle and catch-up fixes**
+
+## v5.2.0 — 2026-10-17
+
+### ✨ New features
+- **🏆 Sports: a new section with live scores, today's and tomorrow's matches, and match pages**
+- **🔎 Find channels: the channels in your guide that show a match, ranked, with a preview**
+- **📺 Broadcasts tab, venue and round on every match page**
+- **🏷️ Pick several sports and leagues at once on the Sports page**
+- **↕️ Hold OK to put your sports and leagues in your own order**
+- **🏠 Sports row on Home with a LIVE mark**
+- **⚙️ Settings → Sports: leagues, auto rebuild, live refresh, playlist and strict channel filters**
+- **↩️ Restore a category, or the playlists shown, to the playlist default** (community PR #235 by @tvdev-android)
+- **🔄 "Stream interrupted. Reconnecting…" while a live channel recovers** (community PR #237 by @tvdev-android)
+- **🖼️ Title art in Home's trending banner**
+- **📊 Progress bars on series posters**
+- **⏩ Page jumps in the channel list while watching (CH+/CH−, long press for first/last)**
+- **🎞️ Guide video preview on/off switch (Order ▾ › Show)**
+- **🎨 The player's channel list, history and categories in the Stage design**
+- **⭐ Favorites, Recently watched, Catch-up and All channels in the player's category list**
+- **⭐ Favourite movies and series rows on Home**
+- **🔎 Search finds TV programmes by title (On TV)**
+- **⏰ Schedule recording… on a channel: pick the day, start and end (#2)**
+- **⏹️ Stop recording from the channel's menu**
+- **☀️ Light theme across the whole app (Theme: System / Dark / Light)**
+- **🗓️ Auto-match EPG says when it has finished, even away from the Guide** (community PR #251 by @camchis)
+- **🔐 ClearKey channels whose playlist carries the key itself play**
+- **🔎 Search filter buttons: Live TV, TV Shows, Movies, Series**
+- **🎞️ Software decoding above 1080p (Video player switch)**
+- **⚡ Faster downloads over several connections**
+- **💬 A failed download says why**
+- **📺 Watch or keep downloading on a one-stream playlist**
+- **🗂️ Downloads and recordings whose file is gone say "File missing"**
+
+### 🐛 Fixes
+- **↕️ Move opens straight from a category's menu and moves as many items as you like before Save**
+- **🌍 Channels named "UK: …" or "IT: …" get their country and language, like "UK| …"**
+- **🧹 Find channels leaves out playlist divider rows and other matches' event channels**
+- **📺 Broadcasts lists one channel per row, by country**
+- **🎨 Every popup, menu, form field and player control in the current design**
+- **📏 Multiview tile and category menus at the same size as every other menu**
+- **🖼️ Your own picture can be chosen while creating or editing any profile**
+- **📺 Series no longer show "No episodes" when one episode is oddly written by the provider**
+- **💬 A series the provider refused says why instead of "No episodes"**
+- **📺 Live TV falls back to the other player and gives up on time again**
+- **🔊 Opening a previewed channel keeps its volume; unmute returns to the level before**
+- **🔈 Changing sound settings during a film no longer starts a second copy**
+- **🗣️ Audio language and the episode queue survive a reload**
+- **🚫 A dead film link shows its error in seconds**
+- **🕒 Catch-up time zone "Automatic" uses the playlist's own zone**
+- **⏪ M3U catch-up and Xtream rewind start at the right moment**
+- **▶️ External player starts where you left off**
+- **🏷️ Categories keep their country ("UK|") when a list mixes countries**
+- **✏️ Bulk rename and ✨ Auto cleanup for categories**
+- **🔁 Retry works after a live channel gives up**
+- **👤 "Account already in use" says so, instead of loading forever**
+- **🔍 ◀ from a search opens the categories, with or without results**
+- **🌙 Home and the screensaver bring back the episode queue**
+- **🔤 Hebrew and Arabic subtitles read right to left on every line (#259)**
+- **🎯 ▶ into a page that is still opening no longer does nothing** (community PR #264 by @Kevsosmooth)
+- **⌨️ Settings search from More opens the keyboard on the first OK**
+- **▶️ External player picker offers Always again, so one player can be the default**
+- **📡 Pause and rewind live TV: a channel comes back by itself after a network outage**
+- **⚡ A single CH+/CH− press opens the channel without the half-second wait** (community PR #255 by @sarmadsoomro)
+- **🗓️ Auto-match EPG finishes in seconds on large playlists** (community PR #252 by @camchis)
+- **🎬 A longer Film buffer really holds more of a high-bitrate film** (community PR ahXN00/OwnTV_Core#31 by @sarmadsoomro)
+- **⚡ Opening a channel from its preview goes straight to full screen, no black gap** (community PR #242 by @tvdev-android)
+- **😴 The screensaver no longer starts when a film stops to buffer**
+- **Customize no longer keeps a removed item's actions on screen**
+- **🎞️ Catch-up plays on the hardware decoder and freezes on its first frame less often (#229)**
+- **📡 A catch-up of a programme still on air switches to live instead of freezing**
+- **🎬 Films keep playing when the TV changes picture mode or the remote wakes up (#9)**
+- **🔔 The update notice no longer reappears during a session**
+- **📥 Downloads: the focused tab and Download folder no longer cover the text beside them**
+- **🎬 An automatic playlist or guide refresh waits until playback stops**
+- **💾 A first-run backup restore finishes before the app opens, even after Back**
+- **🔄 Restored playlists download straight away after a restore**
+- **🔑 Password fields use the password keyboard and show a Show button in setup**
+- **⚠️ First-run restore warns when Sources is unticked**
+- **📺 Channel logos with white lettering readable again, no white tile behind logos**
+- **📊 Progress bars and the watched ✓ back on film posters**
+- **⏱️ The seek bar's time no longer cut off at the top or the ends**
+- **🧭 The floating menu no longer flashes open when opening a page**
+- **🧭 Extra-wide menu shows its second line at large font sizes**
+- **🔠 Long film and series titles fit instead of being cut off, and show once in the browse panel**
+- **🇫🇷 Info and favourite buttons on Home's trending banner visible in every language**
+- **📋 The playlist picker scrolls to the last playlist**
+- **🌍 Backdrops fade on the correct side in Arabic and other right-to-left languages**
+- **🏠 Home's trending banner sits higher, showing more rows**
+- **⚙️ Settings cards show their whole text at large font sizes**
+- **↩️ Back from a series page returns to the show you opened**
+- **🏷️ Provider tags such as "|MULTI|" no longer lead film and series titles on their pages**
+- **⏺️ Recordings of some HLS channels were a few kB and would not play (#243)**
+- **💥 Error log and Backup & Restore no longer close the app on a 24-hour clock**
+- **⏯️ The remote's Play/Pause key pauses and resumes again**
+- **🔎 Search finds "Spider-Man" from "Spider-M" and lists every match, not the first 40**
+- **🔗 A provider's get.php M3U link is added as Xtream, so movies and series land in their own sections (#238)**
+- **📺 Shows with a Season 0 load all their episodes on Xtream**
+- **🔢 Xtream episodes with no number are numbered in order instead of all showing E0**
+- **🔁 A show's episode list retries once when the provider drops the connection**
+- **▶️ Play on a new show starts at Season 1 Episode 1; Specials come after the last season**
+- **⏭️ Auto-play continues past a missing season number instead of stopping**
+- **🔤 M3U episodes named "Season 1 Episode 5" or "S2019E05" are recognised**
+- **💾 Big downloads to a FAT32 USB stick fail with a clear reason**
 
 ## v5.1.0 — 2026-10-04
 

@@ -82,14 +82,14 @@ class CustomizeItemsViewModel(
         .stateIn(viewModelScope, SharingStarted.Eagerly, Ctx(-1L, emptyList()))
 
     /** The category whose items are shown. Set via [open], cleared via [close]. [categoryId] is null
-     *  for a user's custom combined category (issue #87) — its items live in the membership table. */
+     *  for a user's custom combined category — its items live in the membership table. */
     data class CatInfo(
         val categoryId: Long?,
         val contextKey: String,
         val mediaType: MediaType,
         val sourceIds: List<Long>,
     ) {
-        /** True when this is a user-created combined category (issue #87), keyed "custom:<uuid>". */
+        /** True when this is a user-created combined category, keyed "custom:<uuid>". */
         val isCustom: Boolean get() = CustomizeKeys.isCustom(contextKey)
     }
 
@@ -201,7 +201,7 @@ class CustomizeItemsViewModel(
     private val moveMutex = Mutex()
 
     /** Snapshot of the whole category in current display order: (itemId, stable key) pairs.
-     *  Null when the category can't be snapshotted (EPISODE or no profile). Custom categories (#87)
+     *  Null when the category can't be snapshotted (EPISODE or no profile). Custom categories
      *  snapshot the membership join (same rail-order query as the browse screens). */
     private suspend fun orderedSnapshot(ci: CatInfo): List<Pair<Long, String>>? {
         val pid = ctx.value.profileId
@@ -296,7 +296,7 @@ class CustomizeItemsViewModel(
     }
 
     /** Returns the right Room PagingSource for this media type, with or without manual-order join.
-     *  Custom categories (#87) always take the membership join — it LEFT JOINs content_order itself,
+     *  Custom categories always take the membership join — it LEFT JOINs content_order itself,
      *  so [ordered] doesn't matter there. */
     private fun pagingSource(categoryId: Long?, info: CatInfo, ordered: Boolean): PagingSource<Int, *> {
         if (info.isCustom) {
@@ -376,7 +376,7 @@ class CustomizeItemsViewModel(
         }
     }
 
-    /** Rename an item (Live TV channels only — Movies/Series use bulk rename in Phase 2). */
+    /** Rename an item (Live TV channels only — Movies/Series use bulk rename). */
     fun renameItem(row: CustomizeItemRow, name: String?) {
         val ci = _catInfo.value ?: return
         viewModelScope.launch {
@@ -384,7 +384,7 @@ class CustomizeItemsViewModel(
         }
     }
 
-    // --- bulk rename (issue #86) ---
+    // --- bulk rename ---
 
     /**
      * One-shot bulk-rename flow for the current category's items. Every accepted rename lands in ONE
@@ -459,7 +459,7 @@ class CustomizeItemsViewModel(
         }
     }
 
-    // --- Move to… (issue #87) ---
+    // --- Move to… ---
 
     /** The user's custom categories (with member counts) minus THIS category — the "Move to…"
      *  dialog's list. A category can't contain itself. */
@@ -488,7 +488,7 @@ class CustomizeItemsViewModel(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    /** Creates a custom category (issue #87) — the Move dialog's "＋ New category…" flow. */
+    /** Creates a custom category — the Move dialog's "＋ New category…" flow. */
     fun createCustomCategory(name: String) {
         val ci = _catInfo.value ?: return
         viewModelScope.launch {
@@ -497,7 +497,7 @@ class CustomizeItemsViewModel(
     }
 
     /**
-     * Moves (or copies, [keepInOrigin]) [row] into a custom category (issue #87). The origin is the
+     * Moves (or copies, [keepInOrigin]) [row] into a custom category. The origin is the
      * category this screen is showing: a provider folder marks the item in movedFromOrigin so its
      * browse pager drops it, a custom category deletes its membership row, and Favorites deletes the
      * favorite row. The item always stays in All/search/recent.

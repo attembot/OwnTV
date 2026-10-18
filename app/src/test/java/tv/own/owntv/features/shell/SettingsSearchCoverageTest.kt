@@ -7,7 +7,7 @@ import java.io.File
 
 /**
  * Settings search is a second, hand-written list sitting beside the real rows, and it had quietly
- * stopped matching them: four whole screens — Recording, OpenSubtitles, Glass Effect and Content
+ * stopped matching them: four whole screens — Recording, OpenSubtitles, Glass & background and Content
  * menus — could not be found by name at all, and neither could two thirds of the Video player rows,
  * Multiview and the Live TV engine picker among them. The header offers to search "every setting".
  *
@@ -147,7 +147,7 @@ class SettingsSearchCoverageTest {
         "player_subtitles_connected_user", "player_subtitles_delete_action", "player_subtitles_sign_in",
         "player_subtitles_sign_out", "settings_open_subtitles_advanced", "settings_open_subtitles_setup_local",
         "settings_open_subtitles_setup_remote",
-        // Stage (P10–P12): a full page's own heading — the screen, which has its own entry — and the
+        // Stage: a full page's own heading — the screen, which has its own entry — and the
         // titles and options of its popups and confirmations.
         "settings_epg_sources_title", "settings_home_screen", "settings_title_date_time_weather",
         "settings_delete_subtitles", "settings_remote_shortcuts_capture_title", "settings_epg_sources_fill_playlist",

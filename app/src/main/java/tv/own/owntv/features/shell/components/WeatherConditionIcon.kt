@@ -12,7 +12,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import tv.own.owntv.core.weather.WeatherInfo
 
-/** The weather symbol beside the temperature in the top-right cluster (moved out of the old top bar). */
+/** The weather symbol beside the temperature in the top-right cluster. */
 @Composable
 internal fun WeatherConditionIcon(info: WeatherInfo, modifier: Modifier = Modifier) {
     val key = info.symbolKey()

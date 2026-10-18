@@ -15,7 +15,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import tv.own.owntv.ui.theme.LocalGlass
-import tv.own.owntv.ui.theme.OwnTVTheme
 import tv.own.owntv.ui.theme.drawRadialGlow
 
 /**
@@ -30,10 +29,9 @@ fun SolidAmbientBackdrop(
     modifier: Modifier = Modifier,
 ) {
     val glass = LocalGlass.current
-    val colors = OwnTVTheme.colors
-    if (!glowEnabled || glass.enabled || !colors.isDark) return
+    if (!glowEnabled || glass.enabled || tv.own.owntv.ui.theme.LocalStagePalette.current.isLight) return
 
-    val primary = colors.primary
+    val primary = tv.own.owntv.ui.theme.stageAccent.accent
     val transition = if (pulseEnabled) rememberInfiniteTransition(label = "solidAmbientPulse") else null
     val ringScale = transition?.animateFloat(
         initialValue = 0.92f,

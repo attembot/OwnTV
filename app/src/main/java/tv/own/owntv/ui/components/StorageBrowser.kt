@@ -1,7 +1,6 @@
 package tv.own.owntv.ui.components
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -24,10 +22,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -40,13 +36,11 @@ import androidx.tv.material3.Text
 import tv.own.owntv.R
 import tv.own.owntv.ui.theme.mpx
 import tv.own.owntv.core.storage.StorageAccess
-import tv.own.owntv.core.theme.GlassSurface
-import tv.own.owntv.ui.theme.OwnTVTheme
 import java.io.File
 
 enum class BrowseMode { FOLDER, FILE }
 
-/** One directory's contents, already split and sorted off the main thread (audit U2). */
+/** One directory's contents, already split and sorted off the main thread. */
 private data class Listing(val folders: List<File>, val files: List<File>) {
     companion object { val EMPTY = Listing(emptyList(), emptyList()) }
 }
@@ -93,7 +87,6 @@ private fun StorageBrowserContent(
     onNewFolder: (onCreate: (String) -> Unit) -> Unit,
 ) {
     val context = LocalContext.current
-    val colors = OwnTVTheme.colors
     val roots = remember { StorageAccess.storageRoots(context) }
     var current by remember { mutableStateOf<File?>(null) } // null = the roots list
     var hasAccess by remember { mutableStateOf(StorageAccess.hasStorageAccess(context)) }
@@ -122,13 +115,13 @@ private fun StorageBrowserContent(
 
 
         // scroll = false: the listing below is a height-capped LazyColumn, which cannot nest inside
-        // dialogPanel's own vertical scroll.
+        // the popup's own vertical scroll.
     Column(Modifier.fillMaxWidth()) {
             Text(title, style = tv.own.owntv.ui.theme.stageText(34, 800), color = tv.own.owntv.ui.theme.StageColors.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(current?.absolutePath ?: stringResource(R.string.setup_pick_location), style = tv.own.owntv.ui.theme.stageText(16, 500), color = tv.own.owntv.ui.theme.StageColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.mpx, bottom = 18.mpx))
 
             val dir = current
-            // U2 — listFiles() plus the per-child isDirectory/isFile stats are disk work, and a
+            // listFiles() plus the per-child isDirectory/isFile stats are disk work, and a
             // `remember` block still runs it on the main thread during composition: a USB drive with
             // a large folder stalled the frame. Load it on IO instead; the ".." / roots rows render
             // immediately either way, so D-pad focus still lands the moment the dialog opens.
@@ -192,7 +185,6 @@ private fun StorageBrowserContent(
 
 @Composable
 private fun NewFolderDialog(onCreate: (String) -> Unit, onDismiss: () -> Unit) {
-    val colors = OwnTVTheme.colors
     var name by remember { mutableStateOf("") }
     val focus = remember { FocusRequester() }
     // A popup window of its own: drawn in the browser's layer, the browser's focus trap kept the cursor
@@ -203,7 +195,14 @@ private fun NewFolderDialog(onCreate: (String) -> Unit, onDismiss: () -> Unit) {
     }
     tv.own.owntv.ui.stage.StagePopup(onDismiss = onDismiss, title = null, eyebrow = null, width = 756.mpx) {
         Text(stringResource(R.string.setup_new_folder), style = tv.own.owntv.ui.theme.stageText(38, 800), color = tv.own.owntv.ui.theme.StageColors.Text, modifier = Modifier.padding(bottom = 22.mpx))
-        OwnTVTextField(name, { name = it }, label = stringResource(R.string.setup_folder_name), placeholder = stringResource(R.string.setup_folder_example), modifier = Modifier.fillMaxWidth().focusRequester(focus), surface = GlassSurface.DIALOGS)
+        tv.own.owntv.features.settings.StageFieldRow(
+            icon = tv.own.owntv.ui.components.OwnTVIcon.PENCIL,
+            label = stringResource(R.string.setup_folder_name),
+            value = name,
+            onValueChange = { name = it },
+            modifier = Modifier.fillMaxWidth().focusRequester(focus),
+            placeholder = stringResource(R.string.setup_folder_example),
+        )
         Row(Modifier.fillMaxWidth().padding(top = 24.mpx), horizontalArrangement = Arrangement.spacedBy(14.mpx, Alignment.End)) {
             tv.own.owntv.ui.stage.StageButton(stringResource(R.string.common_cancel), onClick = onDismiss, height = 56.mpx, textSize = 19)
             tv.own.owntv.ui.stage.StageButton(stringResource(R.string.common_create), onClick = { if (name.isNotBlank()) onCreate(name) }, height = 56.mpx, textSize = 19, tinted = true)

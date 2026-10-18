@@ -50,7 +50,7 @@ import tv.own.owntv.ui.theme.stageAccent
 import tv.own.owntv.ui.theme.stageText
 
 /**
- * Settings › Appearance's LIVE PREVIEW (P9-04, G9): a small Home drawn from the first Trending title, at a
+ * Settings › Appearance's LIVE PREVIEW: a small Home drawn from the first Trending title, at a
  * third of the screen's size. Not a second Home — no data of its own, nothing focusable — but it draws
  * with the live accent, focus colour, glass and font, so a change shows here before the row is left.
  */
@@ -61,13 +61,14 @@ internal fun SettingsLivePreview() {
     val items = state.trendingItems
     val lead = items.firstOrNull()
     val a = stageAccent
+    val ink = tv.own.owntv.ui.theme.LocalStagePalette.current.ink
     SettingPanelHeading(stringResource(R.string.settings_quick_live_preview))
     BoxWithConstraints(
         Modifier
             .fillMaxWidth()
             .aspectRatio(16f / 9f)
             .clip(RoundedCornerShape(18.mpx))
-            .drawBehind { drawInnerRing(Color.White.copy(alpha = 0.1f), 1.mpx.toPx(), 18.mpx.toPx()) },
+            .drawBehind { drawInnerRing(ink.copy(alpha = 0.1f), 1.mpx.toPx(), 18.mpx.toPx()) },
     ) {
         // The 1920 × 1080 frame, scaled down to the box: every size below is the real screen's.
         val scale = maxWidth / 1920.mpx
@@ -88,7 +89,7 @@ internal fun SettingsLivePreview() {
                     model = backdropOf(lead),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.align(Alignment.TopEnd).size(1240.mpx, 760.mpx).dissolveEdges(left = 0.45f, bottom = 0.35f),
+                    modifier = Modifier.align(Alignment.TopEnd).size(1240.mpx, 760.mpx).dissolveEdges(start = 0.45f, bottom = 0.35f),
                 )
             }
             // The rail at rest: a glass capsule of icons.
@@ -139,7 +140,7 @@ internal fun SettingsLivePreview() {
                                 model = backdropOf(item),
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxWidth().height(214.mpx).clip(RoundedCornerShape(16.mpx)).background(Color.White.copy(alpha = 0.06f)),
+                                modifier = Modifier.fillMaxWidth().height(214.mpx).clip(RoundedCornerShape(16.mpx)).background(ink.copy(alpha = 0.06f)),
                             )
                             StageProgress(listOf(0.55f, 0.3f, 0.8f, 0.45f, 0.2f)[i], Modifier.padding(top = 10.mpx).fillMaxWidth())
                         }
@@ -152,7 +153,7 @@ internal fun SettingsLivePreview() {
         stringResource(R.string.settings_live_preview_note), style = stageText(15, 500), color = StageColors.Muted,
         modifier = Modifier.padding(top = 12.mpx, start = 2.mpx),
     )
-    Box(Modifier.padding(top = 22.mpx, bottom = 18.mpx).fillMaxWidth().height(1.mpx).background(Color.White.copy(alpha = 0.1f)))
+    Box(Modifier.padding(top = 22.mpx, bottom = 18.mpx).fillMaxWidth().height(1.mpx).background(ink.copy(alpha = 0.1f)))
 }
 
 private fun titleOf(item: TrendingHomeItem?): String? =

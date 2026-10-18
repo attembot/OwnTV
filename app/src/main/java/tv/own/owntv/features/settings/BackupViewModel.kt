@@ -10,7 +10,7 @@ import kotlinx.coroutines.launch
 import tv.own.owntv.core.backup.BackupManager
 import java.io.File
 
-/** Phase 12 — drives Backup & Restore (selective export/import to a JSON file). */
+/** Drives Backup & Restore (selective export/import to a JSON file). */
 enum class DoneKind { EXPORTED, RESTORED }
 enum class BackupError { EXPORT, READ, IMPORT }
 

@@ -3,13 +3,13 @@ package tv.own.owntv.features.settings
 import tv.own.owntv.R
 
 /*
- * The words of each Settings row on a Stage page (P10), by row key: root rows by their own key
+ * The words of each Settings row on a Stage page, by row key: root rows by their own key
  * ("theme", "tab_SOURCES"), Video player rows by their Quick key ("vp_hw"), Recording rows by "rec_*".
  * A row's own title and description are used wherever a key is missing here; a long description
  * the row used to carry becomes its panel text when [SETTING_HELP] has nothing better.
  */
 
-/** The short line under the title (the mockup's wording). */
+/** The short line under the title. */
 internal val SETTING_LINE: Map<String, Int> = mapOf(
     "quick_live_preview" to R.string.settings_line_quick_live_preview,
     "quick_preview_sound" to R.string.settings_line_preview_sound,
@@ -129,7 +129,7 @@ internal val SETTING_HELP: Map<String, Int> = mapOf(
     "reminders" to R.string.settings_reminders_description,
     "reminder_lead" to R.string.settings_reminder_lead_description,
     "guide_days" to R.string.settings_help_guide_days,
-    "catchup" to R.string.settings_help_catchup,
+    "catchup" to R.string.settings_help_catchup_timezone,
     "catchup_sources" to R.string.settings_catchup_timezone_per_playlist_description,
     "theme" to R.string.settings_help_theme,
     "accent" to R.string.settings_help_accent,
@@ -177,6 +177,7 @@ internal val SETTING_HELP: Map<String, Int> = mapOf(
 /** For a switch row, whether On is the recommended value (the panel tags it). Absent = no tag. */
 internal val SWITCH_RECOMMENDED: Map<String, Boolean> = mapOf(
     "vp_hw" to true,
+    "vp_sw_above_1080p" to false,
     "vp_measured_stats" to false,
     "vp_logging" to false,
     "rec_reserve" to true,

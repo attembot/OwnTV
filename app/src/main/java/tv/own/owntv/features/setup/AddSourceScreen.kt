@@ -1,16 +1,11 @@
 package tv.own.owntv.features.setup
 
-import androidx.activity.compose.BackHandler
-import androidx.annotation.StringRes
-import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -20,9 +15,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.Text
@@ -63,10 +56,6 @@ import tv.own.owntv.core.settings.PlaylistRefresh
 import tv.own.owntv.core.settings.SettingsRepository
 import tv.own.owntv.ui.components.BrowseMode
 import tv.own.owntv.ui.components.DayStepperDialog
-import tv.own.owntv.ui.components.OwnTVPopup
-import tv.own.owntv.ui.components.dialogPanel
-import tv.own.owntv.ui.components.modalScrim
-import tv.own.owntv.ui.components.trapAllFocusExit
 import tv.own.owntv.ui.components.StorageBrowser
 
 private enum class SourceKind { XTREAM, M3U, STALKER }
@@ -111,7 +100,7 @@ fun AddSourceScreen(
     initialAutoRefresh: PlaylistRefresh = PlaylistRefresh.OFF,
     initialIsDefault: Boolean = false,
     showDefaultToggle: Boolean = true,
-    // Stalker portal (plan Phase B). Null = the Stalker option is hidden (e.g. the setup wizard).
+    // Stalker portal. Null = the Stalker option is hidden (e.g. the setup wizard).
     onStartStalker: ((
         name: String,
         portalUrl: String,
@@ -176,7 +165,7 @@ fun AddSourceScreen(
     val startImportFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
 
-    // Profile-wide "hide new categories on sync" default (issue #87, Phase 4). Written straight to
+    // Profile-wide "hide new categories on sync" default. Written straight to
     // DataStore — no callback signature change — so it lands on the ACTIVE profile at add time. The row
     // is only shown while ADDING (an edit re-syncs nothing new) and only when a profile exists (the
     // setup wizard may still be profile-less; the value defaults to off there).
@@ -404,8 +393,8 @@ fun AddSourceScreen(
         SourceKind.STALKER -> tv.own.owntv.core.stalker.StalkerClient.isValidPortalUrl(portalUrl) && macValid
     }
 
-    // P10B-10: every field is a row (label + value or placeholder, OK = keyboard); Start import sits in the
-    // panel, reached with ▶ from any row. Everything the old form offered stays, below the drawn rows.
+    // Every field is a row (label + value or placeholder, OK = keyboard); Start import sits in the
+    // panel, reached with ▶ from any row.
     val submit = {
         when (kind) {
             SourceKind.XTREAM -> onStartXtream(name, server, username, password, userAgent, referer, epgUrl, autoRefresh, syncLive, syncMovies, syncSeries, isDefault, preferHls)

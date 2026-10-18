@@ -1,26 +1,16 @@
 package tv.own.owntv.player
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.focusGroup
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.delay
 import tv.own.owntv.R
 import tv.own.owntv.core.ui.findActivity
-import tv.own.owntv.ui.components.dialogPanel
-import tv.own.owntv.ui.components.modalScrim
-import tv.own.owntv.ui.components.trapAllFocusExit
 import kotlin.math.roundToInt
 
 /** How long the mismatched stream must play before the suggestion appears — long enough that it never
@@ -28,7 +18,7 @@ import kotlin.math.roundToInt
 private const val SETTLE_MS = 8_000L
 
 /**
- * F13: the one-time "your TV is at 60 Hz and this stream is 25 fps" suggestion.
+ * The one-time "your TV is at 60 Hz and this stream is 25 fps" suggestion.
  *
  * On mpv's direct `vo=mediacodec_embed` path the app does not control scan-out timing — frames go to the
  * decoder's surface and the display presents them on its own cadence. 25 fps on a fixed 60 Hz output

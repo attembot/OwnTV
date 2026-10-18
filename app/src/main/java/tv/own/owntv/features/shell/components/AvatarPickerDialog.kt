@@ -49,7 +49,7 @@ fun AvatarPickerDialog(
         modifier = Modifier.longPressMenuGuard(),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(16.mpx)) {
-            // Phase 7 — "no avatar" option showing the Rank 1 ProfileIcon (ID -1)
+            // The "no avatar" option showing the Rank 1 ProfileIcon (ID -1)
             AvatarTile(selected = selectedId == -1, onClick = { onSelect(-1); onDismiss() }, focus = selectedFocus.takeIf { selectedId == -1 }) {
                 ProfileIcon(color = stageAccent.accent, modifier = Modifier.size(56.mpx))
             }
@@ -73,10 +73,10 @@ fun AvatarPickerDialog(
                         modifier = Modifier.weight(1f),
                     )
                     if (customPath.isNotBlank() && onClearCustom != null) {
-                        tv.own.owntv.ui.components.OwnTVButton(
-                            label = stringResource(R.string.common_clear),
+                        tv.own.owntv.ui.stage.StagePopupButton(
+                            stringResource(R.string.common_clear),
                             onClick = onClearCustom,
-                            style = tv.own.owntv.ui.components.OwnTVButtonStyle.SECONDARY,
+                            primary = false,
                         )
                     }
                 }

@@ -58,7 +58,7 @@ fun NetworkSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         vm.resetProxyTest()
     }
 
-    // P10B-13: Use proxy, the four fields as rows and Test proxy; the privacy notes in the panel.
+    // Use proxy, the four fields as rows and Test proxy; the privacy notes in the panel.
     val privacy = stringResource(R.string.settings_proxy_privacy)
     val limits = stringResource(R.string.settings_proxy_limitations)
     val about = stringResource(R.string.settings_proxy_description)

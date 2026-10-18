@@ -42,7 +42,7 @@ fun NumberInputDialog(
     onReset: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    // A number nudged by ◀ ▶, saved as it changes: in the page's panel on a settings page (owner, P12),
+    // A number nudged by ◀ ▶, saved as it changes: in the page's panel on a settings page,
     // a Stage popup elsewhere. The unit and the advisory warning sit above it; the warning never blocks.
     val showWarn = warnAbove != null && value > warnAbove && warningText != null
     val stepper: @Composable () -> Unit = {

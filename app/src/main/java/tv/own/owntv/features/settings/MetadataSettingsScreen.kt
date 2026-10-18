@@ -27,8 +27,6 @@ import androidx.tv.material3.Text
 import tv.own.owntv.R
 import tv.own.owntv.core.metadata.MetadataConfig
 import tv.own.owntv.ui.components.OwnTVIcon
-import tv.own.owntv.ui.components.OwnTVTextField
-import tv.own.owntv.ui.theme.OwnTVTheme
 import tv.own.owntv.ui.theme.StageColors
 import tv.own.owntv.ui.theme.mpx
 import tv.own.owntv.ui.theme.stageText
@@ -96,11 +94,11 @@ private fun tmdbLangName(code: String): String = stringResource(
 )
 
 /**
- * Settings → Metadata (TMDB). Phase M1 of the enrichment plan: the master toggle and the two advanced
+ * Settings → Metadata (TMDB): the master toggle and the two advanced
  * access tiers (own TMDB key / self-host URL), plus a manual "look up title" test that proves the
  * configured tier reaches TMDB end-to-end. Enrichment of actual detail screens arrives in later phases.
  *
- * Precedence (plan §4): self-host URL > own key > the default caching Worker (zero setup).
+ * Precedence: self-host URL > own key > the default caching Worker (zero setup).
  */
 private fun metadataModeLabelRes(mode: tv.own.owntv.core.metadata.MetadataMode): Int = when (mode) {
     tv.own.owntv.core.metadata.MetadataMode.PROVIDER -> R.string.settings_metadata_provider_only
@@ -116,7 +114,6 @@ private fun metadataTierLabelRes(tier: tv.own.owntv.core.metadata.MetadataConfig
 
 @Composable
 fun MetadataSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
-    val colors = OwnTVTheme.colors
     val vm: SettingsViewModel = koinViewModel()
     val mode by vm.metadataMode.collectAsStateWithLifecycle()
     val storedKey by vm.tmdbApiKey.collectAsStateWithLifecycle()
@@ -173,7 +170,7 @@ fun MetadataSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val firstFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
 
-    // P10B-04: LIBRARY DETAILS and CONNECTION as rows; the active source on top of the panel.
+    // LIBRARY DETAILS and CONNECTION as rows; the active source on top of the panel.
     val back = stringResource(R.string.common_back)
     val content = stringResource(R.string.settings_group_content_metadata)
     val modeLabels = tv.own.owntv.core.metadata.MetadataMode.entries.map { stringResource(metadataModeLabelRes(it)) }
@@ -211,7 +208,7 @@ fun MetadataSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                     }
                     Text(stringResource(R.string.settings_metadata_fair_share), style = stageText(15, 500), color = StageColors.Muted, modifier = Modifier.padding(top = 6.mpx))
                 }
-                Box(Modifier.padding(top = 18.mpx, bottom = 18.mpx).fillMaxWidth().height(1.mpx).background(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.1f)))
+                Box(Modifier.padding(top = 18.mpx, bottom = 18.mpx).fillMaxWidth().height(1.mpx).background(StageColors.Ink.copy(alpha = 0.1f)))
             }
         } else null,
     ) {
@@ -392,7 +389,6 @@ fun MetadataSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
 
 @Composable
 private fun MetadataTestLabel(state: SettingsViewModel.MetadataTestState) {
-    val colors = OwnTVTheme.colors
     val (text, color) = when (state) {
         is SettingsViewModel.MetadataTestState.Ok -> stringResource(
             R.string.settings_metadata_match_result,
@@ -400,14 +396,14 @@ private fun MetadataTestLabel(state: SettingsViewModel.MetadataTestState) {
             // The space lives here: Weblate trims it from the start of the string resource.
             state.year?.let { " " + stringResource(R.string.settings_metadata_year, it) } ?: "",
             state.tmdbId,
-        ) to colors.primary
+        ) to tv.own.owntv.ui.theme.stageAccent.accent
         is SettingsViewModel.MetadataTestState.Fail -> when (val failure = state.failure) {
             SettingsViewModel.MetadataFailure.EmptyTitle -> stringResource(R.string.settings_metadata_empty_title)
             SettingsViewModel.MetadataFailure.ServerUnavailable -> stringResource(R.string.settings_metadata_server_unavailable)
             is SettingsViewModel.MetadataFailure.NoMatch -> stringResource(R.string.settings_metadata_no_match, failure.query)
             is SettingsViewModel.MetadataFailure.Unknown -> failure.rawMessage ?: stringResource(R.string.settings_metadata_lookup_failed)
         } to androidx.compose.ui.graphics.Color(0xFFEF4444)
-        else -> null to colors.onSurfaceVariant
+        else -> null to tv.own.owntv.ui.theme.StageColors.Muted
     }
     if (text != null) {
         Text(text, style = stageText(16, 600), color = color)
@@ -444,16 +440,30 @@ private fun AdvancedMetadataPopup(
             tv.own.owntv.ui.stage.StageButton(stringResource(R.string.common_save), onClick = onSave, height = 56.mpx, textSize = 19, tinted = true)
         },
     ) {
-        Row2(
-            icon = OwnTVIcon.SHARE,
+        tv.own.owntv.ui.stage.StagePopupOption(
             title = stringResource(R.string.settings_metadata_key_from_phone),
-            desc = stringResource(R.string.settings_metadata_key_from_phone_desc),
-            modifier = Modifier.focusRequester(firstFocus),
+            subtitle = stringResource(R.string.settings_metadata_key_from_phone_desc),
             onClick = onRemote,
+            modifier = Modifier.focusRequester(firstFocus),
+            leading = { tv.own.owntv.ui.stage.StagePopupIcon(OwnTVIcon.SHARE) },
         )
         Column(Modifier.padding(top = 10.mpx), verticalArrangement = Arrangement.spacedBy(12.mpx)) {
-            OwnTVTextField(value = key, onValueChange = onKeyChange, label = stringResource(R.string.settings_tmdb_api_key), placeholder = stringResource(R.string.settings_metadata_optional), modifier = Modifier.fillMaxWidth())
-            OwnTVTextField(value = url, onValueChange = onUrlChange, label = stringResource(R.string.settings_worker_server_url), placeholder = "https://your-worker.example.workers.dev", modifier = Modifier.fillMaxWidth())
+            tv.own.owntv.features.settings.StageFieldRow(
+                icon = tv.own.owntv.ui.components.OwnTVIcon.PENCIL,
+                label = stringResource(R.string.settings_tmdb_api_key),
+                value = key,
+                onValueChange = onKeyChange,
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = stringResource(R.string.settings_metadata_optional),
+            )
+            tv.own.owntv.features.settings.StageFieldRow(
+                icon = tv.own.owntv.ui.components.OwnTVIcon.PENCIL,
+                label = stringResource(R.string.settings_worker_server_url),
+                value = url,
+                onValueChange = onUrlChange,
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = "https://your-worker.example.workers.dev",
+            )
         }
     }
 }

@@ -1,10 +1,8 @@
 package tv.own.owntv.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -12,19 +10,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
 import tv.own.owntv.R
 import tv.own.owntv.ui.theme.mpx
-import tv.own.owntv.core.theme.GlassSurface
 
 /**
  * A simple TV dialog with one text field (e.g. renaming a channel/category). [onConfirm] receives the
  * trimmed text — possibly empty, which callers treat as "reset to original". [onDelete] is optional
  * and renders a destructive button (tinted with the app's favorite/error color) at the left end of
- * the button row — used by the custom-category rename dialog (issue #87) to delete the category.
+ * the button row — used by the custom-category rename dialog to delete the category.
  */
 @Composable
 fun TextInputDialog(
@@ -59,6 +55,12 @@ fun TextInputDialog(
             tv.own.owntv.ui.stage.StageButton(resolvedConfirmLabel, onClick = { if (allowBlank || value.isNotBlank()) onConfirm(value.trim()) }, height = 56.mpx, textSize = 19, tinted = true)
         },
     ) {
-        OwnTVTextField(value = value, onValueChange = { value = it }, label = resolvedLabel, modifier = Modifier.fillMaxWidth(), focusRequester = fieldFocus, surface = GlassSurface.DIALOGS)
+        tv.own.owntv.features.settings.StageFieldRow(
+            icon = tv.own.owntv.ui.components.OwnTVIcon.PENCIL,
+            label = resolvedLabel,
+            value = value,
+            onValueChange = { value = it },
+            modifier = Modifier.fillMaxWidth().focusRequester(fieldFocus),
+        )
     }
 }

@@ -148,7 +148,7 @@ object FrameRateController {
     /**
      * Told each time a mode change is actually pushed to the window, with whether the panel can make it
      * without re-syncing HDMI. The full-screen film surface listens, to hold the film through the black
-     * gap (N7); nothing else does, so live TV is never paused by it.
+     * gap; nothing else does, so live TV is never paused by it.
      */
     var onModeSwitched: ((seamless: Boolean) -> Unit)? = null
 
@@ -165,7 +165,7 @@ object FrameRateController {
     /**
      * The best display mode for [fps], or null when nothing matches — the `Display` side of [chooseMode].
      *
-     * Shared by [apply] and [betterRefreshRateFor] so the "Auto frame rate would help here" prompt (F13)
+     * Shared by [apply] and [betterRefreshRateFor] so the "Auto frame rate would help here" prompt
      * can never promise a switch [apply] would not make.
      */
     private fun pickMode(activity: Activity, fps: Float, videoSize: Pair<Int, Int>? = null): Choice? {
@@ -216,7 +216,7 @@ object FrameRateController {
      *
      * The resolution is the **base** one — where the display was before this playback moved it — so a
      * 4K output is never switched down to 1080p just to hit a rate. The one exception is [video], passed
-     * only when the user turned on resolution matching for a film (N7): the smallest mode that holds the
+     * only when the user turned on resolution matching for a film: the smallest mode that holds the
      * whole picture, never above the base, is tried first, and the base resolution is the fallback when
      * it has no matching rate. A seamless-only system never gets a resolution change: none is seamless.
      */
@@ -342,7 +342,7 @@ object FrameRateController {
     /**
      * The refresh rate a matching display mode would give for [fps], or null when switching would not
      * help — because the display is already on a clean multiple, or because no mode at the current
-     * resolution is one. Used to decide whether suggesting Auto frame rate is honest (F13): on a panel
+     * resolution is one. Used to decide whether suggesting Auto frame rate is honest: on a panel
      * with only a 60 Hz mode, 25 fps judder cannot be fixed by AFR and the app must not pretend it can.
      */
     fun betterRefreshRateFor(activity: Activity, fps: Float): Float? {
@@ -380,7 +380,7 @@ object FrameRateController {
  * player reports it, and releases the display mode on dispose. Mount it from the full-screen video
  * surfaces only — a mini/preview window must not reconfigure the whole display.
  *
- * [film] is a FILM on the full-screen surface — the only case the two N7 extras apply to. On live TV a
+ * [film] is a FILM on the full-screen surface — the only case the two resolution extras apply to. On live TV a
  * resolution switch would black the screen on every zap between an SD and an HD channel, and a pause
  * would put the viewer behind the broadcast for nothing. [videoSize] feeds resolution matching;
  * [holdSecs] > 0 holds the film paused through a switch the panel cannot make seamlessly.

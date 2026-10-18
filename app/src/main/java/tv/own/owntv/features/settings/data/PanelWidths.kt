@@ -12,7 +12,7 @@ import kotlin.math.roundToInt
 /** Inset between the shared browse container edge and its columns. */
 val BrowseContainerPadding: Dp = 12.dp
 
-/** The mockup's spacing between each column, the divider, and the raised preview. */
+/** The spacing between each column, the divider, and the raised preview. */
 val BrowseColumnGap: Dp = 12.dp
 
 /** The category/list separator itself. */

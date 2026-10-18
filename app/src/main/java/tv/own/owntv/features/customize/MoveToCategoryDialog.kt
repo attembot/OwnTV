@@ -5,11 +5,7 @@ import tv.own.owntv.ui.theme.stageText
 import androidx.compose.foundation.layout.heightIn
 import tv.own.owntv.ui.components.OwnTVIcon
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -21,28 +17,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.focusGroup
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
 import androidx.tv.material3.Text
 import tv.own.owntv.R
 import tv.own.owntv.ui.theme.mpx
-import tv.own.owntv.ui.components.OwnTVButton
-import tv.own.owntv.ui.components.OwnTVButtonStyle
-import tv.own.owntv.ui.components.dialogPanel
-import tv.own.owntv.ui.components.modalScrim
-import tv.own.owntv.core.theme.GlassSurface
 
 /**
- * One destination row in the "Move to…" dialog: a user-created custom category (issue #87) plus how
+ * One destination row in the "Move to…" dialog: a user-created custom category plus how
  * many items it currently holds. Exposed here (not in the view models) so Live TV, Movies and Series
  * all share the same dialog and the same target model.
  */
 data class MoveTarget(val id: String, val displayName: String, val count: Int)
 
 /**
- * Shared "Move to…" dialog (issue #87): pick one of the user's custom combined categories (or create
+ * Shared "Move to…" dialog: pick one of the user's custom combined categories (or create
  * a new one via [onNewCategory], which swaps this dialog for a name prompt at the call site), decide
  * whether the item stays in its origin as well, then Move. The Move button is disabled until a target
  * is selected. Scrim/trap/BackHandler match [RangeHideDialog] so D-pad focus and Back behave like the
@@ -67,8 +56,8 @@ fun MoveToCategoryDialog(
         body = stringResource(R.string.settings_move_category_description, originName),
         width = 880.mpx,
         buttons = {
-            OwnTVButton(stringResource(R.string.common_cancel), onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY)
-            OwnTVButton(
+            tv.own.owntv.ui.stage.StagePopupButton(stringResource(R.string.common_cancel), onClick = onDismiss, primary = false)
+            tv.own.owntv.ui.stage.StagePopupButton(
                 stringResource(R.string.settings_move_category_action),
                 onClick = { selectedTarget?.let { onMove(it, keepInOrigin) } },
                 enabled = selectedTarget != null,

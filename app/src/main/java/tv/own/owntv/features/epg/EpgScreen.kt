@@ -50,7 +50,6 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.Text
 import kotlinx.coroutines.delay
@@ -64,13 +63,14 @@ import tv.own.owntv.core.model.RecordingStatus
 import tv.own.owntv.core.settings.SettingsRepository
 import tv.own.owntv.features.live.LiveCategories
 import tv.own.owntv.features.live.LiveViewModel
-import tv.own.owntv.features.live.ProviderTags
+import tv.own.owntv.core.live.ProviderTags
 import tv.own.owntv.features.live.edgeScrollSpec
 import tv.own.owntv.features.live.liveCategoryEntries
 import tv.own.owntv.features.live.liveEpgShiftLabel
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.OwnTVSpinner
 import tv.own.owntv.ui.stage.StageButton
+import tv.own.owntv.ui.stage.shownColor
 import tv.own.owntv.ui.stage.stageFocusLook
 import tv.own.owntv.ui.stage.StageSearchField
 import tv.own.owntv.ui.stage.StageTool
@@ -87,8 +87,9 @@ private fun epgMessageText(message: EpgMessage): String = when (message) {
     EpgMessage.MismatchedIds -> stringResource(R.string.content_epg_mismatched_ids)
 }
 
+/** The one line an auto-match outcome reads as — beside the Guide's button, and in the shell's toast off it. */
 @Composable
-private fun epgMatchSummaryText(summary: EpgMatchSummary): String = when (summary) {
+internal fun epgMatchSummaryText(summary: EpgMatchSummary): String = when (summary) {
     EpgMatchSummary.CatchupUnavailable -> stringResource(R.string.content_epg_catchup_unavailable)
     EpgMatchSummary.MatchedNoProgrammes -> stringResource(R.string.content_epg_matched_no_programmes)
     EpgMatchSummary.AddPlaylist -> stringResource(R.string.content_epg_add_playlist_first)
@@ -139,7 +140,7 @@ private fun cursorStep(progs: List<EpgProgrammeEntity>, cursor: Long, dir: Int, 
 }
 
 /**
- * The TV Guide in the Stage design (P4-01): the focused channel's preview and the focused programme
+ * The TV Guide in the Stage design: the focused channel's preview and the focused programme
  * with its actions on top; one control line (Today · Now · Category · Order · Search · Auto-match EPG);
  * the ruler with the now-line; 8 slim rows of channel labels and programme cells.
  *
@@ -147,7 +148,7 @@ private fun cursorStep(progs: List<EpgProgrammeEntity>, cursor: Long, dir: Int, 
  * ▲ ▼ step rows at the same time), so a week of guide stays one node per row. OK watches — the channel,
  * or a programme that has been on from the archive; holding OK or ☰ opens the programme menu.
  *
- * With [liveMode] this is Live TV's Guide view (G14): the category is Live TV's own, the title says
+ * With [liveMode] this is Live TV's Guide view: the category is Live TV's own, the title says
  * Live TV, and List view goes back to the channel list.
  */
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
@@ -158,7 +159,6 @@ fun EpgScreen(
     onAddEpg: () -> Unit = {},
     restoreFocus: Boolean = false,
     onRestored: () -> Unit = {},
-    onContentScrolled: (Boolean) -> Unit = {},
     /** Required: every live tune in the app goes through the one shared path in LiveViewModel, so a
      *  channel gets the same Prefer HLS handling, ExoPlayer→mpv ladder, per-channel engine pin and
      *  external-player routing however the user reached it. */
@@ -200,6 +200,7 @@ fun EpgScreen(
     val livePreviewSetting by liveVm.livePreviewEnabled.collectAsStateWithLifecycle()
     val previewChannel by liveVm.previewChannel.collectAsStateWithLifecycle()
     val previewArmed by liveVm.previewArmed.collectAsStateWithLifecycle()
+    val guidePreview by vm.guidePreview.collectAsStateWithLifecycle()
 
     // Live TV's Guide view shows Live TV's own category; the TV Guide keeps its own choice.
     val categoryKey: LiveKey? = if (liveMode) liveSelected.takeUnless { it == LiveKey.All } else categoryFilter
@@ -207,7 +208,9 @@ fun EpgScreen(
     LaunchedEffect(Unit) { vm.load() } // reload from DB each time the guide is opened
 
     // The focused channel plays in the video after the focus settles, as in Live TV.
-    val effectivePreview = previewEnabled && livePreviewSetting
+    val effectivePreview = previewEnabled && livePreviewSetting && guidePreview
+    // Switching the Guide's own preview off stops what is already playing, not only the next channel.
+    LaunchedEffect(guidePreview) { if (!guidePreview && previewEnabled) liveVm.stopPreview() }
     LaunchedEffect(previewChannel?.id, effectivePreview, previewArmed) {
         if (!effectivePreview || !previewArmed) return@LaunchedEffect
         val ch = previewChannel ?: return@LaunchedEffect
@@ -218,7 +221,6 @@ fun EpgScreen(
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val rowListState = rememberLazyListState()
-    LaunchedEffect(rowListState.firstVisibleItemIndex > 0) { onContentScrolled(rowListState.firstVisibleItemIndex > 0) }
 
     // --- The time axis: one scroll position shared by the ruler, the now-line and every row. ----------
     val ppm = with(density) { GuideGridDefaults.PxPerMin.toPx() }
@@ -228,7 +230,7 @@ fun EpgScreen(
     fun maxScroll(): Int = (pxAt(state.windowEnd) - timelinePx).toInt().coerceAtLeast(0)
     fun timeAt(px: Float): Long = state.windowStart + (px / ppm * 60_000f).toLong()
     // A time is shown 3/8 of the way across, as the guide always had it: the programme on now keeps room
-    // on both sides and its title is never cut (owner, 2026-09-30).
+    // on both sides and its title is never cut.
     fun showTime(t: Long) {
         scrollPx = (pxAt(t) - timelinePx * 3f / 8f).toInt().coerceIn(0, maxScroll())
     }
@@ -448,13 +450,13 @@ fun EpgScreen(
                     modifier = Modifier.padding(start = 46.mpx, top = 76.mpx).widthIn(max = 1080.mpx),
                 )
             }
-            // The key hints at the bottom right of the top area, level with the video's bottom edge (owner, 2026-10-01).
+            // The key hints at the bottom right of the top area, level with the video's bottom edge.
             Box(Modifier.align(Alignment.BottomEnd)) { GuideKeyHints(cellMode = inCellMode && gridHasFocus) }
         }
 
         }
 
-        // The control line (452): one row, every header button of the old guide kept.
+        // The control line (452): one row with every guide header button.
         val viewTime = timeAt(scrollPx + timelinePx * 3f / 8f)
         val viewDay = localMidnight(viewTime)
         Row(
@@ -528,7 +530,7 @@ fun EpgScreen(
                 state.channels.isEmpty() -> GuideEmpty(title = state.message?.let { epgMessageText(it) } ?: stringResource(R.string.content_epg_no_guide))
                 else -> {
                     val gx = fx(48) + labelW
-                    // The number column fits the longest channel number (38 = the mockup's three digits).
+                    // The number column fits the longest channel number (38 = three digits).
                     val numberWidth = maxOf(38f, (state.channels.maxOfOrNull { it.number?.toString()?.length ?: 0 } ?: 0) * 11f).mpx
                     GuideRuler(
                         windowStart = state.windowStart, windowEnd = state.windowEnd, now = liveNow, scrollPx = scrollPx,
@@ -551,7 +553,7 @@ fun EpgScreen(
                                     vm = vm,
                                     channel = channel,
                                     name = rowName(channel),
-                                    dot = playlistMarks[channel.sourceId]?.color,
+                                    dot = playlistMarks[channel.sourceId]?.shownColor,
                                     labelWidth = labelW,
                                     numberWidth = numberWidth,
                                     windowStart = state.windowStart,
@@ -604,7 +606,7 @@ fun EpgScreen(
 
         }
 
-        // ◀ … Category ▾ (P4-03): Live TV's own list as the sheet, titled for the guide.
+        // ◀ … Category ▾: Live TV's own list as the sheet, titled for the guide.
         if (sheetOpen) {
             val railCounts by liveVm.railCounts.collectAsStateWithLifecycle()
             val (sheetEntries, _) = liveCategoryEntries(railItems, railCounts)
@@ -663,7 +665,12 @@ fun EpgScreen(
     }
     if (orderOpen) {
         val showEmpty by vm.showEmpty.collectAsStateWithLifecycle()
-        GuideOrderMenu(current = sortGuide, onPick = vm::setGuideSort, showEmpty = showEmpty, onShowEmpty = vm::setShowEmpty, onDismiss = { orderOpen = false })
+        GuideOrderMenu(
+            current = sortGuide, onPick = vm::setGuideSort,
+            showEmpty = showEmpty, onShowEmpty = vm::setShowEmpty,
+            showPreview = guidePreview, onShowPreview = vm::setGuidePreview,
+            onDismiss = { orderOpen = false },
+        )
     }
     channelMenuFor?.let { ch ->
         GuideChannelMenu(
@@ -855,7 +862,7 @@ private fun GuideEmpty(title: String, body: String? = null, action: String? = nu
 }
 
 /**
- * How to move, under the programme beside the video (owner, 2026-10-01: in place of the old action buttons,
+ * How to move, under the programme beside the video (in place of action buttons,
  * which could not be reached without leaving the channel — they are all in Hold OK's menu). At row level:
  * OK Browse · ▲▼ Channels · ◀ Menu · Hold OK Options; inside a row: OK Watch · ◀ ▶ Programs · Back Channels.
  */

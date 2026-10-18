@@ -2,20 +2,15 @@ package tv.own.owntv.features.customize
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -23,10 +18,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.foundation.focusGroup
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -34,13 +27,11 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.launch
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemContentType
 import androidx.paging.compose.itemKey
 import org.koin.androidx.compose.koinViewModel
-import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import tv.own.owntv.R
 import tv.own.owntv.ui.components.OwnTVIcon
@@ -57,16 +48,8 @@ import tv.own.owntv.features.settings.PickerDialog
 import tv.own.owntv.features.settings.SettingsViewModel
 import tv.own.owntv.ui.components.chNavPaging
 import tv.own.owntv.ui.components.jumpLazyListTo
-import tv.own.owntv.ui.components.OwnTVButton
-import tv.own.owntv.ui.components.OwnTVButtonStyle
 import tv.own.owntv.ui.components.TextInputDialog
-import tv.own.owntv.ui.components.dialogPanel
-import tv.own.owntv.ui.components.modalScrim
-import tv.own.owntv.ui.components.trapAllFocusExit
 import tv.own.owntv.ui.components.trapVerticalFocusExit
-import tv.own.owntv.core.theme.GlassSurface
-import tv.own.owntv.ui.theme.LocalActionSurface
-import tv.own.owntv.ui.theme.OwnTVTheme
 import tv.own.owntv.core.customize.MoveKind
 import tv.own.owntv.core.customize.SpanSelector
 
@@ -114,7 +97,6 @@ fun CustomizeItemsScreen(
     if (selectedCategory == null) return
 
     val items = vm.items.collectAsLazyPagingItems()
-    val colors = OwnTVTheme.colors
     val settingsVm: SettingsViewModel = koinViewModel()
     val chNavEnabled by settingsVm.chNavEnabled.collectAsStateWithLifecycle()
     val chNavUpSkip by settingsVm.chNavUpSkip.collectAsStateWithLifecycle()
@@ -127,7 +109,7 @@ fun CustomizeItemsScreen(
     var showFilterPicker by remember { mutableStateOf(false) }
     // The item whose Hide button was clicked to close a range — opens the Show/Hide/Cancel prompt.
     var rangeEnd by remember { mutableStateOf<CustomizeItemRow?>(null) }
-    // The item the "Move to…" dialog is moving (issue #87); creatingCategory swaps the dialog for the
+    // The item the "Move to…" dialog is moving; creatingCategory swaps the dialog for the
     // new-category name prompt.
     var movingItem by remember { mutableStateOf<CustomizeItemRow?>(null) }
     var creatingCategory by remember { mutableStateOf(false) }
@@ -157,11 +139,19 @@ fun CustomizeItemsScreen(
             // owner while Paging is empty (and the first row takes over later if data arrives).
             kotlinx.coroutines.delay(60)
             runCatching { backFocus.requestFocus() }
+        } else if (!firstLanding && focusedItemIndex >= items.itemCount) {
+            // The focused row left the list (removed from this category): its actions must not stay
+            // in the panel, and focus must not stay on them.
+            kotlinx.coroutines.delay(60)
+            if (items.itemCount == 0) {
+                runCatching { backFocus.requestFocus() }
+            } else {
+                items[items.itemCount - 1]?.let { rowFocusers[it.key] }?.let { runCatching { it.requestFocus() } }
+            }
         }
     }
 
-    CompositionLocalProvider(LocalActionSurface provides GlassSurface.CARDS) {
-    // P10B-03: Customize › the category. Its tool row above the list, the items as rows and the panel
+    // Customize › the category. Its tool row above the list, the items as rows and the panel
     // with the focused item's actions and the span help.
     val about = when (section) {
         MediaType.LIVE -> stringResource(R.string.settings_customize_channels_description)
@@ -178,7 +168,7 @@ fun CustomizeItemsScreen(
         handleBack = false,
         toolbar = {
             // Bulk rename — Movies/Series only: rename the WHOLE category, optionally with the ✨ Auto
-            // cleanup preset applied immediately (issue #86). Live renames go per row or via span.
+            // cleanup preset applied immediately. Live renames go per row or via span.
             if (!isLive) {
                 tv.own.owntv.ui.stage.StageTool(
                     stringResource(R.string.settings_customize_rename_items),
@@ -209,6 +199,10 @@ fun CustomizeItemsScreen(
             )
         },
         list = { pos ->
+            // The page's own panel: with the last row gone nothing else replaces its actions.
+            val pagePanel = tv.own.owntv.features.settings.LocalSettingsPanel.current
+            val emptied = !firstLanding && items.itemCount == 0
+            LaunchedEffect(emptied) { if (emptied) pagePanel?.help = null }
             Column(pos) {
                 if (rangeAnchorKey != null) {
                     StageSettingRow(
@@ -343,11 +337,11 @@ fun CustomizeItemsScreen(
         )
     }
 
-    // Bulk rename (issue #86): choice popup, rule builder, review, restore-confirm, refusal.
+    // Bulk rename: choice popup, rule builder, review, restore-confirm, refusal.
     // Its popups restore D-pad focus to the row that opened the flow when the whole flow closes.
     BulkRenameFlow(vm.bulk, returnFocus = dialogReturn)
 
-    // Move to… (issue #87): pick a combined category; "＋ New category…" swaps this dialog for the
+    // Move to…: pick a combined category; "＋ New category…" swaps this dialog for the
     // name prompt, then the move dialog re-opens with the fresh category listed.
     val moveTargets by vm.moveTargets.collectAsStateWithLifecycle()
     if (creatingCategory) {
@@ -373,13 +367,11 @@ fun CustomizeItemsScreen(
             )
         }
     }
-    } // CompositionLocalProvider
 }
 
 /** Confirms a range select over ITEMS: hide or show every item in the chosen span (or cancel). */
 @Composable
 private fun ItemsRangeHideDialog(count: Int, onHide: () -> Unit, onShow: () -> Unit, onDismiss: () -> Unit) {
-    val colors = OwnTVTheme.colors
     val hideFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { hideFocus.requestFocus() } }
     BackHandler { onDismiss() }
@@ -389,9 +381,9 @@ private fun ItemsRangeHideDialog(count: Int, onHide: () -> Unit, onShow: () -> U
         body = pluralStringResource(R.plurals.settings_customize_selected_items, count, count),
         width = 864.mpx,
         buttons = {
-            OwnTVButton(stringResource(R.string.common_cancel), onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY)
-            OwnTVButton(stringResource(R.string.common_show), onClick = onShow, style = OwnTVButtonStyle.SECONDARY)
-            OwnTVButton(stringResource(R.string.common_hide), onClick = onHide, modifier = Modifier.focusRequester(hideFocus))
+            tv.own.owntv.ui.stage.StagePopupButton(stringResource(R.string.common_cancel), onClick = onDismiss, primary = false)
+            tv.own.owntv.ui.stage.StagePopupButton(stringResource(R.string.common_show), onClick = onShow, primary = false)
+            tv.own.owntv.ui.stage.StagePopupButton(stringResource(R.string.common_hide), onClick = onHide, modifier = Modifier.focusRequester(hideFocus))
         },
     )
 }
@@ -418,7 +410,7 @@ private fun ItemRow(
     onRename: () -> Unit,
     onRenameLongPress: () -> Unit,
     onPickRenameEnd: () -> Unit,
-    // "Move to…" (issue #87): send this item into a user's combined category.
+    // "Move to…": send this item into a user's combined category.
     onMove: () -> Unit,
     // Only in a custom category: take the item out of it alone.
     onRemoveFromCategory: (() -> Unit)?,

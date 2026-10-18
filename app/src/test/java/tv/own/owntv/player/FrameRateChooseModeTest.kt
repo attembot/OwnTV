@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import tv.own.owntv.player.FrameRateController.ModeSpec
 
-/** The display-mode choice behind Auto frame rate, including N7's resolution matching. */
+/** The display-mode choice behind Auto frame rate, including resolution matching. */
 class FrameRateChooseModeTest {
 
     private val uhd60 = ModeSpec(1, 3840, 2160, 60f)

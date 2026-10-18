@@ -33,8 +33,8 @@ import tv.own.owntv.ui.theme.mpx
 import androidx.compose.foundation.layout.Spacer
 
 /**
- * Settings › Layout › Navigation (P1-06, P1-18, P1-19): Floating or Docked as radio rows, then the rail's
- * Size and Length (Docked + Compact adds Widen on focus, owner 2026-10-02), Menu items (Dynamic / Static; Static lists the sections as toggles) and, for Floating
+ * Settings › Layout › Navigation: Floating or Docked as radio rows, then the rail's
+ * Size and Length (Docked + Compact adds Widen on focus), Menu items (Dynamic / Static; Static lists the sections as toggles) and, for Floating
  * only, the hide delay. OK on a value row steps to its next choice.
  */
 @Composable
@@ -154,6 +154,7 @@ fun NavigationSettingsPopup(
 private val MenuSections = listOf(
     MainSection.HOME to OwnTVIcon.HOME,
     MainSection.LIVE_TV to OwnTVIcon.LIVE_TV,
+    MainSection.SPORTS to OwnTVIcon.SPORTS,
     MainSection.EPG to OwnTVIcon.EPG,
     MainSection.MOVIES to OwnTVIcon.MOVIES,
     MainSection.SERIES to OwnTVIcon.SERIES,

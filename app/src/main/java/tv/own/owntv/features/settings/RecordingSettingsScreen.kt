@@ -1,8 +1,6 @@
 package tv.own.owntv.features.settings
 
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -12,9 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -25,7 +21,6 @@ import tv.own.owntv.features.recordings.RecordingsViewModel
 import tv.own.owntv.ui.components.NumberInputDialog
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.restoreAfterDialogClose
-import tv.own.owntv.ui.components.roundedPanel
 import tv.own.owntv.ui.theme.mpx
 
 private enum class RecordingDialog { NONE, PRE_ROLL, POST_ROLL }
@@ -38,7 +33,7 @@ internal val RECORDING_SEARCH_ROWS: List<Int> = listOf(
 
 /**
  * The three things recording can be told, and one thing it has to tell the user — the RECORDING part
- * of Settings › Watching & recording (P10), drawn inside that page under its own sub-heading.
+ * of Settings › Watching & recording, drawn inside that page under its own sub-heading.
  *
  * There is deliberately **no** "what to do when space runs low": that behaviour is fixed — a
  * recording stops with 500 MB free, keeps what it captured, and never deletes anything to make room.
@@ -83,45 +78,41 @@ internal fun RecordingSettingsRows(
             modifier = Modifier.padding(start = 22.mpx, bottom = 6.mpx),
         )
     }
-    Row2(
+    KeyedSettingRow(
         icon = OwnTVIcon.LIVE_TV,
         title = stringResource(R.string.settings_recording_reserve),
         desc = stringResource(R.string.settings_recording_reserve_description),
-        chip = stringResource(if (reserve) R.string.common_on else R.string.common_off),
-        primaryChip = reserve,
+        value = SettingValue.Switch(reserve),
         helpKey = "rec_reserve",
         onClick = { vm.setRecordingReserveConnection(!reserve) },
     )
-    // D3 — the player's record button does not exist until this is on, and turning it on is
+    // The player's record button does not exist until this is on, and turning it on is
     // where the one-connection trade-off is explained and accepted. Turning it OFF needs no
     // dialog: nothing is being traded away.
-    Row2(
+    KeyedSettingRow(
         icon = OwnTVIcon.PLAY,
         title = stringResource(R.string.settings_record_watching),
         desc = stringResource(R.string.settings_record_watching_description),
-        chip = stringResource(if (recordWatching) R.string.common_on else R.string.common_off),
-        primaryChip = recordWatching,
+        value = SettingValue.Switch(recordWatching),
         helpKey = "rec_watching",
         onClick = {
-            if (recordWatching) vm.setRecordWhatImWatching(false) else showWatchingWarning = true
-        },
+                if (recordWatching) vm.setRecordWhatImWatching(false) else showWatchingWarning = true
+            },
     )
-    Row2(
+    KeyedSettingRow(
         icon = OwnTVIcon.HISTORY,
         title = stringResource(R.string.settings_recording_pre_roll),
         desc = stringResource(R.string.settings_recording_pre_roll_description),
-        chip = pluralStringResource(R.plurals.recording_minutes, preRoll, preRoll),
-        chevron = true,
+        value = SettingValue.Choice(pluralStringResource(R.plurals.recording_minutes, preRoll, preRoll)),
         helpKey = "rec_pre_roll",
         onClick = { dialogReturn = preRollFocus; dialog = RecordingDialog.PRE_ROLL },
         modifier = Modifier.focusRequester(preRollFocus),
     )
-    Row2(
+    KeyedSettingRow(
         icon = OwnTVIcon.HISTORY,
         title = stringResource(R.string.settings_recording_post_roll),
         desc = stringResource(R.string.settings_recording_post_roll_description),
-        chip = pluralStringResource(R.plurals.recording_minutes, postRoll, postRoll),
-        chevron = true,
+        value = SettingValue.Choice(pluralStringResource(R.plurals.recording_minutes, postRoll, postRoll)),
         helpKey = "rec_post_roll",
         onClick = { dialogReturn = postRollFocus; dialog = RecordingDialog.POST_ROLL },
         modifier = Modifier.focusRequester(postRollFocus),
@@ -174,7 +165,7 @@ internal fun RecordingSettingsRows(
 private const val MAX_ROLL_MINUTES = tv.own.owntv.core.recording.RecordingSchedule.MAX_ROLL_MINUTES
 
 /**
- * The trade-off behind "Record what I'm watching", said before it is switched on (D3).
+ * The trade-off behind "Record what I'm watching", said before it is switched on.
  *
  * Shaped exactly like the Multiview and auto-frame-rate warnings before it: a title naming the
  * constraint, a paragraph explaining what is gained and what is given up, and two buttons with the

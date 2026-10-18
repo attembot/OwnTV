@@ -14,7 +14,7 @@ import tv.own.owntv.core.util.Pin
 import tv.own.owntv.core.settings.SettingsRepository
 
 /**
- * Phase 6.5 — profile creation/switching and the launch gate's data. Shared by the "Who's watching?"
+ * Profile creation/switching and the launch gate's data. Shared by the "Who's watching?"
  * gate and the Settings → Profiles management screen.
  */
 class ProfilesViewModel(
@@ -57,25 +57,44 @@ class ProfilesViewModel(
 
     /**
      * Create a new profile. New profiles inherit the existing sources (single-account, multi-viewer)
-     * so they immediately have content; favorites/history stay per-profile.
+     * so they immediately have content; favorites/history stay per-profile. [picture], when the user
+     * chose one, is stored once the profile exists — before that there is no id to store it under.
      */
-    fun create(name: String, avatarId: Int, isKids: Boolean, pin: String?, defaultName: String, onCreated: (Long) -> Unit = {}) {
+    fun create(name: String, avatarId: Int, isKids: Boolean, pin: String?, defaultName: String, picture: java.io.File? = null, onCreated: (Long) -> Unit = {}) {
         viewModelScope.launch {
-            onCreated(manager.create(name, avatarId, isKids, pin, defaultName))
+            val id = manager.create(name, avatarId, isKids, pin, defaultName)
+            if (picture != null) setPictureNow(id, picture)
+            onCreated(id)
         }
     }
 
-    /** Apply edits from the editor dialog. [pin]: null = keep the existing PIN, "" = remove it. */
+    /** Give the profile [profileId] the picture in [source]; core copies and scales it. */
+    fun setPicture(profileId: Long, source: java.io.File) {
+        viewModelScope.launch { setPictureNow(profileId, source) }
+    }
+
+    /** Drop [profileId]'s own picture; the drawn tile it already had comes back. */
+    fun clearPicture(profileId: Long) {
+        viewModelScope.launch { profileDao.getById(profileId)?.let { manager.clearCustomAvatar(it) } }
+    }
+
+    // Read fresh by id rather than taking a caller's entity: the picture is written as a copy of the
+    // whole row, so a stale one would put back whatever the editor has just changed.
+    private suspend fun setPictureNow(profileId: Long, source: java.io.File) {
+        profileDao.getById(profileId)?.let { manager.setCustomAvatar(it, source) }
+    }
+
+    /**
+     * Apply edits from the editor dialog. [pin]: null = keep the existing PIN, "" = remove it.
+     * Edits the row as it is now, not [profile]: a picture chosen while the dialog was open has
+     * already been written, and the dialog's copy would put the old one back.
+     */
     fun edit(profile: ProfileEntity, name: String, avatarId: Int, isKids: Boolean, pin: String?) {
-        viewModelScope.launch { manager.edit(profile, name, avatarId, isKids, pin) }
+        viewModelScope.launch { manager.edit(profileDao.getById(profile.id) ?: profile, name, avatarId, isKids, pin) }
     }
 
     fun rename(profile: ProfileEntity, name: String) {
         viewModelScope.launch { profileDao.update(profile.copy(name = name.ifBlank { profile.name })) }
-    }
-
-    fun setKids(profile: ProfileEntity, isKids: Boolean) {
-        viewModelScope.launch { profileDao.update(profile.copy(isKids = isKids)) }
     }
 
     fun setPin(profile: ProfileEntity, pin: String?) {

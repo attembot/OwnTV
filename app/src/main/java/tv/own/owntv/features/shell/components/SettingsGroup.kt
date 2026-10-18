@@ -4,7 +4,7 @@ import tv.own.owntv.R
 import tv.own.owntv.features.settings.VideoGroup
 
 /**
- * The twelve Settings groups (P10), in the order of More › Settings' cards — a card's index is the
+ * The twelve Settings groups, in the order of More › Settings' cards — a card's index is the
  * group it opens. [video] marks the five groups whose rows are the Video player's.
  */
 internal enum class SettingsGroup(val titleRes: Int, val video: VideoGroup? = null) {

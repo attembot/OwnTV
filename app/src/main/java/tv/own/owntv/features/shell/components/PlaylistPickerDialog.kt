@@ -1,9 +1,13 @@
 package tv.own.owntv.features.shell.components
 
+import tv.own.owntv.ui.theme.StageColors
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -24,7 +28,7 @@ import tv.own.owntv.core.database.entity.SourceEntity
 import tv.own.owntv.ui.components.trapAllFocusExit
 
 /**
- * The Stage playlist switcher (P1-07): the options-menu style, 520 wide under the playlist pill, over
+ * The Stage playlist switcher: the options-menu style, 520 wide under the playlist pill, over
  * the Stage scrim with the pill itself redrawn above it, lit, at [pillBounds]. Rows: "All playlists"
  * with the layers icon, then each playlist with its mark and channel count; a ✓ marks the current one.
  */
@@ -47,7 +51,7 @@ fun StagePlaylistMenu(
     LaunchedEffect(Unit) { runCatching { selectedFocus.requestFocus() } }
     BackHandler { onDismiss() }
 
-    Box(Modifier.fillMaxSize().background(Color(2, 5, 6).copy(alpha = 0.55f))) {
+    Box(Modifier.fillMaxSize().background(StageColors.Scrim)) {
         if (pillBounds != null) {
             val density = androidx.compose.ui.platform.LocalDensity.current
             with(density) {
@@ -67,7 +71,7 @@ fun StagePlaylistMenu(
         tv.own.owntv.ui.stage.StageMenu(
             Modifier
                 .align(Alignment.TopEnd)
-                .padding(top = 104.mpx, end = 100.mpx)
+                .padding(top = 104.mpx, end = 100.mpx, bottom = 24.mpx)
                 .width(520.mpx)
                 .trapAllFocusExit()
                 .focusGroup(),
@@ -76,23 +80,27 @@ fun StagePlaylistMenu(
                 title = stringResource(R.string.content_playlist_picker_title),
                 subtitle = stringResource(R.string.content_playlist_picker_subtitle),
             )
-            tv.own.owntv.ui.stage.StageMenuItem(
-                text = stringResource(R.string.content_all_playlists),
-                icon = tv.own.owntv.ui.components.OwnTVIcon.LAYERS,
-                checked = activeId <= 0,
-                onClick = { onSelect(-1L); onDismiss() },
-                modifier = if (activeId <= 0) Modifier.focusRequester(selectedFocus) else Modifier,
-            )
-            playlists.forEachIndexed { index, source ->
-                val current = source.id == activeId
+            // The list scrolls under a fixed heading: without it the menu ran off the bottom of the screen
+            // at about 17 playlists, and the rest could not be reached (#6).
+            Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
                 tv.own.owntv.ui.stage.StageMenuItem(
-                    text = source.name,
-                    leading = { tv.own.owntv.ui.stage.StagePlaylistMark(tv.own.owntv.ui.stage.PlaylistMark.of(source.name, index)) },
-                    value = if (current) null else counts[source.id]?.let(numbers::format),
-                    checked = current,
-                    onClick = { onSelect(source.id); onDismiss() },
-                    modifier = if (current) Modifier.focusRequester(selectedFocus) else Modifier,
+                    text = stringResource(R.string.content_all_playlists),
+                    icon = tv.own.owntv.ui.components.OwnTVIcon.LAYERS,
+                    checked = activeId <= 0,
+                    onClick = { onSelect(-1L); onDismiss() },
+                    modifier = if (activeId <= 0) Modifier.focusRequester(selectedFocus) else Modifier,
                 )
+                playlists.forEachIndexed { index, source ->
+                    val current = source.id == activeId
+                    tv.own.owntv.ui.stage.StageMenuItem(
+                        text = source.name,
+                        leading = { tv.own.owntv.ui.stage.StagePlaylistMark(tv.own.owntv.ui.stage.PlaylistMark.of(source.name, index)) },
+                        value = if (current) null else counts[source.id]?.let(numbers::format),
+                        checked = current,
+                        onClick = { onSelect(source.id); onDismiss() },
+                        modifier = if (current) Modifier.focusRequester(selectedFocus) else Modifier,
+                    )
+                }
             }
         }
     }

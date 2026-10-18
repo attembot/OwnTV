@@ -8,13 +8,13 @@ import tv.own.owntv.core.live.MIN_MULTIVIEW_TILES
 
 /**
  * The **most** tiles the Multiview grid may have. Every value is always offered — nothing is greyed
- * out (D5) — and the grid still opens with two, growing only when the user asks for more.
+ * out — and the grid still opens with two, growing only when the user asks for more.
  */
 @Composable
 internal fun MultiviewTilesDialog(current: Int, onPick: (Int) -> Unit, onDismiss: () -> Unit) {
     val tiles = (MIN_MULTIVIEW_TILES..MAX_MULTIVIEW_TILES).toList()
     // Each option is a ceiling too, so it reads the same as the row it came from. A simple choice:
-    // on the settings page it opens in the panel (owner, P12).
+    // on the settings page it opens in the panel.
     PickerDialog(
         title = stringResource(R.string.settings_multiview_tiles_max),
         options = tiles.map { it.toString() to stringResource(R.string.settings_multiview_tiles_max_value, it) },
@@ -27,9 +27,9 @@ internal fun MultiviewTilesDialog(current: Int, onPick: (Int) -> Unit, onDismiss
 /**
  * Three or four tiles need three or four provider connections and three or four hardware decoders.
  *
- * Shaped exactly like the Auto-frame-rate warning, and asked in Settings only (D12). It never
+ * Shaped exactly like the Auto-frame-rate warning, and asked in Settings only. It never
  * refuses: "Use anyway" gives the count the user picked, and a tile that then cannot start says so
- * itself (D5). Focus starts on Keep two.
+ * itself. Focus starts on Keep two.
  */
 @Composable
 internal fun MultiviewWarningDialog(onUseAnyway: () -> Unit, onKeepTwo: () -> Unit) {

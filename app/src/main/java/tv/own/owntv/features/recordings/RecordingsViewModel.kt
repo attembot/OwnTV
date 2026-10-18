@@ -1,5 +1,7 @@
 package tv.own.owntv.features.recordings
 
+import kotlinx.coroutines.flow.map
+import tv.own.owntv.core.storage.missingFiles
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -30,6 +32,8 @@ import tv.own.owntv.player.OwnTVPlayer
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RecordingsViewModel(
+    /** Only to check whether finished files are still there. */
+    appContext: android.content.Context,
     private val settings: SettingsRepository,
     private val recordings: RecordingManager,
     val player: OwnTVPlayer,
@@ -45,6 +49,12 @@ class RecordingsViewModel(
      * recording may begin a few minutes late. Read once: revoking the permission stops the app, so
      * the answer cannot change under a running process.
      */
+    /** Paths of finished recordings whose file is gone (drive formatted, swapped or unplugged). */
+    val missingFiles: StateFlow<Set<String>> = rows
+        .map { list -> list.filter { it.status == RecordingStatus.COMPLETED }.map { it.filePath } }
+        .missingFiles(appContext)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
     val timersAreExact: Boolean = recordings.timersAreExact()
 
     private val _lastPlayedId = MutableStateFlow<Long?>(null)
@@ -86,7 +96,7 @@ class RecordingsViewModel(
     /** Drops a scheduled recording. Nothing on disk is touched, because nothing is there yet. */
     fun cancel(recording: RecordingEntity) = recordings.cancel(recording)
 
-    /** Removes the row **and** the file. The only thing here that deletes anything (D2). */
+    /** Removes the row **and** the file. The only thing here that deletes anything. */
     fun delete(recording: RecordingEntity) = recordings.delete(recording)
 
     /**

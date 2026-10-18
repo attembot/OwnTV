@@ -59,11 +59,14 @@ internal fun LazyListScope.recordingItems(
     onCancel: (RecordingEntity) -> Unit,
     onRetry: (RecordingEntity) -> Unit,
     onDelete: (RecordingEntity) -> Unit,
+    /** Paths of finished recordings whose file is gone: those offer only Delete. */
+    missing: Set<String> = emptySet(),
 ) {
     recordingGroups(recordings).forEachIndexed { g, (labelRes, rows) ->
         item(key = "rhdr_$labelRes") { StageListLabel(stringResource(labelRes), first = g == 0) }
         items(rows, key = { "r_${it.id}" }) { r ->
             val delete = StageAction(stringResource(R.string.common_delete), OwnTVIcon.TRASH) { onDelete(r) }
+            val gone = r.status == RecordingStatus.COMPLETED && r.filePath in missing
             StageDownloadRow(
                 title = r.title,
                 line = recordingLine(r),
@@ -79,14 +82,16 @@ internal fun LazyListScope.recordingItems(
                     RecordingStatus.CANCELLED -> emptyList()
                 },
                 // A recording still being written is not playable here: two readers on one growing file.
-                onClick = if (r.status == RecordingStatus.COMPLETED) ({ onPlay(r) }) else null,
+                onClick = if (r.status == RecordingStatus.COMPLETED && !gone) ({ onPlay(r) }) else null,
                 art = {
-                    // The channel's logo on the white plate, as everywhere a channel is named.
-                    Box(Modifier.fillMaxSize().background(Color.White).padding(14.mpx), contentAlignment = Alignment.Center) {
+                    // The channel's logo on its plate, as everywhere a channel is named.
+                    Box(Modifier.fillMaxSize().background(tv.own.owntv.ui.stage.stageStillBack).padding(14.mpx), contentAlignment = Alignment.Center) {
                         tv.own.owntv.features.live.LivePlate(r.channelIconUrl, 162.mpx, 79.mpx)
                     }
                 },
-            ) { RecordingStatusText(r) }
+            ) {
+                if (gone) StatusLine(stringResource(R.string.content_downloads_file_missing), Color(0xFFEF4444)) else RecordingStatusText(r)
+            }
         }
     }
 }

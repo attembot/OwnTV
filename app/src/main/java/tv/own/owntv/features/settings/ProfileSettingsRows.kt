@@ -39,8 +39,8 @@ internal fun profileCount(): Int {
 }
 
 /**
- * Settings › Profile (P9-02): the profiles themselves, then Add a profile. OK edits a profile (the same
- * editor as before), a held OK offers to delete it while more than one exists. The panel explains
+ * Settings › Profile: the profiles themselves, then Add a profile. OK edits a profile (the profile
+ * editor), a held OK offers to delete it while more than one exists. The panel explains
  * profiles as a whole.
  */
 @Composable
@@ -118,7 +118,7 @@ internal fun ProfileSettingsRows() {
     if (creating) {
         ProfileEditorDialog(
             initial = null,
-            onConfirm = { name, avatarId, isKids, pin -> vm.create(name, avatarId, isKids, pin, defaultProfileName); creating = false },
+            onConfirm = { name, avatarId, isKids, pin, picture -> vm.create(name, avatarId, isKids, pin, defaultProfileName, picture); creating = false },
             onDismiss = { creating = false },
             // Names must stay unique (backup restore matches profiles by name).
             takenNames = profiles.map { it.name.trim().lowercase() }.toSet(),
@@ -127,9 +127,14 @@ internal fun ProfileSettingsRows() {
     editing?.let { p ->
         ProfileEditorDialog(
             initial = p,
-            onConfirm = { name, avatarId, isKids, pin -> vm.edit(p, name, avatarId, isKids, pin); editing = null },
+            onConfirm = { name, avatarId, isKids, pin, _ -> vm.edit(p, name, avatarId, isKids, pin); editing = null },
             onDismiss = { editing = null },
             takenNames = profiles.filter { it.id != p.id }.map { it.name.trim().lowercase() }.toSet(),
+            // From the live list, not [p]: [p] is the row as it was when the dialog opened, and a
+            // picture chosen here applies at once.
+            customPath = profiles.firstOrNull { it.id == p.id }?.avatarPath.orEmpty(),
+            onPickPicture = { file -> vm.setPicture(p.id, file) },
+            onClearPicture = { vm.clearPicture(p.id) },
         )
     }
     confirmDelete?.let { p ->

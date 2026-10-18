@@ -3,15 +3,12 @@ package tv.own.owntv.features.settings
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -34,16 +31,11 @@ import tv.own.owntv.ui.components.OwnTVIcon
 fun DeveloperScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val vm: HomeSettingsViewModel = koinViewModel()
     val devRebuild by vm.devRebuild.collectAsStateWithLifecycle()
-    var showStageSpecimen by remember { mutableStateOf(false) }
-    if (showStageSpecimen) {
-        StageSpecimenScreen(onBack = { showStageSpecimen = false }, modifier = modifier)
-        return
-    }
 
     val firstFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { kotlinx.coroutines.delay(60); runCatching { firstFocus.requestFocus() } }
     BackHandler { onBack() }
-    // Drawn as the other More pages (P9): the 42 px title, then Stage rows.
+    // Drawn as the other More pages: the 42 px title, then Stage rows.
     androidx.compose.foundation.layout.Column(
         modifier.fillMaxSize().focusGroup(),
         verticalArrangement = Arrangement.spacedBy(6.mpx),
@@ -56,13 +48,6 @@ fun DeveloperScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             value = if (devRebuild == HomeSettingsViewModel.DevRebuildState.STARTED) SettingValue.Action(stringResource(R.string.settings_rebuilding)) else null,
             onClick = { vm.rebuildTrendingNow() },
             modifier = Modifier.focusRequester(firstFocus),
-        )
-        StageSettingRow(
-            icon = OwnTVIcon.PALETTE,
-            title = "Stage specimen",
-            desc = "Every Stage component on one page, for checking against the mockup references.",
-            value = SettingValue.Opens(null),
-            onClick = { showStageSpecimen = true },
         )
     }
 }

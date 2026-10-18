@@ -37,7 +37,7 @@ sealed interface EpgSyncUi {
 }
 
 /**
- * After a playlist imports, ask whether to sync its TV guide now (the old behaviour synced it automatically,
+ * After a playlist imports, ask whether to sync its TV guide now (syncing it automatically,
  * which was slow). "Sync now" runs in the foreground and shows a **live programme count** — exactly like the
  * playlist import — then a brief "Done", and closes itself.
  */

@@ -19,7 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
 /**
- * Settings › Appearance › Fonts & text size as a Stage page (owner, P12: no popup for simple values).
+ * Settings › Appearance › Fonts & text size as a Stage page (no popup for simple values).
  * Font (its list in the panel), Text size and Popup text size (◀ ▶ in place, OK opens the value in the
  * panel — popup text size with a real-size sample popup), then Reset. Each change applies at once.
  */
@@ -85,7 +85,7 @@ fun FontSettingsScreen(
             title = reset,
             desc = null,
             value = null,
-            // Popup size has its own row in Appearance; Reset leaves it alone, as the old dialog did.
+            // Popup size has its own row in Appearance; Reset leaves it alone.
             onClick = { onSet(FontCustomization(popupSizePercent = current.popupSizePercent)) },
             help = SettingHelp(reset, stringResource(R.string.settings_font_customization_description), hints = settingHints(null, pinnable = false)),
         )
@@ -95,7 +95,7 @@ fun FontSettingsScreen(
                 title = fontTitle,
                 options = families,
                 selected = current.mainFamily.name,
-                // One family for the interface and its popups (P10): popups follow the main font.
+                // One family for the interface and its popups: popups follow the main font.
                 onSelect = { name -> AppFontFamily.valueOf(name).let { onSet(current.copy(mainFamily = it, popupFamily = it)) }; editing = null },
                 onDismiss = { editing = null },
             )

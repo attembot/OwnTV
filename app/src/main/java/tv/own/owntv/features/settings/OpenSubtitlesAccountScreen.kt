@@ -1,6 +1,5 @@
 package tv.own.owntv.features.settings
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,7 +14,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -24,13 +22,10 @@ import androidx.tv.material3.Text
 import org.koin.androidx.compose.koinViewModel
 import tv.own.owntv.R
 import tv.own.owntv.ui.components.OwnTVIcon
-import tv.own.owntv.ui.components.OwnTVTextField
-import tv.own.owntv.ui.theme.OwnTVTheme
 import tv.own.owntv.ui.theme.StageColors
 import tv.own.owntv.ui.theme.mpx
 import tv.own.owntv.ui.theme.stageText
 import tv.own.owntv.ui.format.localizedInteger
-import tv.own.owntv.ui.theme.PopupFontTheme
 
 /**
  * Languages the OpenSubtitles search can be restricted to (ISO 639-1, the codes their API expects).
@@ -67,12 +62,11 @@ private fun defaultSearchLang(): String {
 }
 
 /**
- * Settings → Video Player → Subtitles → OpenSubtitles account (subtitle plan §5.2/§5.3).
+ * Settings → Video Player → Subtitles → OpenSubtitles account.
  * The connection is per OwnTV profile; users sign in with their own free OpenSubtitles account.
  */
 @Composable
 fun OpenSubtitlesAccountScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
-    val colors = OwnTVTheme.colors
     val vm: OpenSubtitlesViewModel = koinViewModel()
     val state by vm.state.collectAsStateWithLifecycle()
     val error by vm.error.collectAsStateWithLifecycle()
@@ -172,7 +166,7 @@ fun OpenSubtitlesAccountScreen(onBack: () -> Unit, modifier: Modifier = Modifier
     val seriesSubs by deleteVm.seriesCount.collectAsStateWithLifecycle()
     val downloaded = movieSubs + seriesSubs
 
-    // P10B-05: ACCOUNT, SEARCH and ON THIS TV as rows; the account's details in the panel.
+    // ACCOUNT, SEARCH and ON THIS TV as rows; the account's details in the panel.
     val ok = stringResource(R.string.common_ok)
     val back = stringResource(R.string.common_back)
     val content = stringResource(R.string.settings_group_content_metadata)
@@ -461,18 +455,18 @@ private fun OpenSubtitlesSetupChooser(onRemote: () -> Unit, onLocal: () -> Unit,
         body = stringResource(R.string.settings_open_subtitles_setup_description),
         buttons = { tv.own.owntv.ui.stage.StageButton(stringResource(R.string.common_cancel), onClick = onDismiss, height = 56.mpx, textSize = 19) },
     ) {
-        Row2(
-            icon = OwnTVIcon.SHARE,
+        tv.own.owntv.ui.stage.StagePopupOption(
             title = stringResource(R.string.settings_open_subtitles_setup_remote),
-            desc = stringResource(R.string.settings_open_subtitles_setup_remote_description),
-            modifier = Modifier.focusRequester(firstFocus),
+            subtitle = stringResource(R.string.settings_open_subtitles_setup_remote_description),
             onClick = onRemote,
+            modifier = Modifier.focusRequester(firstFocus),
+            leading = { tv.own.owntv.ui.stage.StagePopupIcon(OwnTVIcon.SHARE) },
         )
-        Row2(
-            icon = OwnTVIcon.PERSON,
+        tv.own.owntv.ui.stage.StagePopupOption(
             title = stringResource(R.string.settings_open_subtitles_setup_local),
-            desc = stringResource(R.string.settings_open_subtitles_setup_local_description),
+            subtitle = stringResource(R.string.settings_open_subtitles_setup_local_description),
             onClick = onLocal,
+            leading = { tv.own.owntv.ui.stage.StagePopupIcon(OwnTVIcon.PERSON) },
         )
     }
 }
@@ -501,23 +495,37 @@ private fun OpenSubtitlesApiPopup(
             tv.own.owntv.ui.stage.StageButton(stringResource(R.string.common_save), onClick = onSave, height = 56.mpx, textSize = 19, tinted = true)
         },
     ) {
-        Row2(
-            icon = OwnTVIcon.SHARE,
+        tv.own.owntv.ui.stage.StagePopupOption(
             title = stringResource(R.string.settings_open_subtitles_setup_remote),
-            desc = stringResource(R.string.settings_metadata_key_from_phone_desc),
-            modifier = Modifier.focusRequester(firstFocus),
+            subtitle = stringResource(R.string.settings_metadata_key_from_phone_desc),
             onClick = onRemote,
+            modifier = Modifier.focusRequester(firstFocus),
+            leading = { tv.own.owntv.ui.stage.StagePopupIcon(OwnTVIcon.SHARE) },
         )
         Column(Modifier.padding(top = 10.mpx), verticalArrangement = Arrangement.spacedBy(12.mpx)) {
-            OwnTVTextField(value = key, onValueChange = onKeyChange, label = stringResource(R.string.settings_open_subtitles_api_key), placeholder = stringResource(R.string.settings_metadata_optional), modifier = Modifier.fillMaxWidth())
-            OwnTVTextField(value = url, onValueChange = onUrlChange, label = stringResource(R.string.settings_worker_server_url), placeholder = stringResource(R.string.settings_metadata_optional), modifier = Modifier.fillMaxWidth())
+            tv.own.owntv.features.settings.StageFieldRow(
+                icon = tv.own.owntv.ui.components.OwnTVIcon.PENCIL,
+                label = stringResource(R.string.settings_open_subtitles_api_key),
+                value = key,
+                onValueChange = onKeyChange,
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = stringResource(R.string.settings_metadata_optional),
+            )
+            tv.own.owntv.features.settings.StageFieldRow(
+                icon = tv.own.owntv.ui.components.OwnTVIcon.PENCIL,
+                label = stringResource(R.string.settings_worker_server_url),
+                value = url,
+                onValueChange = onUrlChange,
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = stringResource(R.string.settings_metadata_optional),
+            )
             Text(stringResource(R.string.settings_open_subtitles_access_priority), style = tv.own.owntv.ui.theme.stageText(15, 500), color = tv.own.owntv.ui.theme.StageColors.Muted)
         }
     }
 }
 
 /**
- * The whole sign-in on one panel: username, password, "Stay signed in" (review R5), and the two
+ * The whole sign-in on one panel: username, password, "Stay signed in", and the two
  * optional API fields inline. Deliberately the same four inputs, in the same order, as the remote
  * companion page — so filling it in on the TV and filling it in on a browser look like one feature.
  *
@@ -553,13 +561,20 @@ private fun OpenSubtitlesSignInDialog(
         },
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.mpx)) {
-            OwnTVTextField(
-                value = username, onValueChange = onUsernameChange,
-                label = stringResource(R.string.player_subtitles_username), modifier = Modifier.fillMaxWidth(), focusRequester = fieldFocus,
+            tv.own.owntv.features.settings.StageFieldRow(
+                icon = tv.own.owntv.ui.components.OwnTVIcon.PENCIL,
+                label = stringResource(R.string.player_subtitles_username),
+                value = username,
+                onValueChange = onUsernameChange,
+                modifier = Modifier.fillMaxWidth().focusRequester(fieldFocus),
             )
-            OwnTVTextField(
-                value = password, onValueChange = onPasswordChange,
-                label = stringResource(R.string.player_subtitles_password), isPassword = true, modifier = Modifier.fillMaxWidth(),
+            tv.own.owntv.features.settings.StageFieldRow(
+                icon = tv.own.owntv.ui.components.OwnTVIcon.PENCIL,
+                label = stringResource(R.string.player_subtitles_password),
+                value = password,
+                onValueChange = onPasswordChange,
+                modifier = Modifier.fillMaxWidth(),
+                password = true,
             )
         }
         tv.own.owntv.ui.stage.StagePopupOption(
@@ -573,15 +588,21 @@ private fun OpenSubtitlesSignInDialog(
         tv.own.owntv.ui.stage.StagePopupLabel(stringResource(R.string.settings_open_subtitles_advanced).uppercase(androidx.compose.ui.platform.LocalConfiguration.current.locales[0]))
         Text(stringResource(R.string.settings_open_subtitles_advanced_description), style = tv.own.owntv.ui.theme.stageText(15, 500), color = tv.own.owntv.ui.theme.StageColors.Muted, modifier = Modifier.padding(bottom = 12.mpx))
         Column(verticalArrangement = Arrangement.spacedBy(12.mpx)) {
-            OwnTVTextField(
-                value = apiKey, onValueChange = onApiKeyChange,
+            tv.own.owntv.features.settings.StageFieldRow(
+                icon = tv.own.owntv.ui.components.OwnTVIcon.PENCIL,
                 label = stringResource(R.string.settings_open_subtitles_api_key),
-                placeholder = stringResource(R.string.settings_metadata_optional), modifier = Modifier.fillMaxWidth(),
+                value = apiKey,
+                onValueChange = onApiKeyChange,
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = stringResource(R.string.settings_metadata_optional),
             )
-            OwnTVTextField(
-                value = serverUrl, onValueChange = onServerUrlChange,
+            tv.own.owntv.features.settings.StageFieldRow(
+                icon = tv.own.owntv.ui.components.OwnTVIcon.PENCIL,
                 label = stringResource(R.string.settings_worker_server_url),
-                placeholder = stringResource(R.string.settings_metadata_optional), modifier = Modifier.fillMaxWidth(),
+                value = serverUrl,
+                onValueChange = onServerUrlChange,
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = stringResource(R.string.settings_metadata_optional),
             )
             Text(stringResource(R.string.settings_open_subtitles_access_priority), style = tv.own.owntv.ui.theme.stageText(15, 500), color = tv.own.owntv.ui.theme.StageColors.Muted)
         }

@@ -45,7 +45,7 @@ import tv.own.owntv.ui.stage.StageTag
 import androidx.compose.ui.res.pluralStringResource
 
 /**
- * Setup's Language row (P10B-W1): the current language with ▾, OK opens the list in a Stage popup (there
+ * Setup's Language row: the current language with ▾, OK opens the list in a Stage popup (there
  * is no settings panel in the wizard).
  */
 @Composable
@@ -135,7 +135,7 @@ private fun FirstRunLanguagePopup(
 }
 
 /**
- * Settings › App › Language (P10B-21): System default, then every language A–Z by English name, each
+ * Settings › App › Language: System default, then every language A–Z by English name, each
  * with a radio; OK uses it. Same-script switches recompose instantly via
  * [tv.own.owntv.core.i18n.LocalizedContent]; cross-script switches trigger one
  * [android.app.Activity.recreate]. The panel explains the focused choice and carries the translation
@@ -232,12 +232,12 @@ private fun LanguageStageRow(
     )
 }
 
-/** The panel's HELP TRANSLATE block (P10B-21, owner): QR and link to the project, then the request note. */
+/** The panel's HELP TRANSLATE block: QR and link to the project, then the request note. */
 @Composable
 private fun TranslateBlock() {
     val url = SupportedLocales.CONTRIBUTION_PROJECT_URL
     val qr = remember(url) { CompanionLink.renderQr(url) }
-    Box(Modifier.padding(top = 22.mpx, bottom = 16.mpx).fillMaxWidth().height(1.mpx).background(Color.White.copy(alpha = 0.1f)))
+    Box(Modifier.padding(top = 22.mpx, bottom = 16.mpx).fillMaxWidth().height(1.mpx).background(StageColors.Ink.copy(alpha = 0.1f)))
     SettingPanelHeading(stringResource(R.string.settings_language_help_translate))
     Row(horizontalArrangement = Arrangement.spacedBy(20.mpx), verticalAlignment = Alignment.CenterVertically) {
         if (qr != null) {

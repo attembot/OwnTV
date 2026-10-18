@@ -1,5 +1,6 @@
 package tv.own.owntv.features.more
 
+import tv.own.owntv.ui.theme.stageTone
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -8,10 +9,12 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -114,12 +117,6 @@ private fun PageHead(title: String, trailing: @Composable RowScope.() -> Unit = 
     }
 }
 
-/** A dim caps heading inside a page ("WHAT'S INCLUDED"). */
-@Composable
-internal fun PageLabel(text: String, modifier: Modifier = Modifier) {
-    Text(text.uppercase(androidx.compose.ui.platform.LocalConfiguration.current.locales[0]), style = stageText(13, 800, 0.13.em), color = StageColors.Dim, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = modifier)
-}
-
 /** `.tool.box` on a focused row ("▶ Resume", "✕ Remove"): 44 high, 16/700. */
 data class RowAction(val text: String, val icon: OwnTVIcon, val onClick: () -> Unit)
 
@@ -165,7 +162,7 @@ internal fun StageActionRow(
             ) {
                 leading(hasFocus)
                 Column(Modifier.weight(1f)) {
-                    Text(title, style = stageText(titleSize, 700), color = if (hasFocus) Color.White else StageColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(title, style = stageText(titleSize, 700), color = if (hasFocus) StageColors.FxText else StageColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (line != null) Text(line, style = stageText(17, 400), color = StageColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.mpx))
                     extra(hasFocus)
                 }
@@ -201,11 +198,11 @@ private fun EmptyNote(title: String, body: String? = null) {
 private fun counted(nameRes: Int, n: Int) = stringResource(nameRes) + " " + n
 
 // ---------------------------------------------------------------------------------------------
-// Settings (P8-01): Search and the twelve group cards
+// Settings: Search and the twelve group cards
 // ---------------------------------------------------------------------------------------------
 
 /**
- * The twelve Settings groups (P10), in the order of `SettingsGroup`: a card's index is the group it opens.
+ * The twelve Settings groups, in the order of `SettingsGroup`: a card's index is the group it opens.
  */
 private data class SettingsGroupCard(val icon: OwnTVIcon, val nameRes: Int, val summaryRes: Int, val count: Int?)
 
@@ -249,11 +246,13 @@ internal fun SettingsPage(entry: FocusRequester, pinned: Int, onOpenGroup: (Int)
         }
         Column(Modifier.padding(top = 22.mpx), verticalArrangement = Arrangement.spacedBy(20.mpx)) {
             SettingsCards.chunked(3).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(20.mpx)) {
+                // 150 at the default font; a larger app font grows the row rather than cutting the
+                // summary, and the row's cards keep one height.
+                Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(20.mpx)) {
                     row.forEach { card ->
                         val index = SettingsCards.indexOf(card)
                         StageTile(
-                            modifier = Modifier.weight(1f).height(150.mpx).then(if (index == back) Modifier.focusRequester(entry) else Modifier),
+                            modifier = Modifier.weight(1f).heightIn(min = 150.mpx).fillMaxHeight().then(if (index == back) Modifier.focusRequester(entry) else Modifier),
                             onClick = { lastOpenedCard = index; onOpenGroup(index) },
                             padding = 0.mpx,
                         ) { focused ->
@@ -275,7 +274,7 @@ internal fun SettingsPage(entry: FocusRequester, pinned: Int, onOpenGroup: (Int)
 }
 
 // ---------------------------------------------------------------------------------------------
-// Favourites (P8-03)
+// Favourites
 // ---------------------------------------------------------------------------------------------
 
 private enum class FavFilter { ALL, LIVE, MOVIES, SERIES }
@@ -329,7 +328,7 @@ internal fun FavouritesPage(
                 modifier = Modifier.focusRequester(segFocus),
             )
         }
-        androidx.compose.runtime.SideEffect { setEntry { runCatching { firstTarget.requestFocus() }.isSuccess } }
+        androidx.compose.runtime.SideEffect { setEntry { runCatching { firstTarget.requestFocus() }.getOrDefault(false) } }
         if (counts.total == 0) {
             EmptyNote(stringResource(R.string.more_fav_empty_title), stringResource(R.string.more_fav_empty_body))
             return@Column
@@ -388,7 +387,7 @@ internal fun FavouritesPage(
             val first = remember { FocusRequester() }
             LaunchedEffect(Unit) { withFrameNanos { }; runCatching { first.requestFocus() } }
             BackHandler { close() }
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)).trapAllFocusExit().focusGroup(), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxSize().background(stageTone(Color.Black.copy(alpha = 0.45f), StageColors.Scrim)).trapAllFocusExit().focusGroup(), contentAlignment = Alignment.Center) {
                 StageMenu(Modifier.width(440.mpx)) {
                     StageMenuHeader(name, null)
                     StageMenuItem(stringResource(R.string.content_remove_favourite), onClick = { vm.removeFavourite(type, id); returnTo = segFocus; close() }, icon = OwnTVIcon.FAVORITE, modifier = Modifier.focusRequester(first))
@@ -402,8 +401,7 @@ internal fun FavouritesPage(
             title = stringResource(R.string.content_move),
             itemNames = m.names,
             activeIndex = m.index,
-            onMoveUp = { vm.moveBy(-1) },
-            onMoveDown = { vm.moveBy(1) },
+            onMove = vm::move,
             onCommit = vm::commitMove,
             onCancel = vm::cancelMove,
         )
@@ -420,7 +418,7 @@ private fun RowHead(title: String, small: String?, top: Dp) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// History (P8-04)
+// History
 // ---------------------------------------------------------------------------------------------
 
 @Composable
@@ -473,7 +471,7 @@ internal fun HistoryPage(
             Spacer(Modifier.weight(1f))
             if (counts.total > 0) StageTool(stringResource(R.string.settings_clear_history), onClick = { showClear = true }, icon = OwnTVIcon.TRASH, danger = true, modifier = Modifier.focusRequester(clearFocus))
         }
-        androidx.compose.runtime.SideEffect { setEntry { runCatching { (rows.firstOrNull()?.let { r -> focusOf(r.id) } ?: segFocus).requestFocus() }.isSuccess } }
+        androidx.compose.runtime.SideEffect { setEntry { runCatching { (rows.firstOrNull()?.let { r -> focusOf(r.id) } ?: segFocus).requestFocus() }.getOrDefault(false) } }
         if (rows.isEmpty()) {
             EmptyNote(stringResource(R.string.more_history_empty))
             return@Column
@@ -482,7 +480,7 @@ internal fun HistoryPage(
             items(rows, key = { it.type.name + it.id }) { e ->
                 val left = when {
                     e.durationMs > 0 && e.positionMs > 0 -> timeLeftText(((e.durationMs - e.positionMs).coerceAtLeast(0L) + 59_999L) / 60_000L)
-                    // "0:14 watched": hours and minutes, as the mockup writes it.
+                    // "0:14 watched": hours and minutes.
                     e.positionMs > 0 -> (e.positionMs / 60_000L).let { m -> stringResource(R.string.content_watched_duration, String.format(androidx.compose.ui.platform.LocalConfiguration.current.locales[0], "%d:%02d", m / 60, m % 60)) }
                     else -> null
                 }
@@ -499,7 +497,7 @@ internal fun HistoryPage(
                     focus = focusOf(e.id),
                     onClick = { play(e) },
                     leading = {
-                        Box(Modifier.size(176.mpx, 99.mpx).clip(RoundedCornerShape(14.mpx)).background(Color(0xFF0F1518)), contentAlignment = Alignment.Center) {
+                        Box(Modifier.size(176.mpx, 99.mpx).clip(RoundedCornerShape(14.mpx)).background(tv.own.owntv.ui.stage.stageStillBack), contentAlignment = Alignment.Center) {
                             when {
                                 e.channel != null -> ChannelPlate(e.channel, Modifier.size(110.mpx, 70.mpx))
                                 !e.art.isNullOrBlank() -> AsyncImage(model = e.art, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
@@ -534,7 +532,7 @@ internal fun HistoryPage(
 }
 
 // ---------------------------------------------------------------------------------------------
-// Error log (P8-07)
+// Error log
 // ---------------------------------------------------------------------------------------------
 
 @Composable
@@ -572,7 +570,7 @@ internal fun ErrorLogPage(setEntry: (() -> Boolean) -> Unit, onCountChanged: () 
                 runCatching { exportFocus.requestFocus() }
             })
         }
-        androidx.compose.runtime.SideEffect { setEntry { runCatching { (if (entries.isNullOrEmpty()) exportFocus else firstRow).requestFocus() }.isSuccess } }
+        androidx.compose.runtime.SideEffect { setEntry { runCatching { (if (entries.isNullOrEmpty()) exportFocus else firstRow).requestFocus() }.getOrDefault(false) } }
         Text(stringResource(R.string.settings_playback_error_description_full), style = stageText(17, 500), color = StageColors.Muted, modifier = Modifier.padding(top = 10.mpx))
         exportPath?.let { Text(stringResource(R.string.settings_backup_saved_to, it), style = stageText(16, 500), color = stageAccent.accent, modifier = Modifier.padding(top = 8.mpx)) }
         if (exportFailed) Text(stringResource(R.string.settings_backup_export_error), style = stageText(16, 500), color = StageColors.Danger, modifier = Modifier.padding(top = 8.mpx))
@@ -597,7 +595,7 @@ internal fun ErrorLogPage(setEntry: (() -> Boolean) -> Unit, onCountChanged: () 
                                 kind.first.uppercase(androidx.compose.ui.platform.LocalConfiguration.current.locales[0]),
                                 style = stageText(13, 800, 0.05.em), color = kind.second, maxLines = 1, overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.widthIn(min = 72.mpx)
-                                    .background(if (kind.second == StageColors.TagText) Color.White.copy(alpha = 0.08f) else kind.second.copy(alpha = 0.16f), RoundedCornerShape(6.mpx))
+                                    .background(if (kind.second == StageColors.TagText) StageColors.Ink.copy(alpha = 0.08f) else kind.second.copy(alpha = 0.16f), RoundedCornerShape(6.mpx))
                                     .padding(horizontal = 7.mpx, vertical = 3.mpx),
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                             )
@@ -608,7 +606,7 @@ internal fun ErrorLogPage(setEntry: (() -> Boolean) -> Unit, onCountChanged: () 
                             stringResource(if (e.live) R.string.settings_live else R.string.settings_vod),
                             e.mediaSpec()?.displayText() ?: e.spec,
                         ).joinToString(sep),
-                        trailing = { Text(formatBestDateTime(context, "dMMMjm", e.atMs), style = stageText(17, 500), color = StageColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        trailing = { Text(formatBestDateTime(context, "dMMM", e.atMs), style = stageText(17, 500), color = StageColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         extra = { focused ->
                             if (focused) {
                                 e.raw?.let { Text(it, style = stageText(15, 500), color = StageColors.Dim, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.mpx)) }
@@ -623,7 +621,7 @@ internal fun ErrorLogPage(setEntry: (() -> Boolean) -> Unit, onCountChanged: () 
 }
 
 // ---------------------------------------------------------------------------------------------
-// About (P8-08)
+// About
 // ---------------------------------------------------------------------------------------------
 
 @Composable
@@ -641,7 +639,7 @@ internal fun AboutPage(vm: MoreCountsViewModel, entry: FocusRequester, onOpenLan
 
     Column(Modifier.fillMaxSize().focusGroup()) {
         Row(horizontalArrangement = Arrangement.spacedBy(40.mpx), verticalAlignment = Alignment.CenterVertically) {
-            // The app's own icon (150) and the #227 wordmark (300).
+            // The app's own icon (150) and the wordmark (300).
             BrandMark(rememberAppliedIcon(), 150.mpx)
             Column {
                 Wordmark(300.mpx)
@@ -668,7 +666,7 @@ internal fun AboutPage(vm: MoreCountsViewModel, entry: FocusRequester, onOpenLan
                 )
             }
         }
-        Text(stringResource(R.string.more_about_description), style = stageText(18, 500).copy(lineHeight = 29.mpxSp), color = Color(0xFFD3DCD8),
+        Text(stringResource(R.string.more_about_description), style = stageText(18, 500).copy(lineHeight = 29.mpxSp), color = stageTone(Color(0xFFD3DCD8), StageColors.Body),
             modifier = Modifier.padding(top = 26.mpx).widthIn(max = 860.mpx))
         Text(stringResource(R.string.settings_contributions), style = stageText(16, 500), color = StageColors.Dim,
             modifier = Modifier.padding(top = 10.mpx, bottom = 24.mpx).widthIn(max = 860.mpx))

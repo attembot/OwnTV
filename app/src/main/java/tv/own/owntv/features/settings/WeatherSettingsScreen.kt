@@ -43,7 +43,7 @@ import tv.own.owntv.ui.theme.stageAccent
 import tv.own.owntv.ui.theme.stageText
 
 /**
- * Settings › Appearance › Date, time & weather (P10B-15): the top bar's weather (show, location, °C/°F)
+ * Settings › Appearance › Date, time & weather: the top bar's weather (show, location, °C/°F)
  * and the colours of the clock's three parts, each picked in the Accent colour picker with a live preview
  * of the clock in the panel.
  */
@@ -194,7 +194,7 @@ private fun ClockPreview(colors: ClockColors) {
         Modifier
             .padding(top = 20.mpx)
             .fillMaxWidth()
-            .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(18.mpx))
+            .background(StageColors.Ink.copy(alpha = 0.04f), RoundedCornerShape(18.mpx))
             .padding(20.mpx),
         contentAlignment = Alignment.CenterEnd,
     ) { StageClock(weather, fahrenheit, colors) }
@@ -219,7 +219,7 @@ private val ClockPart.icon: OwnTVIcon get() = when (this) {
 }
 
 /** The shipped colour of each part: white time, grey date and weather. */
-private val ClockPart.default: Color get() = if (this == ClockPart.TIME) StageColors.Text else StageColors.Muted
+private val ClockPart.default: Color @Composable @androidx.compose.runtime.ReadOnlyComposable get() = if (this == ClockPart.TIME) StageColors.Text else StageColors.Muted
 
 private fun Color.hex(): String = String.format("#%06X", toArgb() and 0xFFFFFF)
 

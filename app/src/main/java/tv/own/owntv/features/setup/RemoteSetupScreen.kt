@@ -1,5 +1,6 @@
 package tv.own.owntv.features.setup
 
+import tv.own.owntv.ui.theme.stageTone
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -42,8 +43,8 @@ import tv.own.owntv.ui.theme.stageAccent
 import tv.own.owntv.ui.theme.stageText
 
 /**
- * Add a source › From your phone (P10B-09): the small LAN web server starts as the page opens (owner,
- * 1 Oct); the panel shows the QR, the address and the PIN. A submission hands off to the Type it here
+ * Add a source › From your phone: the small LAN web server starts as the page opens;
+ * the panel shows the QR, the address and the PIN. A submission hands off to the Type it here
  * form, pre-filled, where the user presses Start import ([onPayloadReceived]). New PIN restarts the server
  * with a fresh PIN. The listener stops when this page leaves composition.
  */
@@ -111,7 +112,7 @@ fun RemoteSetupScreen(
     }
 }
 
-/** The panel (P10B-09): SCAN WITH YOUR PHONE, the QR beside "or open" + the address + the PIN, then the note. */
+/** The panel: SCAN WITH YOUR PHONE, the QR beside "or open" + the address + the PIN, then the note. */
 @Composable
 private fun RemotePanel(state: CompanionServerState) {
     SettingPanelHeading(stringResource(R.string.settings_remote_scan))
@@ -140,4 +141,4 @@ private fun RemotePanel(state: CompanionServerState) {
     Box(Modifier.size(18.mpx))
 }
 
-private val PanelText = Color(0xFFD3DCD8)
+private val PanelText: Color @Composable get() = stageTone(Color(0xFFD3DCD8), StageColors.Body)

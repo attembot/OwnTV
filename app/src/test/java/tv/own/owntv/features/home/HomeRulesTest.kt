@@ -6,7 +6,7 @@ import org.junit.Test
 
 class HomeRulesTest {
 
-    // --- Keep watching stills (G12): TMDB backdrop → provider backdrop → poster → channel logo ---
+    // --- Keep watching stills: TMDB backdrop → provider backdrop → poster → channel logo ---
 
     @Test
     fun tmdbBackdropWins() = assertEquals(HomeStill.Picture("tmdb"), homeStill("tmdb", "prov", "poster", null))

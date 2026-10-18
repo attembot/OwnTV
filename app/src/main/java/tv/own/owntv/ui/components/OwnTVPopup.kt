@@ -35,7 +35,11 @@ import tv.own.owntv.ui.theme.PopupFontTheme
  * Popup chrome and the user-selected popup typography are reduced together here. Keeping the scale in the host means
  * nested popups (Rule builder -> Rule value) cannot silently return to full application size.
  *
- * [stageLayout] is for the Stage popups and menus, which are drawn in mockup pixels at the screen's own
+ * A popup has no settings panel of its own: [LocalSettingsPanel][tv.own.owntv.features.settings.LocalSettingsPanel]
+ * is cleared inside it, so a picker opened here draws its own popup and a row here never writes its
+ * help into the page behind.
+ *
+ * [stageLayout] is for the Stage popups and menus, which are drawn in design pixels at the screen's own
  * scale times the user's Popup size, and placed by their caller: no 0.70 host scale, no centring.
  */
 @Composable
@@ -50,7 +54,7 @@ fun OwnTVPopup(
     content: @Composable () -> Unit,
 ) {
     // The app's own density (2.0 × UI Zoom). A dialog window starts again from the display's density,
-    // so Stage menus, drawn in mockup pixels, would come out at 100% zoom whatever the user chose.
+    // so Stage menus, drawn in design pixels, would come out at 100% zoom whatever the user chose.
     val appDensity = LocalDensity.current
     Dialog(
         onDismissRequest = onDismissRequest,
@@ -121,7 +125,7 @@ fun OwnTVPopup(
                 fontScale = appDensity.fontScale / tv.own.owntv.ui.theme.LocalUiFontScaleFactor.current *
                     tv.own.owntv.ui.theme.LocalPopupFontScaleFactor.current,
             )
-            CompositionLocalProvider(LocalDensity provides stageDensity, LocalTvImeWatcher provides watcher, LocalTvImeMetrics provides metrics, LocalStagePopup provides true) {
+            CompositionLocalProvider(LocalDensity provides stageDensity, LocalTvImeWatcher provides watcher, LocalTvImeMetrics provides metrics, tv.own.owntv.features.settings.LocalSettingsPanel provides null) {
                 Box(Modifier.fillMaxSize()) { content() }
             }
             return@Dialog
@@ -149,7 +153,7 @@ fun OwnTVPopup(
                     LocalDensity provides popupDensity,
                     LocalTvImeWatcher provides watcher,
                     LocalTvImeMetrics provides metrics,
-                    LocalStagePopup provides true,
+                    tv.own.owntv.features.settings.LocalSettingsPanel provides null,
                 ) {
                     PopupFontTheme(fontScale = fontScale) {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

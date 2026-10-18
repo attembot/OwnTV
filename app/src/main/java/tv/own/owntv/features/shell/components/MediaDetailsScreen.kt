@@ -1,5 +1,7 @@
 package tv.own.owntv.features.shell.components
 
+import tv.own.owntv.ui.theme.stageTone
+import tv.own.owntv.ui.theme.LocalStagePalette
 import androidx.compose.runtime.Immutable
 
 import androidx.compose.foundation.background
@@ -52,7 +54,7 @@ import tv.own.owntv.ui.components.trapAllFocusExit
 import tv.own.owntv.ui.theme.gradientWash
 
 /**
- * Read-only, already-merged data for the [MediaDetailsScreen] window. The caller applies the §7.1/§4.1
+ * Read-only, already-merged data for the [MediaDetailsScreen] window. The caller applies the
  * provider/TMDB merge and builds image.tmdb.org URLs, so this window is source-agnostic and reused for
  * movie / series / episode.
  */
@@ -70,7 +72,7 @@ data class MediaDetailsUi(
 )
 
 /**
- * TMDB details (plan §11.1) as a Stage page in its own full-screen window: the backdrop edge to edge,
+ * TMDB details as a Stage page in its own full-screen window: the backdrop edge to edge,
  * fading into the page, then the eyebrow (episode line), the title 64/800, the meta line, genres as
  * tags, the overview and the cast. Purely for reading: **Up/Down scroll, Back exits, nothing is
  * selectable** — the page owns focus and turns Up/Down into a scroll, so the D-pad cannot leak behind.
@@ -95,7 +97,7 @@ fun MediaDetailsScreen(details: MediaDetailsUi, onExit: () -> Unit, modifier: Mo
             else -> false
         }
     }
-    val page = Color(0xFF070B0E)
+    val page = stageTone(Color(0xFF070B0E), LocalStagePalette.current.page)
     tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onExit, stageLayout = true, stageScaled = false) {
         LaunchedEffect(Unit) { kotlinx.coroutines.delay(60); runCatching { focus.requestFocus() } }
         Box(modifier.fillMaxSize().background(page).trapAllFocusExit()) {
@@ -173,7 +175,7 @@ private fun CastGrid(cast: List<tv.own.owntv.core.metadata.CastMember>) {
             Column(Modifier.width(132.mpx), horizontalAlignment = Alignment.CenterHorizontally) {
                 val photo = tv.own.owntv.core.metadata.MetadataImages.profile(member.profilePath)
                 Box(
-                    Modifier.size(112.mpx).clip(RoundedCornerShape(56.mpx)).background(Color.White.copy(alpha = 0.06f)),
+                    Modifier.size(112.mpx).clip(RoundedCornerShape(56.mpx)).background(StageColors.Ink.copy(alpha = 0.06f)),
                     contentAlignment = Alignment.Center,
                 ) {
                     if (photo != null) {

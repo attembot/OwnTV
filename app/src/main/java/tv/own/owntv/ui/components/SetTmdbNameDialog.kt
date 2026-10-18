@@ -4,7 +4,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,7 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
@@ -42,7 +41,7 @@ import tv.own.owntv.ui.theme.stageAccent
 import tv.own.owntv.ui.theme.stageText
 
 /**
- * "Set TMDB name" (plan §11.2 U5b) in the Stage design: the user types the exact title (+ optional year)
+ * "Set TMDB name" in the Stage design: the user types the exact title (+ optional year)
  * to search TMDB under, overriding the auto-normalized provider title — the escape hatch when a match is
  * wrong or was negative-cached for 7 days; saving forces a fresh re-resolve.
  *
@@ -69,7 +68,7 @@ fun SetTmdbNameDialog(
         val ime = LocalTvImeMetrics.current
         val density = LocalDensity.current
         BoxWithConstraints(
-            Modifier.fillMaxSize().background(Color(2, 5, 6).copy(alpha = 0.55f)).trapAllFocusExit().focusGroup(),
+            Modifier.fillMaxSize().background(StageColors.Scrim).trapAllFocusExit().focusGroup(),
             contentAlignment = if (ime.visible) Alignment.TopCenter else Alignment.Center,
         ) {
             val top = 40.mpx
@@ -97,17 +96,18 @@ fun SetTmdbNameDialog(
                     color = StageColors.Muted, modifier = Modifier.padding(top = 10.mpx, bottom = 24.mpx),
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(16.mpx)) {
-                    OwnTVTextField(
+                    tv.own.owntv.features.settings.StageFieldRow(
+                        icon = tv.own.owntv.ui.components.OwnTVIcon.PENCIL,
+                        label = stringResource(R.string.common_title),
                         value = title,
                         onValueChange = { title = it },
-                        label = stringResource(R.string.common_title),
-                        modifier = Modifier.weight(1f),
-                        focusRequester = titleFocus,
+                        modifier = Modifier.weight(1f).focusRequester(titleFocus),
                     )
-                    OwnTVTextField(
+                    tv.own.owntv.features.settings.StageFieldRow(
+                        icon = tv.own.owntv.ui.components.OwnTVIcon.PENCIL,
+                        label = stringResource(R.string.setup_year_optional),
                         value = year,
                         onValueChange = { s -> year = s.filter { it.isDigit() }.take(4) },
-                        label = stringResource(R.string.setup_year_optional),
                         modifier = Modifier.width(200.mpx),
                         keyboardType = KeyboardType.Number,
                     )

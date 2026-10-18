@@ -1,5 +1,7 @@
 package tv.own.owntv.player
 
+import tv.own.owntv.ui.theme.stageTone
+import tv.own.owntv.ui.theme.LocalStagePalette
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -81,9 +83,9 @@ import tv.own.owntv.ui.theme.animationsOn
 
 /**
  * The wide "now-playing" bar shown in the top bar (left of the weather chip) while [PlayerMode.AUDIO]
- * is active — Audio Mode plan §6. Video is stopped; only audio plays.
+ * is active. Video is stopped; only audio plays.
  *
- * **Two-stage focus (owner spec):**
+ * **Two-stage focus:**
  *  1. **Collapsed** — no D-pad focus: equaliser cover + title + a static play/pause glyph.
  *  2. **Stage 1 — pill focused:** focus lands on the WHOLE bar as one target (highlighted, expanded to
  *     show the full row). The inner buttons are NOT individually navigable yet.
@@ -197,7 +199,7 @@ fun AudioNowPlayingBar(
             .focusGroup(),
     ) {
         if (!expanded) {
-            // Rest (P1-08): a glass pill in the Continue pill's place — equaliser, "Now playing", title.
+            // Rest: a glass pill in the Continue pill's place — equaliser, "Now playing", title.
             Row(
                 Modifier.height(50.mpx).widthIn(max = 470.mpx).stageGlass(StageRadii.Pill).padding(horizontal = 18.mpx),
                 horizontalArrangement = Arrangement.spacedBy(10.mpx),
@@ -210,7 +212,7 @@ fun AudioNowPlayingBar(
                 Text(meta.title ?: "", style = stageText(18, 700), color = StageColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         } else {
-            // Focused (P1-09): the whole card is one target, drawn FX. OK (P1-10/11): the accent rim,
+            // Focused: the whole card is one target, drawn FX. OK: the accent rim,
             // and focus moves into the buttons.
             val r = 22.mpx
             Row(
@@ -296,6 +298,7 @@ fun AudioNowPlayingBar(
             // The progress hairline along the card's bottom edge (recordings only), inset 22.
             if (hasTime) {
                 val lineColor = accent.accent
+                val track = StageColors.Ink.copy(alpha = 0.12f)
                 Box(
                     Modifier.matchParentSize().drawBehind {
                         val inset = 22.mpx.toPx()
@@ -304,7 +307,7 @@ fun AudioNowPlayingBar(
                         val frac = (positionState.value.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
                         val top = size.height - h
                         val corner = CornerRadius(2.mpx.toPx())
-                        drawRoundRect(Color.White.copy(alpha = 0.12f), Offset(inset, top), Size(w, h), corner)
+                        drawRoundRect(track, Offset(inset, top), Size(w, h), corner)
                         val x = if (layoutDirection == LayoutDirection.Rtl) inset + w * (1 - frac) else inset
                         drawRoundRect(lineColor, Offset(x, top), Size(w * frac, h), corner)
                     },
@@ -372,7 +375,7 @@ private fun pulse(): Float {
 }
 
 /**
- * Bars that dance while [playing] and freeze flat when paused (Audio Mode plan §3/§6). Also stands in
+ * Bars that dance while [playing] and freeze flat when paused. Also stands in
  * for the missing picture on the sidebar's Now Playing item while Audio Mode is running.
  */
 @Composable
@@ -444,7 +447,8 @@ private fun AudioBtn(
             .focusRequester(requesters[slot])
             .onFocusChanged { if (it.isFocused) onFocused(slot) }
             .focusProperties { canFocus = focusable && enabled },
-        idle = if (big) Modifier.background(Color.White.copy(alpha = 0.10f), CircleShape) else Modifier,
+        // `.audc .ab.big`: ink 10% (8% in light).
+        idle = if (big) Modifier.background(StageColors.Ink.copy(alpha = if (LocalStagePalette.current.isLight) 0.08f else 0.10f), CircleShape) else Modifier,
         contentAlignment = Alignment.Center,
     ) { focused ->
         OwnTVIcon(
@@ -452,7 +456,7 @@ private fun AudioBtn(
             tint = when {
                 focused -> a.onAccent
                 favorite -> colors.favorite
-                else -> Color(0xFFE6EEEA)
+                else -> stageTone(Color(0xFFE6EEEA), StageColors.ItemText)
             },
             filled = favorite || icon == OwnTVIcon.PLAY,
             modifier = Modifier.size(if (big) 24.mpx else 21.mpx),

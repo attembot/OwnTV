@@ -46,7 +46,7 @@ fun BackgroundImageChooserDialog(
     onClear: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    // A Stage popup with the three sources as rows (owner, P12): from this TV, by Remote, or clear.
+    // A Stage popup with the three sources as rows: from this TV, by Remote, or clear.
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) { kotlinx.coroutines.delay(60); runCatching { first.requestFocus() } }
     tv.own.owntv.ui.stage.StagePopup(

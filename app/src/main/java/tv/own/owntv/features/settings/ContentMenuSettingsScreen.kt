@@ -42,7 +42,6 @@ import tv.own.owntv.core.menu.catalogue
 import tv.own.owntv.core.model.ContentMenu
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.trapAllFocusExit
-import tv.own.owntv.ui.theme.OwnTVTheme
 
 @Composable
 private fun menuTitle(menu: ContentMenu) = stringResource(
@@ -76,7 +75,7 @@ fun ContentMenuSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier)
     val rowFocus = remember { ContentMenu.entries.associateWith { FocusRequester() } }
     var openMenu by remember { mutableStateOf<ContentMenu?>(null) }
     LaunchedEffect(Unit) { runCatching { rowFocus.getValue(ContentMenu.LIVE).requestFocus() } }
-    // P10B-19: four menu rows and Reset; the panel lists the focused menu's actions in their order.
+    // Four menu rows and Reset; the panel lists the focused menu's actions in their order.
     val about = stringResource(R.string.settings_content_menus_description)
     StageFullPage(
         parents = listOf(stringResource(R.string.settings_group_layout)),
@@ -125,7 +124,7 @@ fun ContentMenuSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier)
             onClick = { ContentMenu.entries.forEach { vm.setMenuOrder(it, emptyList()) } },
             help = SettingHelp(reset, about, hints = settingHints(null, pinnable = false)),
         )
-        // Arranged in the page's panel (owner, P12).
+        // Arranged in the page's panel.
         openMenu?.let { menu ->
             ArrangeMenuOverlay(
                 menu = menu,
@@ -138,7 +137,7 @@ fun ContentMenuSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier)
 }
 
 /**
- * One menu's actions in the Move overlay — the same panel the owner reorders channels with, except
+ * One menu's actions in the Move overlay — the same panel channels are reordered with, except
  * the item being carried is chosen here rather than handed in: hold OK on an action to pick it up,
  * Up/Down to carry it, OK to put it down.
  */
@@ -149,7 +148,6 @@ private fun ArrangeMenuOverlay(
     onCancel: () -> Unit,
 ) {
     val vm: SettingsViewModel = koinViewModel()
-    val colors = OwnTVTheme.colors
     val refs = catalogue(menu)
     // Wait for DataStore's first real value before seeding. An eager empty placeholder would make
     // every reopened editor show the shipped order even when a custom order is already saved.
@@ -224,7 +222,7 @@ private fun ArrangeMenuRow(
     modifier: Modifier = Modifier,
 ) {
     // A held OK raises the long press first and the plain click when the key is finally released,
-    // which would pick the action up and immediately put it back down. Same guard as Row2.
+    // which would pick the action up and immediately put it back down.
     var longAt by remember { androidx.compose.runtime.mutableLongStateOf(0L) }
     val a = tv.own.owntv.ui.theme.stageAccent
     tv.own.owntv.ui.stage.StageSurface(

@@ -42,7 +42,7 @@ internal fun DayStepperDialog(
             confirm = true,
         )
     }
-    // On a settings page it opens in the panel (owner, P12); elsewhere a Stage popup.
+    // On a settings page it opens in the panel; elsewhere a Stage popup.
     if (tv.own.owntv.features.settings.panelEditor(onDismiss) { stepper() }) return
     tv.own.owntv.ui.stage.StagePopup(onDismiss = onDismiss, title = title, body = hint, width = 760.mpx) { stepper() }
 }

@@ -1,11 +1,7 @@
 package tv.own.owntv.features.subtitles
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
-import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,19 +12,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import tv.own.owntv.R
 import tv.own.owntv.ui.theme.mpx
 import tv.own.owntv.core.database.dao.LinkedSubtitle
 import tv.own.owntv.ui.components.OwnTVIcon
-import tv.own.owntv.ui.components.dialogPanel
-import tv.own.owntv.ui.components.modalScrim
-import tv.own.owntv.ui.components.trapAllFocusExit
-import tv.own.owntv.ui.theme.PopupFontTheme
 
 /**
- * Per-item "Delete subtitles" popup opened from a movie/episode long-press (subtitle plan §11).
+ * Per-item "Delete subtitles" popup opened from a movie/episode long-press.
  * Lists that item's downloaded subtitles; tapping one deletes it individually. Shares the app's selected
  * popup styling. [items] is re-supplied by the caller after each delete (empty → the caller closes).
  */

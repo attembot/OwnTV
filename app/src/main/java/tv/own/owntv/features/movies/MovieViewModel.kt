@@ -41,7 +41,6 @@ import tv.own.owntv.core.customize.SectionCustomizations
 import tv.own.owntv.core.customize.applyCustomizations
 import tv.own.owntv.core.customize.CategoryMove
 import tv.own.owntv.core.customize.CategoryRailEditor
-import tv.own.owntv.core.customize.MoveKind
 import tv.own.owntv.core.customize.railCategories
 import tv.own.owntv.core.database.dao.CategoryDao
 import tv.own.owntv.core.database.dao.ContentOrderDao
@@ -63,6 +62,9 @@ import tv.own.owntv.core.launcher.LauncherIntegrationRepository
 import tv.own.owntv.core.model.MediaType
 import tv.own.owntv.core.util.throttleLatest
 import tv.own.owntv.features.customize.MoveTarget
+import tv.own.owntv.core.customize.CategoryRestorePlan
+import tv.own.owntv.core.customize.planCategoryRestore
+import tv.own.owntv.core.customize.restoreCategoryToDefault
 import tv.own.owntv.features.live.LiveRailItem
 import tv.own.owntv.core.download.DownloadManager
 import tv.own.owntv.core.storage.StorageAccess
@@ -79,7 +81,7 @@ import tv.own.owntv.core.settings.SourceOverrides
 
 class MovieViewModel(
     private val movieDao: MovieDao,
-    /** Lets the browse screen tell core's drain which category to fill first (core's N1c). */
+    /** Lets the browse screen tell core's drain which category to fill first. */
     private val catalogPriority: tv.own.owntv.core.sync.CatalogPriority,
     private val categoryDao: CategoryDao,
     private val favoriteDao: FavoriteDao,
@@ -140,7 +142,7 @@ class MovieViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
-    /** Contexts that actually have manual-order rows (C3): only those folders pay the
+    /** Contexts that actually have manual-order rows: only those folders pay the
      *  unindexable content_order join-sort; everything else stays on the plain indexed query. */
     private val orderedContexts: StateFlow<Set<String>> = ctx
         .flatMapLatest { c ->
@@ -181,7 +183,7 @@ class MovieViewModel(
     /** The stable key of a provider folder ([null] when the folder vanished) — the Move dialog's origin. */
     fun folderKey(id: Long): String? = folderContextKeys.value[id]
 
-    /** Creates a custom category (issue #87) — the Move dialog's "＋ New category…" flow. */
+    /** Creates a custom category — the Move dialog's "＋ New category…" flow. */
     fun createCustomCategory(name: String) {
         viewModelScope.launch {
             val pid = currentProfileId() ?: return@launch
@@ -190,7 +192,7 @@ class MovieViewModel(
     }
 
     /**
-     * Moves (or copies, [keepInOrigin]) one movie into a custom category (issue #87). The item is
+     * Moves (or copies, [keepInOrigin]) one movie into a custom category. The item is
      * appended at the category's tail (maxPosition + 1). Without [keepInOrigin] the item leaves its
      * origin: a favorite row is deleted, a custom-category membership row is deleted, and a provider
      * folder is marked in movedFromOrigin — the pager chain then drops it from that folder while
@@ -273,9 +275,9 @@ class MovieViewModel(
     val selectedMovie: StateFlow<MovieEntity?> = _selectedMovie.asStateFlow()
 
     /**
-     * On-demand TMDB enrichment for the focused movie (plan §7.2: detail screens resolve lazily). Debounced
+     * On-demand TMDB enrichment for the focused movie (detail screens resolve lazily). Debounced
      * so scrolling fast doesn't fire a lookup per card; cached in Room so a second focus is instant. Null
-     * when enrichment is off or no confident match — the UI then shows pure provider data (§7.1).
+     * when enrichment is off or no confident match — the UI then shows pure provider data.
      */
     /** Bumped by [refetchMovieMeta] to force the focused movie's TMDB resolve to re-run after clearing its cache. */
     private val _metaRefreshTick = MutableStateFlow(0L)
@@ -322,7 +324,7 @@ class MovieViewModel(
 
     fun onPosterlessVisible(movies: List<MovieEntity>) { _posterProbe.value = movies }
 
-    /** Source mode (plan §4.1) — the detail pane uses it to flip provider/TMDB field precedence. */
+    /** Source mode — the detail pane uses it to flip provider/TMDB field precedence. */
     val metadataMode: StateFlow<tv.own.owntv.core.metadata.MetadataMode> = settings.metadataMode
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.core.metadata.MetadataMode.PROVIDER_PLUS_TMDB)
 
@@ -390,7 +392,7 @@ class MovieViewModel(
             ) { cats, cust, sort, profile ->
                 // A–Z also sorts the category folders (custom categories included); manually moved
                 // categories stay pinned first. Custom categories ride the SAME customization keys,
-                // so renames/hides/reorders apply to them with no extra code (#87).
+                // so renames/hides/reorders apply to them with no extra code.
                 val folders = cats.railCategories(
                     cust,
                     kids = profile?.isKids == true,
@@ -417,7 +419,7 @@ class MovieViewModel(
         _selected, ctx, _search.map { it.trim() }.debounce(300).distinctUntilChanged(), sortMode, _listRefresh,
     ) { key, c, query, sort, _ -> Args(key, c, query, sort) }
         .combine(custResolved) { args, cs -> args to cs }
-        // Rebuild the pager when a folder gains/loses manual order (C3): the fast-path plain
+        // Rebuild the pager when a folder gains/loses manual order: the fast-path plain
         // PagingSource doesn't observe content_order, so the switch must recreate it.
         .combine(orderedContexts) { p, _ -> p }
         .flatMapLatest { (args, cs) ->
@@ -447,7 +449,7 @@ class MovieViewModel(
     private data class Args(val key: LiveKey, val ctx: Ctx, val query: String, val sort: SettingsRepository.SortMode)
 
     val count: StateFlow<Int> = combine(_selected, ctx, hiddenCategoryIds) { key, c, hidden -> Triple(key, c, hidden) }
-        .flatMapLatest { (key, c, hidden) -> countFlow(key, c, hidden).throttleLatest() } // C2: cap live COUNT re-runs during bulk sync
+        .flatMapLatest { (key, c, hidden) -> countFlow(key, c, hidden).throttleLatest() } // Cap live COUNT re-runs during bulk sync
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
     /** The count beside every category (Stage sheet / column): one grouped query for the folders. */
@@ -527,7 +529,7 @@ class MovieViewModel(
         if (lockedKey != null) return
         _selected.value = key
         // Core's lazy-catalogue drain fills categories in the provider's order; tell it the user is
-        // here so this one is served next (core's N1c). A no-op for every playlist that was not
+        // here so this one is served next. A no-op for every playlist that was not
         // lazily added, and for a category that is already complete.
         if (key is LiveKey.Folder) {
             viewModelScope.launch { runCatching { catalogPriority.requestFirst(key.id) } }
@@ -565,7 +567,7 @@ class MovieViewModel(
     fun revealDone() { _reveal.value = null }
 
     /**
-     * Manual "Refetch TMDB details" (plan §11.2 U5a): clear this movie's cached match/details (incl. a 7-day
+     * Manual "Refetch TMDB details": clear this movie's cached match/details (incl. a 7-day
      * negative cache) and re-trigger [resolveMovie] for the focused movie via the meta-refresh tick.
      */
     fun refetchMovieMeta(movie: MovieEntity) {
@@ -578,7 +580,7 @@ class MovieViewModel(
     }
 
     /**
-     * Prefill for the "Set TMDB name" dialog (plan §11.2 U5b): the saved override if any, else the cleaned
+     * Prefill for the "Set TMDB name" dialog: the saved override if any, else the cleaned
      * provider title. [hasOverride] drives the dialog's Clear button.
      */
     data class TmdbNamePrefill(val title: String, val year: Int?, val hasOverride: Boolean)
@@ -589,7 +591,7 @@ class MovieViewModel(
         return TmdbNamePrefill(norm.query, movie.year ?: norm.year, hasOverride = false)
     }
 
-    /** Save the hand-typed override and force a re-resolve under the new query (plan §11.2 U5b). */
+    /** Save the hand-typed override and force a re-resolve under the new query. */
     fun setMovieTmdbName(movie: MovieEntity, title: String, year: Int?) {
         viewModelScope.launch {
             runCatching { metadata.setMovieOverride(movie, title, year) }
@@ -598,7 +600,7 @@ class MovieViewModel(
         }
     }
 
-    /** Remove the override and re-resolve with the cleaned provider title (plan §11.2 U5b). */
+    /** Remove the override and re-resolve with the cleaned provider title. */
     fun clearMovieTmdbName(movie: MovieEntity) {
         viewModelScope.launch {
             runCatching { metadata.clearMovieOverride(movie) }
@@ -633,7 +635,7 @@ class MovieViewModel(
         }
     }
 
-    /** Phase B: long-press "Play with external player" — always external, regardless of the global toggle. */
+    /** Long-press "Play with external player" — always external, regardless of the global toggle. */
     fun playExternal(movie: MovieEntity) {
         viewModelScope.launch {
             val pid = currentProfileId()
@@ -646,6 +648,7 @@ class MovieViewModel(
                 title = movie.name,
                 userAgent = source?.userAgent,
                 httpHeaders = SourceOverrides.headersWithReferer(movie.httpHeaders, source),
+                startPositionMs = savedPositionMs(movie),
             )
             if (pid != null) {
                 runCatching {
@@ -663,7 +666,7 @@ class MovieViewModel(
             // in-app engine entirely. History is still recorded (recently-watched); resume position
             // and the playing-movie HUD/progress tick are intentionally not — the external app owns
             // playback and OwnTV can't observe it.
-            // #115 — a protected item cannot go to an external player: no standard intent extra
+            // A protected item cannot go to an external player: no standard intent extra
             // carries a licence URL, so the other app would open it and fail on the first segment.
             // Play it here instead, where the licence request can actually be made.
             if (settings.externalPlayerMovies.first() && movie.drmConfig == null) {
@@ -675,6 +678,7 @@ class MovieViewModel(
                     title = movie.name,
                     userAgent = source?.userAgent,
                     httpHeaders = SourceOverrides.headersWithReferer(movie.httpHeaders, source),
+                    startPositionMs = startPositionMs, // the screen's Resume / Start over answer
                 )
                 if (pid != null) {
                     runCatching {
@@ -710,9 +714,9 @@ class MovieViewModel(
                 vodEngineOverride = SourceOverrides.vodEngineOf(source),
                 drmConfig = movie.drmConfig,
                 manifestType = movie.manifestType,
-                // P6 — engine pins key on this, not on playUrl (a Stalker playUrl is minted per play).
+                // Engine pins key on this, not on playUrl (a Stalker playUrl is minted per play).
                 contentKey = pinKey,
-                // F12 — a Stalker create_link URL dies before a long film ends; give the player a way to
+                // A Stalker create_link URL dies before a long film ends; give the player a way to
                 // mint a fresh one instead of retrying the expired link. Null for M3U/Xtream, which also
                 // clears any provider the previous item left on the player.
                 reconnectProvider = if (streamUrlResolver.needsResolve(source)) {
@@ -725,8 +729,8 @@ class MovieViewModel(
             )
             _playingMovie.value = movie
             playingRef = pid?.let { PlayingRef(movie, it, pinKey) }
-            // Enable the player's OpenSubtitles search for this movie (subtitle plan §4). tmdbId is
-            // resolved from the metadata cache when available (review R7) for a stronger match.
+            // Enable the player's OpenSubtitles search for this movie. tmdbId is
+            // resolved from the metadata cache when available for a stronger match.
             if (pid != null) {
                 val tmdbId = runCatching { metadata.resolveMovie(movie)?.tmdbId?.toLong() }.getOrNull()
                 subtitleController.setMovie(pid, movie, tmdbId)
@@ -738,13 +742,6 @@ class MovieViewModel(
                     Log.w(TAG, "play history record failed movieId=${movie.id} profile=$pid", t)
                 }
             }
-        }
-    }
-
-    fun playById(movieId: Long, startPositionMs: Long = 0) {
-        viewModelScope.launch {
-            val movie = movieDao.getById(movieId) ?: return@launch
-            play(movie, startPositionMs)
         }
     }
 
@@ -777,7 +774,7 @@ class MovieViewModel(
         }
     }
 
-    /** Downloaded OpenSubtitles subtitles for this movie (long-press "Delete subtitles" popup, §11). */
+    /** Downloaded OpenSubtitles subtitles for this movie (long-press "Delete subtitles" popup). */
     suspend fun downloadedSubtitles(movie: MovieEntity): List<tv.own.owntv.core.database.dao.LinkedSubtitle> =
         subtitleController.downloadsForMovie(movie)
 
@@ -801,6 +798,35 @@ class MovieViewModel(
         }
     }
 
+    /** The content_order / movedFromOrigin context behind a rail key, or null for All / Favorites / History. */
+    private fun categoryContextKey(key: LiveKey): String? = when (key) {
+        is LiveKey.Folder -> folderContextKeys.value[key.id]
+        is LiveKey.Custom -> key.id
+        else -> null
+    }
+
+    /** What restoring [key]'s category to the playlist default would undo (empty when nothing). */
+    suspend fun categoryRestorePlan(key: LiveKey): CategoryRestorePlan {
+        val contextKey = categoryContextKey(key) ?: return CategoryRestorePlan()
+        val pid = currentProfileId() ?: return CategoryRestorePlan()
+        return planCategoryRestore(customize, contentOrderDao, pid, MediaType.MOVIE, contextKey, customCategoryDao) {
+            when (key) {
+                is LiveKey.Folder -> movieDao.snapshotByCategoryManual(key.id, pid, contextKey, Int.MAX_VALUE)
+                    .mapTo(HashSet()) { CustomizeKeys.movie(it) }
+                else -> customCategoryDao.stableItemKeys(pid, contextKey).toSet()
+            }
+        }
+    }
+
+    /** Back to the playlist's order and contents (see [restoreCategoryToDefault]). */
+    fun restoreCategory(key: LiveKey) {
+        val contextKey = categoryContextKey(key) ?: return
+        viewModelScope.launch {
+            val pid = currentProfileId() ?: return@launch
+            restoreCategoryToDefault(customize, contentOrderDao, pid, MediaType.MOVIE, contextKey, categoryRestorePlan(key))
+        }
+    }
+
     fun enterCategoryMoveMode(key: LiveKey) {
         if (key !is LiveKey.Folder && key !is LiveKey.Custom) return
         viewModelScope.launch {
@@ -815,12 +841,11 @@ class MovieViewModel(
         }
     }
 
-    fun moveCategoryUp() {
-        _categoryMoveState.value = _categoryMoveState.value?.moved(MoveKind.UP) ?: return
-    }
-
-    fun moveCategoryDown() {
-        _categoryMoveState.value = _categoryMoveState.value?.moved(MoveKind.DOWN) ?: return
+    fun moveCategory(from: Int, to: Int) {
+        val s = _categoryMoveState.value ?: return
+        if (from !in s.rows.indices || to !in s.rows.indices || from == to) return
+        val rows = s.rows.toMutableList().apply { add(to, removeAt(from)) }
+        _categoryMoveState.value = s.copy(rows = rows, activeIndex = to, targetKey = rows[to].key)
     }
 
     fun commitCategoryMove() {
@@ -927,22 +952,13 @@ class MovieViewModel(
     /** The sort the user was on before [enterMoveMode] switched the list to playlist order. */
     private var sortBeforeMove: SettingsRepository.SortMode? = null
 
-    fun moveUp() {
+    /** Takes the item being moved out and puts it back at [target]; the rest close up around it. */
+    /** Takes the item at [from] out and puts it back at [to]; the rest close up around it. */
+    fun move(from: Int, to: Int) {
         val s = _moveState.value ?: return
-        if (s.activeIndex == 0) return
-        val list = s.items.toMutableList()
-        val i = s.activeIndex
-        list[i - 1] = s.items[i]; list[i] = s.items[i - 1]
-        _moveState.value = s.copy(items = list, activeIndex = i - 1)
-    }
-
-    fun moveDown() {
-        val s = _moveState.value ?: return
-        if (s.activeIndex == s.items.size - 1) return
-        val list = s.items.toMutableList()
-        val i = s.activeIndex
-        list[i + 1] = s.items[i]; list[i] = s.items[i + 1]
-        _moveState.value = s.copy(items = list, activeIndex = i + 1)
+        if (from !in s.items.indices || to !in s.items.indices || from == to) return
+        val list = s.items.toMutableList().apply { add(to, removeAt(from)) }
+        _moveState.value = s.copy(items = list, activeIndex = to)
     }
 
     fun commitMove() {
@@ -1012,7 +1028,7 @@ class MovieViewModel(
                 when {
                     rating -> movieDao.pagingByCategoryRating(key.id)
                     dateAdded -> movieDao.pagingByCategoryDateAdded(key.id)
-                    // C3 fast path: no manual order in this folder → the plain indexed query has
+                    // Fast path: no manual order in this folder → the plain indexed query has
                     // the identical (sortOrder, name) order without the join-sort.
                     ctxKey !in orderedContexts.value -> movieDao.pagingByCategory(key.id)
                     else -> movieDao.pagingByCategoryManual(key.id, c.profileId, ctxKey)

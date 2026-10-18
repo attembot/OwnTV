@@ -30,11 +30,14 @@ import tv.own.owntv.ui.theme.subtitleFontResource
 class OwnTVApp : Application(), SingletonImageLoader.Factory, androidx.work.Configuration.Provider {
 
     companion object {
-        /** Upper bound for the image disk cache — the value it was fixed at before ST6. */
+        /** Upper bound for the image disk cache — the value it was once fixed at. */
         private const val MAX_IMAGE_CACHE_BYTES = 250L * 1024 * 1024
 
         /** Lower bound: below this the cache thrashes and stops saving any downloads. */
         private const val MIN_IMAGE_CACHE_BYTES = 32L * 1024 * 1024
+
+        /** Sports' Auto rebuild waits this long after launch, so it never competes with the first screen. */
+        private const val SPORTS_START_DELAY_MS = 15_000L
     }
 
     /** Application-lifetime scope for small fire-and-forget IO that must not touch the launch path. */
@@ -126,14 +129,18 @@ class OwnTVApp : Application(), SingletonImageLoader.Factory, androidx.work.Conf
             settings = GlobalContext.get().get(),
             archiveStore = GlobalContext.get().get(),
         )
-        // The Stage UI's own defaults, once per install (owner, 2026-10-02): Docked · Compact rail, glass
+        // The Stage UI's own defaults, once per install: Docked · Compact rail, glass
         // on at 50%, the Stage background; Movies & Series keep an update's layout.
         appScope.launch {
             runCatching {
-                GlobalContext.get().get<tv.own.owntv.core.settings.SettingsRepository>().applyStageDefaults(
-                    tv.own.owntv.core.theme.GlassConfig(tv.own.owntv.ui.theme.ALL_GLASS_SURFACES).toBitmask(),
-                )
+                GlobalContext.get().get<tv.own.owntv.core.settings.SettingsRepository>().applyStageDefaults()
             }
+        }
+        // Sports: core decides from Auto rebuild whether the stored board is due ("on every app start",
+        // or older than the chosen hours). It reads one small file and touches no database.
+        appScope.launch {
+            kotlinx.coroutines.delay(SPORTS_START_DELAY_MS)
+            runCatching { GlobalContext.get().get<tv.own.owntv.core.sports.SportsRepository>().appStarted() }
         }
         // NOTE: cold start does ZERO heavy DB work. Index + ANALYZE maintenance is piggy-backed onto the
         // operation that actually changes the data — ImportFinalizer.finalize() for normal re-syncs, the
@@ -190,7 +197,7 @@ class OwnTVApp : Application(), SingletonImageLoader.Factory, androidx.work.Conf
     }
 
     /**
-     * ST6 — size the poster/logo disk cache against the storage the box actually has: 5% of free
+     * Size the poster/logo disk cache against the storage the box actually has: 5% of free
      * space, capped at the previous fixed 250 MB and floored at 32 MB (below that the cache stops
      * being worth having). A 220k-item catalog *will* reach whatever cap it is given, so on a nearly
      * full 8 GB box the fixed number was competing with downloads and app updates for the last

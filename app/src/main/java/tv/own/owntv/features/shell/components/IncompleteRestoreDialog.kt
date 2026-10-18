@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import tv.own.owntv.R
 
 /**
- * Shown at launch when a backup restore was interrupted (B2). A restore spans the database and
+ * Shown at launch when a backup restore was interrupted. A restore spans the database and
  * several preference files, so an unlucky kill can leave it half-applied — a merge, so nothing was
  * deleted, but some sections may simply not be there. Rather than let that pass unnoticed, the app
  * says so and points at the fix: run the same restore again (it's idempotent — a re-run merges the

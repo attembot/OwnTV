@@ -34,9 +34,6 @@ import tv.own.owntv.ui.theme.mpx
 import tv.own.owntv.core.database.entity.ProfileEntity
 import tv.own.owntv.ui.components.OwnTVAvatar
 import tv.own.owntv.ui.components.OwnTVAvatars
-import tv.own.owntv.ui.components.OwnTVButton
-import tv.own.owntv.ui.components.OwnTVButtonStyle
-import tv.own.owntv.ui.components.OwnTVTextField
 
 /** The profile dialogs' Stage popup: [title], [content], [buttons] bottom right. It scrolls, so small
  *  screens still reach the lower controls; the popup window keeps D-pad focus inside. */
@@ -71,24 +68,29 @@ private fun PinDialogBody(title: String, onSubmit: (String) -> Unit, onDismiss: 
     ProfileScrim(
         onDismiss, title = title, width = if (compact) 560.mpx else 700.mpx,
         buttons = {
-            OwnTVButton(
-                stringResource(R.string.common_cancel), onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY,
+            tv.own.owntv.ui.stage.StagePopupButton(
+                stringResource(R.string.common_cancel),
+                onClick = onDismiss,
                 modifier = Modifier.focusRequester(cancelFocus).focusProperties { end = okFocus },
+                primary = false,
             )
-            OwnTVButton(
-                stringResource(R.string.common_ok), onClick = { onSubmit(pin) }, enabled = pin.length >= 4,
+            tv.own.owntv.ui.stage.StagePopupButton(
+                stringResource(R.string.common_ok),
+                onClick = { onSubmit(pin) },
                 modifier = Modifier.focusRequester(okFocus).focusProperties { start = cancelFocus },
+                enabled = pin.length >= 4,
             )
         },
     ) {
-        OwnTVTextField(
+        tv.own.owntv.features.settings.StageFieldRow(
+            icon = tv.own.owntv.ui.components.OwnTVIcon.PENCIL,
+            label = stringResource(R.string.profiles_pin),
             value = pin,
             onValueChange = { if (it.length <= 6 && it.all(Char::isDigit)) pin = it },
-            label = stringResource(R.string.profiles_pin),
-            placeholder = stringResource(R.string.profiles_pin_placeholder),
-            keyboardType = KeyboardType.NumberPassword,
-            isPassword = true,
             modifier = Modifier.fillMaxWidth().focusRequester(focus),
+            placeholder = stringResource(R.string.profiles_pin_placeholder),
+            password = true,
+            keyboardType = KeyboardType.NumberPassword,
         )
     }
 }
@@ -100,19 +102,29 @@ private fun PinDialogBody(title: String, onSubmit: (String) -> Unit, onDismiss: 
  *
  * [takenNames] are the OTHER profiles' names (lowercased) — profile names must be unique (they're the
  * merge key for backup restore), so a collision blocks Create/Save with an inline error.
+ *
+ * A picture of the user's own: on an existing profile [onPickPicture] / [onClearPicture] apply it at
+ * once, as the phone does, and [customPath] is the one it has now. A new profile has no id to store
+ * one under yet, so the dialog holds the chosen file and hands it to [onConfirm] with the rest.
  */
 @Composable
 internal fun ProfileEditorDialog(
     initial: ProfileEntity?,
-    onConfirm: (name: String, avatarId: Int, isKids: Boolean, pin: String?) -> Unit,
+    onConfirm: (name: String, avatarId: Int, isKids: Boolean, pin: String?, picture: java.io.File?) -> Unit,
     onDismiss: () -> Unit,
     takenNames: Set<String> = emptySet(),
+    customPath: String = "",
+    onPickPicture: ((java.io.File) -> Unit)? = null,
+    onClearPicture: (() -> Unit)? = null,
 ) {
     var name by remember { mutableStateOf(initial?.name ?: "") }
-    var avatarId by remember { mutableIntStateOf(initial?.avatarId ?: -1) } // Phase 7 — new profiles default to no-avatar
+    var avatarId by remember { mutableIntStateOf(initial?.avatarId ?: -1) } // new profiles default to no avatar
     var isKids by remember { mutableStateOf(initial?.isKids ?: false) }
     var pin by remember { mutableStateOf("") }
     var removePin by remember { mutableStateOf(false) }
+    var pendingPicture by remember { mutableStateOf<java.io.File?>(null) }
+    var choosingPicture by remember { mutableStateOf(false) }
+    val picturePath = pendingPicture?.absolutePath ?: customPath
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     val nameTaken = name.trim().isNotEmpty() && name.trim().lowercase() in takenNames
@@ -121,15 +133,22 @@ internal fun ProfileEditorDialog(
         onDismiss,
         title = stringResource(if (initial == null) R.string.profiles_new else R.string.profiles_edit),
         buttons = {
-            OwnTVButton(stringResource(R.string.common_cancel), onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY)
-            OwnTVButton(
-                label = stringResource(if (initial == null) R.string.profiles_create else R.string.profiles_save),
-                onClick = { onConfirm(name, avatarId, isKids, if (removePin) "" else pin.takeIf { it.isNotBlank() }) },
+            tv.own.owntv.ui.stage.StagePopupButton(stringResource(R.string.common_cancel), onClick = onDismiss, primary = false)
+            tv.own.owntv.ui.stage.StagePopupButton(
+                stringResource(if (initial == null) R.string.profiles_create else R.string.profiles_save),
+                onClick = { onConfirm(name, avatarId, isKids, if (removePin) "" else pin.takeIf { it.isNotBlank() }, pendingPicture) },
                 enabled = name.isNotBlank() && !nameTaken && (removePin || pin.isEmpty() || pin.length >= 4),
             )
         },
     ) {
-        OwnTVTextField(name, { name = it }, label = stringResource(R.string.profiles_name), placeholder = stringResource(R.string.profiles_name_hint), modifier = Modifier.fillMaxWidth().focusRequester(focus))
+        tv.own.owntv.features.settings.StageFieldRow(
+            icon = tv.own.owntv.ui.components.OwnTVIcon.PENCIL,
+            label = stringResource(R.string.profiles_name),
+            value = name,
+            onValueChange = { name = it },
+            modifier = Modifier.fillMaxWidth().focusRequester(focus),
+            placeholder = stringResource(R.string.profiles_name_hint),
+        )
         if (nameTaken) {
             Text(
                 stringResource(R.string.profiles_name_taken),
@@ -140,7 +159,7 @@ internal fun ProfileEditorDialog(
         tv.own.owntv.ui.stage.StagePopupLabel(stringResource(R.string.profiles_avatar).uppercase(), Modifier.padding(top = 18.mpx))
         val accent = stageAccent.accent
         LazyRow(horizontalArrangement = Arrangement.spacedBy(14.mpx), contentPadding = androidx.compose.foundation.layout.PaddingValues(6.mpx)) {
-            items((-1 until OwnTVAvatars.COUNT).toList()) { id -> // Phase 7 — includes "no avatar" (-1)
+            items((-1 until OwnTVAvatars.COUNT).toList()) { id -> // includes "no avatar" (-1)
                 tv.own.owntv.ui.stage.StageSurface(
                     onClick = { avatarId = id },
                     radius = 44.mpx,
@@ -153,6 +172,14 @@ internal fun ProfileEditorDialog(
                 }
             }
         }
+        tv.own.owntv.ui.stage.StagePopupOption(
+            title = stringResource(R.string.profiles_avatar_own_picture),
+            onClick = { choosingPicture = true },
+            leading = {
+                if (picturePath.isNotBlank()) OwnTVAvatar(avatarId = avatarId, imagePath = picturePath, modifier = Modifier.size(44.mpx))
+                else tv.own.owntv.ui.stage.StagePopupIcon(tv.own.owntv.ui.components.OwnTVIcon.IMAGE)
+            },
+        )
         tv.own.owntv.ui.stage.StagePopupDivider()
         ToggleRow(label = stringResource(R.string.profiles_kids), desc = stringResource(R.string.profiles_kids_description), checked = isKids) { isKids = it }
         if (initial?.pinHash != null) {
@@ -160,16 +187,31 @@ internal fun ProfileEditorDialog(
         }
         if (!removePin) {
             Spacer(Modifier.height(14.mpx))
-            OwnTVTextField(
+            tv.own.owntv.features.settings.StageFieldRow(
+                icon = tv.own.owntv.ui.components.OwnTVIcon.PENCIL,
+                label = if (initial?.pinHash != null) stringResource(R.string.profiles_change_pin) else stringResource(R.string.profiles_optional_pin),
                 value = pin,
                 onValueChange = { if (it.length <= 6 && it.all(Char::isDigit)) pin = it },
-                label = if (initial?.pinHash != null) stringResource(R.string.profiles_change_pin) else stringResource(R.string.profiles_optional_pin),
-                placeholder = stringResource(R.string.profiles_pin_digits),
-                keyboardType = KeyboardType.NumberPassword,
-                isPassword = true,
                 modifier = Modifier.fillMaxWidth(),
+                placeholder = stringResource(R.string.profiles_pin_digits),
+                password = true,
+                keyboardType = KeyboardType.NumberPassword,
             )
         }
+    }
+    if (choosingPicture) {
+        ProfilePictureChooser(
+            hasImage = picturePath.isNotBlank(),
+            onPicked = { file ->
+                if (onPickPicture != null) onPickPicture(file) else pendingPicture = file
+                choosingPicture = false
+            },
+            onClear = {
+                if (onClearPicture != null) onClearPicture() else pendingPicture = null
+                choosingPicture = false
+            },
+            onDismiss = { choosingPicture = false },
+        )
     }
 }
 

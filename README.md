@@ -93,7 +93,9 @@ Questions, ideas, bug reports — **join the OwnTV Telegram group:**
 - Offline movies and episodes with pause, resume, retry and a storage bar
 
 ### 🎨 Look & robustness
-- Material 3 theming, your own accent and focus highlight, and an interaction-aware **Glass Effect**
+- Your own accent colour and focus highlight, frosted **Glass** with adjustable opacity, and a Stage,
+  Picture or Plain background
+- **Dark and Light themes** (or follow the TV) across the whole app, the player included
 - Font sizing for the interface and for popups, independently
 - **Remote Shortcuts** — map spare colour, number, channel and media keys to 26 actions
 - **26 interface languages**, RTL-aware, chosen before anything else on a fresh install
@@ -183,7 +185,6 @@ OwnTV_Mobile/  (separate repo, the phone and tablet app on the same core)
 - 📖 **[User Guide](extras/USER_GUIDE.md)** — every feature and where to find it.
 - 📄 **[Master Product Brief](extras/OwnTV_Master_Product_Brief.md)** — the full as-built feature and
   architecture reference.
-- 📺 **[Player design reference](extras/player.html)** — an interactive mockup of the player UI.
 
 ## 📥 Installing (Fire TV / Android TV)
 

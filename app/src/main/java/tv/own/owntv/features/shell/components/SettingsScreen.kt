@@ -1,5 +1,6 @@
 package tv.own.owntv.features.shell.components
 
+import tv.own.owntv.ui.theme.StageColors
 import tv.own.owntv.features.settings.SettingValue
 import tv.own.owntv.features.settings.labelRes
 import tv.own.owntv.features.settings.AccentSwatches
@@ -14,7 +15,6 @@ import tv.own.owntv.features.settings.VideoPlayerGroupRows
 import tv.own.owntv.features.settings.settingHelp
 import tv.own.owntv.features.settings.videoGroupCount
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.border
@@ -23,73 +23,53 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.androidx.compose.koinViewModel
-import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import tv.own.owntv.R
 import tv.own.owntv.features.customize.CustomizeScreen
@@ -106,35 +86,17 @@ import tv.own.owntv.features.settings.BackupScreen
 import tv.own.owntv.features.settings.ManageSourcesScreen
 import tv.own.owntv.features.settings.SettingsViewModel
 import tv.own.owntv.core.nav.MainSection
-import tv.own.owntv.ui.components.BrandLockup
 import tv.own.owntv.ui.components.BrowseMode
-import tv.own.owntv.ui.components.FocusableSurface
-import tv.own.owntv.ui.components.OwnTVButton
-import tv.own.owntv.ui.components.dialogPanel
-import tv.own.owntv.ui.components.modalScrim
-import tv.own.owntv.ui.components.OwnTVButtonStyle
 import tv.own.owntv.ui.components.OwnTVIcon
-import tv.own.owntv.ui.components.displayText
-import tv.own.owntv.ui.components.ContentPanelFill
-import tv.own.owntv.ui.components.roundedPanel
 import tv.own.owntv.ui.components.StorageBrowser
 import tv.own.owntv.ui.components.BackgroundImageChooserDialog
 import tv.own.owntv.ui.components.ingestBackgroundImage
 import tv.own.owntv.ui.components.trapAllFocusExit
 import tv.own.owntv.ui.components.longPressMenuGuard
-import tv.own.owntv.ui.format.formatBestDateTime
-import tv.own.owntv.ui.theme.ALL_GLASS_SURFACES
 import tv.own.owntv.core.theme.GlassConfig
-import tv.own.owntv.ui.theme.GlassInteraction
-import tv.own.owntv.core.theme.GlassPreset
-import tv.own.owntv.core.theme.GlassSurface
-import tv.own.owntv.ui.theme.glass
 import tv.own.owntv.core.theme.AppFontFamily
 import tv.own.owntv.core.theme.FontCustomization
 import tv.own.owntv.core.theme.PopupSizeScale
-import tv.own.owntv.ui.theme.LocalGlass
-import tv.own.owntv.ui.theme.OwnTVTheme
-import tv.own.owntv.player.displayText
 import tv.own.owntv.core.theme.ThemeMode
 import tv.own.owntv.core.theme.UiZoom
 import kotlin.math.roundToInt
@@ -145,20 +107,7 @@ import tv.own.owntv.ui.theme.primary
 
 internal enum class TileTone { PRIMARY, SECONDARY, TERTIARY }
 
-/**
- * The icon-tile tone for the rows *inside* a settings sub-screen. A sub-screen is opened by exactly
- * one root row, so its rows take that row's tone — otherwise e.g. Weather is a grey tile on the root
- * list and an accent tile the moment you open it. Provided per sub-screen at the dispatch below;
- * anything not listed there stays PRIMARY.
- */
-internal val LocalSettingsRowTone = staticCompositionLocalOf { TileTone.PRIMARY }
-
-/** Wraps a sub-screen so its rows match the tone of the root row that opens it (see `rootItems`). */
-@Composable
-private fun Toned(tone: TileTone, content: @Composable () -> Unit) =
-    CompositionLocalProvider(LocalSettingsRowTone provides tone, content = content)
-
-private enum class SettingsTab { ROOT, LANGUAGE, SOURCES, EPG, BACKUP, LOCAL_SYNC, CUSTOMIZE, HOME, NETWORK, DNS, METADATA, OPEN_SUBTITLES, WEATHER, CH_NAV, PANEL_WIDTH, GUIDE_WIDTH, GLASS_EFFECT, CONTENT_MENUS, FONTS, BROWSING, SUBTITLE_STYLE }
+private enum class SettingsTab { ROOT, LANGUAGE, SOURCES, EPG, BACKUP, LOCAL_SYNC, CUSTOMIZE, HOME, NETWORK, DNS, METADATA, OPEN_SUBTITLES, WEATHER, CH_NAV, PANEL_WIDTH, GUIDE_WIDTH, GLASS_EFFECT, CONTENT_MENUS, FONTS, BROWSING, SUBTITLE_STYLE, SPORTS }
 
 @Composable
 internal fun surroundModeLabel(mode: SurroundMode): String = stringResource(
@@ -205,14 +154,14 @@ fun SettingsScreen(
     onOpenPlaylist: () -> Unit,
     modifier: Modifier = Modifier,
     /**
-     * Where Back from the **root** of this screen goes. Plan Z put Settings behind More, so leaving
+     * Where Back from the **root** of this screen goes. Settings sits behind More, so leaving
      * it should land on More rather than throw focus all the way out to the rail. Null keeps the old
      * behaviour, which is the shell's own handler.
      */
     onBack: (() -> Unit)? = null,
     openEpgAdd: Boolean = false,
     onEpgAddConsumed: () -> Unit = {},
-    /** More › Settings (until P10 redraws this screen): open at a root group, or with search open. */
+    /** More › Settings: open at a root group, or with search open. */
     start: SettingsStart? = null,
     onStartConsumed: () -> Unit = {},
 ) {
@@ -240,7 +189,7 @@ fun SettingsScreen(
     var showVodLayout by remember { mutableStateOf(false) }
     var showNavigation by remember { mutableStateOf(false) }
     var showLiveLayout by remember { mutableStateOf(false) }
-    // Stage P5's three pickers (Live TV opens in, Programme reminders, Reminder time): their state, rows,
+    // The three Stage pickers (Live TV opens in, Programme reminders, Reminder time): their state, rows,
     // search entries and dialogs live outside this function, which sits at the JVM's 64 KB method limit.
     val stageSettings = remember { StageSettingsState() }
     var showStartup by remember { mutableStateOf(false) }
@@ -251,14 +200,14 @@ fun SettingsScreen(
     var showBgPicker by remember { mutableStateOf(false) }
     var showBgRemote by remember { mutableStateOf(false) }
     var showAmbientGlow by remember { mutableStateOf(false) }
-    // U2 — background-image ingest copies a multi-megabyte file; it runs here, off the main thread.
+    // Background-image ingest copies a multi-megabyte file; it runs here, off the main thread.
     val ingestScope = rememberCoroutineScope()
 
     // Batch 4 · Settings search + quick toggles. Empty query = normal grouped list; a non-blank
     // query swaps the list for flat results that carry their group context ("Playback › HDR").
     var searchQuery by remember { mutableStateOf("") }
     // Search opened (from More, or a full page's search): the plain search page, even while the query
-    // is still empty — not the group that happens to be selected behind it (owner, P10B).
+    // is still empty — not the group that happens to be selected behind it.
     var searchMode by remember { mutableStateOf(false) }
     var searchFromMore by remember { mutableStateOf(false) }
     val searchFieldFocus = remember { FocusRequester() }
@@ -302,6 +251,9 @@ fun SettingsScreen(
     val saveScroll = { savedScrollPx = pageScroll.value }
     // The rows column: fresh entry and a lost focus land here, on the page's first row.
     val rowsFocus = remember { FocusRequester() }
+    // Opens the search field's keyboard as it appears, so one OK reaches typing (More's search box too).
+    var searchAutoEdit by remember { mutableStateOf(false) }
+    LaunchedEffect(searchAutoEdit) { if (searchAutoEdit) { kotlinx.coroutines.delay(1000); searchAutoEdit = false } }
     LaunchedEffect(start) {
         if (start == null) return@LaunchedEffect
         tab = SettingsTab.ROOT
@@ -309,7 +261,8 @@ fun SettingsScreen(
         if (start.search) {
             searchMode = true
             searchFromMore = true
-            for (attempt in 0 until 10) { kotlinx.coroutines.delay(50); if (runCatching { searchFieldFocus.requestFocus() }.isSuccess) break }
+            searchAutoEdit = true
+            for (attempt in 0 until 10) { kotlinx.coroutines.delay(50); if (runCatching { searchFieldFocus.requestFocus() }.getOrDefault(false)) break }
         }
         onStartConsumed()
     }
@@ -321,7 +274,7 @@ fun SettingsScreen(
     var dialogReturn by remember { mutableStateOf<FocusRequester?>(null) }
     LaunchedEffect(showZoom, showPopupSize, showTheme, showAccent, showUpdate, showCatchupTime, showCatchupSources, showCatchupSourceValue, showEpgOffset, showGuideDays, showAnimations, showStartup, showStartupChannelPicker, showAfrWarning, showLivePreviewPanelWarning, showBgImageChooser, showBgPicker, showAmbientGlow, showFocusHighlight, showBgRemote, showVodLayout, showNavigation, showLiveLayout, stageSettings.open) {
         // Only after a popup really closed: on first composition there is no opener, and holding a stale
-        // offset for the settle frames bounced the page (owner's video, 2026-10-03).
+        // offset for the settle frames bounced the page.
         if (!anyDialogOpen && dialogReturn != null) {
             // Focus back on the opener row, with the scroll offset held still the whole way — see
             // [restoreAfterDialogClose] for why doing those two in sequence made the highlight travel.
@@ -374,9 +327,6 @@ fun SettingsScreen(
     val rememberLastLive by settingsVm.rememberLastLive.collectAsStateWithLifecycle()
     val rememberLastMovies by settingsVm.rememberLastMovies.collectAsStateWithLifecycle()
     val rememberLastSeries by settingsVm.rememberLastSeries.collectAsStateWithLifecycle()
-    val rememberCatLive by settingsVm.rememberCategoryLive.collectAsStateWithLifecycle()
-    val rememberCatMovies by settingsVm.rememberCategoryMovies.collectAsStateWithLifecycle()
-    val rememberCatSeries by settingsVm.rememberCategorySeries.collectAsStateWithLifecycle()
     // "Custom" on the Panel Width row as soon as any one of the three sections is switched on.
     val panelWidthLive by settingsVm.panelWidthEnabled.getValue(tv.own.owntv.core.settings.PanelSection.LIVE).collectAsStateWithLifecycle()
     val panelWidthMovies by settingsVm.panelWidthEnabled.getValue(tv.own.owntv.core.settings.PanelSection.MOVIES).collectAsStateWithLifecycle()
@@ -411,8 +361,8 @@ fun SettingsScreen(
 
     // Restore focus to the row a sub-screen was opened from when the user navigates back.
     var lastTab by rememberSaveable { mutableStateOf<SettingsTab?>(null) }
-    var searchAutoEdit by remember { mutableStateOf(false) }
-    LaunchedEffect(searchAutoEdit) { if (searchAutoEdit) { kotlinx.coroutines.delay(1000); searchAutoEdit = false } }
+    // The Sports hub's Settings button: straight to Settings → Sports; Back lands on its row. After the
+    // start effect above (which resets to the root), so this one wins.
     // Built from the enum, not hand-listed. It used to be a literal map of twenty entries, and
     // adding SettingsTab.RECORDING without adding a line to it crashed the whole Settings screen
     // with "Key RECORDING is missing in the map" — a `getValue` on a map that had quietly gone
@@ -447,10 +397,9 @@ fun SettingsScreen(
         if (openEpgAdd) { consumeEpgAdd = true; open(SettingsTab.EPG); onEpgAddConsumed() }
     }
 
-    // Settings now has the Stage canvas (P10). The sub-screens it opens are not redrawn yet, so they keep
-    // the inset they had under the old top bar.
+    // Sub-screens sit below the status cluster (StageContentTop), 6 dp in from the edges.
     val sub = modifier.padding(start = 6.dp, end = 6.dp, bottom = 6.dp, top = StageContentTop)
-    // A full page's search hands over to Settings search, keyboard up (P10B).
+    // A full page's search hands over to Settings search, keyboard up.
     val openSearch: () -> Unit = { lastTab = null; searchQuery = ""; searchMode = true; searchFromMore = false; searchAutoEdit = true; tab = SettingsTab.ROOT }
     if (tab != SettingsTab.ROOT) {
     CompositionLocalProvider(tv.own.owntv.features.settings.LocalSettingsSearch provides openSearch) {
@@ -458,8 +407,8 @@ fun SettingsScreen(
         SettingsTab.LANGUAGE -> { LanguageSettingsScreen(onBack = { tab = SettingsTab.ROOT }, modifier = modifier) }
         SettingsTab.SOURCES -> { ManageSourcesScreen(onBack = { tab = SettingsTab.ROOT }, modifier = modifier) }
         SettingsTab.EPG -> { tv.own.owntv.features.settings.EpgSourcesScreen(onBack = { tab = SettingsTab.ROOT; consumeEpgAdd = false }, modifier = modifier, startOnAdd = consumeEpgAdd) }
-        SettingsTab.BACKUP -> { Toned(TileTone.TERTIARY) { BackupScreen(onBack = { tab = SettingsTab.ROOT }, modifier = sub) } }
-        SettingsTab.LOCAL_SYNC -> { Toned(TileTone.TERTIARY) { LocalSyncScreen(onBack = { tab = SettingsTab.ROOT }, modifier = sub) } }
+        SettingsTab.BACKUP -> { BackupScreen(onBack = { tab = SettingsTab.ROOT }, modifier = sub) }
+        SettingsTab.LOCAL_SYNC -> { LocalSyncScreen(onBack = { tab = SettingsTab.ROOT }, modifier = sub) }
         SettingsTab.CUSTOMIZE -> { CustomizeScreen(onBack = { tab = SettingsTab.ROOT }, modifier = modifier) }
         SettingsTab.HOME -> { HomeSettingsScreen(onBack = { tab = SettingsTab.ROOT }, modifier = modifier) }
         SettingsTab.NETWORK -> { tv.own.owntv.features.settings.NetworkSettingsScreen(onBack = { tab = SettingsTab.ROOT }, modifier = modifier) }
@@ -474,6 +423,7 @@ fun SettingsScreen(
             SettingsTab.GLASS_EFFECT -> { GlassEffectSettingsScreen(onBack = { tab = SettingsTab.ROOT }, modifier = modifier) }
             SettingsTab.SUBTITLE_STYLE -> tv.own.owntv.features.settings.SubtitleStylePage(onBack = { tab = SettingsTab.ROOT }, modifier = modifier)
             SettingsTab.BROWSING -> tv.own.owntv.features.settings.BrowsingListsSettingsScreen(onBack = { tab = SettingsTab.ROOT }, modifier = modifier)
+            SettingsTab.SPORTS -> tv.own.owntv.features.sports.SportsSettingsScreen(onBack = { tab = SettingsTab.ROOT }, modifier = modifier)
             SettingsTab.FONTS -> tv.own.owntv.features.settings.FontSettingsScreen(
                 current = fontCustomization, onSet = onSetFontCustomization, familyLabel = { fontFamilyLabel(it) },
                 onBack = { tab = SettingsTab.ROOT }, modifier = modifier,
@@ -488,7 +438,6 @@ fun SettingsScreen(
     // therefore wins while one is open.
     if (onBack != null) BackHandler { onBack() }
 
-    val colors = OwnTVTheme.colors
 
     // The root rows, as data (see [RootItem]). Building 40 small objects is a fraction of the cost of
     // composing 40 rows, and it is what lets the list below stay lazy while both focus restores can
@@ -587,6 +536,7 @@ fun SettingsScreen(
             desc = if (catchupChannels > 0) pluralStringResource(R.plurals.settings_catchup_supported, catchupChannels, catchupChannels)
                 else stringResource(R.string.settings_catchup_unavailable),
             chip = when (catchupTz) {
+                SettingsRepository.CatchupTimezone.AUTOMATIC -> stringResource(R.string.settings_catchup_timezone_automatic)
                 SettingsRepository.CatchupTimezone.DEVICE -> stringResource(R.string.settings_device)
                 SettingsRepository.CatchupTimezone.MANUAL -> utcOffsetLabel(catchupOffset)
             },
@@ -629,7 +579,7 @@ fun SettingsScreen(
             focus = focusHighlightRowFocus,
             onClick = { saveScroll(); dialogReturn = focusHighlightRowFocus; showFocusHighlight = true },
         ),
-        // Glass Effect has enough controls to be a full settings screen; the root row only summarizes it.
+        // Glass & background has enough controls to be a page of its own; the root row only summarizes it.
         RootRow(
             tabRowKey(SettingsTab.GLASS_EFFECT), TileTone.PRIMARY, OwnTVIcon.SPARKLE,
             title = stringResource(R.string.settings_glass_bg_title), desc = stringResource(R.string.settings_line_glass_bg),
@@ -771,10 +721,18 @@ fun SettingsScreen(
         RootGroup("group_sound", stringResource(R.string.settings_group_sound_subtitles), OwnTVIcon.HEADPHONES, ""),
         RootGroup("group_live", stringResource(R.string.settings_live_tv), OwnTVIcon.LIVE_TV, ""),
         RootGroup("group_watching", stringResource(R.string.settings_group_watching_recording), OwnTVIcon.REC, ""),
-        // Plan Z — the whole "Data" group is gone. Backup and Local sync are places, not preferences,
+        // No "Data" group: Backup and Local sync are places, not preferences,
         // and are More rows now; Clear history moved onto the History screen it acts on; the download
         // folder moved to the Downloads screen. With all four gone the group had nothing left in it.
         RootGroup("group_app", stringResource(R.string.settings_app_group), OwnTVIcon.INFO, stringResource(R.string.settings_group_summary_app)),
+        // Sports Hub: one row in App, opening the page with every Sports setting. Not a group of its
+        // own: More › Settings opens groups by position (SettingsGroup), and its 12 cards fill the page.
+        RootRow(
+            tabRowKey(SettingsTab.SPORTS), TileTone.PRIMARY, OwnTVIcon.SPORTS,
+            title = stringResource(R.string.sports_title), desc = stringResource(R.string.sports_leagues),
+            focus = rowFocus.getValue(SettingsTab.SPORTS),
+            onClick = { open(SettingsTab.SPORTS) },
+        ),
         RootRow(
             tabRowKey(SettingsTab.LANGUAGE), TileTone.PRIMARY, OwnTVIcon.LANGUAGE,
             heading = stringResource(R.string.settings_group_app),
@@ -836,7 +794,7 @@ fun SettingsScreen(
             focus = rowFocus.getValue(SettingsTab.DNS),
             onClick = { open(SettingsTab.DNS) },
         ),
-        // Plan Z — About and the error log left with the Data group. A page of facts and a log are
+        // About and the error log live in More. A page of facts and a log are
         // not preferences; both are More rows now, opening the very same dialogs.
     )
 
@@ -864,7 +822,7 @@ fun SettingsScreen(
             tone = TileTone.TERTIARY,
             icon = ref.icon,
             title = stringResource(ref.titleRes),
-            // Where it lives, so a pin never loses its home (P9-01 "Pinned from Player").
+            // Where it lives, so a pin never loses its home ("Pinned from Player").
             desc = stringResource(R.string.settings_pinned_from, stringResource(SettingsGroup.of(tv.own.owntv.features.settings.videoGroupOf(ref.section)).titleRes)),
             chip = binding?.chip,
             chipTone = if (binding?.primaryChip == true) TileTone.PRIMARY else TileTone.SECONDARY,
@@ -1016,7 +974,7 @@ fun SettingsScreen(
         SettingsSearchEntry(stringResource(R.string.settings_group_layout), stringResource(R.string.settings_browsing_lists), stringResource(R.string.settings_search_keywords_browsing), OwnTVIcon.LIST_GRID, TileTone.PRIMARY) { open(SettingsTab.BROWSING) },
             SettingsSearchEntry(stringResource(R.string.settings_group_layout), stringResource(R.string.settings_home_root), stringResource(R.string.settings_search_keywords_home), OwnTVIcon.HOME, TileTone.SECONDARY) { open(SettingsTab.HOME) },
             SettingsSearchEntry(stringResource(R.string.settings_group_content_metadata), stringResource(R.string.settings_metadata), stringResource(R.string.settings_search_keywords_metadata), OwnTVIcon.IMAGE, TileTone.PRIMARY) { open(SettingsTab.METADATA) },
-            // Plan Z — no entries for the download folder, Backup, Local sync or Clear history. They
+            // No entries for the download folder, Backup, Local sync or Clear history. They
             // are not in Settings any more, and a result for something that is not here is a lie
             // about where it lives. The no-results state deliberately says nothing else either.
             SettingsSearchEntry(stringResource(R.string.settings_group_appearance), stringResource(R.string.settings_theme), stringResource(R.string.settings_search_keywords_theme), OwnTVIcon.THEME, TileTone.PRIMARY,
@@ -1072,6 +1030,7 @@ fun SettingsScreen(
                 chip = if (autoPlayNext) stringResource(R.string.common_on) else stringResource(R.string.common_off), chipTone = if (autoPlayNext) TileTone.PRIMARY else TileTone.SECONDARY, showChevron = false) { settingsVm.setAutoPlayNext(!autoPlayNext) },
             SettingsSearchEntry(stringResource(R.string.settings_group_sources), stringResource(R.string.settings_catchup), stringResource(R.string.settings_search_keywords_catchup), OwnTVIcon.CATCHUP, TileTone.SECONDARY,
                 chip = when (catchupTz) {
+                    SettingsRepository.CatchupTimezone.AUTOMATIC -> stringResource(R.string.settings_catchup_timezone_automatic)
                     SettingsRepository.CatchupTimezone.DEVICE -> stringResource(R.string.settings_device)
                     SettingsRepository.CatchupTimezone.MANUAL -> utcOffsetLabel(catchupOffset)
                 }) { saveScroll(); dialogReturn = searchFieldFocus; showCatchupTime = true },
@@ -1091,6 +1050,7 @@ fun SettingsScreen(
             SettingsSearchEntry(tv.own.owntv.features.settings.videoRowPath("vp_logging"), stringResource(R.string.settings_detailed_playback_logging), stringResource(R.string.settings_search_keywords_detailed_logging), OwnTVIcon.INFO, TileTone.SECONDARY) { jumpVideo("vp_logging", false) },
             SettingsSearchEntry(stringResource(R.string.settings_breadcrumb, stringResource(R.string.settings_group_app), stringResource(R.string.settings_group_network)), stringResource(R.string.common_proxy), stringResource(R.string.settings_search_keywords_proxy), OwnTVIcon.NETWORK, TileTone.SECONDARY) { open(SettingsTab.NETWORK) },
             SettingsSearchEntry(stringResource(R.string.settings_breadcrumb, stringResource(R.string.settings_group_app), stringResource(R.string.settings_group_network)), stringResource(R.string.settings_dns), stringResource(R.string.settings_search_keywords_dns), OwnTVIcon.DNS, TileTone.SECONDARY) { open(SettingsTab.DNS) },
+            SettingsSearchEntry(stringResource(R.string.settings_group_app), stringResource(R.string.sports_title), stringResource(R.string.sports_leagues), OwnTVIcon.SPORTS, TileTone.PRIMARY) { open(SettingsTab.SPORTS) },
             // Settings inside a sub-screen, by their own names (kept out of line: this function is at the JVM size limit).
             *subScreenSearchEntries { t -> open(t) }.toTypedArray(),
             SettingsSearchEntry(stringResource(R.string.settings_group_app), stringResource(R.string.settings_app_startup), stringResource(R.string.settings_search_keywords_startup), OwnTVIcon.POWER, TileTone.SECONDARY,
@@ -1156,7 +1116,7 @@ fun SettingsScreen(
             // The Catch-up popup's second row; its first (the time zone) is the Catch-up entry above.
             rowsOf(stringResource(R.string.settings_breadcrumb, stringResource(R.string.settings_group_sources), stringResource(R.string.settings_catchup)),
                 listOf(R.string.settings_catchup_player), R.string.settings_search_keywords_catchup, OwnTVIcon.CATCHUP) { saveScroll(); dialogReturn = searchFieldFocus; showCatchupTime = true }
-        // A setting is found by its own name only: "play" lists every setting with "play" in its name (owner).
+        // A setting is found by its own name only: "play" lists every setting with "play" in its name.
         val needle = searchQuery.trim().lowercase()
         (entries + videoEntries + screenRowEntries)
             .filter { e -> e.title.lowercase().contains(needle) }
@@ -1189,11 +1149,10 @@ fun SettingsScreen(
         onOpenZoom = { saveScroll(); dialogReturn = zoomRowFocus; showZoom = true },
         fontCustomization, onSetFontCustomization, playlistSources,
     )
-    // Shared with the dialogs below, so the simple ones open in the page's panel (owner, P12).
+    // Shared with the dialogs below, so the simple ones open in the page's panel.
     val panel = remember { tv.own.owntv.features.settings.SettingsPanelState() }
     CompositionLocalProvider(
-        tv.own.owntv.features.settings.LocalStageRows provides true,
-        // Subtitle appearance is a page of its own, opened from the Sound & subtitles rows (P12).
+        // Subtitle appearance is a page of its own, opened from the Sound & subtitles rows.
         tv.own.owntv.features.settings.LocalOpenSubtitleStyle provides { saveScroll(); open(SettingsTab.SUBTITLE_STYLE) },
         tv.own.owntv.features.settings.LocalSubtitleStyleRowFocus provides rowFocus.getValue(SettingsTab.SUBTITLE_STYLE),
     ) {
@@ -1250,7 +1209,7 @@ fun SettingsScreen(
         }
     }
 
-    // Every dialog below shares the page's panel: the simple ones open there instead of as a popup (owner, P12).
+    // Every dialog below shares the page's panel: the simple ones open there instead of as a popup.
     CompositionLocalProvider(tv.own.owntv.features.settings.LocalSettingsPanel provides panel) {
     menuRow?.let { row ->
         val at = quickPinned.indexOf(row.key)
@@ -1414,7 +1373,7 @@ fun SettingsScreen(
                 showBgPicker = false
             },
             // Back goes back one level, to the local/remote/clear chooser this was opened from —
-            // closing both left the user on the Glass Effect row two steps up.
+            // closing both would leave the user on the Glass & background row two steps up.
             onDismiss = { showBgPicker = false; showBgImageChooser = true },
         )
     }
@@ -1430,7 +1389,7 @@ private fun StartupChannelPickerDialog(
     onSelect: (tv.own.owntv.core.database.entity.ChannelEntity) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    // A long list picked from: in the page's panel on a settings page, a Stage popup elsewhere (owner, P12).
+    // A long list picked from: in the page's panel on a settings page, a Stage popup elsewhere.
     val list: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit = {
         StartupChannelList(query, channels, selected, onQueryChange, onSelect)
     }
@@ -1542,7 +1501,7 @@ private fun NavigationPopupHost(settingsVm: SettingsViewModel, onDismiss: () -> 
 
 /**
  * The Movies & Series layout picker. Moved out of [SettingsScreen] unchanged, because that function's
- * body had reached the JVM's 64 KB method-size limit and the Navigation row (Stage P1) did not fit.
+ * body had reached the JVM's 64 KB method-size limit and the Navigation row did not fit.
  */
 @Composable
 private fun VodLayoutDialog(
@@ -1602,7 +1561,7 @@ private fun navigationSearchEntry(settingsVm: SettingsViewModel, onClick: () -> 
     )
 }
 
-/** The Layout group's Live TV layout row (Stage P4): Stage, or Separate panels. */
+/** The Layout group's Live TV layout row: Stage, or Separate panels. */
 @Composable
 private fun liveLayoutRootRow(settingsVm: SettingsViewModel, focus: FocusRequester, onClick: () -> Unit): RootRow {
     val layout by settingsVm.liveLayout.collectAsStateWithLifecycle()
@@ -1757,7 +1716,7 @@ private fun GuideDaysDialog(settingsVm: SettingsViewModel, guideDays: Int, onClo
 
 private enum class StageSettingsDialog { LIVE_OPENS_IN, REMINDERS, REMINDER_LEAD }
 
-/** Which Stage P5 picker is open, and each row's focus to come back to. */
+/** Which Stage picker is open, and each row's focus to come back to. */
 @androidx.compose.runtime.Stable
 private class StageSettingsState {
     var open by mutableStateOf<StageSettingsDialog?>(null)
@@ -1793,7 +1752,7 @@ private fun StageSettingsDialogHost(settingsVm: SettingsViewModel, state: StageS
     }
 }
 
-/** Layout › Live TV opens in (G14): List view or Guide view — the same value Live TV's toggle sets. */
+/** Layout › Live TV opens in: List view or Guide view — the same value Live TV's toggle sets. */
 @Composable
 private fun liveOpensInRootRow(settingsVm: SettingsViewModel, focus: FocusRequester, onClick: () -> Unit): RootRow {
     val view by settingsVm.liveView.collectAsStateWithLifecycle()
@@ -1824,7 +1783,7 @@ private fun LiveOpensInDialog(settingsVm: SettingsViewModel, onClose: () -> Unit
     )
 }
 
-/** The guide block's Programme reminders (G2): Ask to switch · Switch · Notify only. */
+/** The guide block's Programme reminders: Ask to switch · Switch · Notify only. */
 @Composable
 private fun remindersRootRow(settingsVm: SettingsViewModel, focus: FocusRequester, onClick: () -> Unit): RootRow {
     val mode by settingsVm.reminderMode.collectAsStateWithLifecycle()
@@ -1913,8 +1872,7 @@ private fun vodLayoutLabelRes(layout: tv.own.owntv.core.settings.SettingsReposit
  */
 @Composable
 private fun VodLayoutPreviewBars(layout: tv.own.owntv.core.settings.SettingsRepository.VodLayout) {
-    val colors = OwnTVTheme.colors
-    val bar = colors.onSurface.copy(alpha = 0.13f)
+    val bar = tv.own.owntv.ui.theme.StageColors.Text.copy(alpha = 0.13f)
     val shape = RoundedCornerShape(4.dp)
     Row(
         modifier = Modifier.fillMaxWidth().height(30.dp),
@@ -1929,7 +1887,7 @@ private fun VodLayoutPreviewBars(layout: tv.own.owntv.core.settings.SettingsRepo
                     .clip(shape)
                     .background(
                         androidx.compose.ui.graphics.Brush.horizontalGradient(
-                            listOf(colors.primary.copy(alpha = 0.45f), colors.tertiary.copy(alpha = 0.28f)),
+                            listOf(tv.own.owntv.ui.theme.stageAccent.accent.copy(alpha = 0.45f), tv.own.owntv.ui.theme.stageAccent.accent.copy(alpha = 0.28f)),
                         ),
                     ),
             )
@@ -1954,7 +1912,7 @@ private val AccentPresetChoices: List<tv.own.owntv.core.theme.AccentColor> =
     tv.own.owntv.core.theme.AccentColor.entries.take(6)
 
 /**
- * Focus highlight presets (#121): the six accent presets plus gold and white, which are the two
+ * Focus highlight presets: the six accent presets plus gold and white, which are the two
  * colors people actually ask for when they want the cursor to shout. Hex, so a preset and a
  * hand-typed color are the same stored value — there is no second "preset" concept to keep in sync.
  */
@@ -1982,7 +1940,7 @@ private fun focusWidthLabel(dp: Int): String = stringResource(
 )
 
 /**
- * Focus highlight picker (#121): presets, hex field and the shared HSV palette pick the ring color;
+ * Focus highlight picker: presets, hex field and the shared HSV palette pick the ring color;
  * four buttons pick its width. A live sample sits under the controls because the dialog itself is
  * still drawn with the *saved* values — without it you could not judge a color before committing.
  * "Reset" clears the color back to the accent.
@@ -1995,8 +1953,8 @@ private fun FocusHighlightDialog(
     onPickWidth: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    // The Stage colour popup (P9-05), as Accent colour and the clock colours; its preview is the ring
-    // itself and the thickness under it (owner, P12).
+    // The Stage colour popup, as Accent colour and the clock colours; its preview is the ring
+    // itself and the thickness under it.
     val start = remember { highlight }
     val ring = tv.own.owntv.ui.theme.parseAccentHex(highlight) ?: tv.own.owntv.ui.theme.stageAccent.focus
     val defaultRing = tv.own.owntv.ui.theme.stageAccent.focus
@@ -2020,7 +1978,7 @@ private fun FocusHighlightDialog(
         Column(Modifier.padding(top = 20.mpx)) {
             Box(
                 Modifier.fillMaxWidth().height(64.mpx)
-                    .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(18.mpx))
+                    .background(StageColors.Ink.copy(alpha = 0.04f), RoundedCornerShape(18.mpx))
                     .border(widthDp.dp, ring, RoundedCornerShape(18.mpx)),
                 contentAlignment = Alignment.Center,
             ) {
@@ -2082,7 +2040,7 @@ private fun CatchupSourcesHost(
     )
 }
 
-/** More's way into this screen until P10: a root group to open at, or the search field. */
+/** More's way into this screen: a root group to open at, or the search field. */
 data class SettingsStart(val group: Int?, val search: Boolean)
 
 /** One playlist's catch-up time zone, moved out of [SettingsScreen] unchanged (its body is at the JVM method limit). */
@@ -2124,7 +2082,7 @@ internal const val GITHUB_REPO = "github.com/attembot/OwnTV"
 internal const val TELEGRAM_LINK = "t.me/owntvplayer"
 
 /**
- * Read-only viewer for the persisted playback error history (B5): the last ~10 failures with their
+ * Read-only viewer for the persisted playback error history: the last ~10 failures with their
  * plain-English reason, media spec, raw engine text, engine, stream type and device info — so users
  * who can't pull logcat can read/report what happened after dismissing the error screen.
  */
@@ -2227,8 +2185,8 @@ internal fun fontFamilyLabel(family: AppFontFamily): String = stringResource(
 /** A stepper for shared popup geometry. Changes apply live to this dialog too. */
 @Composable
 private fun PopupSizeDialog(current: Int, onSet: (Int) -> Unit, onDismiss: () -> Unit) {
-    // The value with a real-size sample popup above it: in the page's panel on a settings page
-    // (owner, P12), a Stage popup elsewhere.
+    // The value with a real-size sample popup above it: in the page's panel on a settings page,
+    // a Stage popup elsewhere.
     val stepper: @Composable () -> Unit = {
         tv.own.owntv.features.settings.PanelStepper(
             value = stringResource(R.string.common_percent, current),
@@ -2246,7 +2204,7 @@ private fun PopupSizeDialog(current: Int, onSet: (Int) -> Unit, onDismiss: () ->
 @Composable
 private fun ZoomDialog(current: Int, onSet: (Int) -> Unit, onDismiss: () -> Unit) {
     // Zoom below LOW_RAM_WARN doubles the on-screen item count, which can OOM-crash 2 GB devices
-    // (#51) — the first step under it asks first (a Stage question, focus on Cancel). Accepting once
+    // the first step under it asks first (a Stage question, focus on Cancel). Accepting once
     // arms the rest of this session; if it was opened already below the line, don't nag.
     var lowZoomAccepted by remember { mutableStateOf(current < UiZoom.LOW_RAM_WARN) }
     var pendingLowZoom by remember { mutableStateOf<Int?>(null) }
@@ -2261,7 +2219,7 @@ private fun ZoomDialog(current: Int, onSet: (Int) -> Unit, onDismiss: () -> Unit
             onDone = onDismiss,
         )
     }
-    // In the page's panel on a settings page (owner, P12), a Stage popup elsewhere.
+    // In the page's panel on a settings page, a Stage popup elsewhere.
     if (!tv.own.owntv.features.settings.panelEditor(onDismiss) { stepper() }) {
         tv.own.owntv.ui.stage.StagePopup(onDismiss = onDismiss, title = stringResource(R.string.settings_ui_zoom), body = stringResource(R.string.settings_ui_zoom_range, UiZoom.MIN, UiZoom.MAX)) { stepper() }
     }
@@ -2286,7 +2244,7 @@ private fun AmbientGlowDialog(
     onTogglePulse: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    // Two switches: in the page's panel (owner, P12), a Stage popup elsewhere.
+    // Two switches: in the page's panel, a Stage popup elsewhere.
     val rows: @Composable () -> Unit = {
         val first = remember { FocusRequester() }
         LaunchedEffect(Unit) { kotlinx.coroutines.delay(60); runCatching { first.requestFocus() } }
@@ -2308,12 +2266,7 @@ private fun AmbientGlowDialog(
     tv.own.owntv.ui.stage.StagePopup(onDismiss = onDismiss, title = stringResource(R.string.settings_ambient_glow), body = stringResource(R.string.settings_ambient_glow_dialog_description)) { rows() }
 }
 
-/**
- * A stepper for the Glass effect fill strength — how opaque the translucent panels are over the
- * background photo. Higher = more solid (less see-through). Changes apply live. Range 20–95% in 5%
- * steps so panels can never go fully transparent (text would be unreadable) or fully solid (pointless).
- */
-/** Dedicated Glass Effect settings destination. Background selection stays nested here, so Back returns here. */
+/** The Glass & background page. Background selection stays nested here, so Back returns here. */
 @Composable
 private fun GlassEffectSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val settingsVm: SettingsViewModel = koinViewModel()
@@ -2341,11 +2294,11 @@ private fun GlassEffectSettingsScreen(onBack: () -> Unit, modifier: Modifier = M
         onSetAccentLight = settingsVm::setBackgroundAccentLight,
         onToggleGlass = {
             settingsVm.setGlassScopeBitmask(
-                if (glassConfig.enabled) 0 else GlassConfig(ALL_GLASS_SURFACES).toBitmask(),
+                if (glassConfig.enabled) 0 else GlassConfig.ON_BITS,
             )
         },
-        onSetAlpha = { settingsVm.setGlassAlphaPercent(it, (glassConfig.blurStrength * 100).roundToInt()) },
-        onReset = { settingsVm.resetGlassAndBackground(GlassConfig(ALL_GLASS_SURFACES).toBitmask()) },
+        onSetAlpha = settingsVm::setGlassAlphaPercent,
+        onReset = settingsVm::resetGlassAndBackground,
         onBack = onBack,
         modifier = modifier,
     )
@@ -2402,416 +2355,6 @@ private fun GlassEffectSettingsScreen(onBack: () -> Unit, modifier: Modifier = M
     }
 }
 
-@Composable
-private fun GlassEffectContentScreen(
-    glassOn: Boolean,
-    preset: GlassPreset,
-    alphaPercent: Int,
-    blurPercent: Int,
-    highlightPercent: Int,
-    allowFullTransparency: Boolean,
-    depthEffects: Boolean,
-    bgOn: Boolean,
-    scope: Set<GlassSurface>,
-    onToggleGlass: () -> Unit,
-    onSetPreset: (GlassPreset) -> Unit,
-    onSetAlpha: (Int) -> Unit,
-    onSetBlur: (Int) -> Unit,
-    onSetHighlight: (Int) -> Unit,
-    onSetAllowFullTransparency: (Boolean) -> Unit,
-    onSetDepthEffects: (Boolean) -> Unit,
-    onSetScope: (Int) -> Unit,
-    onOpenBackground: () -> Unit,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val colors = OwnTVTheme.colors
-    val firstFocus = remember { FocusRequester() }
-    // Per-surface scope sub-dialog (advanced). While it is open the main panel is NOT composed at all:
-    // the main panel's trapAllFocusExit would otherwise keep D-pad focus locked inside itself, making
-    // the sub-dialog unreachable. Re-request focus here whenever the main panel comes (back) on screen.
-    var showSurfaces by remember { mutableStateOf(false) }
-    LaunchedEffect(showSurfaces) { if (!showSurfaces) runCatching { firstFocus.requestFocus() } }
-    val min = 20
-    val max = 100
-    val step = 5
-    fun clamp(v: Int) = v.coerceIn(min, max)
-    // Backdrop blur ("frost") stepper — 0..100 in 10% steps. 0 keeps the Tier-1 translucency-only look;
-    // only has an effect when a background image is set and the device supports it (API 31+).
-    val blurMin = 0
-    val blurMax = 100
-    val blurStep = 10
-    fun blurClamp(v: Int) = v.coerceIn(blurMin, blurMax)
-    val highlightStep = 5
-    fun highlightClamp(v: Int) = v.coerceIn(0, 100)
-    BackHandler { onBack() }
-    if (!showSurfaces) {
-        Column(
-            modifier = modifier
-                .fillMaxSize()
-                .roundedPanel()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 40.dp, vertical = 28.dp),
-        ) {
-            tv.own.owntv.features.settings.Header(
-                title = stringResource(R.string.settings_glass_effect_title),
-                onBack = onBack,
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                stringResource(R.string.settings_glass_effect_description),
-                style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(14.dp))
-            Text(
-                stringResource(R.string.settings_glass_live_preview),
-                style = MaterialTheme.typography.labelLarge,
-                color = colors.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(6.dp))
-            GlassEffectPreview()
-            Spacer(Modifier.height(14.dp))
-            // Master on/off for the glass (works with or without a background image).
-            tv.own.owntv.features.settings.Row2(
-                icon = OwnTVIcon.THEME,
-                title = stringResource(R.string.settings_glass_effect),
-                desc = stringResource(R.string.settings_glass_description),
-                chip = stringResource(if (glassOn) R.string.common_on else R.string.common_off),
-                primaryChip = glassOn,
-                onClick = onToggleGlass,
-                modifier = Modifier.fillMaxWidth().focusRequester(firstFocus),
-            )
-            if (glassOn) {
-                Spacer(Modifier.height(14.dp))
-                // Wallpaper belongs to Glass mode and stays hidden until Glass is enabled.
-                tv.own.owntv.features.settings.Row2(
-                    icon = OwnTVIcon.IMAGE,
-                    title = stringResource(if (bgOn) R.string.settings_background_on else R.string.settings_background_off),
-                    chevron = true,
-                    onClick = onOpenBackground,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(22.dp))
-                Text(stringResource(R.string.settings_glass_preset_title), style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    glassPresetDescription(preset),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.onSurfaceVariant,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                )
-                Spacer(Modifier.height(12.dp))
-                GlassPreset.entries.chunked(2).forEach { rowPresets ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        rowPresets.forEach { choice ->
-                            OwnTVButton(
-                                label = glassPresetLabel(choice),
-                                onClick = { onSetPreset(choice) },
-                                style = OwnTVButtonStyle.SECONDARY,
-                                selected = preset == choice,
-                                compact = true,
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                }
-                Spacer(Modifier.height(10.dp))
-                Text(stringResource(R.string.settings_transparency_title), style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    stringResource(R.string.settings_transparency_description, min, max),
-                    style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                )
-                Spacer(Modifier.height(12.dp))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                    StepButton(stringResource(R.string.settings_decrease), dimmed = alphaPercent <= min) { onSetAlpha(clamp(alphaPercent - step)) }
-                    Text(
-                        stringResource(R.string.settings_surface_transparency, alphaPercent),
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = colors.primary,
-                        modifier = Modifier.width(120.dp),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    )
-                    StepButton(stringResource(R.string.settings_increase), dimmed = alphaPercent >= max) { onSetAlpha(clamp(alphaPercent + step)) }
-                }
-                // Backdrop blur — the real "frost" behind the panels (needs a background image; API 31+).
-                Spacer(Modifier.height(20.dp))
-                Text(stringResource(R.string.settings_blur_title), style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    stringResource(if (bgOn) R.string.settings_blur_description_enabled else R.string.settings_blur_description_disabled, blurMin, blurMax),
-                    style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                )
-                Spacer(Modifier.height(12.dp))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                    StepButton(stringResource(R.string.settings_decrease), dimmed = blurPercent <= blurMin) { onSetBlur(blurClamp(blurPercent - blurStep)) }
-                    Text(
-                        stringResource(R.string.settings_surface_transparency, blurPercent),
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = colors.primary,
-                        modifier = Modifier.width(120.dp),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    )
-                    StepButton(stringResource(R.string.settings_increase), dimmed = blurPercent >= blurMax) { onSetBlur(blurClamp(blurPercent + blurStep)) }
-                }
-
-                Spacer(Modifier.height(20.dp))
-                Text(stringResource(R.string.settings_glass_highlight_title), style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    stringResource(R.string.settings_glass_highlight_description),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.onSurfaceVariant,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                )
-                Spacer(Modifier.height(12.dp))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                    StepButton(stringResource(R.string.settings_decrease), dimmed = highlightPercent <= 0) {
-                        onSetHighlight(highlightClamp(highlightPercent - highlightStep))
-                    }
-                    Text(
-                        stringResource(R.string.settings_surface_transparency, highlightPercent),
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = colors.primary,
-                        modifier = Modifier.width(120.dp),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    )
-                    StepButton(stringResource(R.string.settings_increase), dimmed = highlightPercent >= 100) {
-                        onSetHighlight(highlightClamp(highlightPercent + highlightStep))
-                    }
-                }
-
-                Spacer(Modifier.height(18.dp))
-                Text(
-                    stringResource(R.string.settings_glass_full_transparency_description),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.onSurfaceVariant,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                )
-                Spacer(Modifier.height(8.dp))
-                OwnTVButton(
-                    label = "${stringResource(R.string.settings_glass_full_transparency_title)}: ${stringResource(if (allowFullTransparency) R.string.common_on else R.string.common_off)}",
-                    onClick = { onSetAllowFullTransparency(!allowFullTransparency) },
-                    style = OwnTVButtonStyle.SECONDARY,
-                    selected = allowFullTransparency,
-                    compact = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-
-                Spacer(Modifier.height(14.dp))
-                Text(
-                    stringResource(R.string.settings_glass_depth_description),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.onSurfaceVariant,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                )
-                Spacer(Modifier.height(8.dp))
-                OwnTVButton(
-                    label = "${stringResource(R.string.settings_glass_depth_title)}: ${stringResource(if (depthEffects) R.string.common_on else R.string.common_off)}",
-                    onClick = { onSetDepthEffects(!depthEffects) },
-                    style = OwnTVButtonStyle.SECONDARY,
-                    selected = depthEffects,
-                    compact = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-
-                // Advanced: choose exactly which surfaces render as glass.
-                Spacer(Modifier.height(16.dp))
-                OwnTVButton(
-                    if (scope == ALL_GLASS_SURFACES) stringResource(R.string.settings_surface_count_all)
-                    else pluralStringResource(R.plurals.settings_surface_count, scope.size, scope.size, ALL_GLASS_SURFACES.size),
-                    onClick = { showSurfaces = true },
-                    style = OwnTVButtonStyle.SECONDARY,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            if (glassOn) {
-                Spacer(Modifier.height(24.dp))
-                OwnTVButton(
-                    stringResource(R.string.settings_reset),
-                    onClick = {
-                        onSetPreset(GlassPreset.BALANCED)
-                        onSetHighlight((GlassConfig.DEFAULT_HIGHLIGHT_STRENGTH * 100).roundToInt())
-                        onSetAllowFullTransparency(false)
-                        onSetDepthEffects(true)
-                        onSetScope(GlassConfig(ALL_GLASS_SURFACES).toBitmask())
-                    },
-                    style = OwnTVButtonStyle.SECONDARY,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        }
-    }
-    if (showSurfaces) {
-        GlassSurfacesDialog(scope = scope, onSetScope = onSetScope, onDismiss = { showSurfaces = false })
-    }
-}
-
-/** Compact always-visible sample of the same panel/card/top-bar surfaces controlled below. */
-@Composable
-private fun GlassEffectPreview() {
-    val colors = OwnTVTheme.colors
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(92.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(colors.secondaryContainer.copy(alpha = 0.42f))
-            .padding(horizontal = 24.dp, vertical = 18.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Row(
-            Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                Modifier.weight(1.5f).fillMaxHeight().clip(RoundedCornerShape(12.dp)).glass(
-                    surface = GlassSurface.PANELS,
-                    baseFill = colors.surfaceContainerHighest,
-                    shape = RoundedCornerShape(12.dp),
-                    interaction = GlassInteraction.SELECTED,
-                ),
-            )
-            Box(
-                Modifier.weight(0.9f).fillMaxHeight().clip(RoundedCornerShape(12.dp)).glass(
-                    surface = GlassSurface.CARDS,
-                    baseFill = colors.surfaceContainerHighest,
-                    shape = RoundedCornerShape(12.dp),
-                    interaction = GlassInteraction.FOCUSED,
-                ),
-            )
-            Box(
-                Modifier.weight(1f).height(34.dp).clip(RoundedCornerShape(17.dp)).glass(
-                    surface = GlassSurface.TOPBAR,
-                    baseFill = colors.surfaceContainerHighest,
-                    shape = RoundedCornerShape(17.dp),
-                    interaction = GlassInteraction.FOCUSED,
-                ),
-            )
-        }
-    }
-}
-
-/**
- * Browsing & lists — six per-section toggles, two for each of Live TV / Movies / Series:
- *
- *  - "Remember last category" (on by default): reopening the section lands on the category you left
- *    rather than All. Live TV has always behaved this way; Movies/Series gained it alongside the toggle.
- *  - "Remember last item" (off by default): each category keeps its own scroll position instead of
- *    resetting to the top. The Live TV one additionally gates the last-focused-channel restore.
- *
- * The separate "App startup -> Last channel" setting is independent of all six.
- */
-@Composable
-internal fun glassPresetLabel(preset: GlassPreset): String = stringResource(
-    when (preset) {
-        GlassPreset.ULTRA_CLEAR -> R.string.settings_glass_preset_ultra_clear
-        GlassPreset.CLEAR -> R.string.settings_glass_preset_clear
-        GlassPreset.BALANCED -> R.string.settings_glass_preset_balanced
-        GlassPreset.TINTED -> R.string.settings_glass_preset_tinted
-        GlassPreset.OPAQUE -> R.string.settings_glass_preset_opaque
-        GlassPreset.AURORA -> R.string.settings_glass_preset_aurora
-        GlassPreset.CUSTOM -> R.string.settings_glass_preset_custom
-    },
-)
-
-@Composable
-internal fun glassPresetDescription(preset: GlassPreset): String = stringResource(
-    when (preset) {
-        GlassPreset.ULTRA_CLEAR -> R.string.settings_glass_preset_ultra_clear_description
-        GlassPreset.CLEAR -> R.string.settings_glass_preset_clear_description
-        GlassPreset.BALANCED -> R.string.settings_glass_preset_balanced_description
-        GlassPreset.TINTED -> R.string.settings_glass_preset_tinted_description
-        GlassPreset.OPAQUE -> R.string.settings_glass_preset_opaque_description
-        GlassPreset.AURORA -> R.string.settings_glass_preset_aurora_description
-        GlassPreset.CUSTOM -> R.string.settings_glass_preset_custom_description
-    },
-)
-
-/** User-facing label for a glassable surface. */
-@Composable
-internal fun glassSurfaceLabel(s: GlassSurface): String = stringResource(
-    when (s) {
-        GlassSurface.PANELS -> R.string.settings_glass_surface_panels
-        GlassSurface.SIDEBAR -> R.string.settings_glass_surface_sidebar
-        GlassSurface.PREVIEW -> R.string.settings_glass_surface_preview
-        GlassSurface.DIALOGS -> R.string.settings_glass_surface_dialogs
-        GlassSurface.TOPBAR -> R.string.settings_glass_surface_topbar
-        GlassSurface.CARDS -> R.string.settings_glass_surface_cards
-        GlassSurface.MINI_PLAYER -> R.string.settings_glass_surface_miniplayer
-        GlassSurface.PLAYER_CONTROLS -> R.string.settings_glass_surface_player_controls
-        GlassSurface.TOASTS -> R.string.settings_glass_surface_toasts
-    },
-)
-
-/**
- * Advanced per-surface glass scope: one On/Off row per [GlassSurface] plus an "All" master.
- * Changes apply live (persisted via the scope bitmask). Unticking every surface is the same as
- * turning glass off — the helper text says so instead of blocking it.
- */
-@Composable
-internal fun GlassSurfacesDialog(
-    scope: Set<GlassSurface>,
-    onSetScope: (Int) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val colors = OwnTVTheme.colors
-    val firstFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
-    BackHandler { onDismiss() }
-    fun toggled(s: GlassSurface): Int = GlassConfig(if (s in scope) scope - s else scope + s).toBitmask()
-    tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss) {
-    Box(
-        modifier = Modifier.fillMaxSize().modalScrim().trapAllFocusExit().focusGroup(),
-        contentAlignment = Alignment.Center,
-    ) {
-        tv.own.owntv.ui.theme.PopupFontTheme {
-        Column(
-            modifier = Modifier.dialogPanel(width = 440.dp, padding = 28.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(stringResource(R.string.settings_glass_surfaces), style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
-            Spacer(Modifier.height(6.dp))
-            Text(
-                stringResource(R.string.settings_glass_surfaces_description),
-                style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            )
-            Spacer(Modifier.height(16.dp))
-            // All rows use the SECONDARY chrome: with the accent (PRIMARY) fill on every "On" row the
-            // focused row was indistinguishable on TV. State lives in the ": On/Off" text; focus in the
-            // button's own focus highlight.
-            OwnTVButton(
-                if (scope == ALL_GLASS_SURFACES) stringResource(R.string.settings_all_surfaces_on) else stringResource(R.string.settings_all_surfaces_off),
-                onClick = {
-                    onSetScope(if (scope == ALL_GLASS_SURFACES) 0 else GlassConfig(ALL_GLASS_SURFACES).toBitmask())
-                },
-                style = OwnTVButtonStyle.SECONDARY,
-                modifier = Modifier.fillMaxWidth().focusRequester(firstFocus),
-            )
-            Spacer(Modifier.height(12.dp))
-            ALL_GLASS_SURFACES.forEach { s ->
-                val on = s in scope
-                OwnTVButton(
-                    stringResource(R.string.settings_surface_toggle, glassSurfaceLabel(s), stringResource(if (on) R.string.common_on else R.string.common_off)),
-                    onClick = { onSetScope(toggled(s)) },
-                    style = OwnTVButtonStyle.SECONDARY,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(8.dp))
-            }
-            Spacer(Modifier.height(12.dp))
-            OwnTVButton(stringResource(R.string.settings_done), onClick = onDismiss, modifier = Modifier.fillMaxWidth())
-        }
-        }
-    }
-    }
-}
-
 /** Per-playlist catch-up picker keys: follow the global setting, or a UTC offset in minutes. */
 private const val CATCHUP_FOLLOW = ""
 private const val CATCHUP_MANUAL_PREFIX = "MANUAL:"
@@ -2840,27 +2383,31 @@ private fun CatchupTimeDialog(
     offsetRange: IntRange,
     onSetMode: (SettingsRepository.CatchupTimezone) -> Unit,
     onAdjustOffset: (Int) -> Unit,
-    /** One −/+ press, in minutes (N20: a quarter hour). */
+    /** One −/+ press, in minutes (a quarter hour). */
     offsetStep: Int,
     player: SettingsRepository.CatchupPlayer,
     onSetPlayer: (SettingsRepository.CatchupPlayer) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    // Three simple values: in the page's panel (owner, P12), a Stage popup elsewhere.
+    // Three simple values: in the page's panel, a Stage popup elsewhere.
     val manual = mode == SettingsRepository.CatchupTimezone.MANUAL
     val form: @Composable () -> Unit = {
         val first = remember { FocusRequester() }
         LaunchedEffect(Unit) { kotlinx.coroutines.delay(60); runCatching { first.requestFocus() } }
-        val modes = listOf(SettingsRepository.CatchupTimezone.DEVICE, SettingsRepository.CatchupTimezone.MANUAL)
+        val modes = SettingsRepository.CatchupTimezone.entries
         Column(Modifier.trapAllFocusExit().focusGroup()) {
             tv.own.owntv.ui.stage.StageMenuChoice(
-                options = listOf(stringResource(R.string.settings_catchup_timezone_device), stringResource(R.string.settings_manual)),
+                options = listOf(
+                    stringResource(R.string.settings_catchup_timezone_automatic),
+                    stringResource(R.string.settings_catchup_timezone_device),
+                    stringResource(R.string.settings_manual),
+                ),
                 selected = modes.indexOf(mode),
                 onSelect = { onSetMode(modes[it]) },
                 focusRequester = first,
             )
             if (manual) {
-                // ◀ ▶ move the offset by a quarter hour (N20); clamped at the ends.
+                // ◀ ▶ move the offset by a quarter hour; clamped at the ends.
                 tv.own.owntv.ui.stage.StageSurface(
                     onClick = {},
                     radius = 18.mpx,
@@ -2907,7 +2454,7 @@ private fun CatchupTimeDialog(
         }
     }
     if (tv.own.owntv.features.settings.panelEditor(onDismiss) { form() }) return
-    tv.own.owntv.ui.stage.StagePopup(onDismiss = onDismiss, title = stringResource(R.string.settings_catchup), body = stringResource(R.string.settings_catchup_description)) { form() }
+    tv.own.owntv.ui.stage.StagePopup(onDismiss = onDismiss, title = stringResource(R.string.settings_catchup), body = stringResource(R.string.settings_catchup_timezone_description)) { form() }
 }
 
 /**
@@ -2924,7 +2471,7 @@ private fun EpgOffsetSettingDialog(
     onReset: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    // A number: in the page's panel on a settings page (owner, P12), a Stage popup elsewhere.
+    // A number: in the page's panel on a settings page, a Stage popup elsewhere.
     val stepper: @Composable () -> Unit = {
         tv.own.owntv.features.settings.PanelStepper(
             value = epgShiftLabel(offsetMinutes),
@@ -2939,27 +2486,6 @@ private fun EpgOffsetSettingDialog(
         title = stringResource(R.string.content_epg_time_offset),
         body = stringResource(R.string.settings_epg_offset_dialog_description),
     ) { stepper() }
-}
-
-@Composable
-private fun StepButton(
-    label: String,
-    enabled: Boolean = true,
-    dimmed: Boolean = false,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-) {
-    val colors = OwnTVTheme.colors
-    FocusableSurface(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier.size(64.dp),
-        shape = RoundedCornerShape(18.dp),
-        contentAlignment = Alignment.Center,
-        surface = GlassSurface.DIALOGS,
-    ) { _ ->
-        Text(label, style = MaterialTheme.typography.headlineMedium, color = if (enabled && !dimmed) colors.onSurface else colors.outline)
-    }
 }
 
 /**
@@ -3108,10 +2634,10 @@ internal fun SettingsRowMenu(
     // The Stage menu (playbook 11), as every other hold-OK menu.
     tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onDismiss, stageLayout = true) {
         Box(
-            Modifier.fillMaxSize().longPressMenuGuard().modalScrim().trapAllFocusExit().focusGroup(),
+            Modifier.fillMaxSize().background(tv.own.owntv.ui.theme.StageColors.Scrim).longPressMenuGuard(),
             contentAlignment = Alignment.Center,
         ) {
-            tv.own.owntv.ui.stage.StageMenu(Modifier.width(520.mpx)) {
+            tv.own.owntv.ui.stage.StageMenu(Modifier.width(520.mpx).trapAllFocusExit().focusGroup()) {
                 tv.own.owntv.ui.stage.StageMenuHeader(title = title, subtitle = null)
                 tv.own.owntv.ui.stage.StageMenuItem(
                     stringResource(if (pinned) R.string.settings_row_menu_unpin else R.string.settings_row_menu_pin),
@@ -3151,17 +2677,7 @@ private class SettingsSearchEntry(
     val onClick: () -> Unit,
 )
 
-@Composable
-internal fun TileTone.colors(): Pair<Color, Color> {
-    val c = OwnTVTheme.colors
-    return when (this) {
-        TileTone.PRIMARY -> c.primaryContainer to c.onPrimaryContainer
-        TileTone.SECONDARY -> c.secondaryContainer to c.onSecondaryContainer
-        TileTone.TERTIARY -> c.tertiaryContainer to c.onTertiaryContainer
-    }
-}
-
-/** What a root row shows and does on its Stage page beyond its chip (P9-03 … P9-13). */
+/** What a root row shows and does on its Stage page beyond its chip. */
 private class RowExtra(
     val value: SettingValue? = null,
     val onStep: ((Int) -> Unit)? = null,
@@ -3215,7 +2731,7 @@ private fun stageRowExtras(
     val themeNames = themes.map { themeLabel(it) }
     val liveLayouts = tv.own.owntv.core.settings.SettingsRepository.LiveLayout.entries
     val liveViews = tv.own.owntv.core.settings.SettingsRepository.LiveView.entries
-    // In the mockup's order: Cinematic first.
+    // Cinematic first.
     val vodLayouts = listOf(tv.own.owntv.core.settings.SettingsRepository.VodLayout.CINEMATIC, tv.own.owntv.core.settings.SettingsRepository.VodLayout.SEPARATE)
     val presets = tv.own.owntv.core.theme.AccentColor.entries
     val presetColors = presets.map { it.primary(true) }
@@ -3228,7 +2744,7 @@ private fun stageRowExtras(
     }
     val zoomStep: (Int) -> Unit = { step ->
         val next = tv.own.owntv.core.theme.UiZoom.clamp(uiZoomPercent + step * tv.own.owntv.core.theme.UiZoom.STEP)
-        // Below the low-memory line the zoom popup asks first (#51); the row never steps past it alone.
+        // Below the low-memory line the zoom popup asks first; the row never steps past it alone.
         if (next < tv.own.owntv.core.theme.UiZoom.LOW_RAM_WARN && uiZoomPercent >= tv.own.owntv.core.theme.UiZoom.LOW_RAM_WARN) onOpenZoom() else onSetZoom(next)
     }
     val popupStep: (Int) -> Unit = { step ->
@@ -3266,7 +2782,7 @@ private fun stageRowExtras(
         }),
         "tab_GLASS_EFFECT" to RowExtra(SettingValue.Opens(glassBackgroundSummary(vm.backgroundConfig.collectAsStateWithLifecycle().value, glass))),
         "fonts" to RowExtra(SettingValue.Opens(fontFamilyLabel(font.mainFamily) + sep + stringResource(R.string.common_percent, font.sizePercent))),
-        // The sample popup shows as soon as the row has focus, so ◀ ▶ on the row resize it live (owner, P12).
+        // The sample popup shows as soon as the row has focus, so ◀ ▶ on the row resize it live.
         "popup_size" to RowExtra(
             SettingValue.Stepper(stringResource(R.string.common_percent, font.popupSizePercent)), onStep = popupStep,
             extra = { Box(Modifier.fillMaxWidth().padding(top = 18.mpx), contentAlignment = Alignment.Center) { tv.own.owntv.features.settings.PopupSizeSample(font.popupSizePercent) } },

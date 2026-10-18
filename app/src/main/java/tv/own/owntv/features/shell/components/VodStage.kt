@@ -1,5 +1,8 @@
 package tv.own.owntv.features.shell.components
 
+import tv.own.owntv.ui.theme.stageTone
+import tv.own.owntv.ui.stage.StageTitleArt
+import tv.own.owntv.ui.stage.backdropLeftWash
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -47,6 +50,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.em
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
@@ -61,13 +67,14 @@ import java.util.Locale
 import tv.own.owntv.R
 import tv.own.owntv.core.live.LiveKey
 import tv.own.owntv.core.metadata.CastMember
+import tv.own.owntv.core.metadata.HeadlineTitle
 import tv.own.owntv.core.metadata.MetadataImages
 import tv.own.owntv.core.model.ContentMenu
 import tv.own.owntv.core.settings.SettingsRepository.SortMode
 import tv.own.owntv.features.epg.GuideMenuHost
 import tv.own.owntv.features.live.LiveCategoryEntry
 import tv.own.owntv.features.live.LiveRailItem
-import tv.own.owntv.features.live.ProviderTags
+import tv.own.owntv.core.live.ProviderTags
 import tv.own.owntv.features.live.displayLabel
 import tv.own.owntv.ui.components.MenuAction
 import tv.own.owntv.ui.components.OwnTVIcon
@@ -93,7 +100,7 @@ import tv.own.owntv.ui.theme.stageAccent
 import tv.own.owntv.ui.theme.stageText
 
 /*
- * Movies & Series in the Stage design (P5-01 … P5-12): the header, the Cinematic backdrop and hero,
+ * Movies & Series in the Stage design: the header, the Cinematic backdrop and hero,
  * the Separate details card, the list row, the sort and options menus, and the category list's
  * entries. MoviesScreen and SeriesScreen own the state and the focus plumbing; these only draw.
  */
@@ -114,7 +121,7 @@ internal data class VodTitleInfo(
     val cast: List<CastMember>,
 )
 
-/** A rating as the mockup writes it: one decimal, in the user's number format ("8.4", "8,4"). */
+/** A rating as the design writes it: one decimal, in the user's number format ("8.4", "8,4"). */
 internal fun vodRating(rating: Double): String = String.format(Locale.getDefault(), "%.1f", rating)
 
 /** "1 h 42 min", or "48 min" under an hour. */
@@ -188,23 +195,17 @@ internal fun VodCinematicBackdrop(url: String?, series: Boolean, modifier: Modif
         }
         url?.let { if (seen.size > 300) seen.clear(); seen += it }
     }
-    val wash = Color(5, 8, 10)
+    val wash = StageColors.Wash
     // object-position 30% 40% (Movies) / 100% 40% (Series), as drawn.
     val focus = BiasAlignment(if (series) 1f else -0.4f, -0.2f)
-    Box(modifier.fillMaxWidth(1400f / 1920f).aspectRatio(1400f / 720f).dissolveEdges(left = 0.34f, bottom = 0.38f)) {
+    Box(modifier.fillMaxWidth(1400f / 1920f).aspectRatio(1400f / 720f).dissolveEdges(start = 0.34f, bottom = 0.38f)) {
         Crossfade(targetState = settled, animationSpec = ownTvTween(420), label = "vodBackdrop") { u ->
             if (!u.isNullOrBlank()) {
                 AsyncImage(model = u, contentDescription = null, contentScale = ContentScale.Crop, alignment = focus, modifier = Modifier.fillMaxSize())
             }
         }
         Box(
-            Modifier.fillMaxSize().gradientWash(
-                false,
-                0f to wash.copy(alpha = 0.85f),
-                0.34f to wash.copy(alpha = 0.35f),
-                0.64f to wash.copy(alpha = 0f),
-                1f to wash.copy(alpha = 0f),
-            ),
+            Modifier.fillMaxSize().backdropLeftWash(0f to 0.85f, 0.34f to 0.35f, 0.64f to 0f, 1f to 0f),
         )
         Box(
             Modifier.fillMaxSize().gradientWash(
@@ -219,7 +220,7 @@ internal fun VodCinematicBackdrop(url: String?, series: Boolean, modifier: Modif
 }
 
 /**
- * The Cinematic hero (P5-01 / P5-10): title art 170 high (the name in 92/800 when there is none or it
+ * The Cinematic hero: title art 170 high (the name in 92/800 when there is none or it
  * fails to load), the meta line, a two-line synopsis and six cast photos. Display only — focus never
  * leaves the poster row.
  */
@@ -229,20 +230,14 @@ internal fun VodHero(info: VodTitleInfo, modifier: Modifier = Modifier) {
         var logoFailed by remember(info.logoUrl) { mutableStateOf(false) }
         Box(Modifier.fillMaxWidth().height(170.mpx), contentAlignment = Alignment.BottomStart) {
             if (!info.logoUrl.isNullOrBlank() && !logoFailed) {
-                AsyncImage(
-                    model = info.logoUrl,
+                StageTitleArt(
+                    url = info.logoUrl,
                     contentDescription = null,
-                    contentScale = ContentScale.Fit,
-                    alignment = Alignment.CenterStart,
-                    onState = { if (it is AsyncImagePainter.State.Error) logoFailed = true },
+                    onFailed = { logoFailed = true },
                     modifier = Modifier.fillMaxSize(),
                 )
             } else {
-                Text(
-                    info.title,
-                    style = stageText(92, 800, (-2.5).mpxSp).copy(lineHeight = (92 * 1.02f).mpxSp),
-                    color = StageColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
+                VodHeroTitle(info.title)
             }
         }
         VodMeta(
@@ -252,7 +247,7 @@ internal fun VodHero(info: VodTitleInfo, modifier: Modifier = Modifier) {
         )
         info.plot?.takeIf { it.isNotBlank() }?.let {
             Text(
-                it, style = stageText(19.5f, 400).copy(lineHeight = (19.5f * 1.55f).mpxSp), color = Color(0xFFC9D3CF),
+                it, style = stageText(19.5f, 400).copy(lineHeight = (19.5f * 1.55f).mpxSp), color = StageColors.Body,
                 maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 860.mpx),
             )
         }
@@ -260,11 +255,28 @@ internal fun VodHero(info: VodTitleInfo, modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * The hero's title when there is no title art: 92/800 at most, shrinking to 48 and wrapping to a second
+ * line so a long name fits instead of running off as "Building the Ban…" (#7.3). Shared with the series
+ * page's header. A leading provider tag ("|MULTI| ") is not part of a headline.
+ */
+@Composable
+internal fun VodHeroTitle(title: String, modifier: Modifier = Modifier) {
+    BasicText(
+        HeadlineTitle.of(title),
+        modifier,
+        style = stageText(92, 800, (-2.5f / 92f).em).copy(lineHeight = 1.02.em, color = StageColors.Text),
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+        autoSize = TextAutoSize.StepBased(minFontSize = 48.mpxSp, maxFontSize = 92.mpxSp, stepSize = 4.mpxSp),
+    )
+}
+
 /** `metaHtml`: "2026 • Animation, Family • 1 h 42 min • ★ 8.4 [4K] [HDR]", 600 weight, dots at 40%. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun VodMeta(parts: List<String>, rating: Double?, tags: List<String>, size: Int, modifier: Modifier = Modifier) {
-    val text = Color(0xFFD3DCD8)
+    val text = stageTone(Color(0xFFD3DCD8), StageColors.Body)
     val items = parts + listOfNotNull(rating?.let { "★" })
     FlowRow(
         modifier,
@@ -293,6 +305,7 @@ internal fun VodMeta(parts: List<String>, rating: Double?, tags: List<String>, s
 /** `.cast`: photos 64 round with a 2 px white-14% ring, the initials on the mint→blue gradient when there is no photo. */
 @Composable
 internal fun VodCast(cast: List<CastMember>, count: Int, modifier: Modifier = Modifier) {
+    val castRing = StageColors.Ink.copy(alpha = 0.14f)
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(20.mpx)) {
         cast.take(count).forEach { member ->
             Column(Modifier.width(84.mpx), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -300,7 +313,7 @@ internal fun VodCast(cast: List<CastMember>, count: Int, modifier: Modifier = Mo
                 Box(
                     Modifier
                         .size(64.mpx)
-                        .drawBehind { drawInnerRing(Color.White.copy(alpha = 0.14f), 2.mpx.toPx(), size.minDimension / 2f) }
+                        .drawBehind { drawInnerRing(castRing, 2.mpx.toPx(), size.minDimension / 2f) }
                         .padding(2.mpx)
                         .clip(CircleShape)
                         .background(Brush.linearGradient(listOf(Color(0xFFCFE9E3), Color(0xFF9FB8FF)))),
@@ -329,7 +342,7 @@ internal fun VodCast(cast: List<CastMember>, count: Int, modifier: Modifier = Mo
 }
 
 /**
- * The Separate layout's details card (P5-05, the "Poster panel"): glass, radius 30, padding 20 — the
+ * The Separate layout's details card (the "Poster panel"): glass, radius 30, padding 20 — the
  * art 290 high with the title art or name over a bottom shade, the title 32/800, the short meta line,
  * the genres in accent, a five-line synopsis, five cast photos at 92%, and the key hints at the bottom.
  */
@@ -354,16 +367,12 @@ internal fun VodDetailsCard(info: VodTitleInfo?, hints: List<Pair<String, String
                             onState = { if (it is AsyncImagePainter.State.Error) logoFailed = true },
                             modifier = Modifier.align(Alignment.BottomStart).padding(start = 18.mpx, bottom = 14.mpx, end = 18.mpx).height(96.mpx).fillMaxWidth(),
                         )
-                    } else {
-                        Text(
-                            info.title, style = stageText(40, 800), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.align(Alignment.BottomStart).padding(start = 20.mpx, bottom = 16.mpx, end = 20.mpx),
-                        )
                     }
+                    // No name over the art without title art: the line under it already says it (#7.3).
                 }
                 Column(Modifier.padding(horizontal = 4.mpx)) {
                     Text(
-                        info.title, style = stageText(32, 800), color = StageColors.Text, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                        HeadlineTitle.of(info.title), style = stageText(24, 800), color = StageColors.Text, maxLines = 2, overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(top = 18.mpx, bottom = 8.mpx),
                     )
                     VodMeta(listOfNotNull(info.year?.toString(), info.runtimeSecs?.let { vodRuntime(it) }), info.rating, info.tags, 17)
@@ -375,7 +384,7 @@ internal fun VodDetailsCard(info: VodTitleInfo?, hints: List<Pair<String, String
                     }
                     info.plot?.takeIf { it.isNotBlank() }?.let {
                         Text(
-                            it, style = stageText(17, 400).copy(lineHeight = (17 * 1.55f).mpxSp), color = Color(0xFFC9D3CF),
+                            it, style = stageText(17, 400).copy(lineHeight = (17 * 1.55f).mpxSp), color = StageColors.Body,
                             maxLines = 5, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 14.mpx, bottom = 18.mpx),
                         )
                     }
@@ -403,7 +412,7 @@ internal fun vodLine(year: Int?, rating: Double?, runtimeSecs: Int?): AnnotatedS
 }
 
 /**
- * `.vrow` (List view, P5-06 / P5-09): 118 high, radius 20, padding 16, gap 20 — the poster 66×99 radius
+ * `.vrow` (List view): 118 high, radius 20, padding 16, gap 20 — the poster 66×99 radius
  * 10, the title 21/700, the line 16 muted, the resume progress (260 wide) when started, the playlist mark.
  */
 @Composable
@@ -419,7 +428,7 @@ internal fun VodListRow(
     modifier: Modifier = Modifier,
 ) {
     StageRow(onClick = onClick, onLongClick = onLongClick, height = 118.mpx, horizontalPadding = 16.mpx, gap = 20.mpx, modifier = modifier.fillMaxWidth()) { focused ->
-        Box(Modifier.size(66.mpx, 99.mpx).clip(RoundedCornerShape(10.mpx)).background(Color.White.copy(alpha = 0.06f)), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(66.mpx, 99.mpx).clip(RoundedCornerShape(10.mpx)).background(StageColors.Ink.copy(alpha = 0.06f)), contentAlignment = Alignment.Center) {
             if (!posterUrl.isNullOrBlank()) {
                 AsyncImage(model = posterUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
             } else {
@@ -427,7 +436,7 @@ internal fun VodListRow(
             }
         }
         Column(Modifier.weight(1f)) {
-            Text(title, style = stageText(21, 700), color = if (focused) Color.White else StageColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, style = stageText(21, 700), color = if (focused) StageColors.FxText else StageColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (line.isNotEmpty()) {
                 Text(line, style = stageText(16, 400), color = StageColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.mpx))
             }
@@ -440,7 +449,7 @@ internal fun VodListRow(
 /** Poster art for a grid / row card: the artwork, or the section's glyph on a quiet plate. */
 @Composable
 internal fun VodPosterArt(url: String?, placeholder: OwnTVIcon) {
-    Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = 0.06f)), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().background(StageColors.Ink.copy(alpha = 0.06f)), contentAlignment = Alignment.Center) {
         if (!url.isNullOrBlank()) {
             AsyncImage(model = url, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         } else {
@@ -449,7 +458,7 @@ internal fun VodPosterArt(url: String?, placeholder: OwnTVIcon) {
     }
 }
 
-/** The four sort orders, in the mockup's order, with the line each shows when it is not the current one. */
+/** The four sort orders, in order, with the line each shows when it is not the current one. */
 private val VodSorts = listOf(
     Triple(SortMode.PLAYLIST, R.string.content_sort_provider_order, R.string.content_sort_provider_order_hint),
     Triple(SortMode.ALPHA, R.string.settings_sort_alpha, null),
@@ -474,7 +483,7 @@ internal fun VodSortTool(mode: SortMode, modifier: Modifier = Modifier, onClick:
     )
 }
 
-/** Sort (P5-02): "Sort movies · Applies to every category in this section", 560 wide; ✓ on the current order. */
+/** Sort: "Sort movies · Applies to every category in this section", 560 wide; ✓ on the current order. */
 @Composable
 internal fun VodSortMenu(series: Boolean, current: SortMode, x: Float, top: Dp, onPick: (SortMode) -> Unit, onDismiss: () -> Unit) {
     val focus = remember { FocusRequester() }
@@ -496,14 +505,14 @@ internal fun VodSortMenu(series: Boolean, current: SortMode, x: Float, top: Dp, 
     }
 }
 
-/** Group ids of a title's options menu, in the mockup's order: WATCH, LIBRARY, ORGANISE, DETAILS. */
+/** Group ids of a title's options menu, in order: WATCH, LIBRARY, ORGANISE, DETAILS. */
 internal const val VodGroupWatch = 0
 internal const val VodGroupLibrary = 1
 internal const val VodGroupOrganise = 2
 internal const val VodGroupDetails = 3
 
 /**
- * ☰ Title options (P5-03 / P5-12), 540 wide at the right: the poster 52×78, the title and "2026 ·
+ * ☰ Title options, 540 wide at the right: the poster 52×78, the title and "2026 ·
  * Disney+ Kids Movies", then the actions under their group labels, in the order the user set in
  * Settings › Long-press menus. Keys in [disabled] are drawn at 45% and do nothing ("Remove from history"
  * for a title never watched); [values] are the dim right-hand values. Focus starts on the favourite.
@@ -519,7 +528,7 @@ internal fun VodOptionsMenu(
     disabled: Set<String>,
     onDismiss: () -> Unit,
     values: Map<String, String> = emptyMap(),
-    /** P6-04 (an episode): 250 down, a 112×63 still, focus starting on Download. */
+    /** For an episode: 250 down, a 112×63 still, focus starting on Download. */
     top: Dp = 60.mpx,
     artWidth: Dp = 52.mpx,
     artHeight: Dp = 78.mpx,
@@ -538,7 +547,7 @@ internal fun VodOptionsMenu(
         StageMenuHeader(
             title = title, subtitle = subtitle,
             leading = {
-                Box(Modifier.size(artWidth, artHeight).clip(RoundedCornerShape(9.mpx)).background(Color.White.copy(alpha = 0.06f))) {
+                Box(Modifier.size(artWidth, artHeight).clip(RoundedCornerShape(9.mpx)).background(StageColors.Ink.copy(alpha = 0.06f))) {
                     if (!posterUrl.isNullOrBlank()) AsyncImage(model = posterUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                 }
             },
@@ -557,7 +566,7 @@ internal fun VodOptionsMenu(
 }
 
 /**
- * The Movies / Series category list as the Stage sheet and column draw it (P5-04, P5-05): Favourites,
+ * The Movies / Series category list as the Stage sheet and column draw it: Favourites,
  * History and All movies / series with their icons, then the provider categories parsed into name and
  * tags, each with its count and playlist mark. Returns the entries and the "PROVIDERS" heading.
  */
@@ -574,7 +583,8 @@ internal fun vodCategoryEntries(
         val parsed = if (item.key is LiveKey.Folder || item.key is LiveKey.Custom) ProviderTags.parse(label) else null
         LiveCategoryEntry(
             item = item,
-            label = parsed?.name ?: label,
+            // No country heading here, so a group keeps its "UK|".
+            label = parsed?.let { ProviderTags.groupLabel(it, headingCountry = null) } ?: label,
             name = parsed,
             icon = when (item.key) {
                 LiveKey.Favorites -> OwnTVIcon.FAVORITE

@@ -1,24 +1,17 @@
 package tv.own.owntv.features.epg
 
+import tv.own.owntv.ui.theme.LocalStagePalette
 import tv.own.owntv.ui.theme.stageText
 import tv.own.owntv.ui.theme.StageColors
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -28,7 +21,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -37,56 +29,38 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
-import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import tv.own.owntv.R
 import tv.own.owntv.core.model.RecordingStatus
 import tv.own.owntv.core.database.entity.RecordingEntity
 import tv.own.owntv.core.database.entity.EpgProgrammeEntity
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import tv.own.owntv.core.settings.SettingsRepository
-import tv.own.owntv.ui.components.FocusableSurface
-import tv.own.owntv.ui.components.OwnTVButton
-import tv.own.owntv.ui.components.dialogPanel
-import tv.own.owntv.ui.components.modalScrim
-import tv.own.owntv.ui.components.trapAllFocusExit
-import tv.own.owntv.ui.components.OwnTVButtonStyle
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.longPressMenuGuard
 import tv.own.owntv.ui.format.rememberSystemTimeFormatter
-import tv.own.owntv.ui.theme.Dimens
-import tv.own.owntv.core.theme.GlassSurface
-import tv.own.owntv.ui.theme.OwnTVTheme
-import tv.own.owntv.ui.theme.PopupFontTheme
 import tv.own.owntv.ui.theme.mpx
 import tv.own.owntv.ui.stage.drawBoxShadow
 import tv.own.owntv.ui.components.drawStageGlyph
-import tv.own.owntv.ui.theme.glass
 
 internal object GuideGridDefaults {
-    /** The channel column when the guide widths are not customised (P4-01: 48 → 344 of 1920). */
+    /** The channel column when the guide widths are not customised (48 → 344 of 1920). */
     const val ChannelColShare = 296f / 1920f
     /** `.gcell` rows: 56 high, 62 apart. */
     val RowHeight = 56.mpx
     val RowGap = 6.mpx
-    /** 3.5 hours across the mockup's 1512 px timeline. */
+    /** 3.5 hours across the 1512 px timeline. */
     val PxPerMin = 7.2.mpx
     const val SlotMin = 30
 }
 
 /**
- * One channel's programmes as Stage cells (`.gcell`, P4-01): white 4.5%, the one on now 8.5%, past ones
+ * One channel's programmes as Stage cells (`.gcell`): white 4.5%, the one on now 8.5%, past ones
  * at half opacity, radius 14, 3 px apart; title 18/700, then the recording ● / reminder bell / catch-up
  * ↺ icons and the time in 14 dim. The cell at [focusTime] is the focused one: accent fill, 2 px focus
  * ring and glow. One Canvas per row rather than a node per programme, so a week of guide scrolls light.
@@ -117,10 +91,25 @@ internal fun ProgrammeStripCanvas(
         programmes.map { String.format(java.util.Locale.ROOT, rangeTemplate, formatTime(it.startMs), formatTime(it.stopMs)) }
     }
     val recRed = Color(0xFFFF5B5B)
+    val textColor = tv.own.owntv.ui.theme.StageColors.Text
+    val dimColor = tv.own.owntv.ui.theme.StageColors.Dim
+    val ink = tv.own.owntv.ui.theme.StageColors.Ink
+    val palette = tv.own.owntv.ui.theme.LocalStagePalette.current
     // A row with nothing in the window says so, rather than looking broken.
     val emptyText = stringResource(R.string.content_epg_no_programme)
     // Clipped at the timeline's left edge only, so a focused cell's glow still spills up and down.
     Canvas(Modifier.fillMaxSize()) { clipRect(left = 0f, top = -size.height, right = size.width + 40 * px, bottom = size.height * 2) {
+        // The focused cell's ring. In light the focus colour is the accent, the cell's own fill, so the
+        // ring stands off it with a page-coloured gap first (`.mine.light .gcell.f`: 2.5 page + 2.5 accent).
+        fun focusRing(x0: Float, w: Float, h: Float, r: CornerRadius) {
+            if (palette.isLight) {
+                for ((colour, out) in listOf(palette.page to 1.25f * px, a.accent to 3.75f * px)) {
+                    drawRoundRect(colour, Offset(x0 - out, -out), Size(w + 2 * out, h + 2 * out), CornerRadius(r.x + out), style = Stroke(2.5f * px))
+                }
+            } else {
+                drawRoundRect(a.focus, Offset(x0 - px, -px), Size(w + 2 * px, h + 2 * px), CornerRadius(r.x + px), style = Stroke(2 * px))
+            }
+        }
         val viewW = size.width
         val h = size.height
         val r = CornerRadius(14 * px)
@@ -138,7 +127,7 @@ internal fun ProgrammeStripCanvas(
                 val box = androidx.compose.ui.geometry.Rect(gx0, 0f, gx1, h)
                 drawBoxShadow(a.accent.copy(alpha = 0.4f), 34 * px, r.x, dy = 12 * px, bounds = box)
                 drawRoundRect(a.accent, Offset(gx0, 0f), Size(gx1 - gx0, h), r)
-                drawRoundRect(a.focus, Offset(gx0 - px, -px), Size(gx1 - gx0 + 2 * px, h + 2 * px), CornerRadius(r.x + px), style = Stroke(2 * px))
+                focusRing(gx0, gx1 - gx0, h, r)
                 val label = measurer.measure(emptyText, timeStyle.copy(color = a.onAccent), maxLines = 1, softWrap = false)
                 drawText(label, topLeft = Offset(gx0 + 14 * px, (h - label.size.height) / 2f))
                 drawnAny = true
@@ -160,16 +149,16 @@ internal fun ProgrammeStripCanvas(
             if (focused) {
                 drawBoxShadow(a.accent.copy(alpha = 0.4f), 34 * px, r.x, dy = 12 * px, bounds = box)
                 drawRoundRect(a.accent, Offset(x, 0f), Size(w, h), r)
-                drawRoundRect(a.focus, Offset(x - px, -px), Size(w + 2 * px, h + 2 * px), CornerRadius(r.x + px), style = Stroke(2 * px))
+                focusRing(x, w, h, r)
             } else {
-                drawRoundRect(Color.White.copy(alpha = (if (isNow) 0.085f else 0.045f) * fade), Offset(x, 0f), Size(w, h), r)
+                drawRoundRect(ink.copy(alpha = (if (isNow) 0.085f else 0.045f) * fade), Offset(x, 0f), Size(w, h), r)
             }
             // Text starts at the visible part of a cell that began before the timeline's left edge.
             val tx = maxOf(x, 0f)
             val textW = (x + w - tx - 28 * px).toInt()
             if (textW <= 4) return@forEachIndexed
-            val titleColor = if (focused) a.onAccent else tv.own.owntv.ui.theme.StageColors.Text.copy(alpha = fade)
-            val smallColor = if (focused) Color.Black.copy(alpha = 0.6f) else tv.own.owntv.ui.theme.StageColors.Dim.copy(alpha = fade)
+            val titleColor = if (focused) a.onAccent else textColor.copy(alpha = fade)
+            val smallColor = if (focused) Color.Black.copy(alpha = 0.6f) else dimColor.copy(alpha = fade)
             val iconColor = if (focused) a.onAccent else a.accent.copy(alpha = fade)
             val title = measurer.measure(p.title, titleStyle.copy(color = titleColor), overflow = TextOverflow.Ellipsis, maxLines = 1, softWrap = false, constraints = Constraints(maxWidth = textW))
             drawText(title, topLeft = Offset(tx + 14 * px, 8 * px))
@@ -193,8 +182,8 @@ internal fun ProgrammeStripCanvas(
         }
         // Nothing on anywhere in view: say so, rather than a row that looks broken.
         if (!drawnAny) {
-            drawRoundRect(Color.White.copy(alpha = 0.03f), Offset(3 * px, 0f), Size(viewW - 6 * px, h), r)
-            val label = measurer.measure(emptyText, timeStyle.copy(color = tv.own.owntv.ui.theme.StageColors.Dim), maxLines = 1, softWrap = false)
+            drawRoundRect(ink.copy(alpha = 0.03f), Offset(3 * px, 0f), Size(viewW - 6 * px, h), r)
+            val label = measurer.measure(emptyText, timeStyle.copy(color = dimColor), maxLines = 1, softWrap = false)
             drawText(label, topLeft = Offset(17 * px, (h - label.size.height) / 2f))
         }
     } }
@@ -219,23 +208,22 @@ internal fun ProgrammeDetailDialog(
     // Denser variant for the Live TV catch-up picker, which opens this on top of an already-small
     // popup chain — full-size chrome dwarfed the picker it came from. Guide keeps the roomy layout.
     compact: Boolean = false,
-    // --- Recording (Plan D, Feature A). All defaulted, so the Live TV catch-up picker — which opens
+    // --- Recording. All defaulted, so the Live TV catch-up picker — which opens
     // this dialog on top of the player and has no business scheduling anything — is unchanged.
     /** Whether Record can be offered at all: still to come, or on a catch-up channel and already aired. */
     canRecord: Boolean = false,
     /** The recording already covering this programme, which decides what the button says. */
     recording: RecordingEntity? = null,
-    /** The title of a recording this one would contend with, shown as a warning before committing (D10). */
+    /** The title of a recording this one would contend with, shown as a warning before committing. */
     clashWith: String? = null,
     onRecord: () -> Unit = {},
     onStopRecording: () -> Unit = {},
     onCancelRecording: () -> Unit = {},
-    /** Non-null when a standing "record every showing" rule already covers this title (D7). */
+    /** Non-null when a standing "record every showing" rule already covers this title. */
     seriesRuleActive: Boolean = false,
     onRecordSeries: () -> Unit = {},
     onStopSeries: () -> Unit = {},
 ) {
-    val colors = OwnTVTheme.colors
     val formatTime = rememberSystemTimeFormatter()
     // The grid load drops `description` to stay under the CursorWindow limit, so fetch it on demand
     // here (fall back to the row's own value when it was loaded by the lazy per-row path).
@@ -268,12 +256,12 @@ internal fun ProgrammeDetailDialog(
                 }
                 // The clash, said before the user commits to anything. A live programme cannot wait
                 // its turn — "start when the other finishes" would mean "start half-way through"
-                // (D10) — so this is a warning at the moment of choosing, not a failure afterwards.
+                // so this is a warning at the moment of choosing, not a failure afterwards.
                 if (canRecord && clashWith != null && recording == null) {
                     Spacer(Modifier.height(14.mpx))
                     Text(
                         stringResource(R.string.recording_clash_with, clashWith),
-                        style = if (compact) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
+                        style = if (compact) tv.own.owntv.ui.theme.stageText(15, 500) else tv.own.owntv.ui.theme.stageText(18, 400),
                         color = StageColors.Danger,
                     )
                 }
@@ -295,31 +283,31 @@ internal fun ProgrammeDetailDialog(
                                 SettingsRepository.CatchupPlayer.EXTERNAL -> onPlayCatchupExternal()
                             }
                         }
-                        OwnTVButton(stringResource(R.string.content_epg_watch_start), onClick = startCatchup, icon = OwnTVIcon.PLAY, compact = compact, modifier = Modifier.focusRequester(fr))
-                        OwnTVButton(stringResource(R.string.content_epg_watch_channel), onClick = onWatch, style = OwnTVButtonStyle.SECONDARY, compact = compact)
+                        tv.own.owntv.ui.stage.StagePopupButton(stringResource(R.string.content_epg_watch_start), onClick = startCatchup, modifier = Modifier.focusRequester(fr), icon = OwnTVIcon.PLAY, compact = compact)
+                        tv.own.owntv.ui.stage.StagePopupButton(stringResource(R.string.content_epg_watch_channel), onClick = onWatch, primary = false, compact = compact)
                     } else {
-                        OwnTVButton(stringResource(R.string.content_epg_watch_channel), onClick = onWatch, icon = OwnTVIcon.PLAY, compact = compact, modifier = Modifier.focusRequester(fr))
+                        tv.own.owntv.ui.stage.StagePopupButton(stringResource(R.string.content_epg_watch_channel), onClick = onWatch, modifier = Modifier.focusRequester(fr), icon = OwnTVIcon.PLAY, compact = compact)
                     }
                     // Record. What it offers depends on what is already true of this programme, so
                     // the button never lies: nothing yet → Record (or "from catch-up" when the
                     // programme has already been on); running → Stop; scheduled → Cancel.
                     if (canRecord) {
                         when (recording?.status) {
-                            RecordingStatus.RECORDING -> OwnTVButton(
+                            RecordingStatus.RECORDING -> tv.own.owntv.ui.stage.StagePopupButton(
                                 stringResource(R.string.recording_stop),
                                 onClick = onStopRecording,
-                                style = OwnTVButtonStyle.SECONDARY,
+                                primary = false,
                                 compact = compact,
                             )
-                            RecordingStatus.SCHEDULED -> OwnTVButton(
+                            RecordingStatus.SCHEDULED -> tv.own.owntv.ui.stage.StagePopupButton(
                                 stringResource(R.string.common_cancel),
                                 onClick = onCancelRecording,
-                                style = OwnTVButtonStyle.SECONDARY,
+                                primary = false,
                                 compact = compact,
                             )
                             // Already recorded, or failed and worth another go: Record again is the
                             // honest offer, and the Recordings screen is where the result lives.
-                            else -> OwnTVButton(
+                            else -> tv.own.owntv.ui.stage.StagePopupButton(
                                 stringResource(
                                     if (programme.stopMs <= System.currentTimeMillis()) {
                                         R.string.recording_from_archive
@@ -328,7 +316,7 @@ internal fun ProgrammeDetailDialog(
                                     },
                                 ),
                                 onClick = onRecord,
-                                style = OwnTVButtonStyle.SECONDARY,
+                                primary = false,
                                 compact = compact,
                             )
                         }
@@ -337,25 +325,25 @@ internal fun ProgrammeDetailDialog(
                     // instruction about the future, and offering it on last night's repeat would
                     // promise something it cannot do.
                     if (canRecord && programme.stopMs > System.currentTimeMillis()) {
-                        OwnTVButton(
+                        tv.own.owntv.ui.stage.StagePopupButton(
                             stringResource(
                                 if (seriesRuleActive) R.string.recording_stop_series
                                 else R.string.recording_record_series,
                             ),
                             onClick = if (seriesRuleActive) onStopSeries else onRecordSeries,
-                            style = OwnTVButtonStyle.SECONDARY,
+                            primary = false,
                             compact = compact,
                         )
                     }
                     // Favourite the channel without leaving the guide; the label flips in place.
-                    OwnTVButton(
+                    tv.own.owntv.ui.stage.StagePopupButton(
                         stringResource(if (isFavorite) R.string.content_epg_unfavourite else R.string.content_epg_favourite),
                         onClick = onToggleFavorite,
-                        style = OwnTVButtonStyle.SECONDARY,
+                        primary = false,
                         icon = OwnTVIcon.FAVORITE,
                         compact = compact,
                     )
-                    OwnTVButton(stringResource(R.string.settings_close), onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY, compact = compact)
+                    tv.own.owntv.ui.stage.StagePopupButton(stringResource(R.string.settings_close), onClick = onDismiss, primary = false, compact = compact)
                 }
     }
 }
@@ -368,7 +356,6 @@ internal fun CatchupPlayerChooser(
     onExternal: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val colors = OwnTVTheme.colors
     val fr = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
     tv.own.owntv.ui.stage.StagePopup(
@@ -376,7 +363,7 @@ internal fun CatchupPlayerChooser(
         title = stringResource(R.string.settings_catchup_player),
         body = stringResource(R.string.content_epg_player_choice_description),
         width = 700.mpx,
-        buttons = { OwnTVButton(stringResource(R.string.common_cancel), onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY) },
+        buttons = { tv.own.owntv.ui.stage.StagePopupButton(stringResource(R.string.common_cancel), onClick = onDismiss, primary = false) },
     ) {
         BackHandler { onDismiss() }
         tv.own.owntv.ui.stage.StagePopupOption(
@@ -388,11 +375,4 @@ internal fun CatchupPlayerChooser(
             leading = { tv.own.owntv.ui.stage.StagePopupIcon(OwnTVIcon.EXTERNAL) },
         )
     }
-}
-
-/** Applies the shared popup type ramp at a reduced scale only when [compact]; otherwise leaves the
- *  caller's typography untouched, so the Guide's own dialog keeps its existing look. */
-@Composable
-private fun CompactPopupFont(compact: Boolean, content: @Composable () -> Unit) {
-    if (compact) PopupFontTheme(fontScale = 0.7f, content = content) else content()
 }

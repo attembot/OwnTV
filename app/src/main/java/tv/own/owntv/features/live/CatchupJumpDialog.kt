@@ -19,7 +19,6 @@ import tv.own.owntv.core.live.CatchupJumps
 import tv.own.owntv.R
 import tv.own.owntv.ui.theme.mpx
 import tv.own.owntv.ui.format.rememberBestDateFormatter
-import tv.own.owntv.ui.theme.OwnTVTheme
 
 /**
  * "Go back to…" — pick a point in a live channel's catch-up archive and start there.
@@ -75,7 +74,6 @@ internal fun CatchupJumpDialog(
     onPick: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val colors = OwnTVTheme.colors
     val firstFocus = remember { FocusRequester() }
     var manual by remember { mutableStateOf(false) }
     if (manual) {
