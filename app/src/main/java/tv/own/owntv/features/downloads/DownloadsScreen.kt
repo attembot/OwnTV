@@ -74,6 +74,7 @@ import tv.own.owntv.core.storage.StorageAccess
 import tv.own.owntv.features.epg.guideDayLabel
 import tv.own.owntv.features.epg.localMidnight
 import tv.own.owntv.features.live.edgeScrollSpec
+import tv.own.owntv.core.recording.SeriesRecording
 import tv.own.owntv.features.recordings.RecordingsViewModel
 import tv.own.owntv.features.recordings.recordingItems
 import tv.own.owntv.features.shell.components.vodRuntime
@@ -131,6 +132,7 @@ fun DownloadsScreen(
     val storage by vm.storage.collectAsStateWithLifecycle()
     val downloadRoot by vm.downloadRoot.collectAsStateWithLifecycle()
     val recordings by recVm.rows.collectAsStateWithLifecycle()
+    val seriesRules by recVm.seriesRules.collectAsStateWithLifecycle()
     val recExternal by recVm.externalPlayerOn.collectAsStateWithLifecycle()
     val recMissing by recVm.missingFiles.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -149,7 +151,7 @@ fun DownloadsScreen(
     }
     val onTv = remember(shown) { shown.filter { it.status == DownloadStatus.COMPLETED } }
     // The ids in the list, top to bottom, for focus: entry, restore after playing, the neighbour after a delete.
-    val listIds: List<Long> = if (tab == DownloadsTab.RECORDINGS) recordingIdsInOrder(recordings) else downloading.map { it.id } + onTv.map { it.id }
+    val listIds: List<Long> = if (tab == DownloadsTab.RECORDINGS) recordingIdsInOrder(recordings, seriesRules) else downloading.map { it.id } + onTv.map { it.id }
 
     val rowFocus = remember { HashMap<Long, FocusRequester>() }
     fun focusOf(id: Long) = rowFocus.getOrPut(id) { FocusRequester() }
@@ -197,6 +199,9 @@ fun DownloadsScreen(
         if (neighbour != null) focusRow(neighbour) else runCatching { tabFocus.requestFocus() }
     }
     val acted: (Long) -> Unit = { id -> actedId = id; actedIndex = listIds.indexOf(id) }
+
+    // Delete takes the file off the drive for good, so it asks first; Cancel puts focus back on the row.
+    var confirmDelete by remember { mutableStateOf<PendingDelete?>(null) }
 
     // A row that changes group (a download finishes, a recording ends) is laid out anew and drops focus, which
     // then falls to the tabs. Put it back on that row — only when focus left the list at that very moment.
@@ -345,21 +350,26 @@ fun DownloadsScreen(
                         if (tab == DownloadsTab.RECORDINGS) {
                             recordingItems(
                                 recordings = recordings,
+                                seriesRules = seriesRules,
                                 focusOf = ::focusOf,
                                 onFocused = rowFocused,
                                 onPlay = { r -> recVm.play(r); if (!recExternal) onFullscreen() else wentExternal() },
                                 onStop = { r -> recVm.stop(r) },
                                 onCancel = { r -> acted(r.id); recVm.cancel(r) },
                                 onRetry = { r -> recVm.retry(r) },
-                                onDelete = { r -> acted(r.id); recVm.delete(r) },
+                                onDelete = { r -> confirmDelete = PendingDelete(r.id, r.title, recording = true) { recVm.delete(r) } },
+                                onStopSeries = { rule -> acted(tv.own.owntv.features.recordings.seriesRowId(rule)); recVm.stopSeries(rule) },
                                 missing = recMissing,
                             )
                         } else {
+                            val askDelete: (DownloadEntity) -> Unit = { d ->
+                                confirmDelete = PendingDelete(d.id, details[d.id]?.title ?: d.title, recording = false) { vm.delete(d) }
+                            }
                             downloadGroup(R.string.content_downloads_group_downloading, downloading, first = true) { d ->
-                                DownloadItem(d, details[d.id], active?.takeIf { it.id == d.id }, downloading, vm, onFullscreen, externalPlayerOn, focusOf(d.id), acted, rowFocused, wentExternal, gone = d.filePath in missing)
+                                DownloadItem(d, details[d.id], active?.takeIf { it.id == d.id }, downloading, vm, onFullscreen, externalPlayerOn, focusOf(d.id), askDelete, rowFocused, wentExternal, gone = d.filePath in missing)
                             }
                             downloadGroup(R.string.content_downloads_group_on_tv, onTv, first = downloading.isEmpty()) { d ->
-                                DownloadItem(d, details[d.id], null, downloading, vm, onFullscreen, externalPlayerOn, focusOf(d.id), acted, rowFocused, wentExternal, gone = d.filePath in missing)
+                                DownloadItem(d, details[d.id], null, downloading, vm, onFullscreen, externalPlayerOn, focusOf(d.id), askDelete, rowFocused, wentExternal, gone = d.filePath in missing)
                             }
                         }
                     }
@@ -380,6 +390,14 @@ fun DownloadsScreen(
             mode = BrowseMode.FOLDER,
             onPick = { vm.setDownloadRoot(it.absolutePath); showFolderPicker = false },
             onDismiss = { showFolderPicker = false },
+        )
+    }
+    confirmDelete?.let { p ->
+        tv.own.owntv.features.settings.ConfirmDialog(
+            title = stringResource(R.string.content_downloads_delete_title, p.title),
+            message = stringResource(if (p.recording) R.string.recording_delete_message else R.string.content_downloads_delete_message),
+            onConfirm = { confirmDelete = null; acted(p.id); p.delete() },
+            onDismiss = { confirmDelete = null; scope.launch { withFrameNanos { }; focusRow(p.id) } },
         )
     }
     var pickerWasOpen by remember { mutableStateOf(false) }
@@ -433,13 +451,13 @@ private fun DownloadItem(
     onFullscreen: () -> Unit,
     externalPlayerOn: Boolean,
     focus: FocusRequester,
-    acted: (Long) -> Unit,
+    onDelete: (DownloadEntity) -> Unit,
     onFocused: (Long) -> Unit,
     wentExternal: () -> Unit,
     /** Its file (finished or partial) is no longer on the drive. Finished: only Delete; stopped: Resume/Retry start over. */
     gone: Boolean = false,
 ) {
-    val delete = StageAction(stringResource(R.string.common_delete), OwnTVIcon.TRASH) { acted(d.id); vm.delete(d) }
+    val delete = StageAction(stringResource(R.string.common_delete), OwnTVIcon.TRASH) { onDelete(d) }
     val actions = if (gone && d.status == DownloadStatus.COMPLETED) listOf(delete) else when (d.status) {
         DownloadStatus.COMPLETED -> listOf(StageAction(stringResource(R.string.content_downloads_external), OwnTVIcon.EXTERNAL) { wentExternal(); vm.playExternal(d) }, delete)
         DownloadStatus.FAILED -> listOf(StageAction(stringResource(R.string.common_retry), OwnTVIcon.REFRESH) { vm.retry(d) }, delete)
@@ -535,6 +553,9 @@ internal fun StageReady() {
         Text(stringResource(R.string.content_downloads_ready), style = stageText(17, 700), color = StageColors.Ok, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
+
+/** A delete waiting for its answer: the row it came from, the name the question shows, and what Delete does. */
+private class PendingDelete(val id: Long, val title: String, val recording: Boolean, val delete: () -> Unit)
 
 /** A button on the focused row (`.tool.box`, 40 high, 16 px, full text colour). */
 internal data class StageAction(val text: String, val icon: OwnTVIcon, val onClick: () -> Unit)
@@ -663,8 +684,9 @@ internal fun recordingWhen(atMs: Long): String =
     guideDayLabel(localMidnight(atMs)) + " " + tv.own.owntv.ui.format.rememberBestDateFormatter("jm")(atMs)
 
 /** The recordings tab's rows, top to bottom, in the order [recordingItems] draws them. */
-private fun recordingIdsInOrder(recordings: List<RecordingEntity>): List<Long> =
-    tv.own.owntv.features.recordings.recordingGroups(recordings).flatMap { (_, list) -> list.map { it.id } }
+private fun recordingIdsInOrder(recordings: List<RecordingEntity>, seriesRules: List<SeriesRecording>): List<Long> =
+    seriesRules.map { tv.own.owntv.features.recordings.seriesRowId(it.rule) } +
+        tv.own.owntv.features.recordings.recordingGroups(recordings).flatMap { (_, list) -> list.map { it.id } }
 
 /** 3.1 GB from a gigabyte up, 840.2 MB below it. */
 @Composable
